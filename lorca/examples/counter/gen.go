@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/zserge/lorca"
+import "github.com/unix-world/smartgo/lorca"
 
 func main() {
 	// You can also run "npm build" or webpack here, or compress assets, or

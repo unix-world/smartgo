@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zserge/lorca"
+	"github.com/unix-world/smartgo/lorca"
 )
 
 func main() {
@@ -31,6 +31,10 @@ func main() {
 	// Load HTML after Go functions are bound to JS
 	ui.Load("data:text/html," + url.PathEscape(`
 	<html>
+		<head>
+		<meta charset="UTF-8">
+		<title>StopWatch</title>
+		</head>
 		<body>
 			<!-- toggle() and reset() are Go functions wrapped into JS -->
 			<div class="timer" onclick="toggle()"></div>
