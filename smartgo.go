@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200423.1045
+// r.20200423.1121
 
 package smartgo
 
@@ -23,7 +23,7 @@ import (
 )
 
 
-func strTrimWhitespaces(s string) string {
+func StrTrimWhitespaces(s string) string {
 	//--
 	if(s == "") {
 		return ""
@@ -37,7 +37,7 @@ func strTrimWhitespaces(s string) string {
 } //END FUNCTION
 
 
-func textCutByLimit(s string, length int) string {
+func TextCutByLimit(s string, length int) string {
 	//--
 	if(s == "") {
 		return ""
@@ -52,8 +52,8 @@ func textCutByLimit(s string, length int) string {
 		return s
 	} //end if
 	//--
-	s = strGetUnicodeSubstring(s, 0, length - 3) // substract -3 because of the trailing dots ...
-	s = regexReplaceAllStr(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
+	s = StrGetUnicodeSubstring(s, 0, length - 3) // substract -3 because of the trailing dots ...
+	s = RegexReplaceAllStr(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
 	s = s + "..." // add trailing dots
 	//--
 	return s
@@ -61,7 +61,7 @@ func textCutByLimit(s string, length int) string {
 } //END FUNCTION
 
 
-func strGetUnicodeSubstring(s string, start int, stop int) string {
+func StrGetUnicodeSubstring(s string, start int, stop int) string {
 	//--
 	if(s == "") {
 		return ""
@@ -82,7 +82,7 @@ func strGetUnicodeSubstring(s string, start int, stop int) string {
 } //END FUNCTION
 
 
-func strGetAsciiSubstring(s string, start int, stop int) string {
+func StrGetAsciiSubstring(s string, start int, stop int) string {
 	//--
 	if(s == "") {
 		return ""
@@ -102,7 +102,7 @@ func strGetAsciiSubstring(s string, start int, stop int) string {
 } //END FUNCTION
 
 
-func parseStringAsBoolStr(s string) string {
+func ParseStringAsBoolStr(s string) string {
 	//--
 	if((s != "") && (s != "0")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
 		s = "true";
@@ -115,7 +115,7 @@ func parseStringAsBoolStr(s string) string {
 } //END FUNCTION
 
 
-func parseIntegerStrAsInt(s string) int {
+func ParseIntegerStrAsInt(s string) int {
 	//--
 	var Int int = 0 // set the integer as zero Int, in the case of parseInt Error
 	if tmpInt, convErr := strconv.Atoi(s); convErr == nil {
@@ -127,7 +127,7 @@ func parseIntegerStrAsInt(s string) int {
 } //END FUNCTION
 
 
-func parseInteger64AsStr(s string) string {
+func ParseInteger64AsStr(s string) string {
 	//--
 	if tmpInt, convErr := strconv.ParseInt(s, 10, 64); convErr == nil {
 		s = strconv.FormatInt(tmpInt, 10)
@@ -140,7 +140,7 @@ func parseInteger64AsStr(s string) string {
 } //END FUNCTION
 
 
-func parseFloatAsStrDecimal(s string, d int) string {
+func ParseFloatAsStrDecimal(s string, d int) string {
 	//--
 	if(d < 1) {
 		d = 1
@@ -159,7 +159,7 @@ func parseFloatAsStrDecimal(s string, d int) string {
 } //END FUNCTION
 
 
-func parseFloatAsStrFloat(s string) string {
+func ParseFloatAsStrFloat(s string) string {
 	//--
 	var f float64 = 0
 	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
@@ -173,14 +173,16 @@ func parseFloatAsStrFloat(s string) string {
 } //END FUNCTION
 
 
+//== PRIVATE
 func isUnicodeNonspacingMarks(r rune) bool {
 	//--
 	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
 	//--
 } //END FUNCTION
+//==
 
 
-func strDeaccent(s string) string {
+func StrDeaccent(s string) string {
 	//--
 	if(s == "") {
 		return ""
@@ -195,7 +197,7 @@ func strDeaccent(s string) string {
 } //END FUNCTION
 
 
-func regexReplaceAllStr(rexpr string, s string, repl string) string {
+func RegexReplaceAllStr(rexpr string, s string, repl string) string {
 	//--
 	if(s == "") {
 		return ""
@@ -207,54 +209,54 @@ func regexReplaceAllStr(rexpr string, s string, repl string) string {
 } //END FUNCTION
 
 
-func strCreateSlug(s string) string {
+func StrCreateSlug(s string) string {
 	//--
-	s = strTrimWhitespaces(s)
+	s = StrTrimWhitespaces(s)
 	if(s == "") {
 		return ""
 	} //end if
-	s = strDeaccent(s)
+	s = StrDeaccent(s)
 	//--
-	s = regexReplaceAllStr(`[^a-zA-Z0-9_\-]`, s, "-")
-	s = regexReplaceAllStr(`[\-]+`, s, "-") // suppress multiple -
-	s = strTrimWhitespaces(s)
+	s = RegexReplaceAllStr(`[^a-zA-Z0-9_\-]`, s, "-")
+	s = RegexReplaceAllStr(`[\-]+`, s, "-") // suppress multiple -
+	s = StrTrimWhitespaces(s)
 	//--
 	return s
 	//--
 } //END FUNCTION
 
 
-func strCreateHtmId(s string) string {
+func StrCreateHtmId(s string) string {
 	//--
-	s = strTrimWhitespaces(s)
+	s = StrTrimWhitespaces(s)
 	if(s == "") {
 		return ""
 	} //end if
 	//--
-	s = regexReplaceAllStr(`[^a-zA-Z0-9_\-]`, s, "")
-	s = strTrimWhitespaces(s)
+	s = RegexReplaceAllStr(`[^a-zA-Z0-9_\-]`, s, "")
+	s = StrTrimWhitespaces(s)
 	//--
 	return s
 	//--
 } //END FUNCTION
 
 
-func strCreateJsVar(s string) string {
+func StrCreateJsVarName(s string) string {
 	//--
-	s = strTrimWhitespaces(s)
+	s = StrTrimWhitespaces(s)
 	if(s == "") {
 		return ""
 	} //end if
 	//--
-	s = regexReplaceAllStr(`[^a-zA-Z0-9_]`, s, "")
-	s = strTrimWhitespaces(s)
+	s = RegexReplaceAllStr(`[^a-zA-Z0-9_]`, s, "")
+	s = StrTrimWhitespaces(s)
 	//--
 	return s
 	//--
 } //END FUNCTION
 
 
-func bin2Hex(str string) string {
+func Bin2Hex(str string) string {
 	//--
 	i, err := strconv.ParseInt(str, 2, 0)
 	if(err != nil) {
@@ -266,7 +268,7 @@ func bin2Hex(str string) string {
 } //END FUNCTION
 
 
-func hex2Bin(hex string) string {
+func Hex2Bin(hex string) string {
 	//--
 	ui, err := strconv.ParseUint(hex, 16, 64)
 	//--
@@ -279,7 +281,7 @@ func hex2Bin(hex string) string {
 } //END FUNCTION
 
 
-func jsonEncode(data interface{}) string { // https://www.php2golang.com/method/function.json-encode.html
+func JsonEncode(data interface{}) string { // https://www.php2golang.com/method/function.json-encode.html
 	//--
 	jsons, err := json.Marshal(data)
 	if(err != nil) {
@@ -291,7 +293,7 @@ func jsonEncode(data interface{}) string { // https://www.php2golang.com/method/
 } //END FUNCTION
 
 
-func jsonDecode(data string) map[string]interface{} { // https://www.php2golang.com/method/function.json-decode.html
+func JsonDecode(data string) map[string]interface{} { // https://www.php2golang.com/method/function.json-decode.html
 	//--
 	if(data == "") {
 		return nil
@@ -308,14 +310,14 @@ func jsonDecode(data string) map[string]interface{} { // https://www.php2golang.
 } //END FUNCTION
 
 
-func rawUrlEncode(s string) string {
+func RawUrlEncode(s string) string {
 	//--
 	return strings.Replace(url.QueryEscape(s), "+", "%20", -1) // replace all
 	//--
 } //END FUNCTION
 
 
-func escapeHtml(s string) string { // provides a Smart.Framework ~ escapeHtml
+func EscapeHtml(s string) string { // provides a Smart.Framework ~ EscapeHtml
 	//--
 	if(s == "") {
 		return ""
@@ -326,7 +328,7 @@ func escapeHtml(s string) string { // provides a Smart.Framework ~ escapeHtml
 } //END FUNCTION
 
 
-func escapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
+func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 	//--
 	var out = &bytes.Buffer{}
 	//--
@@ -343,7 +345,7 @@ func escapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 } //END FUNCTION
 
 
-func escapeJs(in string) string { // provides a Smart.Framework ~ escapeJs
+func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 	//-- Test
 	// RAW: "1234567890_ abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ:;\"'~`!@#$%^&*()+=[]{}|\\<>,.?/\t\r\n"
 	// GO :  1234567890_ abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ:;\u0022\u0027~`!@#$%^\u0026*()+=[]{}|\\\u003C\u003E,.?\/\t\r\n
@@ -380,7 +382,7 @@ func escapeJs(in string) string { // provides a Smart.Framework ~ escapeJs
 } //END FUNCTION
 
 
-func strNl2Br(s string) string {
+func StrNl2Br(s string) string {
 	//--
 	if(s == "") {
 		return ""
@@ -395,7 +397,7 @@ func strNl2Br(s string) string {
 } //END FUNCTION
 
 
-func prepareNosyntaxHtmlMarkersTpl(tpl string) string {
+func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 	//--
 	if(tpl == "") {
 		return "";
@@ -419,7 +421,7 @@ func prepareNosyntaxHtmlMarkersTpl(tpl string) string {
 } //END FUNCTION
 
 
-func prepareNosyntaxContentMarkersTpl(tpl string) string {
+func PrepareNosyntaxContentMarkersTpl(tpl string) string {
 	//--
 	if(tpl == "") {
 		return "";
@@ -437,7 +439,7 @@ func prepareNosyntaxContentMarkersTpl(tpl string) string {
 } //END FUNCTION
 
 
-func renderMarkersTpl(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
+func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
 
 	var re = regexp.MustCompile(`\[###([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)###\]`)
 
@@ -452,7 +454,7 @@ func renderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 		//--
 		if(mKeyExists) {
 			//--
-			tmp_marker_val = prepareNosyntaxContentMarkersTpl(mKeyValue)
+			tmp_marker_val = PrepareNosyntaxContentMarkersTpl(mKeyValue)
 			//--
 			if((tmp_marker_id != "") && (tmp_marker_key != "")) {
 				//--
@@ -474,28 +476,28 @@ func renderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 			//				fmt.Println(escaping + " # found Marker Escaping [Arr] at index: " + strconv.Itoa(i) + "." + strconv.Itoa(j))
 							//--
 							if(escaping == "|bool") { // Boolean
-								tmp_marker_val = parseStringAsBoolStr(tmp_marker_val)
+								tmp_marker_val = ParseStringAsBoolStr(tmp_marker_val)
 							} else if(escaping == "|int") { // Integer
-								tmp_marker_val = parseInteger64AsStr(tmp_marker_val)
+								tmp_marker_val = ParseInteger64AsStr(tmp_marker_val)
 							} else if(escaping == "|dec1") { // Decimals: 1
-								tmp_marker_val = parseFloatAsStrDecimal(tmp_marker_val, 1)
+								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 1)
 							} else if(escaping == "|dec2") { // Decimals: 2
-								tmp_marker_val = parseFloatAsStrDecimal(tmp_marker_val, 2)
+								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 2)
 							} else if(escaping == "|dec3") { // Decimals: 3
-								tmp_marker_val = parseFloatAsStrDecimal(tmp_marker_val, 3)
+								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 3)
 							} else if(escaping == "|dec4") { // Decimals: 4
-								tmp_marker_val = parseFloatAsStrDecimal(tmp_marker_val, 4)
+								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 4)
 							} else if(escaping == "|num") { // Number (Float / Decimal / Integer)
-								tmp_marker_val = parseFloatAsStrFloat(tmp_marker_val)
+								tmp_marker_val = ParseFloatAsStrFloat(tmp_marker_val)
 							} else if(escaping == "|slug") { // Slug: a-zA-Z0-9_- / - / -- : -
-								tmp_marker_val = strCreateSlug(tmp_marker_val)
+								tmp_marker_val = StrCreateSlug(tmp_marker_val)
 							} else if(escaping == "|htmid") { // HTML-ID: a-zA-Z0-9_-
-								tmp_marker_val = strCreateHtmId(tmp_marker_val)
+								tmp_marker_val = StrCreateHtmId(tmp_marker_val)
 							} else if(escaping == "|jsvar") { // JS-Variable: a-zA-Z0-9_
-								tmp_marker_val = strCreateJsVar(tmp_marker_val)
-							} else if((strGetAsciiSubstring(escaping, 0, 7) == "|substr") || (strGetAsciiSubstring(escaping, 0, 7) == "|subtxt")) { // Sub(String|Text) (0,num)
-								xstrnum := strTrimWhitespaces(strGetAsciiSubstring(escaping, 7, 0))
-								xnum := parseIntegerStrAsInt(xstrnum)
+								tmp_marker_val = StrCreateJsVarName(tmp_marker_val)
+							} else if((StrGetAsciiSubstring(escaping, 0, 7) == "|substr") || (StrGetAsciiSubstring(escaping, 0, 7) == "|subtxt")) { // Sub(String|Text) (0,num)
+								xstrnum := StrTrimWhitespaces(StrGetAsciiSubstring(escaping, 7, 0))
+								xnum := ParseIntegerStrAsInt(xstrnum)
 								if(xnum < 1) {
 									xnum = 1
 								} else if(xnum > 65535) {
@@ -503,10 +505,10 @@ func renderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 								} //end if else
 								if(xnum >= 1 && xnum <= 65535) {
 									if(len(tmp_marker_val) > xnum) {
-										if(strGetAsciiSubstring(escaping, 0, 7) == "|subtxt") {
-											tmp_marker_val = textCutByLimit(tmp_marker_val, xnum)
+										if(StrGetAsciiSubstring(escaping, 0, 7) == "|subtxt") {
+											tmp_marker_val = TextCutByLimit(tmp_marker_val, xnum)
 										} else { // '|substr'
-											tmp_marker_val = strGetUnicodeSubstring(tmp_marker_val, 0, xnum)
+											tmp_marker_val = StrGetUnicodeSubstring(tmp_marker_val, 0, xnum)
 										} //end if
 									} //end if else
 								} //end if
@@ -517,40 +519,40 @@ func renderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|upper") { // apply uppercase
 								tmp_marker_val = strings.ToUpper(tmp_marker_val)
 							} else if(escaping == "|ucfirst") { // apply uppercase first character
-								x1st := strings.ToUpper(strGetUnicodeSubstring(tmp_marker_val, 0, 1)) // get 1st char
-								xrest := strings.ToLower(strGetUnicodeSubstring(tmp_marker_val, 1, 0)) // get the rest of characters
+								x1st := strings.ToUpper(StrGetUnicodeSubstring(tmp_marker_val, 0, 1)) // get 1st char
+								xrest := strings.ToLower(StrGetUnicodeSubstring(tmp_marker_val, 1, 0)) // get the rest of characters
 								tmp_marker_val = x1st + xrest
 								x1st = ""
 								xrest = ""
 							} else if(escaping == "|ucwords") { // apply uppercase on each word
 								tmp_marker_val = strings.Title(strings.ToLower(tmp_marker_val))
 							} else if(escaping == "|trim") { // apply trim
-								tmp_marker_val = strTrimWhitespaces(tmp_marker_val)
+								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
 							} else if(escaping == "|url") { // escape URL
-								tmp_marker_val = rawUrlEncode(tmp_marker_val)
+								tmp_marker_val = RawUrlEncode(tmp_marker_val)
 							} else if(escaping == "|json") { // format as Json Data ; expects pure JSON !!!
-								jsonObj := jsonDecode(tmp_marker_val)
+								jsonObj := JsonDecode(tmp_marker_val)
 								if(jsonObj == nil) {
 									tmp_marker_val = "null"
 								} else {
-									tmp_marker_val = strTrimWhitespaces(jsonEncode(jsonObj))
+									tmp_marker_val = StrTrimWhitespaces(JsonEncode(jsonObj))
 									if(tmp_marker_val == "") {
 										tmp_marker_val = "null"
 									} //end if
 								} //end if else
 								jsonObj = nil
 							} else if(escaping == "|js") { // Escape JS
-								tmp_marker_val = escapeJs(tmp_marker_val)
+								tmp_marker_val = EscapeJs(tmp_marker_val)
 							} else if(escaping == "|html") { // Escape HTML
-								tmp_marker_val = escapeHtml(tmp_marker_val)
+								tmp_marker_val = EscapeHtml(tmp_marker_val)
 							} else if(escaping == "|css") { // Escape CSS
-								tmp_marker_val = escapeCss(tmp_marker_val)
+								tmp_marker_val = EscapeCss(tmp_marker_val)
 							} else if(escaping == "|nl2br") { // Format NL2BR
-								tmp_marker_val = strNl2Br(tmp_marker_val)
+								tmp_marker_val = StrNl2Br(tmp_marker_val)
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
-								tmp_marker_val = prepareNosyntaxHtmlMarkersTpl(tmp_marker_val)
+								tmp_marker_val = PrepareNosyntaxHtmlMarkersTpl(tmp_marker_val)
 							} else {
-								fmt.Println("WARNING: renderMarkersTpl: {### Invalid or Undefined Escaping for Marker [" + strconv.Itoa(i) + "]: " + escaping + " [" + strconv.Itoa(j) + "] - detected in Replacement Key: " + tmp_marker_id)
+								fmt.Println("WARNING: RenderMarkersTpl: {### Invalid or Undefined Escaping for Marker [" + strconv.Itoa(i) + "]: " + escaping + " [" + strconv.Itoa(j) + "] - detected in Replacement Key: " + tmp_marker_id)
 							} //end if
 							//--
 						} //end if
