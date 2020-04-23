@@ -1,13 +1,14 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200423.1433
+// r.20200423.2257
 
 package smartgo
 
 
 import (
 //	"os"
+	"io"
 //	"log"
 	"fmt"
 	"bytes"
@@ -18,9 +19,110 @@ import (
 	"unicode"
 	"net/url"
 	"encoding/json"
+	"encoding/hex"
+	"encoding/base64"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
+
+
+/*
+
+func gzdeflate(str string) string {
+	var b bytes.Buffer
+	w, _ := gzip.NewWriterLevel(&b, 9)
+	w.Write([]byte(str))
+	w.Close()
+	return b.String()
+}
+
+func gzinflate(str string) string {
+	b := bytes.NewReader([]byte(str))
+	r, _ := gzip.NewReader(b)
+	bb2 := new(bytes.Buffer)
+	_, _ = io.Copy(bb2, r)
+	r.Close()
+	byts := bb2.Bytes()
+	return string(byts)
+}
+
+*/
+
+
+func Base64Encode(data string) string {
+	//--
+	return base64.StdEncoding.EncodeToString([]byte(data))
+	//--
+} //END FUNCTION
+
+
+func Base64Decode(data string) string {
+	//--
+	decoded, err := base64.StdEncoding.DecodeString(data)
+	if(err != nil) {
+		return ""
+	} //end if
+	//--
+	return string(decoded)
+	//--
+} //END FUNCTION
+
+
+func Md5(str string) string {
+	//--
+	h := md5.New()
+	io.WriteString(h, str)
+	//--
+	return fmt.Sprintf("%x", h.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha1(str string) string {
+	//--
+	hash := sha1.New()
+	hash.Write([]byte(str))
+	//--
+	return hex.EncodeToString(hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha256(str string) string {
+	//--
+	hash := sha256.New()
+	//--
+	hash.Write([]byte(str))
+	//--
+	return fmt.Sprintf("%x", hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha384(str string) string {
+	//--
+	hash := sha512.New384()
+	//--
+	hash.Write([]byte(str))
+	//--
+	return fmt.Sprintf("%x", hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha512(str string) string {
+	//--
+	hash := sha512.New()
+	//--
+	hash.Write([]byte(str))
+	//--
+	return fmt.Sprintf("%x", hash.Sum(nil))
+	//--
+} //END FUNCTION
 
 
 func StrTrimWhitespaces(s string) string {
