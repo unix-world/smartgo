@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200423.1121
+// r.20200423.1433
 
 package smartgo
 
@@ -256,7 +256,7 @@ func StrCreateJsVarName(s string) string {
 } //END FUNCTION
 
 
-func Bin2Hex(str string) string {
+func Bin2Hex(str string) string { // inspired from: https://www.php2golang.com/
 	//--
 	i, err := strconv.ParseInt(str, 2, 0)
 	if(err != nil) {
@@ -268,7 +268,7 @@ func Bin2Hex(str string) string {
 } //END FUNCTION
 
 
-func Hex2Bin(hex string) string {
+func Hex2Bin(hex string) string { // inspired from: https://www.php2golang.com/
 	//--
 	ui, err := strconv.ParseUint(hex, 16, 64)
 	//--
@@ -281,19 +281,28 @@ func Hex2Bin(hex string) string {
 } //END FUNCTION
 
 
-func JsonEncode(data interface{}) string { // https://www.php2golang.com/method/function.json-encode.html
+func JsonEncode(data interface{}) string { // inspired from: https://www.php2golang.com/method/function.json-encode.html
 	//--
 	jsons, err := json.Marshal(data)
 	if(err != nil) {
 		return ""
 	} //end if
 	//--
-	return string(jsons)
+	var safeJson string = string(jsons)
+	//-- this JSON string will not be 100% like the one produced via PHP with HTML-Safe arguments but at least have the minimum escapes to avoid conflicting HTML tags
+	safeJson = strings.Replace(safeJson, "&", "\\u0026", -1) // replace all :: & 	JSON_HEX_AMP                           ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = strings.Replace(safeJson, "<", "\\u003C", -1) // replace all :: < 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = strings.Replace(safeJson, ">", "\\u003E", -1) // replace all :: > 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
+	//-- these two are not done by json.Marshal
+	safeJson = strings.Replace(safeJson, "/", "\\/",     -1) // replace all :: / 	JSON_UNESCAPED_SLASHES
+	safeJson = StrTrimWhitespaces(safeJson)
+	//-- Fixes: the JSON Marshall does not make the JSON to be HTML-Safe, thus we need several minimal replacements: https://www.drupal.org/node/479368 + escape / (slash)
+	return safeJson
 	//--
 } //END FUNCTION
 
 
-func JsonDecode(data string) map[string]interface{} { // https://www.php2golang.com/method/function.json-decode.html
+func JsonDecode(data string) map[string]interface{} { // inspired from: https://www.php2golang.com/method/function.json-decode.html
 	//--
 	if(data == "") {
 		return nil
