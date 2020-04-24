@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200424.1333
+// r.20200424.1955
 
 package smartgo
 
@@ -22,11 +22,13 @@ import (
 	"encoding/json"
 	"encoding/hex"
 	"encoding/base64"
+	"compress/flate"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
-	"compress/flate"
+	"crypto/cipher"
+	"golang.org/x/crypto/blowfish"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 
@@ -39,16 +41,201 @@ const (
 )
 
 
+func DateNowUtc() string {
+	//--
+	return time.Now().UTC().Format("2006-01-02 15:04:05 -0700")
+	//--
+} //END FUNCTION
+
+
 //===== Custom Logger with Colors
 type logWriterWithColors struct {}
 func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
-	return fmt.Print(color.HiRedString("[LOG] | " + time.Now().UTC().Format("2006-01-02 15:04:05 -0700") + " | " + string(bytes)))
+	return fmt.Print(color.HiRedString("[LOG] | " + DateNowUtc() + " | " + string(bytes)))
 } //END FUNCTION
 func LogToConsoleWithColors() {
 	log.SetFlags(0)
 	log.SetOutput(new(logWriterWithColors))
 } //END FUNCTION
 //===== #
+
+
+//-----
+
+// PRIVATE
+func blowfishChecksizeAndPad(str string, chr byte) string {
+	//--
+	// check the size of plaintext, does it need to be padded? because
+	// blowfish is a block cipher, the plaintext needs to be padded to
+	// a multiple of the blocksize.
+	//--
+	// INFO: chr = 32 is SPACE (for encrypt) ; chr = 0 is NULL (for decrypt)
+	if(chr != 32) {
+		chr = 0
+	} //end if
+	//--
+	pt := []byte(str)
+	//-- calculate modulus of plaintext to blowfish's cipher block size
+	modulus := len(pt) % blowfish.BlockSize
+	//-- if result is not 0, then need to pad
+	if modulus != 0 {
+		//-- how many bytes do we need to pad to make pt to be a multiple of blowfish's block size?
+		padlen := blowfish.BlockSize - modulus
+		//-- let's add the required padding
+		for i := 0; i < padlen; i++ {
+			//-- add the pad, one at a time
+			pt = append(pt, chr) // if string is base64 encoded can pad with SPACE (32) otherwise must pad with NULL (0)
+			//--
+		} //end for
+		//--
+	} //end if
+	//-- return the whole-multiple-of-blowfish.BlockSize-sized plaintext to the calling function
+	return string(pt)
+	//--
+} //END FUNCTION
+
+
+// PRIVATE : Blowfish key {{{SYNC-BLOWFISH-KEY}}}
+func blowfishSafeKey(key string) string {
+	//--
+	var safeKey string = StrGetAsciiSubstring(Sha512(key), 13, 29+13) + strings.ToUpper(StrGetAsciiSubstring(Sha1(key), 13, 10+13)) + StrGetAsciiSubstring(Md5(key), 13, 9+13)
+	//--
+	//log.Println("BfKey: " + safeKey);
+	return safeKey
+	//--
+} //END FUNCTION
+
+
+// PRIVATE : Blowfish iv {{{SYNC-BLOWFISH-IV}}}
+func blowfishSafeIv(key string) string {
+	//--
+	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + strings.ToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
+	safeIv = StrGetAsciiSubstring(safeIv, 1, 8+1)
+	//log.Println("BfIv: " + safeIv);
+	//--
+	return safeIv
+	//--
+} //END FUNCTION
+
+
+func BlowfishEncryptCBC(str string, key string) string {
+	//-- check
+	if(str == "") {
+		return ""
+	} //end if
+	//-- prepare string
+	str = Base64Encode(str)
+	cksum := Sha1(str)
+	str = str + "#CHECKSUM-SHA1#" + cksum
+	//log.Println("BfTxt: " + str);
+	//-- cast to bytes
+	ppt := []byte(blowfishChecksizeAndPad(str, 32)) // pad with spaces
+	str = "" // no more needed
+	//-- create the cipher
+	ecipher, err := blowfish.NewCipher([]byte(blowfishSafeKey(key)))
+	if(err != nil) {
+		log.Println("WARNING: BlowfishEncryptCBC: ", err)
+		return ""
+	} //end if
+	//-- make ciphertext big enough to store len(ppt)+blowfish.BlockSize
+	ciphertext := make([]byte, blowfish.BlockSize+len(ppt))
+	//-- make initialisation vector {{{SYNC-BLOWFISH-IV}}}
+	eiv := []byte(blowfishSafeIv(key))
+	//-- create the encrypter
+	ecbc := cipher.NewCBCEncrypter(ecipher, eiv)
+	//-- encrypt the blocks, because block cipher
+	ecbc.CryptBlocks(ciphertext[blowfish.BlockSize:], ppt)
+	//-- return ciphertext to calling function
+	var encTxt string = StrTrimWhitespaces(strings.ToUpper(Bin2Hex(string(ciphertext))))
+	ciphertext = nil
+	if(StrGetAsciiSubstring(encTxt, 0, 16) != "0000000000000000") { // {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}}
+		log.Println("WARNING: BlowfishEncryptCBC: Invalid Hex Header")
+		return ""
+	} //end if
+	encTxt = StrGetAsciiSubstring(encTxt, 16, 0) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; there are 16 trailing zeroes that represent the HEX of 8 null bytes ; remove them
+	if(encTxt == "") {
+		log.Println("WARNING: BlowfishEncryptCBC: Empty Hex Body") // must be some data after the 8 bytes null header
+		return ""
+	} //end if
+	//--
+	return encTxt
+	//--
+} //END FUNCTION
+
+
+func BlowfishDecryptCBC(str string, key string) string {
+	//-- check
+	if(str == "") {
+		return ""
+	} //end if
+	str = strings.ToLower(StrTrimWhitespaces(str))
+	str = Hex2Bin("0000000000000000" + str) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
+	if(str == "") {
+		return ""
+	} //end if
+	//-- cast string to bytes
+	et := []byte(str)
+	//-- create the cipher
+	dcipher, err := blowfish.NewCipher([]byte(blowfishSafeKey(key)))
+	if(err != nil) {
+		//-- fix this. its okay for this tester program, but...
+		log.Println("WARNING: BlowfishDecryptCBC: ", err)
+		return ""
+	} //end if
+	//-- make initialisation vector {{{SYNC-BLOWFISH-IV}}}
+	div := []byte(blowfishSafeIv(key))
+	//-- check last slice of encrypted text, if it's not a modulus of cipher block size, we're in trouble
+	decrypted := et[blowfish.BlockSize:]
+	if(len(decrypted)%blowfish.BlockSize != 0) {
+		log.Println("NOTICE: BlowfishDecryptCBC: decrypted is not a multiple of blowfish.BlockSize")
+		return ""
+	} //end if
+	//-- ok, all good... create the decrypter
+	dcbc := cipher.NewCBCDecrypter(dcipher, div)
+	//-- decrypt
+	dcbc.CryptBlocks(decrypted, decrypted)
+	//--
+	str = string(decrypted)
+	decrypted = nil
+	//--
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		log.Println("NOTICE: Invalid BlowFishCBC Data, Empty Data after Decrypt")
+		return ""
+	} //end if
+	if(!strings.Contains(str, "#CHECKSUM-SHA1#")) {
+		log.Println("NOTICE: Invalid BlowFishCBC Data, no Checksum")
+		return ""
+	} //end if
+	//--
+	darr := strings.Split(str, "#CHECKSUM-SHA1#")
+	var dlen int = len(darr)
+	if(dlen < 2) {
+		log.Println("NOTICE: Invalid BlowFishCBC Data, Checksum not found")
+		return ""
+	} //end if
+	darr[0] = StrTrimWhitespaces(darr[0])
+	darr[1] = StrTrimWhitespaces(darr[1])
+	if(darr[1] == "") {
+		log.Println("NOTICE: Invalid BlowFishCBC Data, Checksum is Empty")
+		return ""
+	} //end if
+	if(darr[0] == "") {
+		log.Println("NOTICE: Invalid BlowFishCBC Data, Encrypted Data not found")
+		return ""
+	} //end if
+	if(Sha1(darr[0]) != darr[1]) {
+		log.Println("NOTICE: BlowfishDecryptCBC // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid")
+		return ""
+	} //end if
+	str = Base64Decode(darr[0])
+	darr = nil
+	//--
+	return str
+	//--
+} //END FUNCTION
+
+//-----
 
 
 func GzDeflate(str string, level int) string {
@@ -127,24 +314,24 @@ func DataUnArchive(str string) string {
 	const txtErrExpl = "This can occur if decompression failed or an invalid packet has been assigned ..."
 	//--
 	if(!strings.Contains(arr[0], "#CHECKSUM-SHA1#")) {
-		log.Println("WARNING: Invalid Packet, no Checksum :: ", txtErrExpl)
+		log.Println("NOTICE: Invalid Packet, no Checksum :: ", txtErrExpl)
 		return ""
 	} //end if
 	//--
 	darr := strings.Split(arr[0], "#CHECKSUM-SHA1#")
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		log.Println("WARNING: Invalid Packet, Checksum not found :: ", txtErrExpl)
+		log.Println("NOTICE: Invalid Packet, Checksum not found :: ", txtErrExpl)
 		return ""
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		log.Println("WARNING: Invalid Packet, Checksum is Empty :: ", txtErrExpl)
+		log.Println("NOTICE: Invalid Packet, Checksum is Empty :: ", txtErrExpl)
 		return ""
 	} //end if
 	if(darr[0] == "") {
-		log.Println("WARNING: Invalid Packet, Data not found :: ", txtErrExpl)
+		log.Println("NOTICE: Invalid Packet, Data not found :: ", txtErrExpl)
 		return ""
 	} //end if
 	//--
@@ -215,10 +402,11 @@ func Base64Decode(data string) string {
 
 func Md5(str string) string {
 	//--
-	h := md5.New()
-	io.WriteString(h, str)
+	hash := md5.New()
+	io.WriteString(hash, str)
 	//--
-	return fmt.Sprintf("%x", h.Sum(nil))
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -228,7 +416,8 @@ func Sha1(str string) string {
 	hash := sha1.New()
 	hash.Write([]byte(str))
 	//--
-	return hex.EncodeToString(hash.Sum(nil))
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -239,7 +428,8 @@ func Sha256(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-	return fmt.Sprintf("%x", hash.Sum(nil))
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -250,7 +440,8 @@ func Sha384(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-	return fmt.Sprintf("%x", hash.Sum(nil))
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -261,7 +452,8 @@ func Sha512(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-	return fmt.Sprintf("%x", hash.Sum(nil))
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
