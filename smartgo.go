@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200423.2257
+// r.20200424.1333
 
 package smartgo
 
@@ -9,7 +9,8 @@ package smartgo
 import (
 //	"os"
 	"io"
-//	"log"
+	"log"
+	"time"
 	"fmt"
 	"bytes"
 	"strings"
@@ -25,32 +26,171 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"compress/flate"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
+
+	"github.com/fatih/color"
 )
 
 
-/*
+const (
+	DATA_ARCH_SIGNATURE = "PHP.SF.151129/B64.ZLibRaw.HEX"
+)
 
-func gzdeflate(str string) string {
+
+//===== Custom Logger with Colors
+type logWriterWithColors struct {}
+func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
+	return fmt.Print(color.HiRedString("[LOG] | " + time.Now().UTC().Format("2006-01-02 15:04:05 -0700") + " | " + string(bytes)))
+} //END FUNCTION
+func LogToConsoleWithColors() {
+	log.SetFlags(0)
+	log.SetOutput(new(logWriterWithColors))
+} //END FUNCTION
+//===== #
+
+
+func GzDeflate(str string, level int) string {
+	//--
+	if(level < 1 || level > 9) {
+		level = -1 // zlib default compression
+	} //end if
+	//--
 	var b bytes.Buffer
-	w, _ := gzip.NewWriterLevel(&b, 9)
+	w, err := flate.NewWriter(&b, level) // RFC 1951
+	//--
+	if(err != nil) {
+		log.Println("NOTICE: GzDeflate: ", err)
+		return ""
+	} //end if
+	//--
 	w.Write([]byte(str))
 	w.Close()
+	//--
 	return b.String()
-}
+	//--
+} //END FUNCTION
 
-func gzinflate(str string) string {
+
+func GzInflate(str string) string {
+	//--
 	b := bytes.NewReader([]byte(str))
-	r, _ := gzip.NewReader(b)
+	r := flate.NewReader(b)
 	bb2 := new(bytes.Buffer)
 	_, _ = io.Copy(bb2, r)
 	r.Close()
 	byts := bb2.Bytes()
+	//--
 	return string(byts)
-}
+	//--
+} //END FUNCTION
 
-*/
+
+func DataUnArchive(str string) string {
+	//--
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	arr := strings.Split(str, "\n")
+	var alen int = len(arr)
+	//--
+	arr[0] = StrTrimWhitespaces(arr[0])
+	if(arr[0] == "") {
+		log.Println("NOTICE: Data Unarchive // Invalid Package Format")
+		return ""
+	} //end if
+	//--
+	if(alen < 2) {
+		log.Println("NOTICE: Data Unarchive // Empty Package Signature")
+	} else {
+		arr[1] = StrTrimWhitespaces(arr[1])
+		if(arr[1] != DATA_ARCH_SIGNATURE) {
+			log.Println("NOTICE: Data Unarchive // Invalid Package Signature: ", arr[1])
+		} //end if
+	} //end if
+	//--
+	arr[0] = Base64Decode(arr[0])
+	if(arr[0] == "") {
+		log.Println("NOTICE: Data Unarchive // Invalid B64 Data for packet with signature: ", arr[1])
+		return ""
+	} //end if
+	//--
+	arr[0] = GzInflate(arr[0])
+	if(arr[0] == "") {
+		log.Println("NOTICE: Data Unarchive // Invalid Zlib GzInflate Data for packet with signature: ", arr[1])
+		return ""
+	} //end if
+	//--
+	const txtErrExpl = "This can occur if decompression failed or an invalid packet has been assigned ..."
+	//--
+	if(!strings.Contains(arr[0], "#CHECKSUM-SHA1#")) {
+		log.Println("WARNING: Invalid Packet, no Checksum :: ", txtErrExpl)
+		return ""
+	} //end if
+	//--
+	darr := strings.Split(arr[0], "#CHECKSUM-SHA1#")
+	var dlen int = len(darr)
+	if(dlen < 2) {
+		log.Println("WARNING: Invalid Packet, Checksum not found :: ", txtErrExpl)
+		return ""
+	} //end if
+	darr[0] = StrTrimWhitespaces(darr[0])
+	darr[1] = StrTrimWhitespaces(darr[1])
+	if(darr[1] == "") {
+		log.Println("WARNING: Invalid Packet, Checksum is Empty :: ", txtErrExpl)
+		return ""
+	} //end if
+	if(darr[0] == "") {
+		log.Println("WARNING: Invalid Packet, Data not found :: ", txtErrExpl)
+		return ""
+	} //end if
+	//--
+	darr[0] = Hex2Bin(strings.ToLower(darr[0]))
+	if(darr[0] == "") {
+		log.Println("NOTICE: Data Unarchive // Invalid HEX Data for packet with signature: ", arr[1])
+		return ""
+	} //end if
+	//--
+	if(Sha1(darr[0]) != darr[1]) {
+		log.Println("NOTICE: Data Unarchive // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid: ", darr[1])
+		return ""
+	} //end if
+	//--
+	return darr[0]
+	//--
+} //END FUNCTION
+
+
+func DataArchive(str string) string {
+	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	var chksum string = Sha1(str)
+	//--
+	var data string = StrTrimWhitespaces(strings.ToUpper(Bin2Hex(str))) + "#CHECKSUM-SHA1#" + chksum
+	//--
+	var arch string = GzDeflate(data, -1)
+	//--
+	if(arch == "") {
+		return ""
+	} //end if
+	//--
+	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + DATA_ARCH_SIGNATURE
+	//--
+	var unarch_chksum string = Sha1(DataUnArchive(arch))
+	if(unarch_chksum != chksum) {
+		log.Println("ERROR: Data Archive // Data Encode Check Failed")
+		return ""
+	} //end if
+	//--
+	return arch
+	//--
+} //END FUNCTION
 
 
 func Base64Encode(data string) string {
@@ -64,7 +204,8 @@ func Base64Decode(data string) string {
 	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if(err != nil) {
-		return ""
+		log.Println("NOTICE: Base64Decode: ", err)
+		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
 	return string(decoded)
@@ -360,25 +501,23 @@ func StrCreateJsVarName(s string) string {
 
 func Bin2Hex(str string) string { // inspired from: https://www.php2golang.com/
 	//--
-	i, err := strconv.ParseInt(str, 2, 0)
-	if(err != nil) {
-		return ""
-	} //end if
+	src := []byte(str)
+	encodedStr := hex.EncodeToString(src)
 	//--
-	return strconv.FormatInt(i, 16)
+	return encodedStr
 	//--
 } //END FUNCTION
 
 
-func Hex2Bin(hex string) string { // inspired from: https://www.php2golang.com/
+func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 	//--
-	ui, err := strconv.ParseUint(hex, 16, 64)
-	//--
+	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
-		return ""
+		log.Println("NOTICE: Hex2Bin: ", err)
+		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
-	return fmt.Sprintf("%016b", ui)
+	return string(decoded)
 	//--
 } //END FUNCTION
 
@@ -387,6 +526,7 @@ func JsonEncode(data interface{}) string { // inspired from: https://www.php2gol
 	//--
 	jsons, err := json.Marshal(data)
 	if(err != nil) {
+		log.Println("NOTICE: JsonEncode: ", err)
 		return ""
 	} //end if
 	//--
@@ -413,6 +553,7 @@ func JsonDecode(data string) map[string]interface{} { // inspired from: https://
 	var dat map[string]interface{}
 	err := json.Unmarshal([]byte(data), &dat)
 	if(err != nil) {
+		//log.Println("NOTICE: JsonDecode: ", err)
 		return nil
 	} //end if
 	//--
@@ -571,8 +712,8 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 				//--
 			//	fmt.Println("---------- : " + tmp_marker_val)
 			//	fmt.Println(tmp_marker_id + " # found Marker at index: " + strconv.Itoa(i))
-			//	fmt.Println(tmp_marker_key + " # found Marker Key at index: ", strconv.Itoa(i))
-			//	fmt.Println(tmp_marker_esc + " # found Marker Escaping at index: ", strconv.Itoa(i))
+			//	fmt.Println(tmp_marker_key + " # found Marker Key at index:", strconv.Itoa(i))
+			//	fmt.Println(tmp_marker_esc + " # found Marker Escaping at index:", strconv.Itoa(i))
 				//--
 				if(tmp_marker_esc != "") {
 					//--
@@ -663,7 +804,7 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
 								tmp_marker_val = PrepareNosyntaxHtmlMarkersTpl(tmp_marker_val)
 							} else {
-								fmt.Println("WARNING: RenderMarkersTpl: {### Invalid or Undefined Escaping for Marker [" + strconv.Itoa(i) + "]: " + escaping + " [" + strconv.Itoa(j) + "] - detected in Replacement Key: " + tmp_marker_id)
+								log.Println("WARNING: RenderMarkersTpl: {### Invalid or Undefined Escaping " + escaping + " [" + strconv.Itoa(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + strconv.Itoa(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
 							} //end if
 							//--
 						} //end if
