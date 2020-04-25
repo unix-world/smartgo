@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200425.1355
+// r.20200425.1525 :: STABLE
 
 package smartgo
 
@@ -100,7 +100,7 @@ func blowfishSafeKey(key string) string {
 	//--
 	var safeKey string = StrGetAsciiSubstring(Sha512(key), 13, 29+13) + strings.ToUpper(StrGetAsciiSubstring(Sha1(key), 13, 10+13)) + StrGetAsciiSubstring(Md5(key), 13, 9+13)
 	//--
-	//log.Println("BfKey: " + safeKey);
+	//log.Println("BfKey: " + safeKey)
 	return safeKey
 	//--
 } //END FUNCTION
@@ -111,7 +111,7 @@ func blowfishSafeIv(key string) string {
 	//--
 	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + strings.ToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
 	safeIv = StrGetAsciiSubstring(safeIv, 1, 8+1)
-	//log.Println("BfIv: " + safeIv);
+	//log.Println("BfIv: " + safeIv)
 	//--
 	return safeIv
 	//--
@@ -127,7 +127,7 @@ func BlowfishEncryptCBC(str string, key string) string {
 	str = Base64Encode(str)
 	cksum := Sha1(str)
 	str = str + "#CHECKSUM-SHA1#" + cksum
-	//log.Println("BfTxt: " + str);
+	//log.Println("BfTxt: " + str)
 	//-- cast to bytes
 	ppt := []byte(blowfishChecksizeAndPad(str, 32)) // pad with spaces
 	str = "" // no more needed
@@ -555,9 +555,9 @@ func StrGetAsciiSubstring(s string, start int, stop int) string {
 func ParseStringAsBoolStr(s string) string {
 	//--
 	if((s != "") && (s != "0")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
-		s = "true";
+		s = "true"
 	} else {
-		s = "false";
+		s = "false"
 	} //end if else
 	//--
 	return s
@@ -738,15 +738,20 @@ func JsonEncode(data interface{}) string { // inspired from: https://www.php2gol
 	} //end if
 	//--
 	var safeJson string = string(jsons)
-	//-- this JSON string will not be 100% like the one produced via PHP with HTML-Safe arguments but at least have the minimum escapes to avoid conflicting HTML tags
-	safeJson = strings.Replace(safeJson, "&", "\\u0026", -1) // replace all :: & 	JSON_HEX_AMP                           ; already done by json.Marshal, but let in just in case if Marshall fails
-	safeJson = strings.Replace(safeJson, "<", "\\u003C", -1) // replace all :: < 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
-	safeJson = strings.Replace(safeJson, ">", "\\u003E", -1) // replace all :: > 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
-	//-- these two are not done by json.Marshal
-	safeJson = strings.Replace(safeJson, "/", "\\/",     -1) // replace all :: / 	JSON_UNESCAPED_SLASHES
+	jsons = nil
+	//-- this JSON string are replaced by Marshall, but just in case try to replace them if Marshall fail ; they will not be 100% like the one produced via PHP with HTML-Safe arguments but at least have the minimum escapes to avoid conflicting HTML tags
+	safeJson = strings.Replace(safeJson, "&", "\\u0026",   -1) // replace all :: & 	JSON_HEX_AMP                           ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = strings.Replace(safeJson, "<", "\\u003C",   -1) // replace all :: < 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = strings.Replace(safeJson, ">", "\\u003E",   -1) // replace all :: > 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
+	//-- these three are not done by json.Marshal
+	safeJson = strings.Replace(safeJson, "/", "\\/",       -1) // replace all :: / 	JSON_UNESCAPED_SLASHES
+	safeJson = strings.Replace(safeJson, "\\\"", "\\u0022",-1) // replace all :: \" JSON_HEX_QUOT
 	safeJson = StrTrimWhitespaces(safeJson)
 	//-- Fixes: the JSON Marshall does not make the JSON to be HTML-Safe, thus we need several minimal replacements: https://www.drupal.org/node/479368 + escape / (slash)
-	return safeJson
+	var out bytes.Buffer
+	json.HTMLEscape(&out, []byte(safeJson)) // just in case, HTMLEscape appends to dst the JSON-encoded src with <, >, &, U+2028 and U+2029 characters inside string literals changed to \u003c, \u003e, \u0026, \u2028, \u2029 so that the JSON will be safe to embed inside HTML
+	safeJson = ""
+	return out.String()
 	//--
 } //END FUNCTION
 
@@ -859,7 +864,7 @@ func StrNl2Br(s string) string {
 func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 	//--
 	if(tpl == "") {
-		return "";
+		return ""
 	} //end if
 	//--
 	tpl = strings.Replace(tpl, "[###", "&lbrack;###", -1) // replace all
@@ -875,7 +880,7 @@ func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 	tpl = strings.Replace(tpl, "［@@@", "&lbrack;@@@", -1) // replace all
 	tpl = strings.Replace(tpl, "@@@］", "@@@&rbrack;", -1) // replace all
 	//--
-	return tpl;
+	return tpl
 	//--
 } //END FUNCTION
 
@@ -883,7 +888,7 @@ func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 func PrepareNosyntaxContentMarkersTpl(tpl string) string {
 	//--
 	if(tpl == "") {
-		return "";
+		return ""
 	} //end if
 	//--
 	tpl = strings.Replace(tpl, "[###", "［###", -1) // replace all
@@ -899,9 +904,12 @@ func PrepareNosyntaxContentMarkersTpl(tpl string) string {
 
 
 func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
-
-	var re = regexp.MustCompile(`\[###([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)###\]`)
-
+	//-- replace out comments
+	if((strings.Contains(template, "[%%%COMMENT%%%]")) && (strings.Contains(template, "[%%%/COMMENT%%%]"))) {
+		template = RegexReplaceAllStr(`(?sU)\s?\[%%%COMMENT%%%\](.*)?\[%%%\/COMMENT%%%\]\s?`, template, "") // regex syntax as in PHP
+	} //end if
+	//-- process markers
+	var re = regexp.MustCompile(`\[###([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)###\]`) // regex markers as in Javascript
 	for i, match := range re.FindAllStringSubmatch(template, -1) {
 		//--
 		var tmp_marker_val string			= "" 									// just initialize
@@ -1027,11 +1035,18 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 		} //end if
 		//--
 	} //end for
-
-//	fmt.Println("=====" + "\n" + template)
-
+	//-- replace specials: Square-Brackets(L/R) R N TAB SPACE
+	if(strings.Contains(template, "[%%%|")) {
+		template = strings.Replace(template, "[%%%|SB-L%%%]", "［", -1) // replace all
+		template = strings.Replace(template, "[%%%|SB-R%%%]", "］", -1) // replace all
+		template = strings.Replace(template, "[%%%|R%%%]",    "\r", -1) // replace all
+		template = strings.Replace(template, "[%%%|N%%%]",    "\n", -1) // replace all
+		template = strings.Replace(template, "[%%%|T%%%]",    "\t", -1) // replace all
+		template = strings.Replace(template, "[%%%|SPACE%%%]", " ", -1) // replace all
+	} //end if
+	//--
 	return template
-
+	//--
 } //END FUNCTION
 
 
