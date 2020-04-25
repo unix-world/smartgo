@@ -380,7 +380,7 @@ func DataArchive(str string) string {
 		log.Println("ERROR: Data Archive // ZLib Data Ratio is higher than 32768: ", ratio)
 		return ""
 	} //end if
-	log.Println("INFO: Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
+//	log.Println("INFO: Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
 	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + DATA_ARCH_SIGNATURE
 	//--
