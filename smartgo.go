@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200424.1955
+// r.20200425.1355
 
 package smartgo
 
@@ -353,7 +353,9 @@ func DataUnArchive(str string) string {
 
 func DataArchive(str string) string {
 	//--
-	if(str == "") {
+	var ulen int = len(str)
+	//--
+	if((str == "") || (ulen <= 0)) {
 		return ""
 	} //end if
 	//--
@@ -362,10 +364,23 @@ func DataArchive(str string) string {
 	var data string = StrTrimWhitespaces(strings.ToUpper(Bin2Hex(str))) + "#CHECKSUM-SHA1#" + chksum
 	//--
 	var arch string = GzDeflate(data, -1)
+	var alen int = len(arch)
 	//--
-	if(arch == "") {
+	if((arch == "") || (alen <= 0)) { // check also division by zero
+		log.Println("ERROR: Data Archive // ZLib Deflated Data is Empty")
 		return ""
 	} //end if
+	//--
+	var ratio = float64(ulen) / float64(alen) // division by zero is checked above by (alen <= 0)
+	if(ratio <= 0) {
+		log.Println("ERROR: Data Archive // ZLib Data Ratio is zero: ", ratio)
+		return ""
+	} //end if
+	if(ratio > 32768) { // check for this bug in ZLib {{{SYNC-GZ-ARCHIVE-ERR-CHECK}}}
+		log.Println("ERROR: Data Archive // ZLib Data Ratio is higher than 32768: ", ratio)
+		return ""
+	} //end if
+	log.Println("INFO: Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
 	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + DATA_ARCH_SIGNATURE
 	//--
