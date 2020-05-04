@@ -1,14 +1,16 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200425.1525 :: STABLE
+// r.20200504.1323 :: STABLE
 
 package smartgo
 
 
 import (
-//	"os"
+	"os"
+	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"time"
 	"fmt"
@@ -18,6 +20,7 @@ import (
 	"regexp"
 	"html"
 	"unicode"
+	"path/filepath"
 	"net/url"
 	"encoding/json"
 	"encoding/hex"
@@ -61,6 +64,7 @@ func LogToConsoleWithColors() {
 
 
 //-----
+
 
 // PRIVATE
 func blowfishChecksizeAndPad(str string, chr byte) string {
@@ -208,7 +212,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 		return ""
 	} //end if
 	//--
-	darr := strings.Split(str, "#CHECKSUM-SHA1#")
+	darr := Explode("#CHECKSUM-SHA1#", str)
 	var dlen int = len(darr)
 	if(dlen < 2) {
 		log.Println("NOTICE: Invalid BlowFishCBC Data, Checksum not found")
@@ -234,6 +238,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	return str
 	//--
 } //END FUNCTION
+
 
 //-----
 
@@ -274,6 +279,9 @@ func GzInflate(str string) string {
 } //END FUNCTION
 
 
+//-----
+
+
 func DataUnArchive(str string) string {
 	//--
 	str = StrTrimWhitespaces(str)
@@ -281,7 +289,7 @@ func DataUnArchive(str string) string {
 		return ""
 	} //end if
 	//--
-	arr := strings.Split(str, "\n")
+	arr := Explode("\n", str)
 	var alen int = len(arr)
 	//--
 	arr[0] = StrTrimWhitespaces(arr[0])
@@ -318,7 +326,7 @@ func DataUnArchive(str string) string {
 		return ""
 	} //end if
 	//--
-	darr := strings.Split(arr[0], "#CHECKSUM-SHA1#")
+	darr := Explode("#CHECKSUM-SHA1#", arr[0])
 	var dlen int = len(darr)
 	if(dlen < 2) {
 		log.Println("NOTICE: Invalid Packet, Checksum not found :: ", txtErrExpl)
@@ -395,6 +403,9 @@ func DataArchive(str string) string {
 } //END FUNCTION
 
 
+//-----
+
+
 func Base64Encode(data string) string {
 	//--
 	return base64.StdEncoding.EncodeToString([]byte(data))
@@ -469,6 +480,23 @@ func Sha512(str string) string {
 	//--
 //	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+} //END FUNCTION
+
+
+//------
+
+
+func Explode(delimiter string, text string) []string {
+	//--
+	return strings.Split(text, delimiter)
+	//--
+} //END FUNCTION
+
+
+func Implode(glue string, pieces []string) string {
+	//--
+	return strings.Join(pieces, glue)
 	//--
 } //END FUNCTION
 
@@ -861,6 +889,120 @@ func StrNl2Br(s string) string {
 } //END FUNCTION
 
 
+//-----
+
+
+func PathBaseName(filePath string) string {
+	//--
+	return filepath.Base(filePath)
+	//--
+} //END FUNCTION
+
+
+func PathIsAbsolute(filePath string) bool {
+	//--
+	if(
+		(StrGetAsciiSubstring(filePath, 0, 1) == "/") || // unix / linux
+		(StrGetAsciiSubstring(filePath, 0, 1) == ":") || // windows
+		(StrGetAsciiSubstring(filePath, 1, 2) == ":")) { // windows
+		return true
+	} //end if
+	//--
+	return false
+	//--
+} //END FUNCTION
+
+
+func PathIsBackwardUnsafe(filePath string) bool {
+	//--
+	if(
+		strings.Contains(filePath, "/../") ||
+		strings.Contains(filePath, "/./")  ||
+		strings.Contains(filePath, "/..")  ||
+		strings.Contains(filePath, "../")) {
+		return true
+	} //end if
+	//--
+	return false
+	//--
+} //END FUNCTION
+
+
+func ReadSafePathFile(filePath string, allowAbsolutePath bool) (string, error) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return "", errors.New("WARNING: File Path is Empty")
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return "", errors.New("WARNING: File Path is Backward Unsafe")
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
+		} //end if
+	} //end if
+	//--
+	content, err := ioutil.ReadFile(filePath)
+	if(err != nil) {
+		return "", err
+	} //end if
+	//--
+	return string(content), nil
+	//--
+} //END FUNCTION
+
+
+func PathIsDir(thePath string) bool {
+	//--
+	fd, err := os.Stat(thePath)
+	if(err != nil) {
+		if(os.IsNotExist(err)) {
+			return false
+		} //end if
+	} //end if
+	//--
+	fm := fd.Mode()
+	//--
+	return fm.IsDir()
+	//--
+} //END FUNCTION
+
+
+func PathIsFile(thePath string) bool {
+	//--
+	fd, err := os.Stat(thePath)
+	if(err != nil) {
+		if(os.IsNotExist(err)) {
+			return false
+		} //end if
+	} //end if
+	//--
+	fm := fd.Mode()
+	//--
+	return ! fm.IsDir()
+	//--
+} //END FUNCTION
+
+
+func PathExists(thePath string) bool {
+	//--
+	_, err := os.Stat(thePath)
+	if(err != nil) {
+		if(os.IsNotExist(err)) {
+			return false
+		} //end if
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 	//--
 	if(tpl == "") {
@@ -932,7 +1074,7 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 				//--
 				if(tmp_marker_esc != "") {
 					//--
-					var tmp_marker_arr_esc []string	= strings.Split(tmp_marker_esc, "|") // just initialize
+					var tmp_marker_arr_esc []string	= Explode("|", tmp_marker_esc) // just initialize
 					//--
 					for j, tmp_marker_each_esc := range tmp_marker_arr_esc {
 						//--
