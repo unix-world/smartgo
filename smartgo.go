@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Framework
 // (c) 2020 unix-world.org
-// r.20200504.1323 :: STABLE
+// r.20200505.2315 :: STABLE
 
 package smartgo
 
@@ -40,15 +40,229 @@ import (
 
 
 const (
+	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH = "2006-01-02"
+	DATE_TIME_FMT_ISO_STD_GO_EPOCH    = "2006-01-02 15:04:05"
+	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  = "2006-01-02 15:04:05 -0700"
+
 	DATA_ARCH_SIGNATURE = "PHP.SF.151129/B64.ZLibRaw.HEX"
 )
 
 
-func DateNowUtc() string {
+type uxmDateTimeStruct struct {
+	Status        string  `json:"status"` 			// OK | ERROR
+	ErrMsg        string  `json:"errMsg"` 			// error message (if any if date/time conversion was used)
+	Time          int64   `json:"time"` 			// 1607230987 as unix epoch (seconds since unix epoch 1970-01-01 00:00:00), 64-bit integer !!
+	DayOfWeekName string  `json:"dayOfWeekName"` 	// "Sunday" .. "Wednesday" .. "Saturday"
+	DayOfWeek     int     `json:"dayOfWeek"` 		// 1        .. 4           .. 7
+	DayOfYear     int     `json:"dayOfYear"` 		// 1 .. 365(366)
+	Year          int     `json:"year"` 			// 2020
+	Years         string  `json:"years"` 			// "2020"
+	Month         int     `json:"month"` 			// 5
+	Months        string  `json:"months"` 			// "05"
+	MonthName     string  `json:"monthName"` 		// "May"
+	Day           int     `json:"day"` 				// 7
+	Days          string  `json:"days"` 			// "07"
+	Hour          int     `json:"hour"` 			// 9
+	Hours         string  `json:"hours"` 			// "09"
+	Minute        int     `json:"minute"` 			// 8
+	Minutes       string  `json:"minutes"` 			// "08"
+	Second        int     `json:"second"` 			// 1
+	Seconds       string  `json:"seconds"` 			// "01"
+	NanoSec       int     `json:"nanoSec"` 			// Ex: 709122707
+	TzOffset      string  `json:"tzOffset"` 		// "+0000" / "+0300" / ... / "-0700" / ...
+	TzName        string  `json:"tzName"` 			// "UTC" | "LOCAL"
+}
+
+
+//-----
+
+
+// PRIVATE
+func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { // mode = UTC | LOCAL
 	//--
-	return time.Now().UTC().Format("2006-01-02 15:04:05 -0700")
+	dateIsoStr = StrTrimWhitespaces(dateIsoStr)
+	if((dateIsoStr == "") || (strIContains(dateIsoStr, "NOW"))) {
+		dateIsoStr = ""
+	} //end if
+	//--
+	var currentTime time.Time = time.Now()
+	var theError error = nil
+	if(dateIsoStr != "") {
+		dateIsoArr := Explode(" ", dateIsoStr)
+		var dtFormat string = DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH // YYYY-MM-DD
+		var isWellFormatedDate bool = true
+		if(len(dateIsoArr) == 3) { // YYYY-MM-DD HH:II:SS +ZZZZ
+			dtFormat = DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH
+		} else if(len(dateIsoArr) == 2) { // YYYY-MM-DD HH:II:SS
+			dtFormat = DATE_TIME_FMT_ISO_STD_GO_EPOCH
+		} else if(len(dateIsoArr) == 1) { // YYYY-MM-DD
+			// OK
+		} else {
+			isWellFormatedDate = false
+		} //end if else
+		if(isWellFormatedDate == true) {
+			parseTime, err := time.Parse(dtFormat, dateIsoStr)
+			if(err != nil) {
+				theError = err
+			} else {
+				currentTime = parseTime
+			} //end if
+		} else { // error
+			theError = errors.New(`Invalid Format for the Input Date/Time: "` + dateIsoStr + `" # Using Now()`)
+		} //end if else
+	} //end if else
+	//--
+	if(mode == "UTC") {
+		currentTime = currentTime.UTC()
+	} else if(mode == "LOCAL") {
+		// leave as is
+	} else {
+		if(theError == nil) { // avoid overwrite if previous error registered
+			theError = errors.New("Invalid Parsing Mode `" + mode + "` for Date/Time ... Using `LOCAL`")
+		} //end if
+	} //end if else
+	//--
+	var crrYear int = currentTime.Year() // type int
+	var crrStrYear string = strconv.Itoa(crrYear)
+	//--
+	var crrDofY int = currentTime.YearDay()
+	//--
+	crrDofW := currentTime.Weekday() // type time.Weekday
+	var crrDofWInt int = int(crrDofW) // using yota
+	var crrDofWName string = crrDofW.String()
+	//--
+	crrMonth := currentTime.Month() // type time.Month
+	crrIntMonth := int(crrMonth)
+	var crrStrMonth string = ""
+	if(crrIntMonth <= 9) {
+		crrStrMonth = "0" + strconv.Itoa(crrIntMonth)
+	} else {
+		crrStrMonth = ""  + strconv.Itoa(crrIntMonth)
+	} //end if else
+	var crrNameOfMonth string = crrMonth.String()
+	//--
+	var crrDay int = currentTime.Day()
+	var crrStrDay string = ""
+	if(crrDay <= 9) {
+		crrStrDay = "0" + strconv.Itoa(crrDay)
+	} else {
+		crrStrDay = ""  + strconv.Itoa(crrDay)
+	} //end if else
+	//--
+	var crrHour int = int(currentTime.Hour())
+	var crrStrHour string = ""
+	if(crrHour <= 9) {
+		crrStrHour = "0" + strconv.Itoa(crrHour)
+	} else {
+		crrStrHour = ""  + strconv.Itoa(crrHour)
+	} //end if else
+	//--
+	var crrMinute int = int(currentTime.Minute())
+	var crrStrMinute = ""
+	if(crrMinute <= 9) {
+		crrStrMinute = "0" + strconv.Itoa(crrMinute)
+	} else {
+		crrStrMinute = ""  + strconv.Itoa(crrMinute)
+	} //end if else
+	//--
+	var crrSecond int = int(currentTime.Second())
+	var crrStrSecond string = ""
+	if(crrSecond <= 9) {
+		crrStrSecond = "0" + strconv.Itoa(crrSecond)
+	} else {
+		crrStrSecond = ""  + strconv.Itoa(crrSecond)
+	} //end if
+	//--
+	var crrDTimeFmt string = currentTime.Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+	arrDTimeFmt := Explode(" ", crrDTimeFmt)
+	var crrStrTzOffs string = StrTrimWhitespaces(arrDTimeFmt[2])
+	//--
+	var unixTimeStamp64 int64 = int64(currentTime.Unix())
+	var nanoSec int = int(currentTime.Nanosecond())
+	//--
+	var theStatus string = "OK"
+	var theErrMsg string = ""
+	if(theError != nil) {
+		theErrMsg = string(theError.Error())
+	} //end if
+	if(theErrMsg != "") {
+		theStatus = "ERROR"
+		theErrMsg = StrReplaceAll(theErrMsg, `"`, "`")
+	} //end if
+	//--
+	uxmDTStruct := uxmDateTimeStruct {
+		Status        : theStatus,
+		ErrMsg        : theErrMsg,
+		Time          : unixTimeStamp64, // int64
+		DayOfWeekName : crrDofWName,
+		DayOfWeek     : (crrDofWInt + 1), // 1..7 (instead of 0..6)
+		DayOfYear     : crrDofY,
+		Year          : crrYear,
+		Years         : crrStrYear,
+		Month         : crrIntMonth,
+		Months        : crrStrMonth,
+		MonthName     : crrNameOfMonth,
+		Day           : crrDay,
+		Days          : crrStrDay,
+		Hour          : crrHour,
+		Hours         : crrStrHour,
+		Minute        : crrMinute,
+		Minutes       : crrStrMinute,
+		Second        : crrSecond,
+		Seconds       : crrStrSecond,
+		NanoSec       : nanoSec,
+		TzOffset      : crrStrTzOffs,
+		TzName        : mode,
+	}
+	//--
+	return uxmDTStruct
 	//--
 } //END FUNCTION
+
+
+func DateTimeStructUtc(dateIsoStr string) uxmDateTimeStruct {
+	//--
+	return parseDateTimeAsStruct("UTC", dateIsoStr)
+	//--
+} //END FUNCTION
+
+
+func DateNowUtc() string { // YYYY-MM-DD HH:II:SS +ZZZZ
+	//--
+	return time.Now().UTC().Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+func DateNowIsoUtc() string { // YYYY-MM-DD HH:II:SS
+	//--
+	return time.Now().UTC().Format(DATE_TIME_FMT_ISO_STD_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+func DateTimeStructLocal(dateIsoStr string) uxmDateTimeStruct {
+	//--
+	return parseDateTimeAsStruct("LOCAL", dateIsoStr)
+	//--
+} //END FUNCTION
+
+
+func DateNowLocal() string { // YYYY-MM-DD HH:II:SS +ZZZZ
+	//--
+	return time.Now().Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
+	//--
+	return time.Now().Format(DATE_TIME_FMT_ISO_STD_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+//-----
 
 
 //===== Custom Logger with Colors
@@ -207,7 +421,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 		log.Println("NOTICE: Invalid BlowFishCBC Data, Empty Data after Decrypt")
 		return ""
 	} //end if
-	if(!strings.Contains(str, "#CHECKSUM-SHA1#")) {
+	if(!strContains(str, "#CHECKSUM-SHA1#")) {
 		log.Println("NOTICE: Invalid BlowFishCBC Data, no Checksum")
 		return ""
 	} //end if
@@ -321,7 +535,7 @@ func DataUnArchive(str string) string {
 	//--
 	const txtErrExpl = "This can occur if decompression failed or an invalid packet has been assigned ..."
 	//--
-	if(!strings.Contains(arr[0], "#CHECKSUM-SHA1#")) {
+	if(!strContains(arr[0], "#CHECKSUM-SHA1#")) {
 		log.Println("NOTICE: Invalid Packet, no Checksum :: ", txtErrExpl)
 		return ""
 	} //end if
@@ -501,6 +715,20 @@ func Implode(glue string, pieces []string) string {
 } //END FUNCTION
 
 
+func strContains(str string, part string) bool {
+	//--
+	return strings.Contains(str, part)
+	//--
+} //END FUNCTION
+
+
+func strIContains(str string, part string) bool {
+	//--
+	return strings.Contains(strings.ToLower(str), strings.ToLower(part))
+	//--
+} //END FUNCTION
+
+
 func StrTrimWhitespaces(s string) string {
 	//--
 	if(s == "") {
@@ -511,6 +739,20 @@ func StrTrimWhitespaces(s string) string {
 	s = strings.Trim(s, " \t\n\r\x00\x0B") // this is compatible with PHP (not sure if above is quite compatible since there is no clear reference wich are the exact whitespaces it trims)
 	//--
 	return s
+	//--
+} //END FUNCTION
+
+
+func StrReplaceAll(s string, part string, replacement string) string {
+	//--
+	return strings.ReplaceAll(s, part, replacement)
+	//--
+} //END FUNCTION
+
+
+func StrReplaceWithLimit(s string, part string, replacement string, limit int) string {
+	//--
+	return strings.Replace(s, part, replacement, limit) // if (limit == -1) will replace all
 	//--
 } //END FUNCTION
 
@@ -768,12 +1010,12 @@ func JsonEncode(data interface{}) string { // inspired from: https://www.php2gol
 	var safeJson string = string(jsons)
 	jsons = nil
 	//-- this JSON string are replaced by Marshall, but just in case try to replace them if Marshall fail ; they will not be 100% like the one produced via PHP with HTML-Safe arguments but at least have the minimum escapes to avoid conflicting HTML tags
-	safeJson = strings.Replace(safeJson, "&", "\\u0026",   -1) // replace all :: & 	JSON_HEX_AMP                           ; already done by json.Marshal, but let in just in case if Marshall fails
-	safeJson = strings.Replace(safeJson, "<", "\\u003C",   -1) // replace all :: < 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
-	safeJson = strings.Replace(safeJson, ">", "\\u003E",   -1) // replace all :: > 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = StrReplaceAll(safeJson, "&", "\\u0026") 		// & 	JSON_HEX_AMP                           ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = StrReplaceAll(safeJson, "<", "\\u003C") 		// < 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
+	safeJson = StrReplaceAll(safeJson, ">", "\\u003E") 		// > 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
 	//-- these three are not done by json.Marshal
-	safeJson = strings.Replace(safeJson, "/", "\\/",       -1) // replace all :: / 	JSON_UNESCAPED_SLASHES
-	safeJson = strings.Replace(safeJson, "\\\"", "\\u0022",-1) // replace all :: \" JSON_HEX_QUOT
+	safeJson = StrReplaceAll(safeJson, "/", "\\/") 			// / 	JSON_UNESCAPED_SLASHES
+	safeJson = StrReplaceAll(safeJson, "\\\"", "\\u0022") 	// \" 	JSON_HEX_QUOT
 	safeJson = StrTrimWhitespaces(safeJson)
 	//-- Fixes: the JSON Marshall does not make the JSON to be HTML-Safe, thus we need several minimal replacements: https://www.drupal.org/node/479368 + escape / (slash)
 	var out bytes.Buffer
@@ -804,7 +1046,7 @@ func JsonDecode(data string) map[string]interface{} { // inspired from: https://
 
 func RawUrlEncode(s string) string {
 	//--
-	return strings.Replace(url.QueryEscape(s), "+", "%20", -1) // replace all
+	return StrReplaceAll(url.QueryEscape(s), "+", "%20")
 	//--
 } //END FUNCTION
 
@@ -880,9 +1122,9 @@ func StrNl2Br(s string) string {
 		return ""
 	} //end if
 	//--
-	s = strings.ReplaceAll(s, "\r\n", "<br>")
-	s = strings.ReplaceAll(s, "\r", "<br>")
-	s = strings.ReplaceAll(s, "\n", "<br>")
+	s = StrReplaceAll(s, "\r\n", "<br>")
+	s = StrReplaceAll(s, "\r", "<br>")
+	s = StrReplaceAll(s, "\n", "<br>")
 	//--
 	return s
 	//--
@@ -916,10 +1158,10 @@ func PathIsAbsolute(filePath string) bool {
 func PathIsBackwardUnsafe(filePath string) bool {
 	//--
 	if(
-		strings.Contains(filePath, "/../") ||
-		strings.Contains(filePath, "/./")  ||
-		strings.Contains(filePath, "/..")  ||
-		strings.Contains(filePath, "../")) {
+		strContains(filePath, "/../") ||
+		strContains(filePath, "/./")  ||
+		strContains(filePath, "/..")  ||
+		strContains(filePath, "../")) {
 		return true
 	} //end if
 	//--
@@ -928,28 +1170,28 @@ func PathIsBackwardUnsafe(filePath string) bool {
 } //END FUNCTION
 
 
-func ReadSafePathFile(filePath string, allowAbsolutePath bool) (string, error) {
+func ReadSafePathFile(filePath string, allowAbsolutePath bool) (fileContent string, errMsg string) {
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
-		return "", errors.New("WARNING: File Path is Empty")
+		return "", errors.New("WARNING: File Path is Empty").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
-		return "", errors.New("WARNING: File Path is Backward Unsafe")
+		return "", errors.New("WARNING: File Path is Backward Unsafe").Error()
 	} //end if
 	//--
 	if(allowAbsolutePath != true) {
 		if(PathIsAbsolute(filePath) == true) {
-			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
+			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
 		} //end if
 	} //end if
 	//--
 	content, err := ioutil.ReadFile(filePath)
 	if(err != nil) {
-		return "", err
+		return "", err.Error()
 	} //end if
 	//--
-	return string(content), nil
+	return string(content), ""
 	//--
 } //END FUNCTION
 
@@ -1009,18 +1251,18 @@ func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 		return ""
 	} //end if
 	//--
-	tpl = strings.Replace(tpl, "[###", "&lbrack;###", -1) // replace all
-	tpl = strings.Replace(tpl, "###]", "###&rbrack;", -1) // replace all
-	tpl = strings.Replace(tpl, "[%%%", "&lbrack;%%%", -1) // replace all
-	tpl = strings.Replace(tpl, "%%%]", "%%%&rbrack;", -1) // replace all
-	tpl = strings.Replace(tpl, "[@@@", "&lbrack;@@@", -1) // replace all
-	tpl = strings.Replace(tpl, "@@@]", "@@@&rbrack;", -1) // replace all
-	tpl = strings.Replace(tpl, "［###", "&lbrack;###", -1) // replace all
-	tpl = strings.Replace(tpl, "###］", "###&rbrack;", -1) // replace all
-	tpl = strings.Replace(tpl, "［%%%", "&lbrack;%%%", -1) // replace all
-	tpl = strings.Replace(tpl, "%%%］", "%%%&rbrack;", -1) // replace all
-	tpl = strings.Replace(tpl, "［@@@", "&lbrack;@@@", -1) // replace all
-	tpl = strings.Replace(tpl, "@@@］", "@@@&rbrack;", -1) // replace all
+	tpl = StrReplaceAll(tpl, "[###", "&lbrack;###")
+	tpl = StrReplaceAll(tpl, "###]", "###&rbrack;")
+	tpl = StrReplaceAll(tpl, "[%%%", "&lbrack;%%%")
+	tpl = StrReplaceAll(tpl, "%%%]", "%%%&rbrack;")
+	tpl = StrReplaceAll(tpl, "[@@@", "&lbrack;@@@")
+	tpl = StrReplaceAll(tpl, "@@@]", "@@@&rbrack;")
+	tpl = StrReplaceAll(tpl, "［###", "&lbrack;###")
+	tpl = StrReplaceAll(tpl, "###］", "###&rbrack;")
+	tpl = StrReplaceAll(tpl, "［%%%", "&lbrack;%%%")
+	tpl = StrReplaceAll(tpl, "%%%］", "%%%&rbrack;")
+	tpl = StrReplaceAll(tpl, "［@@@", "&lbrack;@@@")
+	tpl = StrReplaceAll(tpl, "@@@］", "@@@&rbrack;")
 	//--
 	return tpl
 	//--
@@ -1033,12 +1275,12 @@ func PrepareNosyntaxContentMarkersTpl(tpl string) string {
 		return ""
 	} //end if
 	//--
-	tpl = strings.Replace(tpl, "[###", "［###", -1) // replace all
-	tpl = strings.Replace(tpl, "###]", "###］", -1) // replace all
-	tpl = strings.Replace(tpl, "[%%%", "［%%%", -1) // replace all
-	tpl = strings.Replace(tpl, "%%%]", "%%%］", -1) // replace all
-	tpl = strings.Replace(tpl, "[@@@", "［@@@", -1) // replace all
-	tpl = strings.Replace(tpl, "@@@]", "@@@］", -1) // replace all
+	tpl = StrReplaceAll(tpl, "[###", "［###")
+	tpl = StrReplaceAll(tpl, "###]", "###］")
+	tpl = StrReplaceAll(tpl, "[%%%", "［%%%")
+	tpl = StrReplaceAll(tpl, "%%%]", "%%%］")
+	tpl = StrReplaceAll(tpl, "[@@@", "［@@@")
+	tpl = StrReplaceAll(tpl, "@@@]", "@@@］")
 	//--
 	return tpl
 	//--
@@ -1047,7 +1289,7 @@ func PrepareNosyntaxContentMarkersTpl(tpl string) string {
 
 func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
 	//-- replace out comments
-	if((strings.Contains(template, "[%%%COMMENT%%%]")) && (strings.Contains(template, "[%%%/COMMENT%%%]"))) {
+	if((strContains(template, "[%%%COMMENT%%%]")) && (strContains(template, "[%%%/COMMENT%%%]"))) {
 		template = RegexReplaceAllStr(`(?sU)\s?\[%%%COMMENT%%%\](.*)?\[%%%\/COMMENT%%%\]\s?`, template, "") // regex syntax as in PHP
 	} //end if
 	//-- process markers
@@ -1170,7 +1412,7 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 					//--
 				} //end if
 				//--
-				template = strings.Replace(template, tmp_marker_id, tmp_marker_val, -1) // replace all
+				template = StrReplaceWithLimit(template, tmp_marker_id, tmp_marker_val, -1) // replace all (testing also for replace with limit -1 !)
 				//--
 			} //end if
 			//--
@@ -1178,13 +1420,13 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 		//--
 	} //end for
 	//-- replace specials: Square-Brackets(L/R) R N TAB SPACE
-	if(strings.Contains(template, "[%%%|")) {
-		template = strings.Replace(template, "[%%%|SB-L%%%]", "［", -1) // replace all
-		template = strings.Replace(template, "[%%%|SB-R%%%]", "］", -1) // replace all
-		template = strings.Replace(template, "[%%%|R%%%]",    "\r", -1) // replace all
-		template = strings.Replace(template, "[%%%|N%%%]",    "\n", -1) // replace all
-		template = strings.Replace(template, "[%%%|T%%%]",    "\t", -1) // replace all
-		template = strings.Replace(template, "[%%%|SPACE%%%]", " ", -1) // replace all
+	if(strContains(template, "[%%%|")) {
+		template = StrReplaceAll(template, "[%%%|SB-L%%%]", "［")
+		template = StrReplaceAll(template, "[%%%|SB-R%%%]", "］")
+		template = StrReplaceAll(template, "[%%%|R%%%]",    "\r")
+		template = StrReplaceAll(template, "[%%%|N%%%]",    "\n")
+		template = StrReplaceAll(template, "[%%%|T%%%]",    "\t")
+		template = StrReplaceAll(template, "[%%%|SPACE%%%]", " ")
 	} //end if
 	//--
 	return template
