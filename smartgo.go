@@ -1,7 +1,7 @@
 
-// GO Lang :: SmartGo :: Smart.Framework
+// GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20200505.2315 :: STABLE
+// r.20200507.1905 :: STABLE
 
 package smartgo
 
@@ -36,6 +36,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/fatih/color"
+	"github.com/unix-world/smartgo/logutils"
 )
 
 
@@ -44,10 +45,159 @@ const (
 	DATE_TIME_FMT_ISO_STD_GO_EPOCH    = "2006-01-02 15:04:05"
 	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  = "2006-01-02 15:04:05 -0700"
 
+	TRIM_WHITESPACES = " \t\n\r\x00\x0B"
+
 	DATA_ARCH_SIGNATURE = "PHP.SF.151129/B64.ZLibRaw.HEX"
 )
 
 
+//-----
+
+
+// PRIVATES
+type logWriterWithColors struct {}
+func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
+	//--
+	var theMsg string = StrTrimWhitespaces(StrNormalizeSpaces(string(bytes)))
+	if(StrIPos(theMsg, "[ERROR]") == 0) {
+		theMsg = color.HiRedString(theMsg)
+	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
+		theMsg = color.HiYellowString(theMsg)
+	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
+		theMsg = color.HiBlueString(theMsg)
+	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
+		theMsg = color.HiMagentaString(theMsg)
+	} else { // ALL OTHER CASES
+		theMsg = color.HiCyanString(theMsg)
+	} //end if else
+	//--
+	return fmt.Println("LOG | " + DateNowUtc() + " | " + theMsg)
+	//--
+} //END FUNCTION
+
+
+// PRIVATES
+var  logFilePath string = ""
+var  logFileFormat string = "plain"
+type logWriterFile struct {}
+type logWriteJsonStruct struct {
+	Type    string `json:"type"`
+	DateUtc string `json:"dateUtc"`
+	Message string `json:"message"`
+}
+func (writer logWriterFile) Write(bytes []byte) (int, error) {
+	//--
+	if(logFilePath == "") {
+		return 0, errors.New("[ERROR] SmartGo LogFile :: Empty LogFile Path provided")
+	} //end if
+	//--
+	var theMsg string = StrTrimWhitespaces(string(bytes))
+	var theType string = ""
+	if(StrIPos(theMsg, "[ERROR]") == 0) {
+		theType = "error"
+	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
+		theType = "warning"
+	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
+		theType = "notice"
+	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
+		theType = "debug"
+	} else { // ALL OTHER CASES
+		theType = "unknown"
+	} //end if else
+	var theFmtMsg string = ""
+	if(logFileFormat == "json") {
+		jsonLogStruct := logWriteJsonStruct {
+			Type    : theType,
+			DateUtc : DateNowUtc(),
+			Message : theMsg, // not necessary to normalize spaces
+		}
+		theFmtMsg = JsonEncode(jsonLogStruct)
+	} else {
+		theFmtMsg = StrNormalizeSpaces(theMsg)
+	} //end if else
+	//--
+	isSuccess, errMsg := SafePathFileWrite(theFmtMsg + "\n", "a", logFilePath, true)
+	//--
+	if(errMsg != "") {
+		return 0, errors.New("[ERROR] SmartGo LogFile write Error `" + logFilePath + "` :: " + errMsg)
+	} //end if
+	//--
+	if(isSuccess != true) {
+		return 0, errors.New("[ERROR] SmartGo LogFile :: FAILED to write to the log File: `" + logFilePath + "`")
+	} //end if
+	//--
+	return len(bytes), nil
+	//--
+} //END FUNCTION
+
+
+// PRIVATE
+func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevelOutput("WARNING", os.Stderr)
+	//--
+	level = strings.ToUpper(StrTrimWhitespaces(level))
+	//--
+	var mLevel string = "ERROR"
+	if(level == "WARNING") {
+		mLevel = "WARNING"
+	} else if(level == "NOTICE") {
+		mLevel = "NOTICE"
+	} else if(level == "DEBUG") {
+		mLevel = "DEBUG"
+	} //end if else
+	//--
+	filter := &logutils.LevelFilter{
+		Levels: []logutils.LogLevel{"DEBUG", "NOTICE", "WARNING", "ERROR"},
+		MinLevel: logutils.LogLevel(mLevel),
+		Writer: output,
+	}
+	log.SetOutput(filter)
+	//--
+} //END FUNCTION
+
+
+func LogToConsole(level string, withColors bool) {
+	//--
+	if(withColors == true) {
+		//--
+		log.SetFlags(0) // custom log with colors, reset all flags
+		//--
+		setLogLevelOutput(level, new(logWriterWithColors))
+		//--
+	} else {
+		//--
+		setLogLevelOutput(level, os.Stderr)
+		//--
+	} //end if else
+	//--
+} //END FUNCTION
+
+
+func LogToFile(level string, filePath string, asJson bool) {
+	//--
+	filePath = StrTrimLeftWhitespaces(filePath)
+	if(filePath != "") {
+		if(!PathIsBackwardUnsafe(filePath)) {
+			if(!PathIsDir(filePath)) {
+				//--
+				log.SetFlags(0) // custom log, reset all flags
+				//--
+				logFilePath = filePath
+				if(asJson == true) {
+					logFileFormat = "json"
+				} //end if
+				setLogLevelOutput(level, new(logWriterFile))
+				//--
+			} //end if
+		} //end if
+	} //end if
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+// PRIVATE
 type uxmDateTimeStruct struct {
 	Status        string  `json:"status"` 			// OK | ERROR
 	ErrMsg        string  `json:"errMsg"` 			// error message (if any if date/time conversion was used)
@@ -74,14 +224,11 @@ type uxmDateTimeStruct struct {
 }
 
 
-//-----
-
-
 // PRIVATE
 func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { // mode = UTC | LOCAL
 	//--
 	dateIsoStr = StrTrimWhitespaces(dateIsoStr)
-	if((dateIsoStr == "") || (strIContains(dateIsoStr, "NOW"))) {
+	if((dateIsoStr == "") || (StrIContains(dateIsoStr, "NOW"))) {
 		dateIsoStr = ""
 	} //end if
 	//--
@@ -123,7 +270,7 @@ func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { /
 	} //end if else
 	//--
 	var crrYear int = currentTime.Year() // type int
-	var crrStrYear string = strconv.Itoa(crrYear)
+	var crrStrYear string = ConvertIntToStr(crrYear)
 	//--
 	var crrDofY int = currentTime.YearDay()
 	//--
@@ -135,42 +282,42 @@ func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { /
 	crrIntMonth := int(crrMonth)
 	var crrStrMonth string = ""
 	if(crrIntMonth <= 9) {
-		crrStrMonth = "0" + strconv.Itoa(crrIntMonth)
+		crrStrMonth = "0" + ConvertIntToStr(crrIntMonth)
 	} else {
-		crrStrMonth = ""  + strconv.Itoa(crrIntMonth)
+		crrStrMonth = ""  + ConvertIntToStr(crrIntMonth)
 	} //end if else
 	var crrNameOfMonth string = crrMonth.String()
 	//--
 	var crrDay int = currentTime.Day()
 	var crrStrDay string = ""
 	if(crrDay <= 9) {
-		crrStrDay = "0" + strconv.Itoa(crrDay)
+		crrStrDay = "0" + ConvertIntToStr(crrDay)
 	} else {
-		crrStrDay = ""  + strconv.Itoa(crrDay)
+		crrStrDay = ""  + ConvertIntToStr(crrDay)
 	} //end if else
 	//--
 	var crrHour int = int(currentTime.Hour())
 	var crrStrHour string = ""
 	if(crrHour <= 9) {
-		crrStrHour = "0" + strconv.Itoa(crrHour)
+		crrStrHour = "0" + ConvertIntToStr(crrHour)
 	} else {
-		crrStrHour = ""  + strconv.Itoa(crrHour)
+		crrStrHour = ""  + ConvertIntToStr(crrHour)
 	} //end if else
 	//--
 	var crrMinute int = int(currentTime.Minute())
 	var crrStrMinute = ""
 	if(crrMinute <= 9) {
-		crrStrMinute = "0" + strconv.Itoa(crrMinute)
+		crrStrMinute = "0" + ConvertIntToStr(crrMinute)
 	} else {
-		crrStrMinute = ""  + strconv.Itoa(crrMinute)
+		crrStrMinute = ""  + ConvertIntToStr(crrMinute)
 	} //end if else
 	//--
 	var crrSecond int = int(currentTime.Second())
 	var crrStrSecond string = ""
 	if(crrSecond <= 9) {
-		crrStrSecond = "0" + strconv.Itoa(crrSecond)
+		crrStrSecond = "0" + ConvertIntToStr(crrSecond)
 	} else {
-		crrStrSecond = ""  + strconv.Itoa(crrSecond)
+		crrStrSecond = ""  + ConvertIntToStr(crrSecond)
 	} //end if
 	//--
 	var crrDTimeFmt string = currentTime.Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
@@ -265,21 +412,6 @@ func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
 //-----
 
 
-//===== Custom Logger with Colors
-type logWriterWithColors struct {}
-func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
-	return fmt.Print(color.HiRedString("[LOG] | " + DateNowUtc() + " | " + string(bytes)))
-} //END FUNCTION
-func LogToConsoleWithColors() {
-	log.SetFlags(0)
-	log.SetOutput(new(logWriterWithColors))
-} //END FUNCTION
-//===== #
-
-
-//-----
-
-
 // PRIVATE
 func blowfishChecksizeAndPad(str string, chr byte) string {
 	//--
@@ -316,9 +448,9 @@ func blowfishChecksizeAndPad(str string, chr byte) string {
 // PRIVATE : Blowfish key {{{SYNC-BLOWFISH-KEY}}}
 func blowfishSafeKey(key string) string {
 	//--
-	var safeKey string = StrGetAsciiSubstring(Sha512(key), 13, 29+13) + strings.ToUpper(StrGetAsciiSubstring(Sha1(key), 13, 10+13)) + StrGetAsciiSubstring(Md5(key), 13, 9+13)
+	var safeKey string = StrSubstr(Sha512(key), 13, 29+13) + strings.ToUpper(StrSubstr(Sha1(key), 13, 10+13)) + StrSubstr(Md5(key), 13, 9+13)
 	//--
-	//log.Println("BfKey: " + safeKey)
+	//log.Println("[DEBUG] BfKey: " + safeKey)
 	return safeKey
 	//--
 } //END FUNCTION
@@ -328,8 +460,8 @@ func blowfishSafeKey(key string) string {
 func blowfishSafeIv(key string) string {
 	//--
 	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + strings.ToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
-	safeIv = StrGetAsciiSubstring(safeIv, 1, 8+1)
-	//log.Println("BfIv: " + safeIv)
+	safeIv = StrSubstr(safeIv, 1, 8+1)
+	//log.Println("[DEBUG] BfIv: " + safeIv)
 	//--
 	return safeIv
 	//--
@@ -345,14 +477,14 @@ func BlowfishEncryptCBC(str string, key string) string {
 	str = Base64Encode(str)
 	cksum := Sha1(str)
 	str = str + "#CHECKSUM-SHA1#" + cksum
-	//log.Println("BfTxt: " + str)
+	//log.Println("[DEBUG] BfTxt: " + str)
 	//-- cast to bytes
 	ppt := []byte(blowfishChecksizeAndPad(str, 32)) // pad with spaces
 	str = "" // no more needed
 	//-- create the cipher
 	ecipher, err := blowfish.NewCipher([]byte(blowfishSafeKey(key)))
 	if(err != nil) {
-		log.Println("WARNING: BlowfishEncryptCBC: ", err)
+		log.Println("[WARNING] BlowfishEncryptCBC: ", err)
 		return ""
 	} //end if
 	//-- make ciphertext big enough to store len(ppt)+blowfish.BlockSize
@@ -366,13 +498,13 @@ func BlowfishEncryptCBC(str string, key string) string {
 	//-- return ciphertext to calling function
 	var encTxt string = StrTrimWhitespaces(strings.ToUpper(Bin2Hex(string(ciphertext))))
 	ciphertext = nil
-	if(StrGetAsciiSubstring(encTxt, 0, 16) != "0000000000000000") { // {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}}
-		log.Println("WARNING: BlowfishEncryptCBC: Invalid Hex Header")
+	if(StrSubstr(encTxt, 0, 16) != "0000000000000000") { // {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}}
+		log.Println("[WARNING] BlowfishEncryptCBC: Invalid Hex Header")
 		return ""
 	} //end if
-	encTxt = StrGetAsciiSubstring(encTxt, 16, 0) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; there are 16 trailing zeroes that represent the HEX of 8 null bytes ; remove them
+	encTxt = StrSubstr(encTxt, 16, 0) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; there are 16 trailing zeroes that represent the HEX of 8 null bytes ; remove them
 	if(encTxt == "") {
-		log.Println("WARNING: BlowfishEncryptCBC: Empty Hex Body") // must be some data after the 8 bytes null header
+		log.Println("[WARNING] BlowfishEncryptCBC: Empty Hex Body") // must be some data after the 8 bytes null header
 		return ""
 	} //end if
 	//--
@@ -397,7 +529,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	dcipher, err := blowfish.NewCipher([]byte(blowfishSafeKey(key)))
 	if(err != nil) {
 		//-- fix this. its okay for this tester program, but...
-		log.Println("WARNING: BlowfishDecryptCBC: ", err)
+		log.Println("[WARNING] BlowfishDecryptCBC: ", err)
 		return ""
 	} //end if
 	//-- make initialisation vector {{{SYNC-BLOWFISH-IV}}}
@@ -405,7 +537,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//-- check last slice of encrypted text, if it's not a modulus of cipher block size, we're in trouble
 	decrypted := et[blowfish.BlockSize:]
 	if(len(decrypted)%blowfish.BlockSize != 0) {
-		log.Println("NOTICE: BlowfishDecryptCBC: decrypted is not a multiple of blowfish.BlockSize")
+		log.Println("[NOTICE] BlowfishDecryptCBC: decrypted is not a multiple of blowfish.BlockSize")
 		return ""
 	} //end if
 	//-- ok, all good... create the decrypter
@@ -418,32 +550,32 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//--
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
-		log.Println("NOTICE: Invalid BlowFishCBC Data, Empty Data after Decrypt")
+		log.Println("[NOTICE] Invalid BlowFishCBC Data, Empty Data after Decrypt")
 		return ""
 	} //end if
-	if(!strContains(str, "#CHECKSUM-SHA1#")) {
-		log.Println("NOTICE: Invalid BlowFishCBC Data, no Checksum")
+	if(!StrContains(str, "#CHECKSUM-SHA1#")) {
+		log.Println("[NOTICE] Invalid BlowFishCBC Data, no Checksum")
 		return ""
 	} //end if
 	//--
 	darr := Explode("#CHECKSUM-SHA1#", str)
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		log.Println("NOTICE: Invalid BlowFishCBC Data, Checksum not found")
+		log.Println("[NOTICE] Invalid BlowFishCBC Data, Checksum not found")
 		return ""
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		log.Println("NOTICE: Invalid BlowFishCBC Data, Checksum is Empty")
+		log.Println("[NOTICE] Invalid BlowFishCBC Data, Checksum is Empty")
 		return ""
 	} //end if
 	if(darr[0] == "") {
-		log.Println("NOTICE: Invalid BlowFishCBC Data, Encrypted Data not found")
+		log.Println("[NOTICE] Invalid BlowFishCBC Data, Encrypted Data not found")
 		return ""
 	} //end if
 	if(Sha1(darr[0]) != darr[1]) {
-		log.Println("NOTICE: BlowfishDecryptCBC // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid")
+		log.Println("[NOTICE] BlowfishDecryptCBC // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid")
 		return ""
 	} //end if
 	str = Base64Decode(darr[0])
@@ -467,7 +599,7 @@ func GzDeflate(str string, level int) string {
 	w, err := flate.NewWriter(&b, level) // RFC 1951
 	//--
 	if(err != nil) {
-		log.Println("NOTICE: GzDeflate: ", err)
+		log.Println("[NOTICE] GzDeflate: ", err)
 		return ""
 	} //end if
 	//--
@@ -508,63 +640,63 @@ func DataUnArchive(str string) string {
 	//--
 	arr[0] = StrTrimWhitespaces(arr[0])
 	if(arr[0] == "") {
-		log.Println("NOTICE: Data Unarchive // Invalid Package Format")
+		log.Println("[NOTICE] Data Unarchive // Invalid Package Format")
 		return ""
 	} //end if
 	//--
 	if(alen < 2) {
-		log.Println("NOTICE: Data Unarchive // Empty Package Signature")
+		log.Println("[NOTICE] Data Unarchive // Empty Package Signature")
 	} else {
 		arr[1] = StrTrimWhitespaces(arr[1])
 		if(arr[1] != DATA_ARCH_SIGNATURE) {
-			log.Println("NOTICE: Data Unarchive // Invalid Package Signature: ", arr[1])
+			log.Println("[NOTICE] Data Unarchive // Invalid Package Signature: ", arr[1])
 		} //end if
 	} //end if
 	//--
 	arr[0] = Base64Decode(arr[0])
 	if(arr[0] == "") {
-		log.Println("NOTICE: Data Unarchive // Invalid B64 Data for packet with signature: ", arr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid B64 Data for packet with signature: ", arr[1])
 		return ""
 	} //end if
 	//--
 	arr[0] = GzInflate(arr[0])
 	if(arr[0] == "") {
-		log.Println("NOTICE: Data Unarchive // Invalid Zlib GzInflate Data for packet with signature: ", arr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid Zlib GzInflate Data for packet with signature: ", arr[1])
 		return ""
 	} //end if
 	//--
 	const txtErrExpl = "This can occur if decompression failed or an invalid packet has been assigned ..."
 	//--
-	if(!strContains(arr[0], "#CHECKSUM-SHA1#")) {
-		log.Println("NOTICE: Invalid Packet, no Checksum :: ", txtErrExpl)
+	if(!StrContains(arr[0], "#CHECKSUM-SHA1#")) {
+		log.Println("[NOTICE] Invalid Packet, no Checksum :: ", txtErrExpl)
 		return ""
 	} //end if
 	//--
 	darr := Explode("#CHECKSUM-SHA1#", arr[0])
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		log.Println("NOTICE: Invalid Packet, Checksum not found :: ", txtErrExpl)
+		log.Println("[NOTICE] Invalid Packet, Checksum not found :: ", txtErrExpl)
 		return ""
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		log.Println("NOTICE: Invalid Packet, Checksum is Empty :: ", txtErrExpl)
+		log.Println("[NOTICE] Invalid Packet, Checksum is Empty :: ", txtErrExpl)
 		return ""
 	} //end if
 	if(darr[0] == "") {
-		log.Println("NOTICE: Invalid Packet, Data not found :: ", txtErrExpl)
+		log.Println("[NOTICE] Invalid Packet, Data not found :: ", txtErrExpl)
 		return ""
 	} //end if
 	//--
 	darr[0] = Hex2Bin(strings.ToLower(darr[0]))
 	if(darr[0] == "") {
-		log.Println("NOTICE: Data Unarchive // Invalid HEX Data for packet with signature: ", arr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid HEX Data for packet with signature: ", arr[1])
 		return ""
 	} //end if
 	//--
 	if(Sha1(darr[0]) != darr[1]) {
-		log.Println("NOTICE: Data Unarchive // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid: ", darr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid: ", darr[1])
 		return ""
 	} //end if
 	//--
@@ -589,26 +721,26 @@ func DataArchive(str string) string {
 	var alen int = len(arch)
 	//--
 	if((arch == "") || (alen <= 0)) { // check also division by zero
-		log.Println("ERROR: Data Archive // ZLib Deflated Data is Empty")
+		log.Println("[ERROR] Data Archive // ZLib Deflated Data is Empty")
 		return ""
 	} //end if
 	//--
 	var ratio = float64(ulen) / float64(alen) // division by zero is checked above by (alen <= 0)
 	if(ratio <= 0) {
-		log.Println("ERROR: Data Archive // ZLib Data Ratio is zero: ", ratio)
+		log.Println("[ERROR] Data Archive // ZLib Data Ratio is zero: ", ratio)
 		return ""
 	} //end if
 	if(ratio > 32768) { // check for this bug in ZLib {{{SYNC-GZ-ARCHIVE-ERR-CHECK}}}
-		log.Println("ERROR: Data Archive // ZLib Data Ratio is higher than 32768: ", ratio)
+		log.Println("[ERROR] Data Archive // ZLib Data Ratio is higher than 32768: ", ratio)
 		return ""
 	} //end if
-//	log.Println("INFO: Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
+//	log.Println("[DEBUG] Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
 	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + DATA_ARCH_SIGNATURE
 	//--
 	var unarch_chksum string = Sha1(DataUnArchive(arch))
 	if(unarch_chksum != chksum) {
-		log.Println("ERROR: Data Archive // Data Encode Check Failed")
+		log.Println("[ERROR] Data Archive // Data Encode Check Failed")
 		return ""
 	} //end if
 	//--
@@ -631,7 +763,7 @@ func Base64Decode(data string) string {
 	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if(err != nil) {
-		log.Println("NOTICE: Base64Decode: ", err)
+		log.Println("[NOTICE] Base64Decode: ", err)
 		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
@@ -715,28 +847,196 @@ func Implode(glue string, pieces []string) string {
 } //END FUNCTION
 
 
-func strContains(str string, part string) bool {
+//-----
+
+
+// case sensitive, find position of first occurrence of string in a string ; multi-byte safe
+// return -1 if can not find the substring or the position of needle in haystack
+func StrPos(haystack string, needle string) int {
+	//--
+	if((haystack == "") || (needle == "")) {
+		return -1;
+	} //end if
+	//--
+	pos := strings.Index(haystack, needle) // -1 if needle is not present in haystack
+	//--
+	if(pos < 0) {
+		return -1 // make it standard return
+	} //end if
+	//--
+	rs := []rune(haystack[0:pos])
+	//--
+	return len(rs)
+	//--
+} //END FUNCTION
+
+
+// case insensitive, find position of first occurrence of string in a string ; multi-byte safe
+// return -1 if can not find the substring or the position of needle in haystack
+func StrIPos(haystack, needle string) int {
+	//--
+	return StrPos(strings.ToLower(haystack), strings.ToLower(needle))
+	//--
+} //END FUNCTION
+
+
+// case sensitive, find position of last occurrence of string in a string ; multi-byte safe
+// return -1 if can not find the substring or the position of needle in haystack
+func StrRPos(haystack string, needle string) int {
+	//--
+	if((haystack == "") || (needle == "")) {
+		return -1;
+	} //end if
+	//--
+	pos := strings.LastIndex(haystack, needle) // -1 if needle is not present in haystack
+	//--
+	if(pos < 0) {
+		return -1 // make it standard return
+	} //end if
+	//--
+	rs := []rune(haystack[0:pos])
+	//--
+	return len(rs)
+	//--
+} //END FUNCTION
+
+
+// case insensitive, find position of last occurrence of string in a string ; multi-byte safe
+// return -1 if can not find the substring or the position of needle in haystack
+func StrRIPos(haystack, needle string) int {
+	//--
+	return StrRPos(strings.ToLower(haystack), strings.ToLower(needle))
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func StrContains(str string, part string) bool {
 	//--
 	return strings.Contains(str, part)
 	//--
 } //END FUNCTION
 
 
-func strIContains(str string, part string) bool {
+func StrIContains(str string, part string) bool {
 	//--
 	return strings.Contains(strings.ToLower(str), strings.ToLower(part))
 	//--
 } //END FUNCTION
 
 
-func StrTrimWhitespaces(s string) string {
+func StrTrim(s string, cutset string) string {
 	//--
 	if(s == "") {
 		return ""
 	} //end if
 	//--
-//	s = strings.TrimSpace(s) // TrimSpace returns a slice of the string s, with all leading and trailing white space removed, as defined by Unicode. Not sure if contain also \x00 and \x0B ...
-	s = strings.Trim(s, " \t\n\r\x00\x0B") // this is compatible with PHP (not sure if above is quite compatible since there is no clear reference wich are the exact whitespaces it trims)
+	s = strings.Trim(s, cutset)
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func StrTrimLeft(s string, cutset string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	s = strings.TrimLeft(s, cutset)
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func StrTrimRight(s string, cutset string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	s = strings.TrimRight(s, cutset)
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func StrTrimWhitespaces(s string) string {
+	//--
+	return StrTrim(s, TRIM_WHITESPACES) // this is compatible with PHP
+	//--
+} //END FUNCTION
+
+
+func StrTrimLeftWhitespaces(s string) string {
+	//--
+	return StrTrimLeft(s, TRIM_WHITESPACES) // this is compatible with PHP
+	//--
+} //END FUNCTION
+
+
+func StrTrimRightWhitespaces(s string) string {
+	//--
+	return StrTrimRight(s, TRIM_WHITESPACES) // this is compatible with PHP
+	//--
+} //END FUNCTION
+
+
+func StrMBSubstr(s string, start int, stop int) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	runes := []rune(s)
+	max := len(runes)
+	//--
+	if(start < 0) {
+		start = 0
+	} //end if
+	if((stop <= 0) || (stop > max)) {
+		stop = max
+	} //end if
+	//--
+	return string(runes[start:stop])
+	//--
+} //END FUNCTION
+
+
+func StrSubstr(s string, start int, stop int) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	max := len(s)
+	//--
+	if(start < 0) {
+		start = 0
+	} //end if
+	if((stop <= 0) || (stop > max)) {
+		stop = max
+	} //end if
+	//--
+	return string(s[start:stop])
+	//--
+} //END FUNCTION
+
+
+func StrNormalizeSpaces(s string) string {
+	//--
+	s = StrReplaceAll(s, "\r\n", " ")
+	s = StrReplaceAll(s, "\r",   " ")
+	s = StrReplaceAll(s, "\n",   " ")
+	s = StrReplaceAll(s, "\t",   " ")
+	s = StrReplaceAll(s, "\x0B", " ")
+	s = StrReplaceAll(s, "\x00", " ")
+	s = StrReplaceAll(s, "\f",   " ")
 	//--
 	return s
 	//--
@@ -772,8 +1072,8 @@ func TextCutByLimit(s string, length int) string {
 		return s
 	} //end if
 	//--
-	s = StrGetUnicodeSubstring(s, 0, length - 3) // substract -3 because of the trailing dots ...
-	s = RegexReplaceAllStr(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
+	s = StrMBSubstr(s, 0, length - 3) // substract -3 because of the trailing dots ...
+	s = StrRegexReplaceAll(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
 	s = s + "..." // add trailing dots
 	//--
 	return s
@@ -781,43 +1081,16 @@ func TextCutByLimit(s string, length int) string {
 } //END FUNCTION
 
 
-func StrGetUnicodeSubstring(s string, start int, stop int) string {
+func ConvertIntToStr(i int) string {
 	//--
-	if(s == "") {
-		return ""
-	} //end if
-	//--
-	runes := []rune(s)
-	max := len(runes)
-	//--
-	if(start < 0) {
-		start = 0
-	} //end if
-	if((stop <= 0) || (stop > max)) {
-		stop = max
-	} //end if
-	//--
-	return string(runes[start:stop])
+	return strconv.Itoa(i)
 	//--
 } //END FUNCTION
 
 
-func StrGetAsciiSubstring(s string, start int, stop int) string {
+func ConvertInt64ToStr(i int64) string {
 	//--
-	if(s == "") {
-		return ""
-	} //end if
-	//--
-	max := len(s)
-	//--
-	if(start < 0) {
-		start = 0
-	} //end if
-	if((stop <= 0) || (stop > max)) {
-		stop = max
-	} //end if
-	//--
-	return string(s[start:stop])
+	return strconv.FormatInt(i, 10)
 	//--
 } //END FUNCTION
 
@@ -847,7 +1120,7 @@ func ParseIntegerStrAsInt(s string) int {
 } //END FUNCTION
 
 
-func ParseInteger64AsStr(s string) string {
+func ParseInteger64StrAsStr(s string) string {
 	//--
 	if tmpInt, convErr := strconv.ParseInt(s, 10, 64); convErr == nil {
 		s = strconv.FormatInt(tmpInt, 10)
@@ -872,7 +1145,7 @@ func ParseFloatAsStrDecimal(s string, d int) string {
 	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
 		f = tmpFlt
 	} //end if
-	s = fmt.Sprintf("%." + strconv.Itoa(d) + "f", f)
+	s = fmt.Sprintf("%." + ConvertIntToStr(d) + "f", f)
 	//--
 	return string(s)
 	//--
@@ -917,7 +1190,7 @@ func StrDeaccent(s string) string {
 } //END FUNCTION
 
 
-func RegexReplaceAllStr(rexpr string, s string, repl string) string {
+func StrRegexReplaceAll(rexpr string, s string, repl string) string {
 	//--
 	if(s == "") {
 		return ""
@@ -937,8 +1210,8 @@ func StrCreateSlug(s string) string {
 	} //end if
 	s = StrDeaccent(s)
 	//--
-	s = RegexReplaceAllStr(`[^a-zA-Z0-9_\-]`, s, "-")
-	s = RegexReplaceAllStr(`[\-]+`, s, "-") // suppress multiple -
+	s = StrRegexReplaceAll(`[^a-zA-Z0-9_\-]`, s, "-")
+	s = StrRegexReplaceAll(`[\-]+`, s, "-") // suppress multiple -
 	s = StrTrimWhitespaces(s)
 	//--
 	return s
@@ -953,7 +1226,7 @@ func StrCreateHtmId(s string) string {
 		return ""
 	} //end if
 	//--
-	s = RegexReplaceAllStr(`[^a-zA-Z0-9_\-]`, s, "")
+	s = StrRegexReplaceAll(`[^a-zA-Z0-9_\-]`, s, "")
 	s = StrTrimWhitespaces(s)
 	//--
 	return s
@@ -968,7 +1241,7 @@ func StrCreateJsVarName(s string) string {
 		return ""
 	} //end if
 	//--
-	s = RegexReplaceAllStr(`[^a-zA-Z0-9_]`, s, "")
+	s = StrRegexReplaceAll(`[^a-zA-Z0-9_]`, s, "")
 	s = StrTrimWhitespaces(s)
 	//--
 	return s
@@ -990,7 +1263,7 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 	//--
 	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
-		log.Println("NOTICE: Hex2Bin: ", err)
+		log.Println("[NOTICE] Hex2Bin: ", err)
 		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
@@ -1003,7 +1276,7 @@ func JsonEncode(data interface{}) string { // inspired from: https://www.php2gol
 	//--
 	jsons, err := json.Marshal(data)
 	if(err != nil) {
-		log.Println("NOTICE: JsonEncode: ", err)
+		log.Println("[NOTICE] JsonEncode: ", err)
 		return ""
 	} //end if
 	//--
@@ -1035,7 +1308,7 @@ func JsonDecode(data string) map[string]interface{} { // inspired from: https://
 	var dat map[string]interface{}
 	err := json.Unmarshal([]byte(data), &dat)
 	if(err != nil) {
-		//log.Println("NOTICE: JsonDecode: ", err)
+		//log.Println("[NOTICE] JsonDecode: ", err)
 		return nil
 	} //end if
 	//--
@@ -1134,7 +1407,22 @@ func StrNl2Br(s string) string {
 //-----
 
 
+func PathDirName(filePath string) string {
+	//--
+	if(filePath == "") {
+		return ""
+	} //end if
+	//--
+	return filepath.Dir(filePath)
+	//--
+} //END FUNCTION
+
+
 func PathBaseName(filePath string) string {
+	//--
+	if(filePath == "") {
+		return ""
+	} //end if
 	//--
 	return filepath.Base(filePath)
 	//--
@@ -1144,9 +1432,9 @@ func PathBaseName(filePath string) string {
 func PathIsAbsolute(filePath string) bool {
 	//--
 	if(
-		(StrGetAsciiSubstring(filePath, 0, 1) == "/") || // unix / linux
-		(StrGetAsciiSubstring(filePath, 0, 1) == ":") || // windows
-		(StrGetAsciiSubstring(filePath, 1, 2) == ":")) { // windows
+		(StrSubstr(filePath, 0, 1) == "/") || // unix / linux
+		(StrSubstr(filePath, 0, 1) == ":") || // windows
+		(StrSubstr(filePath, 1, 2) == ":")) { // windows
 		return true
 	} //end if
 	//--
@@ -1158,40 +1446,14 @@ func PathIsAbsolute(filePath string) bool {
 func PathIsBackwardUnsafe(filePath string) bool {
 	//--
 	if(
-		strContains(filePath, "/../") ||
-		strContains(filePath, "/./")  ||
-		strContains(filePath, "/..")  ||
-		strContains(filePath, "../")) {
+		StrContains(filePath, "/../") ||
+		StrContains(filePath, "/./")  ||
+		StrContains(filePath, "/..")  ||
+		StrContains(filePath, "../")) {
 		return true
 	} //end if
 	//--
 	return false
-	//--
-} //END FUNCTION
-
-
-func ReadSafePathFile(filePath string, allowAbsolutePath bool) (fileContent string, errMsg string) {
-	//--
-	if(StrTrimWhitespaces(filePath) == "") {
-		return "", errors.New("WARNING: File Path is Empty").Error()
-	} //end if
-	//--
-	if(PathIsBackwardUnsafe(filePath) == true) {
-		return "", errors.New("WARNING: File Path is Backward Unsafe").Error()
-	} //end if
-	//--
-	if(allowAbsolutePath != true) {
-		if(PathIsAbsolute(filePath) == true) {
-			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
-		} //end if
-	} //end if
-	//--
-	content, err := ioutil.ReadFile(filePath)
-	if(err != nil) {
-		return "", err.Error()
-	} //end if
-	//--
-	return string(content), ""
 	//--
 } //END FUNCTION
 
@@ -1245,7 +1507,487 @@ func PathExists(thePath string) bool {
 //-----
 
 
-func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
+func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(dirPath) == "") {
+		return false, errors.New("WARNING: Dir Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(dirPath) == true) {
+		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(dirPath) == true) {
+			return false, errors.New("NOTICE: Dir Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathExists(dirPath)) {
+		//--
+		if(PathIsFile(dirPath)) {
+			return false, errors.New("WARNING: Dir Path is a File not a Directory").Error()
+		} //end if
+		if(!PathIsDir(dirPath)) {
+			return false, errors.New("WARNING: Dir Path is Not a Directory").Error()
+		} //end if
+		//--
+	} else {
+		//--
+		var err error = nil
+		if(allowRecursive == true) {
+			err = os.MkdirAll(dirPath, 0755)
+		} else {
+			err = os.Mkdir(dirPath, 0755)
+		} //end if else
+		if(err != nil) {
+			return false, err.Error()
+		} //end if
+		//--
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+
+func SafePathDirDelete(dirPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(dirPath) == "") {
+		return false, errors.New("WARNING: Dir Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(dirPath) == true) {
+		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(dirPath) == true) {
+			return false, errors.New("NOTICE: Dir Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathExists(dirPath)) {
+		//--
+		if(PathIsFile(dirPath)) {
+			return false, errors.New("WARNING: Dir Path is a File not a Directory").Error()
+		} //end if
+		if(!PathIsDir(dirPath)) {
+			return false, errors.New("WARNING: Dir Path is Not a Directory").Error()
+		} //end if
+		//--
+		err := os.RemoveAll(dirPath)
+		if(err != nil) {
+			return false, err.Error()
+		} //end if
+		//--
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathDirRename(dirPath string, dirNewPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(dirPath) == "") {
+		return false, errors.New("WARNING: Dir Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(dirPath) == true) {
+		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(dirPath) == true) {
+			return false, errors.New("NOTICE: Dir Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(StrTrimWhitespaces(dirNewPath) == "") {
+		return false, errors.New("WARNING: New Dir Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(dirNewPath) == true) {
+		return false, errors.New("WARNING: New Dir Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(dirNewPath) == true) {
+			return false, errors.New("NOTICE: New Dir Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(dirPath == dirNewPath) {
+		return false, errors.New("WARNING: New Dir Path is the same as the Original Dir Path").Error()
+	} //end if
+	//--
+	if(!PathExists(dirPath)) {
+		return false, errors.New("WARNING: Dir Path does not exist").Error()
+	} //end if
+	if(!PathIsDir(dirPath)) {
+		return false, errors.New("WARNING: Dir Path is Not a Dir").Error()
+	} //end if
+	//--
+	if(PathIsFile(dirPath)) {
+		return false, errors.New("WARNING: Dir Path is a File not a Directory").Error()
+	} //end if
+	if(PathIsFile(dirNewPath)) {
+		return false, errors.New("WARNING: New Dir Path is a File not a Directory").Error()
+	} //end if
+	//--
+	if(PathExists(dirNewPath)) {
+		return false, errors.New("WARNING: New Dir Path already exist").Error()
+	} //end if
+	//--
+	err := os.Rename(dirPath, dirNewPath)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent string, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return "", errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return "", errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return "", errors.New("WARNING: File Path is a Directory not a File").Error()
+	} //end if
+	//--
+	content, err := ioutil.ReadFile(filePath)
+	if(err != nil) {
+		return "", err.Error()
+	} //end if
+	//--
+	return string(content), ""
+	//--
+} //END FUNCTION
+
+
+func SafePathFileWrite(fileContent string, wrMode string, filePath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	// wrMode : "a" for append | "w" for write
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return false, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return false, errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return false, errors.New("WARNING: File Path is a Directory not a File").Error()
+	} //end if
+	//--
+	if(wrMode == "a") { // append mode
+		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if(err != nil) {
+			return false, err.Error()
+		} //end if
+		defer f.Close()
+		if _, err := f.WriteString(fileContent); err != nil {
+			return false, err.Error()
+		} //end if
+	} else if(wrMode == "w") { // write mode
+		err := ioutil.WriteFile(filePath, []byte(fileContent), 0644)
+		if(err != nil) {
+			return false, err.Error()
+		} //end if
+	} else {
+		return false, errors.New("WARNING: Invalid File Write Mode: `" + wrMode + "`").Error()
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathFileDelete(filePath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return false, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return false, errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathExists(filePath)) {
+		//--
+		if(PathIsDir(filePath)) {
+			return false, errors.New("WARNING: File Path is a Directory not a File").Error()
+		} //end if
+		if(!PathIsFile(filePath)) {
+			return false, errors.New("WARNING: File Path is Not a File").Error()
+		} //end if
+		//--
+		err := os.Remove(filePath)
+		if(err != nil) {
+			return false, err.Error()
+		} //end if
+		//--
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathFileRename(filePath string, fileNewPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return false, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return false, errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(StrTrimWhitespaces(fileNewPath) == "") {
+		return false, errors.New("WARNING: New File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(fileNewPath) == true) {
+		return false, errors.New("WARNING: New File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(fileNewPath) == true) {
+			return false, errors.New("NOTICE: New File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(filePath == fileNewPath) {
+		return false, errors.New("WARNING: New File Path is the same as the Original File Path").Error()
+	} //end if
+	//--
+	if(!PathExists(filePath)) {
+		return false, errors.New("WARNING: File Path does not exist").Error()
+	} //end if
+	if(!PathIsFile(filePath)) {
+		return false, errors.New("WARNING: File Path is Not a File").Error()
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return false, errors.New("WARNING: File Path is a Directory not a File").Error()
+	} //end if
+	if(PathIsDir(fileNewPath)) {
+		return false, errors.New("WARNING: New File Path is a Directory not a File").Error()
+	} //end if
+	//--
+	if(PathExists(fileNewPath)) {
+		return false, errors.New("WARNING: New File Path already exist").Error()
+	} //end if
+	//--
+	err := os.Rename(filePath, fileNewPath)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return false, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return false, errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(StrTrimWhitespaces(fileNewPath) == "") {
+		return false, errors.New("WARNING: New File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(fileNewPath) == true) {
+		return false, errors.New("WARNING: New File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(fileNewPath) == true) {
+			return false, errors.New("NOTICE: New File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(filePath == fileNewPath) {
+		return false, errors.New("WARNING: New File Path is the same as the Original File Path").Error()
+	} //end if
+	//--
+	if(!PathExists(filePath)) {
+		return false, errors.New("WARNING: File Path does not exist").Error()
+	} //end if
+	if(!PathIsFile(filePath)) {
+		return false, errors.New("WARNING: File Path is Not a File").Error()
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return false, errors.New("WARNING: File Path is a Directory not a File").Error()
+	} //end if
+	if(PathIsDir(fileNewPath)) {
+		return false, errors.New("WARNING: New File Path is a Directory not a File").Error()
+	} //end if
+	if(PathIsFile(fileNewPath)) {
+		testDelOldFile, errMsg := SafePathFileDelete(fileNewPath, allowAbsolutePath)
+		if((testDelOldFile != true) || (errMsg != "")) {
+			return false, errors.New("WARNING: Cannot Remove existing Destination File: " + errMsg).Error()
+		} //end if
+	} //end if
+	//--
+	/* this commented code would copy files using in-memory read of origin file and after that write to destination file which is not memory efficient when copying large files ; below is a revised version that copies through a pipe
+	data, err := ioutil.ReadFile(filePath)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	err = ioutil.WriteFile(fileNewPath, data, 0644)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	*/
+	//-- revised copy file, using pipe
+	sourceFileStat, err := os.Stat(filePath)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	if(!sourceFileStat.Mode().IsRegular()) {
+		return false, errors.New("WARNING: Source File is not a regular file").Error()
+	} //end if
+	source, err := os.Open(filePath)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	defer source.Close()
+	destination, err := os.Create(fileNewPath)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	defer destination.Close()
+	nBytes, err := io.Copy(destination, source)
+	if(err != nil) {
+		return false, err.Error()
+	} //end if
+	//--
+	if(!PathIsFile(fileNewPath)) {
+		return false, errors.New("WARNING: New File Path cannot be found after copy").Error()
+	} //end if
+	errChmod := os.Chmod(fileNewPath, 0644)
+	if(err != nil) {
+		log.Println("[WARNING] Failed to CHMOD 0644 the Destination File after copy", fileNewPath, errChmod)
+	} //end if
+	//--
+	fSizeOrigin, errMsg := SafePathFileGetSize(filePath, allowAbsolutePath);
+	if(errMsg != "") {
+		SafePathFileDelete(fileNewPath, allowAbsolutePath)
+		return false, errors.New("WARNING: Failed to Compare After Copy File Sizes (origin)").Error()
+	} //end if
+	fSizeDest, errMsg := SafePathFileGetSize(fileNewPath, allowAbsolutePath);
+	if(errMsg != "") {
+		SafePathFileDelete(fileNewPath, allowAbsolutePath)
+		return false, errors.New("WARNING: Failed to Compare After Copy File Sizes (destination)").Error()
+	} //end if
+	//--
+	if(fSizeOrigin != fSizeDest) {
+		SafePathFileDelete(fileNewPath, allowAbsolutePath)
+		return false, errors.New("WARNING: Compare After Copy File Sizes: File Sizes are Different: OriginSize=" + ConvertInt64ToStr(fSizeOrigin) + " / DestinationSize=" + ConvertInt64ToStr(fSizeDest)).Error()
+	} //end if
+	if(fSizeOrigin != nBytes) {
+		SafePathFileDelete(fileNewPath, allowAbsolutePath)
+		return false, errors.New("WARNING: Compare After Copy File Sizes: Bytes Copied Size is Different than Original Size: OriginSize=" + ConvertInt64ToStr(fSizeOrigin) + " / BytesCopied=" + ConvertInt64ToStr(nBytes)).Error()
+	} //end if
+	//--
+	return true, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int64, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return 0, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return 0, errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return 0, errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(!PathExists(filePath)) {
+		return 0, errors.New("WARNING: File Path does not exist").Error()
+	} //end if
+	if(!PathIsFile(filePath)) {
+		return 0, errors.New("WARNING: File Path is not a file").Error()
+	} //end if
+	//--
+	fd, err := os.Stat(filePath)
+	if(err != nil) {
+		if(os.IsNotExist(err)) {
+			return 0, err.Error()
+		} //end if
+	} //end if
+	var size int64 = fd.Size()
+	//--
+	return size, ""
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func MarkersTplPrepareNosyntaxHtml(tpl string) string {
 	//--
 	if(tpl == "") {
 		return ""
@@ -1269,7 +2011,7 @@ func PrepareNosyntaxHtmlMarkersTpl(tpl string) string {
 } //END FUNCTION
 
 
-func PrepareNosyntaxContentMarkersTpl(tpl string) string {
+func MarkersTplPrepareNosyntaxContent(tpl string) string {
 	//--
 	if(tpl == "") {
 		return ""
@@ -1287,10 +2029,10 @@ func PrepareNosyntaxContentMarkersTpl(tpl string) string {
 } //END FUNCTION
 
 
-func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
 	//-- replace out comments
-	if((strContains(template, "[%%%COMMENT%%%]")) && (strContains(template, "[%%%/COMMENT%%%]"))) {
-		template = RegexReplaceAllStr(`(?sU)\s?\[%%%COMMENT%%%\](.*)?\[%%%\/COMMENT%%%\]\s?`, template, "") // regex syntax as in PHP
+	if((StrContains(template, "[%%%COMMENT%%%]")) && (StrContains(template, "[%%%/COMMENT%%%]"))) {
+		template = StrRegexReplaceAll(`(?sU)\s?\[%%%COMMENT%%%\](.*)?\[%%%\/COMMENT%%%\]\s?`, template, "") // regex syntax as in PHP
 	} //end if
 	//-- process markers
 	var re = regexp.MustCompile(`\[###([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)###\]`) // regex markers as in Javascript
@@ -1305,14 +2047,14 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 		//--
 		if(mKeyExists) {
 			//--
-			tmp_marker_val = PrepareNosyntaxContentMarkersTpl(mKeyValue)
+			tmp_marker_val = MarkersTplPrepareNosyntaxContent(mKeyValue)
 			//--
 			if((tmp_marker_id != "") && (tmp_marker_key != "")) {
 				//--
-			//	fmt.Println("---------- : " + tmp_marker_val)
-			//	fmt.Println(tmp_marker_id + " # found Marker at index: " + strconv.Itoa(i))
-			//	fmt.Println(tmp_marker_key + " # found Marker Key at index:", strconv.Itoa(i))
-			//	fmt.Println(tmp_marker_esc + " # found Marker Escaping at index:", strconv.Itoa(i))
+			//	log.Println("[DEBUG] ---------- : " + tmp_marker_val)
+			//	log.Println("[DEBUG] tmp_marker_id  + " # found Marker at index: " + ConvertIntToStr(i))
+			//	log.Println("[DEBUG] tmp_marker_key + " # found Marker Key at index:", ConvertIntToStr(i))
+			//	log.Println("[DEBUG] tmp_marker_esc + " # found Marker Escaping at index:", ConvertIntToStr(i))
 				//--
 				if(tmp_marker_esc != "") {
 					//--
@@ -1324,12 +2066,12 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 							//--
 							var escaping string = "|" + tmp_marker_each_esc
 							//--
-			//				fmt.Println(escaping + " # found Marker Escaping [Arr] at index: " + strconv.Itoa(i) + "." + strconv.Itoa(j))
+						//	log.Println("[DEBUG] escaping + " # found Marker Escaping [Arr] at index: " + ConvertIntToStr(i) + "." + ConvertIntToStr(j))
 							//--
 							if(escaping == "|bool") { // Boolean
 								tmp_marker_val = ParseStringAsBoolStr(tmp_marker_val)
 							} else if(escaping == "|int") { // Integer
-								tmp_marker_val = ParseInteger64AsStr(tmp_marker_val)
+								tmp_marker_val = ParseInteger64StrAsStr(tmp_marker_val)
 							} else if(escaping == "|dec1") { // Decimals: 1
 								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 1)
 							} else if(escaping == "|dec2") { // Decimals: 2
@@ -1346,8 +2088,8 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = StrCreateHtmId(tmp_marker_val)
 							} else if(escaping == "|jsvar") { // JS-Variable: a-zA-Z0-9_
 								tmp_marker_val = StrCreateJsVarName(tmp_marker_val)
-							} else if((StrGetAsciiSubstring(escaping, 0, 7) == "|substr") || (StrGetAsciiSubstring(escaping, 0, 7) == "|subtxt")) { // Sub(String|Text) (0,num)
-								xstrnum := StrTrimWhitespaces(StrGetAsciiSubstring(escaping, 7, 0))
+							} else if((StrSubstr(escaping, 0, 7) == "|substr") || (StrSubstr(escaping, 0, 7) == "|subtxt")) { // Sub(String|Text) (0,num)
+								xstrnum := StrTrimWhitespaces(StrSubstr(escaping, 7, 0))
 								xnum := ParseIntegerStrAsInt(xstrnum)
 								if(xnum < 1) {
 									xnum = 1
@@ -1356,10 +2098,10 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 								} //end if else
 								if(xnum >= 1 && xnum <= 65535) {
 									if(len(tmp_marker_val) > xnum) {
-										if(StrGetAsciiSubstring(escaping, 0, 7) == "|subtxt") {
+										if(StrSubstr(escaping, 0, 7) == "|subtxt") {
 											tmp_marker_val = TextCutByLimit(tmp_marker_val, xnum)
 										} else { // '|substr'
-											tmp_marker_val = StrGetUnicodeSubstring(tmp_marker_val, 0, xnum)
+											tmp_marker_val = StrMBSubstr(tmp_marker_val, 0, xnum)
 										} //end if
 									} //end if else
 								} //end if
@@ -1370,8 +2112,8 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|upper") { // apply uppercase
 								tmp_marker_val = strings.ToUpper(tmp_marker_val)
 							} else if(escaping == "|ucfirst") { // apply uppercase first character
-								x1st := strings.ToUpper(StrGetUnicodeSubstring(tmp_marker_val, 0, 1)) // get 1st char
-								xrest := strings.ToLower(StrGetUnicodeSubstring(tmp_marker_val, 1, 0)) // get the rest of characters
+								x1st := strings.ToUpper(StrMBSubstr(tmp_marker_val, 0, 1)) // get 1st char
+								xrest := strings.ToLower(StrMBSubstr(tmp_marker_val, 1, 0)) // get the rest of characters
 								tmp_marker_val = x1st + xrest
 								x1st = ""
 								xrest = ""
@@ -1401,9 +2143,9 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|nl2br") { // Format NL2BR
 								tmp_marker_val = StrNl2Br(tmp_marker_val)
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
-								tmp_marker_val = PrepareNosyntaxHtmlMarkersTpl(tmp_marker_val)
+								tmp_marker_val = MarkersTplPrepareNosyntaxHtml(tmp_marker_val)
 							} else {
-								log.Println("WARNING: RenderMarkersTpl: {### Invalid or Undefined Escaping " + escaping + " [" + strconv.Itoa(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + strconv.Itoa(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
+								log.Println("[WARNING] MarkersTplRender: {### Invalid or Undefined Escaping " + escaping + " [" + ConvertIntToStr(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + ConvertIntToStr(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
 							} //end if
 							//--
 						} //end if
@@ -1420,7 +2162,7 @@ func RenderMarkersTpl(template string, arrobj map[string]string, isEncoded bool,
 		//--
 	} //end for
 	//-- replace specials: Square-Brackets(L/R) R N TAB SPACE
-	if(strContains(template, "[%%%|")) {
+	if(StrContains(template, "[%%%|")) {
 		template = StrReplaceAll(template, "[%%%|SB-L%%%]", "［")
 		template = StrReplaceAll(template, "[%%%|SB-R%%%]", "］")
 		template = StrReplaceAll(template, "[%%%|R%%%]",    "\r")
