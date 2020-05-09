@@ -1,6 +1,6 @@
 package main
 
-import "github.com/unix-world/webview"
+import "github.com/unix-world/smartgo/webview"
 
 func main() {
 	// Open wikipedia in a 800x600 resizable window

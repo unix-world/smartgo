@@ -1,13 +1,16 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20200507.1905 :: STABLE
+// r.20200509.1721 :: STABLE
 
 package smartgo
 
+// REQUIRE: go 1.13 or later
 
 import (
 	"os"
+	"os/exec"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -21,6 +24,7 @@ import (
 	"html"
 	"unicode"
 	"path/filepath"
+	"net"
 	"net/url"
 	"encoding/json"
 	"encoding/hex"
@@ -47,6 +51,12 @@ const (
 
 	TRIM_WHITESPACES = " \t\n\r\x00\x0B"
 
+	REGEX_SMART_SAFE_PATH_NAME = `^[_a-zA-Z0-9\-\.@#\/]+$`
+	REGEX_SMART_SAFE_FILE_NAME = `^[_a-zA-Z0-9\-\.@#]+$`
+	REGEX_SMART_SAFE_NET_HOSTNAME  = `^[_a-z0-9\-\.]+$`
+
+	CMD_EXEC_ERR_SIGNATURE = "[SmartGo:cmdExec:Exit:ERROR]"
+
 	DATA_ARCH_SIGNATURE = "PHP.SF.151129/B64.ZLibRaw.HEX"
 )
 
@@ -59,17 +69,20 @@ type logWriterWithColors struct {}
 func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 	//--
 	var theMsg string = StrTrimWhitespaces(StrNormalizeSpaces(string(bytes)))
-	if(StrIPos(theMsg, "[ERROR]") == 0) {
-		theMsg = color.HiRedString(theMsg)
-	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
-		theMsg = color.HiYellowString(theMsg)
-	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
-		theMsg = color.HiBlueString(theMsg)
-	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
-		theMsg = color.HiMagentaString(theMsg)
-	} else { // ALL OTHER CASES
-		theMsg = color.HiCyanString(theMsg)
-	} //end if else
+	//--
+	if(logColoredOnConsole) {
+		if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+			theMsg = color.HiRedString(theMsg)
+		} else if(StrIPos(theMsg, "[WARNING]") == 0) {
+			theMsg = color.HiYellowString(theMsg)
+		} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
+			theMsg = color.HiBlueString(theMsg)
+		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
+			theMsg = color.HiMagentaString(theMsg)
+		} else { // ALL OTHER CASES
+			theMsg = color.HiCyanString(theMsg)
+		} //end if else
+	} //end if
 	//--
 	return fmt.Println("LOG | " + DateNowUtc() + " | " + theMsg)
 	//--
@@ -77,8 +90,10 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 
 
 // PRIVATES
-var  logFilePath string = ""
-var  logFileFormat string = "plain"
+var logFilePath string = ""
+var logFileFormat string = "plain" // can be: "plain" | "json"
+var logToFileAlsoOnConsole bool = false
+var logColoredOnConsole bool = false
 type logWriterFile struct {}
 type logWriteJsonStruct struct {
 	Type    string `json:"type"`
@@ -87,43 +102,98 @@ type logWriteJsonStruct struct {
 }
 func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	//--
-	if(logFilePath == "") {
-		return 0, errors.New("[ERROR] SmartGo LogFile :: Empty LogFile Path provided")
-	} //end if
-	//--
+	var theErr string = ""
 	var theMsg string = StrTrimWhitespaces(string(bytes))
+	//--
 	var theType string = ""
-	if(StrIPos(theMsg, "[ERROR]") == 0) {
+	var colorMsg string = theMsg
+	if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 		theType = "error"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiRedString(colorMsg)
+		} //end if
 	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
 		theType = "warning"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiYellowString(colorMsg)
+		} //end if
 	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 		theType = "notice"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiBlueString(colorMsg)
+		} //end if
 	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 		theType = "debug"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiMagentaString(colorMsg)
+		} //end if
 	} else { // ALL OTHER CASES
 		theType = "unknown"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiCyanString(colorMsg)
+		} //end if
 	} //end if else
+	//--
+	if(isLogPathSafeDir(logFilePath) != true) {
+		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") :: LogFile Path provided is not an existing directory or is not safe: `" + logFilePath + "`"
+		if(logColoredOnConsole) {
+			fmt.Println(color.RedString(theErr) + " : " + colorMsg)
+		} else {
+			fmt.Println(theErr + " : " + theMsg)
+		} //end if
+		return 0, errors.New(theErr)
+	} //end if
+	//--
 	var theFmtMsg string = ""
+	var theLogPfx string = ""
 	if(logFileFormat == "json") {
+		theLogPfx = "json"
 		jsonLogStruct := logWriteJsonStruct {
 			Type    : theType,
 			DateUtc : DateNowUtc(),
 			Message : theMsg, // not necessary to normalize spaces
 		}
 		theFmtMsg = JsonEncode(jsonLogStruct)
-	} else {
+	} else if(logFileFormat == "plain") {
 		theFmtMsg = StrNormalizeSpaces(theMsg)
+	} else {
+		theErr = "[ERROR] SmartGo LogFile Invalid Format (" + logFileFormat + ") for LogPath `" + logFilePath + "`"
+		if(logColoredOnConsole) {
+			fmt.Println(color.RedString(theErr) + " : " + colorMsg)
+		} else {
+			fmt.Println(theErr + " : " + theMsg)
+		} //end if else
+		return 0, errors.New(theErr)
 	} //end if else
 	//--
-	isSuccess, errMsg := SafePathFileWrite(theFmtMsg + "\n", "a", logFilePath, true)
+	dtObjUtc := DateTimeStructUtc("")
+	//--
+	var theLogFile string = logFilePath + theLogPfx + "log" + "-" + dtObjUtc.Years + "-" + dtObjUtc.Months + "-" + dtObjUtc.Days + "-" + dtObjUtc.Hours + ".log"
+	//--
+	isSuccess, errMsg := SafePathFileWrite(theFmtMsg + "\n", "a", theLogFile, true)
 	//--
 	if(errMsg != "") {
-		return 0, errors.New("[ERROR] SmartGo LogFile write Error `" + logFilePath + "` :: " + errMsg)
+		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") write Error `" + theLogFile + "` :: " + errMsg
+		if(logColoredOnConsole) {
+			fmt.Println(color.RedString(theErr) + " : " + colorMsg)
+		} else {
+			fmt.Println(theErr + " : " + theMsg)
+		} //end if else
+		return 0, errors.New(theErr)
 	} //end if
 	//--
 	if(isSuccess != true) {
-		return 0, errors.New("[ERROR] SmartGo LogFile :: FAILED to write to the log File: `" + logFilePath + "`")
+		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") :: FAILED to write to the log File: `" + theLogFile + "`"
+		if(logColoredOnConsole) {
+			fmt.Println(color.RedString(theErr) + " : " + colorMsg)
+		} else {
+			fmt.Println(theErr + " : " + theMsg)
+		} //end if else
+		return 0, errors.New(theErr)
+	} //end if
+	//--
+	if(logToFileAlsoOnConsole) {
+		return fmt.Println("LOG | " + DateNowUtc() + " | " + colorMsg)
 	} //end if
 	//--
 	return len(bytes), nil
@@ -155,40 +225,62 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 } //END FUNCTION
 
 
-func LogToConsole(level string, withColors bool) {
+// PRIVATE
+func isLogPathSafeDir(pathForLogs string) bool {
 	//--
-	if(withColors == true) {
-		//--
-		log.SetFlags(0) // custom log with colors, reset all flags
-		//--
-		setLogLevelOutput(level, new(logWriterWithColors))
-		//--
-	} else {
-		//--
-		setLogLevelOutput(level, os.Stderr)
-		//--
-	} //end if else
+	if((PathIsEmptyOrRoot(pathForLogs)) ||
+		(PathIsBackwardUnsafe(pathForLogs)) ||
+		(!PathExists(pathForLogs)) ||
+		(!PathIsDir(pathForLogs)) ||
+		(!StrEndsWith(pathForLogs, "/"))) {
+		return false
+	} //end if
+	//--
+	return true
 	//--
 } //END FUNCTION
 
 
-func LogToFile(level string, filePath string, asJson bool) {
+func LogToStdErr(level string) {
 	//--
-	filePath = StrTrimLeftWhitespaces(filePath)
-	if(filePath != "") {
-		if(!PathIsBackwardUnsafe(filePath)) {
-			if(!PathIsDir(filePath)) {
-				//--
-				log.SetFlags(0) // custom log, reset all flags
-				//--
-				logFilePath = filePath
-				if(asJson == true) {
-					logFileFormat = "json"
-				} //end if
-				setLogLevelOutput(level, new(logWriterFile))
-				//--
-			} //end if
+	setLogLevelOutput(level, os.Stderr)
+	//--
+} //END FUNCTION
+
+
+func LogToConsole(level string, withColorsOnConsole bool) {
+	//--
+	logColoredOnConsole = withColorsOnConsole
+	//--
+	log.SetFlags(0) // custom log with colors, reset all flags
+	setLogLevelOutput(level, new(logWriterWithColors))
+	//--
+} //END FUNCTION
+
+
+func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole bool, withColorsOnConsole bool) {
+	//--
+	pathForLogs = StrTrimWhitespaces(pathForLogs) // must be (with trailing slash, dir must be existing): a/relative/path/to/log/ | /an/absolute/path/to/log/
+	//--
+	if(isLogPathSafeDir(pathForLogs) == true) {
+		//--
+		logColoredOnConsole = withColorsOnConsole
+		logToFileAlsoOnConsole = alsoOnConsole
+		//--
+		logFilePath = pathForLogs // assign
+		if(theFormat == "json") {
+			logFileFormat = "json"
+		} else {
+			logFileFormat = "plain"
 		} //end if
+		//--
+		log.SetFlags(0) // custom log, reset all flags
+		setLogLevelOutput(level, new(logWriterFile))
+		//--
+	} else {
+		//--
+		LogToConsole(level, true)
+		//--
 	} //end if
 	//--
 } //END FUNCTION
@@ -913,6 +1005,20 @@ func StrRIPos(haystack, needle string) int {
 //-----
 
 
+func StrStartsWith(str string, part string) bool {
+	//--
+	return strings.HasPrefix(str, part)
+	//--
+} //END FUNCTION
+
+
+func StrEndsWith(str string, part string) bool {
+	//--
+	return strings.HasSuffix(str, part)
+	//--
+} //END FUNCTION
+
+
 func StrContains(str string, part string) bool {
 	//--
 	return strings.Contains(str, part)
@@ -1120,6 +1226,20 @@ func ParseIntegerStrAsInt(s string) int {
 } //END FUNCTION
 
 
+func ParseIntegerStrAsInt64(s string) int64 {
+	//--
+	var Int64 int64 = 0 // set the integer as zero Int64, in the case of parseInt Error
+	//--
+	tmpInt64, err := strconv.ParseInt(s, 10, 64)
+	if(err == nil) {
+		Int64 = tmpInt64
+	} //end if else
+	//--
+	return Int64
+	//--
+} //END FUNCTION
+
+
 func ParseInteger64StrAsStr(s string) string {
 	//--
 	if tmpInt, convErr := strconv.ParseInt(s, 10, 64); convErr == nil {
@@ -1198,6 +1318,19 @@ func StrRegexReplaceAll(rexpr string, s string, repl string) string {
 	//--
 	re := regexp.MustCompile(rexpr)
 	return string(re.ReplaceAllString(s, repl))
+	//--
+} //END FUNCTION
+
+
+func StrRegexMatchString(rexpr string, s string) bool {
+	//--
+	if((StrTrimWhitespaces(rexpr) == "") || (s == "")) { // s must NOT be trimmed
+		return false
+	} //end if
+	//--
+	matched, _ := regexp.MatchString(rexpr, s)
+	//--
+	return matched
 	//--
 } //END FUNCTION
 
@@ -1407,7 +1540,7 @@ func StrNl2Br(s string) string {
 //-----
 
 
-func PathDirName(filePath string) string {
+func PathDirName(filePath string) string { // returns: `a/path/to` from `a/path/to/lastDirInPath|file.extension` | `/a/path/to` from `/a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
 		return ""
@@ -1418,13 +1551,44 @@ func PathDirName(filePath string) string {
 } //END FUNCTION
 
 
-func PathBaseName(filePath string) string {
+func PathBaseName(filePath string) string { // returns: `file.extenstion` | `lastDirInPath` from `(/)a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
 		return ""
 	} //end if
 	//--
 	return filepath.Base(filePath)
+	//--
+} //END FUNCTION
+
+
+func PathBaseExtension(filePath string) string { // returns: .extenstion (includding dot) from `(/)a/path/to/lastDirInPath|file.extension`
+	//--
+	if(filePath == "") {
+		return ""
+	} //end if
+	//--
+	return filepath.Ext(filePath)
+	//--
+} //END FUNCTION
+
+
+func PathIsEmptyOrRoot(filePath string) bool { // dissalow a path under 3 characters
+	//--
+	filePath = StrReplaceAll(filePath, "/", "")  // test for linux/unix file system
+	filePath = StrReplaceAll(filePath, "\\", "") // test for network shares
+	filePath = StrReplaceAll(filePath, ":", "")  // test for windows file system
+	//--
+	filePath = StrTrimWhitespaces(filePath)
+	//--
+	if(filePath == "") {
+		return true
+	} //end if
+	if(len(filePath) < 3) {
+		return true
+	} //end if
+	//--
+	return false
 	//--
 } //END FUNCTION
 
@@ -1460,6 +1624,10 @@ func PathIsBackwardUnsafe(filePath string) bool {
 
 func PathIsDir(thePath string) bool {
 	//--
+	if(StrTrimWhitespaces(thePath) == "") {
+		return false
+	} //end if
+	//--
 	fd, err := os.Stat(thePath)
 	if(err != nil) {
 		if(os.IsNotExist(err)) {
@@ -1475,6 +1643,10 @@ func PathIsDir(thePath string) bool {
 
 
 func PathIsFile(thePath string) bool {
+	//--
+	if(StrTrimWhitespaces(thePath) == "") {
+		return false
+	} //end if
 	//--
 	fd, err := os.Stat(thePath)
 	if(err != nil) {
@@ -1492,6 +1664,10 @@ func PathIsFile(thePath string) bool {
 
 func PathExists(thePath string) bool {
 	//--
+	if(StrTrimWhitespaces(thePath) == "") {
+		return false
+	} //end if
+	//--
 	_, err := os.Stat(thePath)
 	if(err != nil) {
 		if(os.IsNotExist(err)) {
@@ -1500,6 +1676,38 @@ func PathExists(thePath string) bool {
 	} //end if
 	//--
 	return true
+	//--
+} //END FUNCTION
+
+
+func PathGetAbsoluteFromRelative(thePath string) string {
+	//--
+	if(!PathExists(thePath)) {
+		return ""
+	} //end if
+	//--
+	absPath, err := filepath.Abs(thePath)
+	//--
+	if(err != nil) {
+		return ""
+	} //end if
+	//--
+	return absPath
+	//--
+} //END FUNCTION
+
+
+func PathGetCurrentExecutableName() string {
+	//--
+	currentExecutableAbsolutePath, err := os.Executable()
+	if(err != nil) {
+		return ""
+	} //end if
+	if(currentExecutableAbsolutePath == "") {
+		return ""
+	} //end if
+	//--
+	return PathBaseName(currentExecutableAbsolutePath)
 	//--
 } //END FUNCTION
 
@@ -1552,7 +1760,7 @@ func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bo
 
 
 
-func SafePathDirDelete(dirPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+func SafePathDirDelete(dirPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) { // will delete the dir with all it's (recursive) content
 	//--
 	if(StrTrimWhitespaces(dirPath) == "") {
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
@@ -1650,6 +1858,77 @@ func SafePathDirRename(dirPath string, dirNewPath string, allowAbsolutePath bool
 	//--
 } //END FUNCTION
 
+
+func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (isSuccess bool, errMsg string, arrDirs []string, arrFiles []string) {
+	//--
+	var dirs  []string
+	var files []string
+	//--
+	if(StrTrimWhitespaces(dirPath) == "") {
+		return false, errors.New("WARNING: Dir Path is Empty").Error(), dirs, files
+	} //end if
+	//--
+	dirPath = StrTrimRight(dirPath, "/ ") + "/"
+	//--
+	if(PathIsBackwardUnsafe(dirPath) == true) {
+		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error(), dirs, files
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(dirPath) == true) {
+			return false, errors.New("NOTICE: Dir Path is Absolute but not allowed to be absolute by the calling parameters").Error(), dirs, files
+		} //end if
+	} //end if
+	//--
+	if(!PathExists(dirPath)) {
+		return false, errors.New("WARNING: Path does not exists").Error(), dirs, files
+	} //end if
+	if(PathIsFile(dirPath)) {
+		return false, errors.New("WARNING: Dir Path is a File not a Directory").Error(), dirs, files
+	} //end if
+	if(!PathIsDir(dirPath)) {
+		return false, errors.New("WARNING: Dir Path is Not a Directory").Error(), dirs, files
+	} //end if
+	//--
+	if(recursive) {
+		//--
+		err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+			if((StrTrimWhitespaces(path) != "") && (StrTrim(path, "/ ") != "") && (path != ".") && (path != "..") && (path != "/") && (StrTrimRight(path, "/") != StrTrimRight(dirPath, "/"))) {
+				if(PathIsDir(path)) {
+					dirs = append(dirs, path)
+				} else {
+					files = append(files, path)
+				} //end if else
+			} //end if
+			return nil
+		})
+		if(err != nil) {
+			return false, err.Error(), dirs, files
+		} //end if
+		//--
+	} else {
+		//--
+		paths, err := ioutil.ReadDir(dirPath)
+		if(err != nil) {
+			return false, err.Error(), dirs, files
+		} //end if
+		for _, p := range paths {
+			if((StrTrimWhitespaces(p.Name()) != "") && (StrTrim(p.Name(), "/ ") != "") && (p.Name() != ".") && (p.Name() != "..") && (p.Name() != "/")) {
+				path   := dirPath + p.Name()
+				isDir  := p.IsDir()
+				if(isDir) {
+					dirs = append(dirs, path)
+				} else {
+					files = append(files, path)
+				} //end if else
+			} //end if
+		} //end for
+		//--
+	} //end if else
+	//--
+	return true, "", dirs, files
+	//--
+} //END FUNCTION
 
 //-----
 
@@ -2174,6 +2453,151 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	return template
 	//--
 } //END FUNCTION
+
+
+//-----
+
+
+func IsNetValidPortNum(p int64) bool { // can be a valid NUMERIC port between 1 and 65535
+	//--
+	if((p < 1) || (p > 65535)) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func IsNetValidPortStr(s string) bool { // can be a valid STRING(as NUMERIC) port between 1 and 65535
+	//--
+	if(StrTrimWhitespaces(s) == "") {
+		return false
+	} //end if
+	//--
+	var p int64 = ParseIntegerStrAsInt64(s)
+	//--
+	return IsNetValidPortNum(p)
+	//--
+} //END FUNCTION
+
+
+func IsNetValidIpAddr(s string) bool { // can be IPV4 or IPV6 but non-empty or zero
+	//--
+	if((StrTrimWhitespaces(s) == "") || (StrTrimWhitespaces(s) == "0.0.0.0") || (StrTrimWhitespaces(s) == "0:0:0:0:0:0:0:0") || (StrTrimWhitespaces(s) == "::0") || (StrTrimWhitespaces(s) == "::")) { // dissalow empty or zero IP v4 / v6 addresses
+		return false
+	} //end if
+	//--
+	if(net.ParseIP(s) == nil) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func IsNetValidHostName(s string) bool { // can contains only
+	//--
+	if(StrTrimWhitespaces(s) == "") {
+		return false
+	} //end if
+	//--
+	if(!StrRegexMatchString(REGEX_SMART_SAFE_NET_HOSTNAME, s)) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
+	//--
+	if(stopTimeout > 86400) {
+		stopTimeout = 86400 // 0 = no execution timeout ; 1..86400 will stop the cmd execution after this number of seconds
+	} //end if
+	//--
+	captureStdout = StrTrimWhitespaces(captureStdout) // "" | "capture" | "capture+output" | "output"
+	captureStderr = StrTrimWhitespaces(captureStderr) // "" | "capture" | "capture+output" | "output"
+	//--
+	additionalEnv = StrTrimWhitespaces(additionalEnv) // Additional ENVIRONMENT ; Example: additionalEnv = "FOO=bar"
+	// inputStdin // The Input to Stdin if any ; DO NOT TRIM, must be passed exact how is get
+	//--
+	theExe = StrTrimWhitespaces(theExe)
+	//--
+	var cmd *exec.Cmd = nil
+	if(stopTimeout > 0) { // timed command
+		ctx := context.Background()
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(stopTimeout)*time.Second)
+		defer cancel()
+		cmd = exec.CommandContext(ctx, theExe, theArgs...)
+	} else { // no timeout
+		cmd = exec.Command(theExe, theArgs...)
+    } //end if
+	//--
+	if(additionalEnv != "") {
+		newEnv := append(os.Environ(), additionalEnv)
+		cmd.Env = newEnv
+	} //end if
+	if(inputStdin != "") {
+		stdin, err := cmd.StdinPipe()
+		if(err != nil) {
+			return false, "", err.Error()
+		} //end if
+		go func() { // If the subprocess doesn't continue before the stdin is closed, the io.WriteString() call needs to be wrapped inside an anonymous function
+			defer stdin.Close()
+			io.WriteString(stdin, inputStdin)
+		}()
+	} //end if
+	//--
+	var stdoutBuf, stderrBuf bytes.Buffer
+	if(captureStdout == "capture") { // capture stdout
+		cmd.Stdout = io.Writer(&stdoutBuf) // cmd.Stdout = &stdoutBuf
+	} else if(captureStdout == "capture+output") { // capture stdout and print to stdout
+		cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
+	} else if(captureStdout == "output") { // print stdout
+		cmd.Stdout = io.Writer(os.Stdout)
+	} //end if
+	if(captureStderr == "capture") { // capture stderr
+		cmd.Stderr = io.Writer(&stderrBuf) // cmd.Stderr = &stderrBuf
+	} else if(captureStderr == "capture+output") { // capture stderr and print to stderr
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+	} else if(captureStderr == "output") { // print to stderr
+		cmd.Stderr = io.Writer(os.Stderr)
+	} //end if
+	//--
+	err := cmd.Run()
+	if(err != nil) { // [ALTERNATIVE] e, ok := err.(*exec.ExitError) // cast the error as *exec.ExitError and compare the result
+		return false, string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()) + "\n" + CMD_EXEC_ERR_SIGNATURE + " " + err.Error()
+	} //end if
+	//--
+	outStr, errStr := string(stdoutBuf.Bytes()), string(stderrBuf.Bytes())
+	//--
+	return true, outStr, errStr
+	//--
+} //END FUNCTION
+
+
+func ExecCmd(captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
+	//--
+	return cmdExec(0, captureStdout, captureStderr, additionalEnv, inputStdin, theExe, theArgs ...)
+	//--
+} //END FUNCTION
+
+
+func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
+	//--
+	return cmdExec(stopTimeout, captureStdout, captureStderr, additionalEnv, inputStdin, theExe, theArgs ...)
+	//--
+} //END FUNCTION
+
+
+//-----
 
 
 // #END
