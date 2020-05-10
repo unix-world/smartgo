@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20200509.1721 :: STABLE
+// r.20200510.1501 :: STABLE
 
 package smartgo
 
@@ -282,6 +282,16 @@ func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole
 		LogToConsole(level, true)
 		//--
 	} //end if
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ClearPrintTerminal() {
+	//--
+	print("\033[H\033[2J") // try to clear the terminal (should work on *nix and windows) ; for *nix only can be: fmt.Println("\033[2J")
 	//--
 } //END FUNCTION
 
@@ -1933,6 +1943,44 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 //-----
 
 
+func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return "", errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return "", errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return "", errors.New("WARNING: File Path is a Directory not a File").Error()
+	} //end if
+	//--
+	f, err := os.Open(filePath)
+	if(err != nil) {
+		return "", err.Error()
+	} //end if
+	defer f.Close()
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err.Error()
+	} //end if
+	//--
+//	hexMd5 := strings.ToLower(fmt.Sprintf("%x", h.Sum(nil)))
+	hexMd5 := strings.ToLower(hex.EncodeToString(h.Sum(nil)))
+	//--
+	return hexMd5, ""
+	//--
+} //END FUNCTION
+
+
 func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent string, errMsg string) {
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
@@ -2451,6 +2499,13 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	} //end if
 	//--
 	return template
+	//--
+} //END FUNCTION
+
+
+func MarkersTplEscapeTpl(template string) string {
+	//--
+	return RawUrlEncode(template)
 	//--
 } //END FUNCTION
 
