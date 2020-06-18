@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20200517.1701 :: STABLE
+// r.20200615.1613 :: STABLE
 
 package smartgo
 
@@ -530,7 +530,7 @@ func blowfishChecksizeAndPad(str string, chr byte) string {
 	//-- calculate modulus of plaintext to blowfish's cipher block size
 	modulus := len(pt) % blowfish.BlockSize
 	//-- if result is not 0, then need to pad
-	if modulus != 0 {
+	if(modulus != 0) {
 		//-- how many bytes do we need to pad to make pt to be a multiple of blowfish's block size?
 		padlen := blowfish.BlockSize - modulus
 		//-- let's add the required padding
@@ -693,7 +693,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 
 func GzDeflate(str string, level int) string {
 	//--
-	if(level < 1 || level > 9) {
+	if((level < 1) || (level > 9)) {
 		level = -1 // zlib default compression
 	} //end if
 	//--
