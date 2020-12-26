@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20200615.1613 :: STABLE
+// r.20200717.1853 :: STABLE
 
 package smartgo
 
@@ -2399,7 +2399,7 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 } //END FUNCTION
 
 
-func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200121
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200717
 	//--
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
@@ -2460,6 +2460,9 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 4)
 							} else if(escaping == "|num") { // Number (Float / Decimal / Integer)
 								tmp_marker_val = ParseFloatAsStrFloat(tmp_marker_val)
+							} else if(escaping == "|idtxt") { // id_txt: Id-Txt
+								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "_", "-", -1) // replace all
+								tmp_marker_val = strings.Title(strings.ToLower(tmp_marker_val))
 							} else if(escaping == "|slug") { // Slug: a-zA-Z0-9_- / - / -- : -
 								tmp_marker_val = StrCreateSlug(tmp_marker_val)
 							} else if(escaping == "|htmid") { // HTML-ID: a-zA-Z0-9_-
