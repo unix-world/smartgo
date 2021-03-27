@@ -1,3 +1,3 @@
 module github.com/unix-world/smartgo/webview
 
-go 1.11
+go 1.12
