@@ -1,3 +1,3 @@
 module github.com/unix-world/smartgo
 
-go 1.12
+go 1.13

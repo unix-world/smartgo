@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20200717.1853 :: STABLE
+// r.20210328.2253 :: STABLE
 
 package smartgo
 
@@ -39,7 +39,8 @@ import (
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/fatih/color"
+//	"github.com/fatih/color"
+	color "github.com/unix-world/smartgo/colorstring"
 	"github.com/unix-world/smartgo/logutils"
 )
 
@@ -80,7 +81,11 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
-			theMsg = color.HiCyanString(theMsg)
+			if(StrIPos(theMsg, "[OK]") == 0) {
+				theMsg = color.HiGreenString(theMsg)
+			} else {
+				theMsg = color.HiCyanString(theMsg)
+			} //end if else
 		} //end if else
 	} //end if
 	//--
@@ -130,7 +135,11 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} else { // ALL OTHER CASES
 		theType = "unknown"
 		if(logColoredOnConsole) {
-			colorMsg = color.HiCyanString(colorMsg)
+			if(StrIPos(theMsg, "[OK]") == 0) {
+				colorMsg = color.HiGreenString(colorMsg)
+			} else {
+				colorMsg = color.HiCyanString(colorMsg)
+			} //end if else
 		} //end if
 	} //end if else
 	//--
@@ -2523,6 +2532,9 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = EscapeCss(tmp_marker_val)
 							} else if(escaping == "|nl2br") { // Format NL2BR
 								tmp_marker_val = StrNl2Br(tmp_marker_val)
+							} else if(escaping == "|smartlist") { // Apply SmartList Fix Replacements ; {{{SYNC-SMARTLIST-BRACKET-REPLACEMENTS}}}
+								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "<", "‹", -1) // replace all
+								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, ">", "›", -1) // replace all
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
 								tmp_marker_val = MarkersTplPrepareNosyntaxHtml(tmp_marker_val)
 							} else {
