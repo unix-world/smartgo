@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020 unix-world.org
-// r.20210328.2253 :: STABLE
+// r.20210425.2023 :: STABLE
 
 package smartgo
 
@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"encoding/base64"
 	"compress/flate"
+	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -700,6 +701,40 @@ func BlowfishDecryptCBC(str string, key string) string {
 //-----
 
 
+func GzEncode(str string) string {
+	//--
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b) // RFC 1952 (gzip compatible)
+	//--
+	w.Write([]byte(str))
+	w.Close()
+	//--
+	return b.String()
+	//--
+} //END FUNCTION
+
+
+func GzDecode(str string) string {
+	//--
+	b := bytes.NewReader([]byte(str))
+	r, err := gzip.NewReader(b) // RFC 1952 (gzip compatible)
+	if(err != nil) {
+		log.Println("[NOTICE] GzDecode: ", err)
+		return ""
+	} //end if
+	bb2 := new(bytes.Buffer)
+	_, _ = io.Copy(bb2, r)
+	r.Close()
+	byts := bb2.Bytes()
+	//--
+	return string(byts)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func GzDeflate(str string, level int) string {
 	//--
 	if((level < 1) || (level > 9)) {
@@ -725,7 +760,7 @@ func GzDeflate(str string, level int) string {
 func GzInflate(str string) string {
 	//--
 	b := bytes.NewReader([]byte(str))
-	r := flate.NewReader(b)
+	r := flate.NewReader(b) // RFC 1951
 	bb2 := new(bytes.Buffer)
 	_, _ = io.Copy(bb2, r)
 	r.Close()
