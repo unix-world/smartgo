@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020 unix-world.org
-// r.20210425.2023 :: STABLE
+// (c) 2020-2021 unix-world.org
+// r.20210426.1130 :: STABLE
 
 package smartgo
 
@@ -701,25 +701,48 @@ func BlowfishDecryptCBC(str string, key string) string {
 //-----
 
 
-func GzEncode(str string) string {
+func GzEncode(str string, level int) string {
+	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	if((level < 1) || (level > 9)) {
+		level = -1 // zlib default compression
+	} //end if
 	//--
 	var b bytes.Buffer
-	w := gzip.NewWriter(&b) // RFC 1952 (gzip compatible)
+	w, err := gzip.NewWriterLevel(&b, level) // RFC 1952 (gzip compatible)
+	//--
+	if(err != nil) {
+		log.Println("[NOTICE] GzDeflate:", err)
+		return ""
+	} //end if
 	//--
 	w.Write([]byte(str))
 	w.Close()
 	//--
-	return b.String()
+	var out string = b.String()
+	if(out == "") {
+		log.Println("[NOTICE] GzEncode:", "Empty Arch Data")
+		return ""
+	}
+	return out
 	//--
 } //END FUNCTION
 
 
 func GzDecode(str string) string {
 	//--
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
+	//--
 	b := bytes.NewReader([]byte(str))
 	r, err := gzip.NewReader(b) // RFC 1952 (gzip compatible)
 	if(err != nil) {
-		log.Println("[NOTICE] GzDecode: ", err)
+		log.Println("[NOTICE] GzDecode:", err)
 		return ""
 	} //end if
 	bb2 := new(bytes.Buffer)
@@ -727,7 +750,12 @@ func GzDecode(str string) string {
 	r.Close()
 	byts := bb2.Bytes()
 	//--
-	return string(byts)
+	var out string = string(byts)
+	if(out == "") {
+		log.Println("[NOTICE] GzDecode:", "Empty UnArch Data")
+		return ""
+	}
+	return out
 	//--
 } //END FUNCTION
 
@@ -737,6 +765,10 @@ func GzDecode(str string) string {
 
 func GzDeflate(str string, level int) string {
 	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
 	if((level < 1) || (level > 9)) {
 		level = -1 // zlib default compression
 	} //end if
@@ -745,19 +777,29 @@ func GzDeflate(str string, level int) string {
 	w, err := flate.NewWriter(&b, level) // RFC 1951
 	//--
 	if(err != nil) {
-		log.Println("[NOTICE] GzDeflate: ", err)
+		log.Println("[NOTICE] GzDeflate:", err)
 		return ""
 	} //end if
 	//--
 	w.Write([]byte(str))
 	w.Close()
 	//--
-	return b.String()
+	var out string = b.String()
+	if(out == "") {
+		log.Println("[NOTICE] GzDeflate:", "Empty Arch Data")
+		return ""
+	}
+	return out
 	//--
 } //END FUNCTION
 
 
 func GzInflate(str string) string {
+	//--
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
 	//--
 	b := bytes.NewReader([]byte(str))
 	r := flate.NewReader(b) // RFC 1951
@@ -766,7 +808,12 @@ func GzInflate(str string) string {
 	r.Close()
 	byts := bb2.Bytes()
 	//--
-	return string(byts)
+	var out string = string(byts)
+	if(out == "") {
+		log.Println("[NOTICE] GzInflate:", "Empty UnArch Data")
+		return ""
+	}
+	return out
 	//--
 } //END FUNCTION
 
