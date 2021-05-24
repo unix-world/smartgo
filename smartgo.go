@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2021 unix-world.org
-// r.20210426.1130 :: STABLE
+// r.20210524.0419 :: STABLE
 
 package smartgo
 
@@ -1048,7 +1048,7 @@ func Implode(glue string, pieces []string) string {
 func StrPos(haystack string, needle string) int {
 	//--
 	if((haystack == "") || (needle == "")) {
-		return -1;
+		return -1
 	} //end if
 	//--
 	pos := strings.Index(haystack, needle) // -1 if needle is not present in haystack
@@ -1078,7 +1078,7 @@ func StrIPos(haystack, needle string) int {
 func StrRPos(haystack string, needle string) int {
 	//--
 	if((haystack == "") || (needle == "")) {
-		return -1;
+		return -1
 	} //end if
 	//--
 	pos := strings.LastIndex(haystack, needle) // -1 if needle is not present in haystack
