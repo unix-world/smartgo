@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2021 unix-world.org
-// r.20210524.0419 :: STABLE
+// r.20210603 :: STABLE
 
 package smartgo
 
@@ -2442,12 +2442,17 @@ func MarkersTplPrepareNosyntaxHtml(tpl string) string {
 	tpl = StrReplaceAll(tpl, "%%%]", "%%%&rbrack;")
 	tpl = StrReplaceAll(tpl, "[@@@", "&lbrack;@@@")
 	tpl = StrReplaceAll(tpl, "@@@]", "@@@&rbrack;")
+	tpl = StrReplaceAll(tpl, "[:::", "&lbrack;:::")
+	tpl = StrReplaceAll(tpl, ":::]", ":::&rbrack;")
+	//--
 	tpl = StrReplaceAll(tpl, "［###", "&lbrack;###")
 	tpl = StrReplaceAll(tpl, "###］", "###&rbrack;")
 	tpl = StrReplaceAll(tpl, "［%%%", "&lbrack;%%%")
 	tpl = StrReplaceAll(tpl, "%%%］", "%%%&rbrack;")
 	tpl = StrReplaceAll(tpl, "［@@@", "&lbrack;@@@")
 	tpl = StrReplaceAll(tpl, "@@@］", "@@@&rbrack;")
+	tpl = StrReplaceAll(tpl, "［:::", "&lbrack;:::")
+	tpl = StrReplaceAll(tpl, ":::］", ":::&rbrack;")
 	//--
 	return tpl
 	//--
@@ -2466,6 +2471,8 @@ func MarkersTplPrepareNosyntaxContent(tpl string) string {
 	tpl = StrReplaceAll(tpl, "%%%]", "%%%］")
 	tpl = StrReplaceAll(tpl, "[@@@", "［@@@")
 	tpl = StrReplaceAll(tpl, "@@@]", "@@@］")
+	tpl = StrReplaceAll(tpl, "[:::", "［:::")
+	tpl = StrReplaceAll(tpl, ":::]", ":::］")
 	//--
 	return tpl
 	//--
@@ -2484,13 +2491,15 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 	tpl = StrReplaceAll(tpl, "%%%］", "%%%]")
 	tpl = StrReplaceAll(tpl, "［@@@", "[@@@")
 	tpl = StrReplaceAll(tpl, "@@@］", "@@@]")
+	tpl = StrReplaceAll(tpl, "［:::", "[:::")
+	tpl = StrReplaceAll(tpl, ":::］", ":::]")
 	//--
 	return tpl
 	//--
 } //END FUNCTION
 
 
-func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20200717
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20210603
 	//--
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
