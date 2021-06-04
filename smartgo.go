@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2021 unix-world.org
-// r.20210603 :: STABLE
+// r.20210604 :: STABLE
 
 package smartgo
 
@@ -1567,29 +1567,22 @@ func JsonDecode(data string) map[string]interface{} { // inspired from: https://
 } //END FUNCTION
 
 
-func RawUrlEncode(s string) string {
+func AddCSlashes(s string, c string) string {
 	//--
-	return StrReplaceAll(url.QueryEscape(s), "+", "%20")
+	var tmpRune []rune
 	//--
-} //END FUNCTION
-
-
-func RawUrlDecode(s string) string {
+	strRune := []rune(s)
+	list := []rune(c)
+	for _, ch := range strRune {
+		for _, v := range list {
+			if ch == v {
+				tmpRune = append(tmpRune, '\\')
+			} //end if
+		} //end for
+		tmpRune = append(tmpRune, ch)
+	} //end for
 	//--
-	u, _ := url.QueryUnescape(StrReplaceAll(s, "%20", "+"))
-	//--
-	return u
-	//--
-} //END FUNCTION
-
-
-func EscapeHtml(s string) string { // provides a Smart.Framework ~ EscapeHtml
-	//--
-	if(s == "") {
-		return ""
-	} //end if
-	//--
-	return html.EscapeString(s) // escapes these five characters: < > & ' "
+	return string(tmpRune)
 	//--
 } //END FUNCTION
 
@@ -1607,6 +1600,17 @@ func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 	} //end for
 	//--
 	return out.String()
+	//--
+} //END FUNCTION
+
+
+func EscapeHtml(s string) string { // provides a Smart.Framework ~ EscapeHtml
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	return html.EscapeString(s) // escapes these five characters: < > & ' "
 	//--
 } //END FUNCTION
 
@@ -1644,6 +1648,29 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 	} //end for
 	//--
 	return out.String()
+	//--
+} //END FUNCTION
+
+
+func EscapeUrl(s string) string { // provides a Smart.Framework ~ EscapeUrl, an alias to RawUrlEncode
+	//--
+	return RawUrlEncode(s)
+	//--
+} //END FUNCTION
+
+
+func RawUrlEncode(s string) string {
+	//--
+	return StrReplaceAll(url.QueryEscape(s), "+", "%20")
+	//--
+} //END FUNCTION
+
+
+func RawUrlDecode(s string) string {
+	//--
+	u, _ := url.QueryUnescape(StrReplaceAll(s, "%20", "+"))
+	//--
+	return u
 	//--
 } //END FUNCTION
 
@@ -2499,7 +2526,7 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 } //END FUNCTION
 
 
-func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20210603
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20210604
 	//--
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
@@ -2603,7 +2630,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|trim") { // apply trim
 								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
 							} else if(escaping == "|url") { // escape URL
-								tmp_marker_val = RawUrlEncode(tmp_marker_val)
+								tmp_marker_val = EscapeUrl(tmp_marker_val)
 							} else if(escaping == "|json") { // format as Json Data ; expects pure JSON !!!
 								jsonObj := JsonDecode(tmp_marker_val)
 								if(jsonObj == nil) {
@@ -2628,6 +2655,10 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, ">", "›", -1) // replace all
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
 								tmp_marker_val = MarkersTplPrepareNosyntaxHtml(tmp_marker_val)
+							} else if(escaping == "|hex") { // Apply Bin2Hex Encode
+								tmp_marker_val = Bin2Hex(tmp_marker_val)
+							} else if(escaping == "|b64") { // Apply Base64 Encode
+								tmp_marker_val = Base64Encode(tmp_marker_val)
 							} else {
 								log.Println("[WARNING] MarkersTplRender: {### Invalid or Undefined Escaping " + escaping + " [" + ConvertIntToStr(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + ConvertIntToStr(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
 							} //end if
