@@ -480,7 +480,7 @@ public:
     WebKitSettings *settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(m_webview));
     webkit_settings_set_default_charset(settings, "UTF-8");
     webkit_settings_set_user_agent(settings, webkit_settings_get_user_agent(settings));
-    webkit_settings_set_enable_plugins(settings, false);
+    //webkit_settings_set_enable_plugins(settings, false); // deprecated
     webkit_settings_set_enable_java(settings, false);
     webkit_settings_set_javascript_can_access_clipboard(settings, false);
     webkit_settings_set_javascript_can_open_windows_automatically(settings, false);
@@ -489,7 +489,7 @@ public:
     webkit_settings_set_enable_page_cache(settings, false);
     webkit_settings_set_enable_smooth_scrolling(settings, false);
     webkit_settings_set_enable_webgl(settings, false);
-    webkit_settings_set_enable_accelerated_2d_canvas(settings, false);
+    //webkit_settings_set_enable_accelerated_2d_canvas(settings, false); // deprecated
     webkit_settings_set_hardware_acceleration_policy(settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER); // WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS WEBKIT_HARDWARE_ACCELERATION_POLICY_ON_DEMAND
     //-- #unixman
 

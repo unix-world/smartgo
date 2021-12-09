@@ -1,65 +1,96 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2021 unix-world.org
-// r.20210604 :: STABLE
+// r.20210821.0243 :: STABLE
 
 package smartgo
 
 // REQUIRE: go 1.13 or later
 
 import (
+	"runtime/debug"
 	"os"
 	"os/exec"
 	"context"
 	"errors"
+
 	"io"
 	"io/ioutil"
-	"log"
+
 	"time"
+
+	"log"
 	"fmt"
+
 	"bytes"
 	"strings"
 	"strconv"
 	"regexp"
-	"html"
 	"unicode"
+	"unicode/utf8"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
+
+	"compress/flate"
+	"compress/gzip"
+
 	"path/filepath"
 	"net"
 	"net/url"
+
+	"html"
 	"encoding/json"
 	"encoding/hex"
 	"encoding/base64"
-	"compress/flate"
-	"compress/gzip"
+
+	"hash/crc32"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/cipher"
 	"golang.org/x/crypto/blowfish"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
+	"golang.org/x/crypto/argon2"
 
+	"github.com/unix-world/smartgo/threefish"
+	"github.com/unix-world/smartgo/base32"
+	"github.com/unix-world/smartgo/base36"
+	"github.com/unix-world/smartgo/base58"
+	"github.com/unix-world/smartgo/base62"
+	"github.com/unix-world/smartgo/base85"
+	"github.com/unix-world/smartgo/base92"
 //	"github.com/fatih/color"
 	color "github.com/unix-world/smartgo/colorstring"
 	"github.com/unix-world/smartgo/logutils"
 )
 
 
-const (
-	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH = "2006-01-02"
-	DATE_TIME_FMT_ISO_STD_GO_EPOCH    = "2006-01-02 15:04:05"
-	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  = "2006-01-02 15:04:05 -0700"
+const ( // DO NOT MODIFY THESE CONSTANTS ... EVER !
+	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
+	DATE_TIME_FMT_ISO_STD_GO_EPOCH    = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
+	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  = "2006-01-02 15:04:05 -0700" 	// GO EPOCH: WITH TIME, WITH TZ OFFSET
 
-	TRIM_WHITESPACES = " \t\n\r\x00\x0B"
+	TRIM_WHITESPACES = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
+	NULL_BYTE = "\000" 													// THE NULL BYTE
 
-	REGEX_SMART_SAFE_PATH_NAME = `^[_a-zA-Z0-9\-\.@#\/]+$`
-	REGEX_SMART_SAFE_FILE_NAME = `^[_a-zA-Z0-9\-\.@#]+$`
-	REGEX_SMART_SAFE_NET_HOSTNAME  = `^[_a-z0-9\-\.]+$`
+	REGEX_SMART_SAFE_PATH_NAME = `^[_a-zA-Z0-9\-\.@#\/]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM PATHS ...
+	REGEX_SMART_SAFE_FILE_NAME = `^[_a-zA-Z0-9\-\.@#]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM FILE AND DIR NAMES ...
+	REGEX_SMART_SAFE_NET_HOSTNAME  = `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
 
-	CMD_EXEC_ERR_SIGNATURE = "[SmartGo:cmdExec:Exit:ERROR]"
+	CMD_EXEC_ERR_SIGNATURE = "[SmartGo:cmdExec:Exit:ERROR]" 			// INTERNAL FLAG FOR CMD EXIT ERROR
 
-	DATA_ARCH_SIGNATURE = "PHP.SF.151129/B64.ZLibRaw.HEX"
+	SEPARATOR_CHECKSUM_V1 = "#CHECKSUM-SHA1#" 							// only to support v1 unarchive or decrypt ; (for v1 no archive or encrypt is available anymore)
+	SEPARATOR_CHECKSUM_V2 = "#CKSUM256#" 								// current, v2 ; archive + unarchive or encrypt + decrypt
+	SIGNATURE_SFZ_DATA_ARCH_V1 = "PHP.SF.151129/B64.ZLibRaw.HEX" 		// only to support v1 unarchive ; (for v1 no archive is available anymore)
+	SIGNATURE_SFZ_DATA_ARCH_V2 = "SFZ.20210818/B64.ZLibRaw.hex" 		// current, v2 ; archive + unarchive
+
+	SIGNATURE_BFISH_V1 = "bf384.v1!" 									// this was not implemented in the v1, if used must be prefixed before decrypt for compatibility ... (for v1 no encrypt is available anymore)
+	SIGNATURE_BFISH_V2 = "bf448.v2!" 									// current, v2 ; encrypt + decrypt
+
+	SIGNATURE_3FISH_V1_DEFAULT  = "3f1kD.v1!" 							// current, v1 (default)  ; encrypt + decrypt
+	SIGNATURE_3FISH_V1_ARGON2ID = "3f1kA.v1!" 							// current, v1 (argon2id) ; encrypt + decrypt
+
+	FIXED_CRYPTO_SALT = "Smart Framework # スマート フレームワーク" 		// fixed salt data for various crypto contexts
 )
 
 
@@ -76,9 +107,11 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 			theMsg = color.HiRedString(theMsg)
 		} else if(StrIPos(theMsg, "[WARNING]") == 0) {
-			theMsg = color.HiYellowString(theMsg)
+			theMsg = color.YellowString(theMsg)
 		} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 			theMsg = color.HiBlueString(theMsg)
+		} else if(StrIPos(theMsg, "[DATA]") == 0) {
+			theMsg = color.HiYellowString(string(bytes)) // for data preserve the string how it is !
 		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
@@ -90,7 +123,7 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		} //end if else
 	} //end if
 	//--
-	return fmt.Println("LOG | " + DateNowUtc() + " | " + theMsg)
+	return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + theMsg)
 	//--
 } //END FUNCTION
 
@@ -121,22 +154,28 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
 		theType = "warning"
 		if(logColoredOnConsole) {
-			colorMsg = color.HiYellowString(colorMsg)
+			colorMsg = color.YellowString(colorMsg)
 		} //end if
 	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 		theType = "notice"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiBlueString(colorMsg)
 		} //end if
+	} else if(StrIPos(theMsg, "[DATA]") == 0) {
+		theType = "data"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiYellowString(colorMsg)
+		}
 	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 		theType = "debug"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiMagentaString(colorMsg)
 		} //end if
 	} else { // ALL OTHER CASES
-		theType = "unknown"
+		theType = "info"
 		if(logColoredOnConsole) {
 			if(StrIPos(theMsg, "[OK]") == 0) {
+				theType = "ok"
 				colorMsg = color.HiGreenString(colorMsg)
 			} else {
 				colorMsg = color.HiCyanString(colorMsg)
@@ -203,7 +242,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} //end if
 	//--
 	if(logToFileAlsoOnConsole) {
-		return fmt.Println("LOG | " + DateNowUtc() + " | " + colorMsg)
+		return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + colorMsg)
 	} //end if
 	//--
 	return len(bytes), nil
@@ -221,12 +260,14 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 		mLevel = "WARNING"
 	} else if(level == "NOTICE") {
 		mLevel = "NOTICE"
+	} else if(level == "DATA") {
+		mLevel = "DATA"
 	} else if(level == "DEBUG") {
 		mLevel = "DEBUG"
 	} //end if else
 	//--
 	filter := &logutils.LevelFilter{
-		Levels: []logutils.LogLevel{"DEBUG", "NOTICE", "WARNING", "ERROR"},
+		Levels: []logutils.LogLevel{"DEBUG", "DATA", "NOTICE", "WARNING", "ERROR"},
 		MinLevel: logutils.LogLevel(mLevel),
 		Writer: output,
 	}
@@ -305,6 +346,16 @@ func ClearPrintTerminal() {
 	//--
 } //END FUNCTION
 
+
+//-----
+
+// call as: defer PanicHandler()
+func PanicHandler() {
+	if panicInfo := recover(); panicInfo != nil {
+		log.Println("[ERROR] PANIC Recovered:", panicInfo)
+		log.Println("[DEBUG] PANIC Trace Stack:", string(debug.Stack()))
+	} //end if
+} //END FUNCTION
 
 //-----
 
@@ -524,131 +575,587 @@ func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
 //-----
 
 
-// PRIVATE
-func blowfishChecksizeAndPad(str string, chr byte) string {
+func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
 	//--
-	// check the size of plaintext, does it need to be padded? because
-	// blowfish is a block cipher, the plaintext needs to be padded to
-	// a multiple of the blocksize.
+	// This should be used as the basis for a derived key, will be 100% in theory and practice agains hash colissions (see the comments below)
+	// It implements a safe mechanism that in order that a key to produce a colission must collide at the same time in all hashing mechanisms: md5, sha1, ha256 and sha512 + crc32b control
+	// By enforcing the max key length to 4096 bytes actually will not have any chance to collide even in the lowest hashing such as md5 ...
+	// It will return a string of 553 bytes length as: (base:key)[8(crc32b) + 1(null) + 32(md5) + 1(null) + 40(sha1) + 1(null) + 64(sha256) + 1(null) + 128(sha512) = 276] + 1(null) + (base:saltedKeyWithNullBytePrefix)[8(crc32b) + 1(null) + 32(md5) + 1(null) + 40(sha1) + 1(null) + 64(sha256) + 1(null) + 128(sha512) = 276]
+	// More, it will return a fixed length (553 bytes) string with an ascii subset just of [ 01234567890abcdef + NullByte ] which already is colission free by using a max source string length of 4096 bytes and by combining many hashes as: md5, sha1, sha256, sha512 and the crc32b
 	//--
-	// INFO: chr = 32 is SPACE (for encrypt) ; chr = 0 is NULL (for decrypt)
-	if(chr != 32) {
-		chr = 0
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if(plainTextKey != key) {
+		log.Println("[WARNING] safePassComposedKey:", "Key is invalid, must not contain trailing spaces !")
+		return ""
 	} //end if
 	//--
-	pt := []byte(str)
-	//-- calculate modulus of plaintext to blowfish's cipher block size
-	modulus := len(pt) % blowfish.BlockSize
-	//-- if result is not 0, then need to pad
-	if(modulus != 0) {
-		//-- how many bytes do we need to pad to make pt to be a multiple of blowfish's block size?
-		padlen := blowfish.BlockSize - modulus
-		//-- let's add the required padding
-		for i := 0; i < padlen; i++ {
-			//-- add the pad, one at a time
-			pt = append(pt, chr) // if string is base64 encoded can pad with SPACE (32) otherwise must pad with NULL (0)
-			//--
-		} //end for
-		//--
-	} //end if
-	//-- return the whole-multiple-of-blowfish.BlockSize-sized plaintext to the calling function
-	return string(pt)
+	var klen int = len(key)
+	if(klen < 7) { // {{{SYNC-CRYPTO-KEY-MIN}}} ; minimum acceptable secure key is 7 characters long
+		log.Println("[WARNING] safePassComposedKey:", "Key Size is lower than 7 bytes (", klen, ") which is not safe against brute force attacks !")
+		return ""
+	} else if(klen > 4096) { // {{{SYNC-CRYPTO-KEY-MAX}}} ; max key size is enforced to allow ZERO theoretical colissions on any of: md5, sha1, sha256 or sha512
+		//-- as a precaution, use the lowest supported value which is 4096 (as the md5 supports) ; under this value all the hashes are safe against colissions (in theory)
+		// MD5     produces 128 bits which is 16 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 16*256 =  4096 bytes
+		// SHA-1   produces 160 bits which is 20 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 20*256 =  5120 bytes
+		// SHA-256 produces 256 bits which is 32 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 32*256 =  8192 bytes
+		// SHA-512 produces 512 bits which is 64 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 64*256 = 16384 bytes
+		//-- anyway, as a more precaution, combine all hashes thus a key should produce a colission at the same time in all: md5, sha1, sha256 and sha512 ... which in theory, event with bad implementations of the hashing functions this is excluded !
+		log.Println("[WARNING] safePassComposedKey:", "Key Size is higher than 4096 bytes (", klen, ") which is not safe against collisions !")
+		return ""
+	} //end if else
+	//--
+	// Security concept: be safe against collisions, the idea is to concatenate more algorithms on the exactly same input !!
+	// https://security.stackexchange.com/questions/169711/when-hashing-do-longer-messages-have-a-higher-chance-of-collisions
+	// just sensible salt + strong password = unbreakable ; using a minimal salt, prepended, the NULL byte ; a complex salt may be used later in combination with derived keys
+	// the best is to pre-pend the salt: http://stackoverflow.com/questions/4171859/password-salts-prepending-vs-appending
+	//--
+	var saltedKey string = NULL_BYTE + key
+	//-- use hex here, with fixed lengths to reduce the chance of collisions for the next step (with not so complex fixed length strings, chances of colissions are infinite lower) ; this will generate a predictible concatenated hash using multiple algorithms ; actually the chances to find a colission for a string between 1..1024 characters that will produce a colission of all 4 hashing algorithms at the same time is ZERO in theory and in practice ... and in the well known universe using well known mathematics !
+	var hkey1 string = Crc32b(key)       + NULL_BYTE + Md5(key)       + NULL_BYTE + Sha1(key)       + NULL_BYTE + Sha256(key)       + NULL_BYTE + Sha512(key)
+	var hkey2 string = Crc32b(saltedKey) + NULL_BYTE + Md5(saltedKey) + NULL_BYTE + Sha1(saltedKey) + NULL_BYTE + Sha256(saltedKey) + NULL_BYTE + Sha512(saltedKey)
+	//--
+	return hkey1 + NULL_BYTE + hkey2 // composedKey
 	//--
 } //END FUNCTION
 
 
-// PRIVATE : Blowfish key {{{SYNC-BLOWFISH-KEY}}}
-func blowfishSafeKey(key string) string {
+//-----
+
+
+func SafePassHashArgon2id824(plainTextKey string) string {
 	//--
-	var safeKey string = StrSubstr(Sha512(key), 13, 29+13) + strings.ToUpper(StrSubstr(Sha1(key), 13, 10+13)) + StrSubstr(Md5(key), 13, 9+13)
+	var composedKey string = safePassComposedKey(plainTextKey)
+	var len_composedKey int = len(composedKey)
+	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
+	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
+		log.Println("[WARNING] SafePassHashArgon2id824:", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		return ""
+	} //end if
 	//--
-	//log.Println("[DEBUG] BfKey: " + safeKey)
+	var salt string = FIXED_CRYPTO_SALT + NULL_BYTE // use a fixed salt with a safe composed derived key to be safe against colissions ; if the salt is random there is no more safety against colissions ...
+	salt = Bin2Hex(salt)
+	salt = base32.Encode([]byte(salt))
+	salt = base36.Encode([]byte(salt))
+	salt = base58.Encode([]byte(salt))
+	salt = base62.Encode([]byte(salt))
+	salt = Base64sEncode(salt)
+	salt = base85.Encode([]byte(salt))
+	salt = StrSubstr(RightPad2Len(Md5B64(salt), "#", 28), 0, 28)
+	//fmt.Println("Argon2id Salt:", salt)
+	//--
+	key := argon2.IDKey([]byte(composedKey), []byte(salt), 21, 512*1024, 1, 103) // Argon2id resources: 21 cycles, 512MB memory, 1 thread, 103 bytes = 824 bits ; return as base92 encoded with a fixed length of 128 bytes (1024 bits) by padding b92 encoded data on the right with ' character
+	//--
+	return StrSubstr(RightPad2Len(base92.Encode(key), "'", 128), 0, 128) // add right padding with '
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func cryptoPacketCheckAndDecode(str string, fx string, ver uint8) string {
+	//--
+	defer PanicHandler() // req. by b64 decrypt panic handler with malformed data
+	//--
+	if((ver != 2) && (ver != 1)) {
+		log.Println("[NOTICE]", fx, "Invalid Version:", ver)
+		return ""
+	} //end if
+	//--
+	if(str == "") {
+		log.Println("[NOTICE]", fx, "Empty Data Packet, v:", ver)
+		return ""
+	} //end if
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, v:", ver)
+		return ""
+	} //end if
+	//--
+	var separator string = ""
+	if(ver == 1) {
+		separator = SEPARATOR_CHECKSUM_V1
+	} else {
+		separator = SEPARATOR_CHECKSUM_V2
+	} //end if else
+	if(separator == "") {
+		log.Println("[NOTICE]", fx, "Empty Data Packet Checksum Separator, v:", ver)
+		return ""
+	} //end if
+	//--
+	if(!StrContains(str, separator)) {
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, no Checksum v:", ver)
+		return ""
+	} //end if
+	//--
+	darr := Explode(separator, str)
+	str = ""
+	var dlen int = len(darr)
+	if(dlen < 2) {
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, Checksum not found v:", ver)
+		return ""
+	} //end if
+	darr[0] = StrTrimWhitespaces(darr[0])
+	darr[1] = StrTrimWhitespaces(darr[1])
+	if(darr[1] == "") {
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, Checksum is Empty v:", ver)
+		return ""
+	} //end if
+	if(darr[0] == "") {
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, Packed Data not found v:", ver)
+		return ""
+	} //end if
+	//--
+	if(ver == 1) {
+		if(Sha1(darr[0]) != darr[1]) {
+			log.Println("[NOTICE]", fx, "Invalid Data Packet (v.1), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
+			return ""
+		} //end if
+	} else {
+		if(Sha256B64(darr[0]) != darr[1]) {
+			log.Println("[NOTICE]", fx, "Invalid Data Packet (v.2), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
+			return ""
+		} //end if
+	} //end if else
+	//--
+	return Base64Decode(darr[0])
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func threefishSafeKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
+	//--
+	defer PanicHandler() // req. by hex2bin panic handler with malformed data
+	//--
+	var composedKey string = safePassComposedKey(plainTextKey)
+	var len_composedKey int = len(composedKey)
+	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
+	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
+		log.Println("[WARNING] threefishSafeKey:", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		return ""
+	} //end if
+	//--
+	var derivedKey string = LeftPad2Len(Crc32bB36(composedKey), "0", 8) + "'" + base92.Encode([]byte(Hex2Bin(Sha512(composedKey)))) + "'" + base92.Encode([]byte(Hex2Bin(Sha256(composedKey))))
+	var safeKey string = StrSubstr(RightPad2Len(derivedKey, "'", 128), 0, 1024/8) // 1024/8
+	//log.Println("[DEBUG] 3fKey:", safeKey)
 	return safeKey
 	//--
 } //END FUNCTION
 
 
-// PRIVATE : Blowfish iv {{{SYNC-BLOWFISH-IV}}}
-func blowfishSafeIv(key string) string {
+func threefishSafeIv(plainTextKey string) string {
 	//--
-	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + strings.ToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
-	safeIv = StrSubstr(safeIv, 1, 8+1)
-	//log.Println("[DEBUG] BfIv: " + safeIv)
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if(key == "") {
+		log.Println("[WARNING] threefishSafeIv:", "Key is Empty !")
+		return ""
+	} //end if
 	//--
+	var safeIv string = StrSubstr(Sha512(key), 0, 1024/8) // 1024/8
+	//--
+	//log.Println("[DEBUG] 3fIv:", safeIv)
 	return safeIv
 	//--
 } //END FUNCTION
 
 
-func BlowfishEncryptCBC(str string, key string) string {
+func threefishSafeTweak(plainTextKey string, derivedKey string) string {
+	//--
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if(key == "") {
+		log.Println("[WARNING] threefishSafeTweak:", "Key is Empty !")
+		return ""
+	} //end if
+	//--
+	if(StrTrimWhitespaces(derivedKey) == "") {
+		log.Println("[WARNING] threefishSafeTweak:", "Derived Key is Empty !")
+		return ""
+	} //end if
+	//--
+	var safeTweak string = LeftPad2Len(StrSubstr(Crc32b(key) + Crc32b(derivedKey), 0, 128/8), "0", 128/8) // 128/8
+	//--
+	//log.Println("[DEBUG] 3fTweak:", safeTweak)
+	return safeTweak
+	//--
+} //END FUNCTION
+
+
+func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
+	//--
+	defer PanicHandler() // req. by cipher encrypt panic handler with wrong padded data
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
 	//-- prepare string
 	str = Base64Encode(str)
-	cksum := Sha1(str)
-	str = str + "#CHECKSUM-SHA1#" + cksum
+	cksum := Sha256B64(str)
+	str = str + SEPARATOR_CHECKSUM_V2 + cksum
 	//log.Println("[DEBUG] BfTxt: " + str)
-	//-- cast to bytes
-	ppt := []byte(blowfishChecksizeAndPad(str, 32)) // pad with spaces
-	str = "" // no more needed
-	//-- create the cipher
-	ecipher, err := blowfish.NewCipher([]byte(blowfishSafeKey(key)))
-	if(err != nil) {
-		log.Println("[WARNING] BlowfishEncryptCBC: ", err)
+	//--
+	var theSignature string = ""
+	var derivedKey string = "" // 128 bytes
+	if(useArgon2id == true) {
+		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
+		derivedKey = SafePassHashArgon2id824(key) // b92
+	} else {
+		theSignature = SIGNATURE_3FISH_V1_DEFAULT
+		derivedKey = threefishSafeKey(key) // ~ b92
+	} //end if else
+	if(len(derivedKey) != 128) {
+		log.Println("[WARNING] ThreefishEncryptCBC:", "Derived Key Size must be 128 bytes")
 		return ""
 	} //end if
-	//-- make ciphertext big enough to store len(ppt)+blowfish.BlockSize
-	ciphertext := make([]byte, blowfish.BlockSize+len(ppt))
+	var tweak string = threefishSafeTweak(key, derivedKey) // 16 bytes, hex
+	if(len(tweak) != 16) {
+		log.Println("[WARNING] ThreefishEncryptCBC:", "Tweak Size must be 16 bytes")
+		return ""
+	} //end if
+	var iv string = threefishSafeIv(key) // 128 bytes, hex
+	if(len(iv) != 128) {
+		log.Println("[WARNING] ThreefishEncryptCBC:", "iV Size must be 128 bytes")
+		return ""
+	} //end if
+	//--
+	block, err := threefish.New1024([]byte(derivedKey), []byte(tweak))
+	if(err != nil) {
+		log.Println("[WARNING] ThreefishEncryptCBC:", err)
+		return ""
+	} //end if
+	//fmt.Println("Threefish BlockSize is:", block.BlockSize());
+	//-- fix padding
+	var slen int = len(str)
+	var modulus int = slen % block.BlockSize()
+	if(modulus > 0) {
+		var padlen int = block.BlockSize() - modulus
+		str = RightPad2Len(str, " ", slen + padlen) // pad with spaces
+		slen = slen + padlen
+	} //end if
+	//-- encrypt
+	ciphertext := make([]byte, block.BlockSize()+slen)
+	ecbc := cipher.NewCBCEncrypter(block, []byte(iv))
+	ecbc.CryptBlocks(ciphertext[block.BlockSize():], []byte(str))
+	str = "" // no more needed
+	var encTxt string = StrTrimWhitespaces(Bin2Hex(string(ciphertext))) // prepare output
+	ciphertext = nil
+	if(StrSubstr(encTxt, 0, block.BlockSize()*2) != strings.Repeat("0", block.BlockSize()*2)) { // {{{FIX-GOLANG-THREEFISH-1ST-128-NULL-BYTES}}}
+		log.Println("[WARNING] ThreefishEncryptCBC: Invalid Hex Header")
+		return ""
+	} //end if
+	encTxt = StrTrimWhitespaces(StrSubstr(encTxt, block.BlockSize()*2, 0)) // fix: {{{FIX-GOLANG-THREEFISH-1ST-128-NULL-BYTES}}} ; there are 256 trailing zeroes that represent the HEX of 128 null bytes ; remove them
+	if(encTxt == "") {
+		log.Println("[WARNING] ThreefishEncryptCBC: Empty Hex Body") // must be some data after the 128 null bytes null header
+		return ""
+	} //end if
+	//--
+	return theSignature + Base64sEncode(Hex2Bin(encTxt)) // signature
+	//--
+} //END FUNCTION
+
+
+func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
+	//--
+	defer PanicHandler() // req. by crypto decrypt panic handler with malformed data
+	//-- check
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	var theSignature string = ""
+	var derivedKey string = "" // 128 bytes
+	if(useArgon2id == true) {
+		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
+		derivedKey = SafePassHashArgon2id824(key) // b92
+	} else {
+		theSignature = SIGNATURE_3FISH_V1_DEFAULT
+		derivedKey = threefishSafeKey(key) // ~ b92
+	} //end if else
+	if(len(derivedKey) != 128) {
+		log.Println("[WARNING] ThreefishDecryptCBC:", "Derived Key Size must be 128 bytes")
+		return ""
+	} //end if
+	var tweak string = threefishSafeTweak(key, derivedKey) // 16 bytes, hex
+	if(len(tweak) != 16) {
+		log.Println("[WARNING] ThreefishDecryptCBC:", "Tweak Size must be 16 bytes")
+		return ""
+	} //end if
+	var iv string = threefishSafeIv(key) // 128 bytes, hex
+	if(len(iv) != 128) {
+		log.Println("[WARNING] ThreefishDecryptCBC:", "iV Size must be 128 bytes")
+		return ""
+	} //end if
+	//--
+	block, err := threefish.New1024([]byte(derivedKey), []byte(tweak))
+	if(err != nil) {
+		log.Println("[WARNING] ThreefishDecryptCBC:", err)
+		return ""
+	} //end if
+	//--
+	if(StrTrimWhitespaces(theSignature) == "") {
+		log.Println("[WARNING] ThreefishDecryptCBC Empty Signature provided")
+	} //end if
+	if(!StrContains(str, theSignature)) {
+		log.Println("[WARNING] ThreefishDecryptCBC Signature was not found")
+		return ""
+	} //end if
+	sgnArr := Explode("!", str)
+	str = StrTrimWhitespaces(sgnArr[1])
+	sgnArr = nil
+	if(str == "") {
+		log.Println("[WARNING] ThreefishDecryptCBC B64s Part not found")
+		return ""
+	} //end if
+	str = Base64sDecode(str)
+	if(str == "") {
+		log.Println("[WARNING] ThreefishDecryptCBC B64s Decode Failed")
+		return ""
+	} //end if
+	str = Hex2Bin(strings.Repeat("0", block.BlockSize()*2) + Bin2Hex(str)) // fix: {{{FIX-GOLANG-THREEFISH-1ST-128-NULL-BYTES}}} ; add back the 256 trailing null bytes as HEX
+	if(str == "") {
+		log.Println("[WARNING] ThreefishDecryptCBC Hex Header Restore and Decode Failed")
+		return ""
+	} //end if
+	//--
+	et := []byte(str)
+	str = ""
+	decrypted := et[block.BlockSize():]
+	et = nil
+	if(len(decrypted) % block.BlockSize() != 0) { //-- check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
+		log.Println("[NOTICE] ThreefishDecryptCBC: decrypted is not a multiple of block.BlockSize() #", block.BlockSize())
+		return ""
+	} //end if
+	dcbc := cipher.NewCBCDecrypter(block, []byte(iv))
+	dcbc.CryptBlocks(decrypted, decrypted)
+	//--
+	return cryptoPacketCheckAndDecode(string(decrypted), "ThreefishDecryptCBC", 2)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+// PRIVATE : Blowfish key @ v1 # ONLY FOR COMPATIBILITY : DECRYPT SUPPORT ONLY
+func blowfishV1SafeKey(plainTextKey string) string {
+	//--
+	var key string = StrTrimWhitespaces(plainTextKey)
+	if(key == "") {
+		log.Println("[WARNING] blowfishV1SafeKey:", "Key is Empty !")
+		return ""
+	} //end if
+	//--
+	var safeKey string = StrSubstr(Sha512(key), 13, 29+13) + strings.ToUpper(StrSubstr(Sha1(key), 13, 10+13)) + StrSubstr(Md5(key), 13, 9+13)
+	//--
+	//log.Println("[DEBUG] BfKey (v1):", safeKey)
+	return safeKey
+	//--
+} //END FUNCTION
+
+
+// PRIVATE : Blowfish iv @ v1 # ONLY FOR COMPATIBILITY : DECRYPT SUPPORT ONLY
+func blowfishV1SafeIv(plainTextKey string) string {
+	//--
+	var key string = StrTrimWhitespaces(plainTextKey)
+	if(key == "") {
+		log.Println("[WARNING] blowfishV1SafeKey:", "Key is Empty !")
+		return ""
+	} //end if
+	//--
+	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + strings.ToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
+	safeIv = StrSubstr(safeIv, 1, 8+1)
+	//log.Println("[DEBUG] BfIv (v1):", safeIv)
+	//--
+	return safeIv
+	//--
+} //END FUNCTION
+
+
+// PRIVATE : Blowfish key {{{SYNC-BLOWFISH-KEY}}}
+func blowfishSafeKey(plainTextKey string) string {
+	//--
+	defer PanicHandler() // req. by hex2bin panic handler with malformed data
+	//--
+	var composedKey string = safePassComposedKey(plainTextKey)
+	var len_composedKey int = len(composedKey)
+	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
+	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
+		log.Println("[WARNING] blowfishSafeKey:", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		return ""
+	} //end if
+	//--
+	var derivedKey string = base92.Encode([]byte(Hex2Bin(Sha256(composedKey)))) + "'" + base92.Encode([]byte(Hex2Bin(Md5(composedKey))))
+	var safeKey string = StrSubstr(derivedKey, 0, 448/8) // 448/8
+	//log.Println("[DEBUG] BfKey:", safeKey)
+	return safeKey
+	//--
+} //END FUNCTION
+
+
+// PRIVATE : Blowfish iv {{{SYNC-BLOWFISH-IV}}}
+func blowfishSafeIv(plainTextKey string) string {
+	//--
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if(key == "") {
+		log.Println("[WARNING] blowfishSafeIv:", "Key is Empty !")
+		return ""
+	} //end if
+	//--
+	var data string = LeftPad2Len(Crc32bB36(key), "0", 8)
+	var safeIv string = StrSubstr(data + ":" + Sha1B64(key), 0, 64/8) // 64/8
+	//--
+	//log.Println("[DEBUG] BfIv:", safeIv)
+	return safeIv
+	//--
+} //END FUNCTION
+
+
+func BlowfishEncryptCBC(str string, key string) string {
+	//--
+	defer PanicHandler() // req. by blowfish encrypt panic handler with wrong padded data
+	//-- check
+	if(str == "") {
+		return ""
+	} //end if
+	//-- prepare string
+	str = Base64Encode(str)
+	cksum := Sha256B64(str)
+	str = str + SEPARATOR_CHECKSUM_V2 + cksum
+	//log.Println("[DEBUG] BfTxt: " + str)
+	//-- fix padding
+	var slen int = len(str)
+	var modulus int = slen % blowfish.BlockSize
+	if(modulus > 0) {
+		var padlen int = blowfish.BlockSize - modulus
+		str = RightPad2Len(str, " ", slen + padlen) // pad with spaces
+		slen = slen + padlen
+	} //end if
+	//--
+	var derivedKey string = blowfishSafeKey(key) // 56 bytes
+	if(len(derivedKey) != 56) {
+		log.Println("[WARNING] BlowfishEncryptCBC:", "Derived Key Size must be 56 bytes")
+		return ""
+	} //end if
+	var iv string = blowfishSafeIv(key) // 8 bytes
+	if(len(iv) != 8) {
+		log.Println("[WARNING] BlowfishEncryptCBC:", "iV Size must be 128 bytes")
+		return ""
+	} //end if
+	//-- create the cipher
+	ecipher, err := blowfish.NewCipher([]byte(derivedKey))
+	if(err != nil) {
+		log.Println("[WARNING] BlowfishEncryptCBC:", err)
+		return ""
+	} //end if
+	//-- make ciphertext big enough to store data
+	ciphertext := make([]byte, blowfish.BlockSize+slen)
 	//-- make initialisation vector {{{SYNC-BLOWFISH-IV}}}
-	eiv := []byte(blowfishSafeIv(key))
+	eiv := []byte(iv)
 	//-- create the encrypter
 	ecbc := cipher.NewCBCEncrypter(ecipher, eiv)
 	//-- encrypt the blocks, because block cipher
-	ecbc.CryptBlocks(ciphertext[blowfish.BlockSize:], ppt)
+	ecbc.CryptBlocks(ciphertext[blowfish.BlockSize:], []byte(str))
+	str = "" // no more needed
 	//-- return ciphertext to calling function
-	var encTxt string = StrTrimWhitespaces(strings.ToUpper(Bin2Hex(string(ciphertext))))
+	var encTxt string = StrTrimWhitespaces(Bin2Hex(string(ciphertext)))
 	ciphertext = nil
-	if(StrSubstr(encTxt, 0, 16) != "0000000000000000") { // {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}}
+	prePaddingSize := blowfish.BlockSize * 2
+	if(StrSubstr(encTxt, 0, prePaddingSize) != strings.Repeat("0", prePaddingSize)) { // {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}}
 		log.Println("[WARNING] BlowfishEncryptCBC: Invalid Hex Header")
 		return ""
 	} //end if
-	encTxt = StrSubstr(encTxt, 16, 0) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; there are 16 trailing zeroes that represent the HEX of 8 null bytes ; remove them
+	encTxt = StrTrimWhitespaces(StrSubstr(encTxt, prePaddingSize, 0)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; there are 16 trailing zeroes that represent the HEX of 8 null bytes ; remove them
 	if(encTxt == "") {
 		log.Println("[WARNING] BlowfishEncryptCBC: Empty Hex Body") // must be some data after the 8 bytes null header
 		return ""
 	} //end if
 	//--
-	return encTxt
+	return SIGNATURE_BFISH_V2 + Base64sEncode(Hex2Bin(encTxt))
 	//--
 } //END FUNCTION
 
 
 func BlowfishDecryptCBC(str string, key string) string {
+	//--
+	defer PanicHandler() // req. by blowfish decrypt panic handler with malformed data
 	//-- check
+	str = StrTrimWhitespaces(str)
 	if(str == "") {
 		return ""
 	} //end if
-	str = strings.ToLower(StrTrimWhitespaces(str))
-	str = Hex2Bin("0000000000000000" + str) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
+	//--
+	var versionDetected uint8 = 0
+	if(StrPos(str, SIGNATURE_BFISH_V2) == 0) {
+		versionDetected = 2;
+	} else if(StrPos(str, SIGNATURE_BFISH_V1) == 0) {
+		versionDetected = 1;
+	} else {
+		str = SIGNATURE_BFISH_V1 + str // if no signature found consider it is v1 and try to dercypt
+		versionDetected = 1;
+	} //end if
+	//--
+	sgnArr := Explode("!", str)
+	str = StrTrimWhitespaces(sgnArr[1])
+	sgnArr = nil
 	if(str == "") {
+		log.Println("[WARNING] BlowfishDecryptCBC B64s Part not found")
+		return ""
+	} //end if
+	//--
+	prePaddingSize := blowfish.BlockSize * 2
+	if(versionDetected == 1) {
+		str = Hex2Bin(strings.Repeat("0", prePaddingSize) + strings.ToLower(str)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
+	} else { // v2
+		str = Base64sDecode(str)
+		str = Hex2Bin(strings.Repeat("0", prePaddingSize) + Bin2Hex(str)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
+	} //end if else
+	if(str == "") {
+		log.Println("[WARNING] BlowfishDecryptCBC Hex Header Restore and Decode Failed")
 		return ""
 	} //end if
 	//-- cast string to bytes
 	et := []byte(str)
+	str = ""
+	//--
+	var derivedKey string = ""
+	if(versionDetected == 1) { // v1
+		derivedKey = blowfishV1SafeKey(key) // 48 bytes
+		if(len(derivedKey) != 48) {
+			log.Println("[WARNING] BlowfishDecryptCBC (v1):", "Derived Key Size must be 48 bytes")
+			return ""
+		} //end if
+	} else { // v2
+		derivedKey = blowfishSafeKey(key) // 56 bytes
+		if(len(derivedKey) != 56) {
+			log.Println("[WARNING] BlowfishDecryptCBC (v2):", "Derived Key Size must be 56 bytes")
+			return ""
+		} //end if
+	} //end if else
+	var iv string = ""
+	if(versionDetected == 1) { // v1
+		iv = blowfishV1SafeIv(key) // 8 bytes
+	} else { // v2
+		iv = blowfishSafeIv(key) // 8 bytes
+	} //end if else
+	if(len(iv) != 8) {
+		log.Println("[WARNING] BlowfishDecryptCBC:", "iV Size must be 128 bytes")
+		return ""
+	} //end if
 	//-- create the cipher
-	dcipher, err := blowfish.NewCipher([]byte(blowfishSafeKey(key)))
+	dcipher, err := blowfish.NewCipher([]byte(derivedKey))
 	if(err != nil) {
 		//-- fix this. its okay for this tester program, but...
-		log.Println("[WARNING] BlowfishDecryptCBC: ", err)
+		log.Println("[WARNING] BlowfishDecryptCBC:", err)
 		return ""
 	} //end if
 	//-- make initialisation vector {{{SYNC-BLOWFISH-IV}}}
-	div := []byte(blowfishSafeIv(key))
-	//-- check last slice of encrypted text, if it's not a modulus of cipher block size, we're in trouble
+	div := []byte(iv)
+	//-- check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
 	decrypted := et[blowfish.BlockSize:]
-	if(len(decrypted)%blowfish.BlockSize != 0) {
+	if(len(decrypted) % blowfish.BlockSize != 0) {
 		log.Println("[NOTICE] BlowfishDecryptCBC: decrypted is not a multiple of blowfish.BlockSize")
 		return ""
 	} //end if
@@ -657,43 +1164,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//-- decrypt
 	dcbc.CryptBlocks(decrypted, decrypted)
 	//--
-	str = string(decrypted)
-	decrypted = nil
-	//--
-	str = StrTrimWhitespaces(str)
-	if(str == "") {
-		log.Println("[NOTICE] Invalid BlowFishCBC Data, Empty Data after Decrypt")
-		return ""
-	} //end if
-	if(!StrContains(str, "#CHECKSUM-SHA1#")) {
-		log.Println("[NOTICE] Invalid BlowFishCBC Data, no Checksum")
-		return ""
-	} //end if
-	//--
-	darr := Explode("#CHECKSUM-SHA1#", str)
-	var dlen int = len(darr)
-	if(dlen < 2) {
-		log.Println("[NOTICE] Invalid BlowFishCBC Data, Checksum not found")
-		return ""
-	} //end if
-	darr[0] = StrTrimWhitespaces(darr[0])
-	darr[1] = StrTrimWhitespaces(darr[1])
-	if(darr[1] == "") {
-		log.Println("[NOTICE] Invalid BlowFishCBC Data, Checksum is Empty")
-		return ""
-	} //end if
-	if(darr[0] == "") {
-		log.Println("[NOTICE] Invalid BlowFishCBC Data, Encrypted Data not found")
-		return ""
-	} //end if
-	if(Sha1(darr[0]) != darr[1]) {
-		log.Println("[NOTICE] BlowfishDecryptCBC // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid")
-		return ""
-	} //end if
-	str = Base64Decode(darr[0])
-	darr = nil
-	//--
-	return str
+	return cryptoPacketCheckAndDecode(string(decrypted), "BlowfishDecryptCBC", versionDetected)
 	//--
 } //END FUNCTION
 
@@ -702,6 +1173,8 @@ func BlowfishDecryptCBC(str string, key string) string {
 
 
 func GzEncode(str string, level int) string {
+	//--
+	defer PanicHandler() // req. by gz encode panic handler with malformed data
 	//--
 	if(str == "") {
 		return ""
@@ -726,13 +1199,16 @@ func GzEncode(str string, level int) string {
 	if(out == "") {
 		log.Println("[NOTICE] GzEncode:", "Empty Arch Data")
 		return ""
-	}
+	} //end if
+	//--
 	return out
 	//--
 } //END FUNCTION
 
 
 func GzDecode(str string) string {
+	//--
+	defer PanicHandler() // req. by gz decode panic handler with malformed data
 	//--
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
@@ -754,7 +1230,8 @@ func GzDecode(str string) string {
 	if(out == "") {
 		log.Println("[NOTICE] GzDecode:", "Empty UnArch Data")
 		return ""
-	}
+	} //end if
+	//--
 	return out
 	//--
 } //END FUNCTION
@@ -764,6 +1241,8 @@ func GzDecode(str string) string {
 
 
 func GzDeflate(str string, level int) string {
+	//--
+	defer PanicHandler() // req. by gz deflate panic handler with malformed data
 	//--
 	if(str == "") {
 		return ""
@@ -788,13 +1267,16 @@ func GzDeflate(str string, level int) string {
 	if(out == "") {
 		log.Println("[NOTICE] GzDeflate:", "Empty Arch Data")
 		return ""
-	}
+	} //end if
+	//--
 	return out
 	//--
 } //END FUNCTION
 
 
 func GzInflate(str string) string {
+	//--
+	defer PanicHandler() // req. by gz inflate panic handler with malformed data
 	//--
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
@@ -812,7 +1294,8 @@ func GzInflate(str string) string {
 	if(out == "") {
 		log.Println("[NOTICE] GzInflate:", "Empty UnArch Data")
 		return ""
-	}
+	} //end if
+	//--
 	return out
 	//--
 } //END FUNCTION
@@ -823,12 +1306,15 @@ func GzInflate(str string) string {
 
 func DataUnArchive(str string) string {
 	//--
+	defer PanicHandler() // req. by gz hex2bin panic handler with malformed data
+	//--
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
 		return ""
 	} //end if
 	//--
 	arr := Explode("\n", str)
+	str = ""
 	var alen int = len(arr)
 	//--
 	arr[0] = StrTrimWhitespaces(arr[0])
@@ -837,59 +1323,91 @@ func DataUnArchive(str string) string {
 		return ""
 	} //end if
 	//--
+	var versionDetected uint8 = 0
 	if(alen < 2) {
 		log.Println("[NOTICE] Data Unarchive // Empty Package Signature")
+		//arr = append(arr, "") // fix: add missing arr[1] to avoid panic below ; no more needed as will exit below if this err happen
+		return ""
 	} else {
 		arr[1] = StrTrimWhitespaces(arr[1])
-		if(arr[1] != DATA_ARCH_SIGNATURE) {
-			log.Println("[NOTICE] Data Unarchive // Invalid Package Signature: ", arr[1])
+		if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V2) {
+			versionDetected = 2
+		} else if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V1) {
+			versionDetected = 1
+		} //end if else
+		if(versionDetected <= 0) {
+			log.Println("[NOTICE] Data Unarchive // Invalid Package (version:", versionDetected, ") Signature:", arr[1])
+			return ""
 		} //end if
 	} //end if
 	//--
 	arr[0] = Base64Decode(arr[0])
 	if(arr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid B64 Data for packet with signature: ", arr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid B64 Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
 	} //end if
 	//--
 	arr[0] = GzInflate(arr[0])
 	if(arr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid Zlib GzInflate Data for packet with signature: ", arr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid Zlib GzInflate Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
 	} //end if
 	//--
 	const txtErrExpl = "This can occur if decompression failed or an invalid packet has been assigned ..."
 	//--
-	if(!StrContains(arr[0], "#CHECKSUM-SHA1#")) {
-		log.Println("[NOTICE] Invalid Packet, no Checksum :: ", txtErrExpl)
+	var versionCksumSeparator string = ""
+	if(versionDetected == 1) {
+		versionCksumSeparator = SEPARATOR_CHECKSUM_V1
+	} else { // v2
+		versionCksumSeparator = SEPARATOR_CHECKSUM_V2
+	} //end if else
+	//--
+	if((versionCksumSeparator == "") || (!StrContains(arr[0], versionCksumSeparator))) {
+		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), no Checksum:", txtErrExpl)
 		return ""
 	} //end if
 	//--
-	darr := Explode("#CHECKSUM-SHA1#", arr[0])
+	darr := Explode(versionCksumSeparator, arr[0])
+	arr = nil
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		log.Println("[NOTICE] Invalid Packet, Checksum not found :: ", txtErrExpl)
+		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), Checksum not found:", txtErrExpl)
 		return ""
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		log.Println("[NOTICE] Invalid Packet, Checksum is Empty :: ", txtErrExpl)
+		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), Checksum is Empty:", txtErrExpl)
 		return ""
 	} //end if
 	if(darr[0] == "") {
-		log.Println("[NOTICE] Invalid Packet, Data not found :: ", txtErrExpl)
+		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), Data not found:", txtErrExpl)
 		return ""
 	} //end if
 	//--
-	darr[0] = Hex2Bin(strings.ToLower(darr[0]))
+	if(versionDetected == 1) {
+		darr[0] = Hex2Bin(strings.ToLower(darr[0]))
+	} else { // v2
+		darr[0] = Hex2Bin(darr[0])
+	} //end if else
 	if(darr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid HEX Data for packet with signature: ", arr[1])
+		log.Println("[NOTICE] Data Unarchive // Invalid HEX Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
 	} //end if
 	//--
-	if(Sha1(darr[0]) != darr[1]) {
-		log.Println("[NOTICE] Data Unarchive // Invalid Packet, Checksum FAILED :: A checksum was found but is invalid: ", darr[1])
+	var chkSignature bool = false
+	if(versionDetected == 1) {
+		if(Sha1(darr[0]) == darr[1]) {
+			chkSignature = true
+		} //end if
+	} else { // v2
+		if(Sha256(darr[0]) == darr[1]) {
+			chkSignature = true
+		} //end if
+	} //end if else
+	//--
+	if(chkSignature != true) {
+		log.Println("[NOTICE] Data Unarchive // Invalid Packet (version:", versionDetected, "), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
 		return ""
 	} //end if
 	//--
@@ -900,15 +1418,16 @@ func DataUnArchive(str string) string {
 
 func DataArchive(str string) string {
 	//--
-	var ulen int = len(str)
+	defer PanicHandler() // req. by gz deflate panic handler with malformed data
 	//--
+	var ulen int = len(str)
 	if((str == "") || (ulen <= 0)) {
 		return ""
 	} //end if
 	//--
-	var chksum string = Sha1(str)
-	//--
-	var data string = StrTrimWhitespaces(strings.ToUpper(Bin2Hex(str))) + "#CHECKSUM-SHA1#" + chksum
+	var chksum string = Sha256(str)
+	var data string = StrTrimWhitespaces(Bin2Hex(str)) + SEPARATOR_CHECKSUM_V2 + chksum
+	str = ""
 	//--
 	var arch string = GzDeflate(data, -1)
 	var alen int = len(arch)
@@ -920,24 +1439,119 @@ func DataArchive(str string) string {
 	//--
 	var ratio = float64(ulen) / float64(alen) // division by zero is checked above by (alen <= 0)
 	if(ratio <= 0) {
-		log.Println("[ERROR] Data Archive // ZLib Data Ratio is zero: ", ratio)
+		log.Println("[ERROR] Data Archive // ZLib Data Ratio is zero:", ratio)
 		return ""
 	} //end if
 	if(ratio > 32768) { // check for this bug in ZLib {{{SYNC-GZ-ARCHIVE-ERR-CHECK}}}
-		log.Println("[ERROR] Data Archive // ZLib Data Ratio is higher than 32768: ", ratio)
+		log.Println("[ERROR] Data Archive // ZLib Data Ratio is higher than 32768:", ratio)
 		return ""
 	} //end if
-//	log.Println("[DEBUG] Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
+	//log.Println("[DEBUG] Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
-	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + DATA_ARCH_SIGNATURE
+	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + SIGNATURE_SFZ_DATA_ARCH_V2
 	//--
-	var unarch_chksum string = Sha1(DataUnArchive(arch))
+	var unarch_chksum string = Sha256(DataUnArchive(arch))
 	if(unarch_chksum != chksum) {
 		log.Println("[ERROR] Data Archive // Data Encode Check Failed")
 		return ""
 	} //end if
 	//--
 	return arch
+	//-- str
+} //END FUNCTION
+
+
+//-----
+
+
+func LeftPad2Len(s string, padStr string, overallLen int) string { // LeftPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
+	//--
+	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
+	var retStr string = strings.Repeat(padStr, padCountInt) + s
+	//--
+	return retStr[(len(retStr) - overallLen):]
+	//--
+} //END FUNCTION
+
+
+func RightPad2Len(s string, padStr string, overallLen int) string { // RightPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
+	//--
+	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
+	var retStr string = s + strings.Repeat(padStr, padCountInt)
+	//--
+	return retStr[:overallLen]
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func BaseEncode(data []byte, toBase string) string {
+	//--
+	defer PanicHandler()
+	//--
+	if(toBase == "b92") {
+		return base92.Encode(data)
+	} else if(toBase == "b85") {
+		return base85.Encode(data)
+	} else if(toBase == "b64s") {
+		return Base64sEncode(string(data))
+	} else if(toBase == "b64") {
+		return Base64Encode(string(data))
+	} else if(toBase == "b62") {
+		return base62.Encode(data)
+	} else if(toBase == "b58") {
+		return base58.Encode(data)
+	} else if(toBase == "b36") {
+		return base36.Encode(data)
+	} else if(toBase == "b32") {
+		return base32.Encode(data)
+	} else if((toBase == "b16") || (toBase == "hex")) { // hex (b16)
+		return Bin2Hex(string(data))
+	} //end if else
+	//--
+	log.Println("[ERROR] BaseEncode:", "Invalid Encoding Base: `" + toBase + "`")
+	return ""
+	//--
+} //END FUNCTION
+
+
+func BaseDecode(data string, fromBase string) []byte {
+	//--
+	defer PanicHandler()
+	//--
+	var decoded []byte = nil
+	var err error = nil
+	//--
+	if(fromBase == "b92") {
+		decoded, err = base92.Decode(data)
+	} else if(fromBase == "b85") {
+		decoded, err = base85.Decode(data)
+	} else if(fromBase == "b64s") {
+		decoded = []byte(Base64sDecode(data))
+	} else if(fromBase == "b64") {
+		decoded = []byte(Base64Decode(data))
+	} else if(fromBase == "b62") {
+		decoded, err = base62.Decode(data)
+	} else if(fromBase == "b58") {
+		decoded, err = base58.Decode(data)
+	} else if(fromBase == "b36") {
+		decoded, err = base36.Decode(data)
+	} else if(fromBase == "b32") {
+		decoded, err = base32.Decode(data)
+	} else if((fromBase == "b16") || (fromBase == "hex")) { // hex (b16)
+		decoded = []byte(Hex2Bin(data))
+	} else {
+		err = errors.New("Invalid Decoding Base: `" + fromBase + "`")
+	} //end if else
+	//--
+	if(err != nil) {
+		log.Println("[ERROR] BaseDecode:", err)
+		return nil
+	} //end if
+	//--
+	return decoded
 	//--
 } //END FUNCTION
 
@@ -954,6 +1568,8 @@ func Base64Encode(data string) string {
 
 func Base64Decode(data string) string {
 	//--
+	defer PanicHandler() // req. by base64 decode panic handler with malformed data
+	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if(err != nil) {
 		log.Println("[NOTICE] Base64Decode: ", err)
@@ -965,48 +1581,30 @@ func Base64Decode(data string) string {
 } //END FUNCTION
 
 
-func Md5(str string) string {
+func Base64sEncode(data string) string {
 	//--
-	hash := md5.New()
-	io.WriteString(hash, str)
+	data = Base64Encode(data)
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	data = StrReplaceAll(data, "+", "-")
+	data = StrReplaceAll(data, "/", "_")
+	data = StrReplaceAll(data, "=", ".")
 	//--
-} //END FUNCTION
-
-
-func Sha1(str string) string {
-	//--
-	hash := sha1.New()
-	hash.Write([]byte(str))
-	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	return data
 	//--
 } //END FUNCTION
 
 
-func Sha256(str string) string {
+func Base64sDecode(data string) string {
 	//--
-	hash := sha256.New()
+	defer PanicHandler() // req. by base64 decode panic handler with malformed data
 	//--
-	hash.Write([]byte(str))
+	data = StrReplaceAll(data, ".", "=")
+	data = StrReplaceAll(data, "_", "/")
+	data = StrReplaceAll(data, "-", "+")
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	data = Base64Decode(data)
 	//--
-} //END FUNCTION
-
-
-func Sha384(str string) string {
-	//--
-	hash := sha512.New384()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	return data
 	//--
 } //END FUNCTION
 
@@ -1023,7 +1621,127 @@ func Sha512(str string) string {
 } //END FUNCTION
 
 
-//------
+func Sha512B64(str string) string {
+	//--
+	hash := sha512.New()
+	//--
+	hash.Write([]byte(str))
+	//--
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha384(str string) string {
+	//--
+	hash := sha512.New384()
+	//--
+	hash.Write([]byte(str))
+	//--
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+} //END FUNCTION
+
+
+func Sha384B64(str string) string {
+	//--
+	hash := sha512.New384()
+	//--
+	hash.Write([]byte(str))
+	//--
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha256(str string) string {
+	//--
+	hash := sha256.New()
+	//--
+	hash.Write([]byte(str))
+	//--
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+} //END FUNCTION
+
+
+func Sha256B64(str string) string {
+	//--
+	hash := sha256.New()
+	//--
+	hash.Write([]byte(str))
+	//--
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Sha1(str string) string {
+	//--
+	hash := sha1.New()
+	hash.Write([]byte(str))
+	//--
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+} //END FUNCTION
+
+
+func Sha1B64(str string) string {
+	//--
+	hash := sha1.New()
+	hash.Write([]byte(str))
+	//--
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Md5(str string) string {
+	//--
+	hash := md5.New()
+	io.WriteString(hash, str)
+	//--
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+} //END FUNCTION
+
+
+func Md5B64(str string) string {
+	//--
+	hash := md5.New()
+	io.WriteString(hash, str)
+	//--
+	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
+	//--
+} //END FUNCTION
+
+
+func Crc32b(str string) string {
+	//--
+	hash := crc32.NewIEEE()
+	hash.Write([]byte(str))
+	//--
+//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+} //END FUNCTION
+
+
+func Crc32bB36(str string) string {
+	//--
+	hash := crc32.NewIEEE()
+	hash.Write([]byte(str))
+	//--
+	return LeftPad2Len(strings.ToLower(base36.Encode(hash.Sum(nil))), "0", 7)
+	//--
+} //END FUNCTION
+
+
+//-----
 
 
 func Explode(delimiter string, text string) []string {
@@ -1311,9 +2029,37 @@ func ConvertIntToStr(i int) string {
 } //END FUNCTION
 
 
+func ConvertUIntToStr(i uint) string {
+	//--
+	return strconv.Itoa(int(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt32ToStr(i int32) string {
+	//--
+	return strconv.FormatInt(int64(i), 10)
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt32ToStr(i uint32) string {
+	//--
+	return strconv.FormatUint(uint64(i), 10)
+	//--
+} //END FUNCTION
+
+
 func ConvertInt64ToStr(i int64) string {
 	//--
 	return strconv.FormatInt(i, 10)
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt64ToStr(i uint64) string {
+	//--
+	return strconv.FormatUint(i, 10)
 	//--
 } //END FUNCTION
 
@@ -1343,6 +2089,15 @@ func ParseIntegerStrAsInt(s string) int {
 } //END FUNCTION
 
 
+func ParseIntegerStrAsUInt(s string) uint {
+	//--
+	var Int int = ParseIntegerStrAsInt(s)
+	//--
+	return uint(Int)
+	//--
+} //END FUNCTION
+
+
 func ParseIntegerStrAsInt64(s string) int64 {
 	//--
 	var Int64 int64 = 0 // set the integer as zero Int64, in the case of parseInt Error
@@ -1353,6 +2108,15 @@ func ParseIntegerStrAsInt64(s string) int64 {
 	} //end if else
 	//--
 	return Int64
+	//--
+} //END FUNCTION
+
+
+func ParseIntegerStrAsUInt64(s string) uint64 {
+	//--
+	var Int64 int64 = ParseIntegerStrAsInt64(s)
+	//--
+	return uint64(Int64)
 	//--
 } //END FUNCTION
 
@@ -1403,6 +2167,58 @@ func ParseFloatAsStrFloat(s string) string {
 } //END FUNCTION
 
 
+// ChunkSplit chunk_split()
+func StrChunkSplit(body string, chunklen uint, end string) string { // github.com/syyongx/php2go/blob/master/php.go
+	//--
+	if(end == "") {
+		return body
+	} //end if
+	//--
+	runes, erunes := []rune(body), []rune(end)
+	l := uint(len(runes))
+	if((l <= 1) || (l < chunklen)) {
+		return body + end
+	} //end if
+	ns := make([]rune, 0, len(runes)+len(erunes))
+	var i uint
+	for i = 0; i < l; i += chunklen {
+		if(i+chunklen > l) {
+			ns = append(ns, runes[i:]...)
+		} else {
+			ns = append(ns, runes[i:i+chunklen]...)
+		} //end if else
+		ns = append(ns, erunes...)
+	} //end for
+	//--
+	return string(ns)
+	//--
+} //END FUNCTION
+
+
+// StrWordCount str_word_count()
+func StrWordCount(str string) []string { // github.com/syyongx/php2go/blob/master/php.go
+	//--
+	return strings.Fields(str)
+	//--
+} //END FUNCTION
+
+
+// Strlen strlen()
+func StrLen(str string) int {
+	//--
+	return len(str)
+	//--
+} //END FUNCTION
+
+
+// MbStrlen mb_strlen()
+func StrUnicodeLen(str string) int { // github.com/syyongx/php2go/blob/master/php.go
+	//--
+	return utf8.RuneCountInString(str)
+	//--
+} //END FUNCTION
+
+
 //== PRIVATE
 func isUnicodeNonspacingMarks(r rune) bool {
 	//--
@@ -1413,6 +2229,8 @@ func isUnicodeNonspacingMarks(r rune) bool {
 
 
 func StrDeaccent(s string) string {
+	//--
+	defer PanicHandler() // req. by transform panic handler with malformed data
 	//--
 	if(s == "") {
 		return ""
@@ -1511,6 +2329,8 @@ func Bin2Hex(str string) string { // inspired from: https://www.php2golang.com/
 
 func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 	//--
+	defer PanicHandler() // req. by hex2bin panic handler with malformed data
+	//--
 	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
 		log.Println("[NOTICE] Hex2Bin: ", err)
@@ -1522,43 +2342,62 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 } //END FUNCTION
 
 
-func JsonEncode(data interface{}) string { // inspired from: https://www.php2golang.com/method/function.json-encode.html
+func jsonEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
+	//-- no need any panic handler
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(htmlsafe)
+	if(prettyprint == true) {
+		encoder.SetIndent("", "    ") // 4 spaces
+	} //end if
 	//--
-	jsons, err := json.Marshal(data)
+	err := encoder.Encode(data)
 	if(err != nil) {
-		log.Println("[NOTICE] JsonEncode: ", err)
+		log.Println("[NOTICE] JsonEncode Failed:", err)
 		return ""
 	} //end if
 	//--
-	var safeJson string = string(jsons)
-	jsons = nil
-	//-- this JSON string are replaced by Marshall, but just in case try to replace them if Marshall fail ; they will not be 100% like the one produced via PHP with HTML-Safe arguments but at least have the minimum escapes to avoid conflicting HTML tags
-	safeJson = StrReplaceAll(safeJson, "&", "\\u0026") 		// & 	JSON_HEX_AMP                           ; already done by json.Marshal, but let in just in case if Marshall fails
-	safeJson = StrReplaceAll(safeJson, "<", "\\u003C") 		// < 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
-	safeJson = StrReplaceAll(safeJson, ">", "\\u003E") 		// > 	JSON_HEX_TAG (use uppercase as in PHP) ; already done by json.Marshal, but let in just in case if Marshall fails
-	//-- these three are not done by json.Marshal
-	safeJson = StrReplaceAll(safeJson, "/", "\\/") 			// / 	JSON_UNESCAPED_SLASHES
-	safeJson = StrReplaceAll(safeJson, "\\\"", "\\u0022") 	// \" 	JSON_HEX_QUOT
-	safeJson = StrTrimWhitespaces(safeJson)
-	//-- Fixes: the JSON Marshall does not make the JSON to be HTML-Safe, thus we need several minimal replacements: https://www.drupal.org/node/479368 + escape / (slash)
-	var out bytes.Buffer
-	json.HTMLEscape(&out, []byte(safeJson)) // just in case, HTMLEscape appends to dst the JSON-encoded src with <, >, &, U+2028 and U+2029 characters inside string literals changed to \u003c, \u003e, \u0026, \u2028, \u2029 so that the JSON will be safe to embed inside HTML
-	safeJson = ""
-	return out.String()
+	return StrTrimWhitespaces(buffer.String()) // must trim as will add a new line at the end ...
 	//--
 } //END FUNCTION
 
 
-func JsonDecode(data string) map[string]interface{} { // inspired from: https://www.php2golang.com/method/function.json-decode.html
+func JsonEncodePretty(data interface{}) string { // HTML Safe, Pretty
 	//--
+	return jsonEncode(data, true, true)
+	//--
+} //END FUNCTION
+func JsonRawEncodePretty(data interface{}) string { // HTML Not Safe (raw), Pretty
+	//--
+	return jsonEncode(data, true, false)
+	//--
+} //END FUNCTION
+
+
+func JsonEncode(data interface{}) string { // HTML Safe
+	//--
+	return jsonEncode(data, false, true)
+	//--
+} //END FUNCTION
+func JsonRawEncode(data interface{}) string { // HTML Not Safe (raw)
+	//--
+	return jsonEncode(data, false, false)
+	//--
+} //END FUNCTION
+
+
+func JsonDecode(data string) map[string]interface{} {
+	//-- no need any panic handler
 	if(data == "") {
 		return nil
 	} //end if
 	//--
 	var dat map[string]interface{}
-	err := json.Unmarshal([]byte(data), &dat)
+	dataReader := strings.NewReader(data)
+	decoder := json.NewDecoder(dataReader)
+	err := decoder.Decode(&dat)
 	if(err != nil) {
-		//log.Println("[NOTICE] JsonDecode: ", err)
+		log.Println("[NOTICE] JsonDecode Failed:", err)
 		return nil
 	} //end if
 	//--
@@ -1667,6 +2506,8 @@ func RawUrlEncode(s string) string {
 
 
 func RawUrlDecode(s string) string {
+	//--
+	defer PanicHandler() // req. by raw url decode panic handler with malformed data
 	//--
 	u, _ := url.QueryUnescape(StrReplaceAll(s, "%20", "+"))
 	//--
@@ -2659,6 +3500,8 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = Bin2Hex(tmp_marker_val)
 							} else if(escaping == "|b64") { // Apply Base64 Encode
 								tmp_marker_val = Base64Encode(tmp_marker_val)
+							} else if(escaping == "|sha1") { // Apply SHA1 Encode
+								tmp_marker_val = Sha1(tmp_marker_val)
 							} else {
 								log.Println("[WARNING] MarkersTplRender: {### Invalid or Undefined Escaping " + escaping + " [" + ConvertIntToStr(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + ConvertIntToStr(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
 							} //end if
