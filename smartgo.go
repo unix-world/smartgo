@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2021 unix-world.org
-// r.20210821.0243 :: STABLE
+// (c) 2020-2022 unix-world.org
+// r.20220303.1232 :: STABLE
 
 package smartgo
 
@@ -43,6 +43,7 @@ import (
 	"encoding/hex"
 	"encoding/base64"
 
+	"hash"
 	"hash/crc32"
 	"crypto/md5"
 	"crypto/sha1"
@@ -2706,6 +2707,21 @@ func PathGetCurrentExecutableName() string {
 } //END FUNCTION
 
 
+func PathGetCurrentExecutableDir() string {
+	//--
+	currentExecutableAbsolutePath, err := os.Executable()
+	if(err != nil) {
+		return ""
+	} //end if
+	if(currentExecutableAbsolutePath == "") {
+		return ""
+	} //end if
+	//--
+	return PathDirName(currentExecutableAbsolutePath)
+	//--
+} //END FUNCTION
+
+
 //-----
 
 
@@ -2961,6 +2977,55 @@ func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, e
 	hexMd5 := strings.ToLower(hex.EncodeToString(h.Sum(nil)))
 	//--
 	return hexMd5, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hashSum string, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return "", errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return "", errors.New("WARNING: File Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return "", errors.New("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return "", errors.New("WARNING: File Path is a Directory not a File").Error()
+	} //end if
+	//--
+	var h hash.Hash
+	if(mode == "sha512") {
+		h = sha512.New()
+	} else if(mode == "sha256") {
+		h = sha256.New()
+	} else if(mode == "sha1") {
+		h = sha1.New()
+	} //end if else
+	if(h == nil) {
+		return "", errors.New("WARNING: Invalid Mode: `" + mode + "`").Error()
+	} //end if
+	//--
+	f, err := os.Open(filePath)
+	if(err != nil) {
+		return "", err.Error()
+	} //end if
+	defer f.Close()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err.Error()
+	} //end if
+	//--
+//	hexSha := strings.ToLower(fmt.Sprintf("%x", h.Sum(nil)))
+	hexSha := strings.ToLower(hex.EncodeToString(h.Sum(nil)))
+	//--
+	return hexSha, ""
 	//--
 } //END FUNCTION
 
