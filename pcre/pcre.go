@@ -26,7 +26,7 @@
 // http://www.pcre.org/pcre.txt
 
 // (c) 2022 unix-world.org
-// v.2022.03.13.01.12
+// v.20220317.0255
 
 package pcre
 
@@ -214,8 +214,8 @@ func pcregroups(ptr *C.pcre) (count C.int) {
 func ParseFlags(ptr string) (string, int) {
 	fReg := MustCompile("^\\(\\?[a-zA-Z]+?\\)", 0)
 	flags := 0
-	for fStr := fReg.FindString(ptr, 0); fStr != ""; ptr = ptr[len(fStr):] {
-		fStr = fReg.FindString(ptr, 0)
+	for fStr := fReg.findString(ptr, 0); fStr != ""; ptr = ptr[len(fStr):] {
+		fStr = fReg.findString(ptr, 0)
 		if strings.Contains(fStr, "i") {
 			flags = flags | CASELESS
 		}
@@ -368,7 +368,7 @@ func MustCompileParseJIT(pattern string, flags int) (re Regexp) {
 	return
 }
 
-// Return the start and end of the first match.
+// Return the start and end of all matches.
 func (re *Regexp) FindAllIndex(bytes []byte, flags int) (r [][]int) {
 	m := re.Matcher(bytes, flags)
 	offset := 0
@@ -391,7 +391,7 @@ func (re *Regexp) FindIndex(bytes []byte, flags int) []int {
 
 // Return the start and end of the first match, or nil if no match.
 // loc[0] is the start and loc[1] is the end.
-func (re *Regexp) FindString(s string, flags int) string {
+func (re *Regexp) findString(s string, flags int) string {
 	m := re.Matcher([]byte(s), flags)
 	if m.Matches {
 		return s[int(m.ovector[0]):int(m.ovector[1])]
@@ -465,12 +465,13 @@ func (re *Regexp) study(flags int) error {
 // or they can be initialized with Reset.
 type Matcher struct {
 	re       Regexp
-	Groups   int
 	ovector  []int32 // space for capture offsets, int32 is analogfor C.int type
+	Groups   int     // matched groups
 	Matches  bool    // last match was successful
-	Error    error   // pcre_exec error from last match
 	Partial  bool    // was the last match a partial match?
 	SubjectB []byte  // contain finded subject as []byte
+	SubjectL int     // the subject length (bug fix by unixman to avoid PCRE overflow)
+	Error    error   // pcre_exec error from last match
 }
 
 // Tries to match the speficied byte array slice to the current
@@ -482,6 +483,7 @@ func (m *Matcher) Exec(subject []byte, flags int) int {
 	}
 	length := len(subject)
 	m.SubjectB = subject
+	m.SubjectL = length
 	if length == 0 {
 		subject = nullbyte // make first character adressable
 	}
@@ -521,6 +523,7 @@ func (m *Matcher) Extract() [][]byte {
 		for i := 0; i < m.Groups+1; i++ {
 			captured_texts[i] = m.Group(i)
 		}
+		//-- #end fix
 		return captured_texts
 	} else {
 		return nil
@@ -529,6 +532,7 @@ func (m *Matcher) Extract() [][]byte {
 
 // Same as Extract, but returns []string
 func (m *Matcher) ExtractString() []string {
+	//-- fix: completely changed by unixman, as it was buggy
 	captured_texts := m.Extract()
 	if(captured_texts == nil) {
 		return nil
@@ -538,6 +542,7 @@ func (m *Matcher) ExtractString() []string {
 		captured_str_texts[i] = string(captured_texts[i])
 	}
 	return captured_str_texts
+	//-- #end fix
 }
 
 func (m *Matcher) init(re Regexp) {
@@ -566,7 +571,11 @@ func (m *Matcher) Group(group int) []byte {
 	start := m.ovector[2*group]
 	end := m.ovector[2*group+1]
 	if start >= 0 {
-		return m.SubjectB[start:end]
+		if(uint64(start) <= uint64(m.SubjectL)) {
+			return m.SubjectB[start:end]
+	//	} else {
+	//		fmt.Println("!!!!!!!!!!!!!!!!! BUG:PCRE#OVERFLOW !!!", start, end)
+		}
 	}
 	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unix-world/smartgo/dynamic-struct"
+	"github.com/ompluscator/dynamic-struct"
 	"gopkg.in/go-playground/validator.v9"
 )
 
