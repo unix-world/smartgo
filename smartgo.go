@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220303.1232 :: STABLE
+// r.20220321.2212 :: STABLE
 
 package smartgo
 
@@ -3432,7 +3432,7 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 } //END FUNCTION
 
 
-func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // r.20210604
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // syntax: r.20210604 ; v.20220321
 	//--
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
@@ -3443,7 +3443,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	template = StrTrimWhitespaces(template)
 	//-- replace out comments
 	if((StrContains(template, "[%%%COMMENT%%%]")) && (StrContains(template, "[%%%/COMMENT%%%]"))) {
-		template = StrRegexReplaceAll(`(?sU)\s?\[%%%COMMENT%%%\](.*)?\[%%%\/COMMENT%%%\]\s?`, template, "") // regex syntax as in PHP
+		template = StrRegexReplaceAll(`(?s)\s??\[%%%COMMENT%%%\](.*?)??\[%%%\/COMMENT%%%\]\s??`, template, "") // regex syntax as in PHP
 	} //end if
 	//-- process markers
 	var re = regexp.MustCompile(`\[###([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)###\]`) // regex markers as in Javascript
