@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220321.2212 :: STABLE
+// r.20220323.1640 :: STABLE
 
 package smartgo
 
@@ -92,6 +92,26 @@ const ( // DO NOT MODIFY THESE CONSTANTS ... EVER !
 	SIGNATURE_3FISH_V1_ARGON2ID = "3f1kA.v1!" 							// current, v1 (argon2id) ; encrypt + decrypt
 
 	FIXED_CRYPTO_SALT = "Smart Framework # スマート フレームワーク" 		// fixed salt data for various crypto contexts
+
+	SVG_SPIN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="grey" id="loading-spin-svg"><path opacity=".25" d="M16 0 A16 16 0 0 0 16 32 A16 16 0 0 0 16 0 M16 4 A12 12 0 0 1 16 28 A12 12 0 0 1 16 4"/><path d="M16 0 A16 16 0 0 1 32 16 L28 16 A12 12 0 0 0 16 4z"><animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite" /></path></svg>`
+
+	HTML_CONTENT_HEADER = "text/html; charset=UTF-8" // keep separate, can be used also by HTTP Headers: Content-Type
+	HTML_TPL = `<!DOCTYPE html>
+<!-- TPL.SmartGo -->
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
+<title>[###TITLE|html###]</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+[###HEAD-HTML###]
+</head>
+<body>
+[###BODY-HTML###]
+</body>
+</html>
+<!-- #end TPL -->
+`
 )
 
 
@@ -2037,6 +2057,20 @@ func ConvertUIntToStr(i uint) string {
 } //END FUNCTION
 
 
+func ConvertInt16ToStr(i int16) string {
+	//--
+	return strconv.FormatInt(int64(i), 10)
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt16ToStr(i uint16) string {
+	//--
+	return strconv.FormatUint(uint64(i), 10)
+	//--
+} //END FUNCTION
+
+
 func ConvertInt32ToStr(i int32) string {
 	//--
 	return strconv.FormatInt(int64(i), 10)
@@ -3602,6 +3636,22 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 func MarkersTplEscapeTpl(template string) string {
 	//--
 	return RawUrlEncode(template)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HtmlSimpleTemplate(titleText string, headHtml string, bodyHtml string) string {
+	//--
+	var arr = map[string]string{
+		"TITLE": 		titleText,
+		"HEAD-HTML": 	headHtml,
+		"BODY-HTML": 	bodyHtml,
+	}
+	//--
+	return MarkersTplRender(HTML_TPL, arr, false, false) + "\n"
 	//--
 } //END FUNCTION
 
