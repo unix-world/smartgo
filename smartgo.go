@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220323.1640 :: STABLE
+// r.20220331.2258 :: STABLE
 
 package smartgo
 
@@ -3397,29 +3397,53 @@ func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int6
 //-----
 
 
-func MarkersTplPrepareNosyntaxHtml(tpl string) string {
+func MarkersTplEscapeSyntaxContent(tpl string, isMainHtml bool) string {
 	//--
 	if(tpl == "") {
 		return ""
 	} //end if
 	//--
-	tpl = StrReplaceAll(tpl, "[###", "&lbrack;###")
-	tpl = StrReplaceAll(tpl, "###]", "###&rbrack;")
-	tpl = StrReplaceAll(tpl, "[%%%", "&lbrack;%%%")
-	tpl = StrReplaceAll(tpl, "%%%]", "%%%&rbrack;")
-	tpl = StrReplaceAll(tpl, "[@@@", "&lbrack;@@@")
-	tpl = StrReplaceAll(tpl, "@@@]", "@@@&rbrack;")
-	tpl = StrReplaceAll(tpl, "[:::", "&lbrack;:::")
-	tpl = StrReplaceAll(tpl, ":::]", ":::&rbrack;")
+	tpl = StrReplaceAll(tpl, "[###", "⁅###¦")
+	tpl = StrReplaceAll(tpl, "###]", "¦###⁆")
+	tpl = StrReplaceAll(tpl, "[%%%", "⁅%%%¦")
+	tpl = StrReplaceAll(tpl, "%%%]", "¦%%%⁆")
+	tpl = StrReplaceAll(tpl, "[@@@", "⁅@@@¦")
+	tpl = StrReplaceAll(tpl, "@@@]", "¦@@@⁆")
+	if(isMainHtml == false) { // for a main template these must remain to be able to post replace placeholders
+		tpl = StrReplaceAll(tpl, "[:::", "⁅:::¦")
+		tpl = StrReplaceAll(tpl, ":::]", "¦:::⁆")
+	} //end if
 	//--
-	tpl = StrReplaceAll(tpl, "［###", "&lbrack;###")
-	tpl = StrReplaceAll(tpl, "###］", "###&rbrack;")
-	tpl = StrReplaceAll(tpl, "［%%%", "&lbrack;%%%")
-	tpl = StrReplaceAll(tpl, "%%%］", "%%%&rbrack;")
-	tpl = StrReplaceAll(tpl, "［@@@", "&lbrack;@@@")
-	tpl = StrReplaceAll(tpl, "@@@］", "@@@&rbrack;")
-	tpl = StrReplaceAll(tpl, "［:::", "&lbrack;:::")
-	tpl = StrReplaceAll(tpl, ":::］", ":::&rbrack;")
+	return tpl
+	//--
+} //END FUNCTION
+
+
+func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
+	//--
+	if(tpl == "") {
+		return ""
+	} //end if
+	//--
+	tpl = StrReplaceAll(tpl, "[###", "&lbrack;&num;&num;&num;")
+	tpl = StrReplaceAll(tpl, "###]", "&num;&num;&num;&rbrack;")
+	tpl = StrReplaceAll(tpl, "[%%%", "&lbrack;&percnt;&percnt;&percnt;")
+	tpl = StrReplaceAll(tpl, "%%%]", "&percnt;&percnt;&percnt;&rbrack;")
+	tpl = StrReplaceAll(tpl, "[@@@", "&lbrack;&commat;&commat;&commat;")
+	tpl = StrReplaceAll(tpl, "@@@]", "&commat;&commat;&commat;&rbrack;")
+	if(isMainHtml == false) { // for a main template these must remain to be able to post replace placeholders
+		tpl = StrReplaceAll(tpl, "[:::", "&lbrack;&colon;&colon;&colon;")
+		tpl = StrReplaceAll(tpl, ":::]", "&colon;&colon;&colon;&rbrack;")
+	} //end if
+	//--
+	tpl = StrReplaceAll(tpl, "［###", "&lbrack;&num;&num;&num;")
+	tpl = StrReplaceAll(tpl, "###］", "&num;&num;&num;&rbrack;")
+	tpl = StrReplaceAll(tpl, "［%%%", "&lbrack;&percnt;&percnt;&percnt;")
+	tpl = StrReplaceAll(tpl, "%%%］", "&percnt;&percnt;&percnt;&rbrack;")
+	tpl = StrReplaceAll(tpl, "［@@@", "&lbrack;&commat;&commat;&commat;")
+	tpl = StrReplaceAll(tpl, "@@@］", "&commat;&commat;&commat;&rbrack;")
+	tpl = StrReplaceAll(tpl, "［:::", "&lbrack;&colon;&colon;&colon;")
+	tpl = StrReplaceAll(tpl, ":::］", "&colon;&colon;&colon;&rbrack;")
 	//--
 	return tpl
 	//--
@@ -3466,8 +3490,8 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 } //END FUNCTION
 
 
-func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool) string { // syntax: r.20210604 ; v.20220321
-	//--
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
+	//-- syntax: r.20220331
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
 	} //end if
@@ -3479,12 +3503,132 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	if((StrContains(template, "[%%%COMMENT%%%]")) && (StrContains(template, "[%%%/COMMENT%%%]"))) {
 		template = StrRegexReplaceAll(`(?s)\s??\[%%%COMMENT%%%\](.*?)??\[%%%\/COMMENT%%%\]\s??`, template, "") // regex syntax as in PHP
 	} //end if
+	//-- process ifs (conditionals)
+	var regexIfVarName = `^[a-zA-Z0-9_\-]+$`
+	var regexIfs = regexp.MustCompile(`(?s)(\[%%%IF\:([a-zA-Z0-9_\-]+)\:(\=\=|\!\=){1}(.*?)(;%%%\]){1}){1}(.*?)((\[%%%ELSE\:([a-zA-Z0-9_\-]+)%%%\])(.*?)){0,1}(\[%%%\/IF\:([a-zA-Z0-9_\-]+)%%%\]){1}`) // Go lang have no backreferences in regex, thus it is too complex at the moment to process nested ifs, thus does not support also (0..9) terminators ; because there is no support for loops yet, dissalow "." in variable names ; also operations between different data type gets too much overhead ; thus keep is simple: no nested if syntax ; allow only (strings): == != ; {{{SYNC-MTPL-IFS-OPERATIONS}}}
+	for c, imatch := range regexIfs.FindAllStringSubmatch(template, -1) {
+		//--
+		var tmp_ifs_cond_block string 		= string(imatch[0]) 					// the whole conditional block [%%%IF:VARNAME:==xyz;%%%] .. ([%%%ELSE:VARNAME%%%] ..) [%%%/IF:VARNAME%%%]
+		var tmp_ifs_part_if string			= string(imatch[6]) 					// the part between IF and ELSE ; or the part between IF and /IF in the case that ELSE is missing
+		var tmp_ifs_part_else string		= string(imatch[10]) 					// the part between ELSE and /IF
+		var tmp_ifs_tag_if string			= string(imatch[1]) 					// [%%%IF:VARNAME:==xyz;%%%]
+		var tmp_ifs_tag_else string			= string(imatch[8]) 					// [%%%ELSE:VARNAME%%%]
+		var tmp_ifs_tag_endif string 		= string(imatch[11]) 					// [%%%/IF:VARNAME%%%]
+		var tmp_ifs_var_if string 			= string(imatch[2]) 					// the 'VARNAME' part of IF
+		var tmp_ifs_var_else string 		= string(imatch[9]) 					// the 'VARNAME' part of ELSE
+		var tmp_ifs_var_endif string 		= string(imatch[12]) 					// the 'VARNAME' part of \IF
+		var tmp_ifs_operation string 		= string(imatch[3]) 					// the IF operation ; at the moment just '==' or '!=' are supported
+		var tmp_ifs_value string 			= string(imatch[4]) 					// the IF value to compare the VARNAME with
+		//--
+	//	log.Println("[DEBUG] ---------- : `" + tmp_ifs_cond_block + "`")
+	//	log.Println("[DEBUG] [IF] : `" + tmp_ifs_tag_if + "`")
+	//	log.Println("[DEBUG] [IF] VAR : `" + tmp_ifs_var_if + "`")
+	//	log.Println("[DEBUG] [IF] OPERATION : `" + tmp_ifs_operation + "`")
+	//	log.Println("[DEBUG] [IF] VALUE : `" + tmp_ifs_value + "`")
+	//	log.Println("[DEBUG] [IF] PART : `" + tmp_ifs_part_if + "`")
+	//	log.Println("[DEBUG] [ELSE] : `" + tmp_ifs_tag_else + "`")
+	//	log.Println("[DEBUG] [ELSE] VAR : `" + tmp_ifs_var_else + "`")
+	//	log.Println("[DEBUG] [ELSE] PART : `" + tmp_ifs_part_else + "`")
+	//	log.Println("[DEBUG] [/IF] : `" + tmp_ifs_tag_endif + "`")
+	//	log.Println("[DEBUG] [/IF] VAR : `" + tmp_ifs_var_endif + "`")
+		//--
+		var isConditionalBlockERR string = ""
+		//-- check the conditional block: should not be empty
+		if(isConditionalBlockERR == "") {
+			if(StrTrimWhitespaces(tmp_ifs_cond_block) == "") {
+				isConditionalBlockERR = "Conditional IF/(ELSE)/IF block is empty"
+			} //end if
+		} //end if
+		//-- check if tag: should not be empty
+		if(isConditionalBlockERR == "") {
+			if(StrTrimWhitespaces(tmp_ifs_tag_if) == "") {
+				isConditionalBlockERR = "IF tag is empty"
+			} //end if
+		} //end if
+		//-- check /if tag: should not be empty
+		if(isConditionalBlockERR == "") {
+			if(StrTrimWhitespaces(tmp_ifs_tag_endif) == "") {
+				isConditionalBlockERR = "/IF tag is empty"
+			} //end if
+		} //end if
+		//-- check if var: should not be empty
+		if(isConditionalBlockERR == "") {
+			if(StrTrimWhitespaces(tmp_ifs_var_if) == "") {
+				isConditionalBlockERR = "IF var name is empty"
+			} //end if
+		} //end if
+		//-- check if var: should match a particular regex
+		if(isConditionalBlockERR == "") {
+			if(!StrRegexMatchString(regexIfVarName, tmp_ifs_var_if)) {
+				isConditionalBlockERR = "IF var name is invalid: `" + tmp_ifs_var_if + "`"
+			} //end if
+		} //end if
+		//-- check if var vs. endif var: should be the same
+		if(isConditionalBlockERR == "") {
+			if(tmp_ifs_var_if != tmp_ifs_var_endif) {
+				isConditionalBlockERR = "IF var `" + tmp_ifs_var_if + "` name does not match /IF var name `" + tmp_ifs_var_endif + "`"
+			} //end if
+		} //end if
+		//-- check if var vs. else var (just in the case that else tag exists): should be the same, in the given case only
+		if(isConditionalBlockERR == "") {
+			if(tmp_ifs_tag_else != "") { // else tag is missing
+				if(tmp_ifs_var_if != tmp_ifs_var_else) {
+					isConditionalBlockERR = "IF var name `" + tmp_ifs_var_if + "` does not match ELSE var name `" + tmp_ifs_var_else + "`"
+				} //end if
+			} //end if
+		} //end if
+		//-- check if operation
+		if(isConditionalBlockERR == "") {
+			if((tmp_ifs_operation != "==") && (tmp_ifs_operation != "!=")) { // {{{SYNC-MTPL-IFS-OPERATIONS}}}
+				isConditionalBlockERR = "IF operation is invalid: `" + tmp_ifs_operation + "`"
+			} //end if
+		} //end if
+		//-- get the value and exists from arrobj by if var name as key
+		iKeyValue, iKeyExists := arrobj[tmp_ifs_var_if]
+		//--
+		if(isConditionalBlockERR == "") {
+			if(!iKeyExists) {
+				isConditionalBlockERR = "IF var name `" + tmp_ifs_var_if + "` is invalid: does not exists"
+			} //end if
+		} //end if
+		//--
+		if(isConditionalBlockERR == "") {
+			//--
+			var theConditionalResult = ""
+			//--
+			if(tmp_ifs_operation == "==") {
+				if(iKeyValue == tmp_ifs_value) {
+					theConditionalResult = tmp_ifs_part_if
+				} else {
+					theConditionalResult = tmp_ifs_part_else
+				} //end if else
+			} else if(tmp_ifs_operation == "!=") {
+				if(iKeyValue != tmp_ifs_value) {
+					theConditionalResult = tmp_ifs_part_if
+				} else {
+					theConditionalResult = tmp_ifs_part_else
+				} //end if else
+			} else { // ERR
+				isConditionalBlockERR = "IF operation mismatch: `" + tmp_ifs_operation + "`"
+			} //end if else
+			//--
+			if(isConditionalBlockERR == "") {
+				template = StrReplaceWithLimit(template, tmp_ifs_cond_block, theConditionalResult, 1) // MUST REPLACE ONLY THE FIRST OCCURENCE
+			} //end if
+			//--
+		} //end if
+		//--
+		if(isConditionalBlockERR != "") {
+			log.Println("[WARNING] MarkersTplRender: {### Invalid Conditional #" + ConvertIntToStr(c) + ": [" + isConditionalBlockERR + "] for Block `" + tmp_ifs_cond_block + "`" + " ###}")
+		} //end if
+		//--
+	} //end for
 	//-- process markers
-	var re = regexp.MustCompile(`\[###([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)###\]`) // regex markers as in Javascript
-	for i, match := range re.FindAllStringSubmatch(template, -1) {
+	var regexMarkers = regexp.MustCompile(`\[\#\#\#([A-Z0-9_\-\.]+)((\|[a-z0-9]+)*)\#\#\#\]`) // regex markers as in Javascript {{{SYNC-REGEX-MARKER-TEMPLATES}}}
+	for i, match := range regexMarkers.FindAllStringSubmatch(template, -1) {
 		//--
 		var tmp_marker_val string			= "" 									// just initialize
-		var tmp_marker_id string			= string(match[0]) 						// [###THE-MARKER|escapings...###]
+		var tmp_marker_id  string			= string(match[0]) 						// [###THE-MARKER|escapings...###]
 		var tmp_marker_key string			= string(match[1]) 						// THE-MARKER
 		var tmp_marker_esc string			= string(match[2]) 						// |escaping1(|escaping2...|escaping99)
 		//--
@@ -3594,7 +3738,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "<", "‹", -1) // replace all
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, ">", "›", -1) // replace all
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
-								tmp_marker_val = MarkersTplPrepareNosyntaxHtml(tmp_marker_val)
+								tmp_marker_val = MarkersTplPrepareNosyntaxHtml(tmp_marker_val, false)
 							} else if(escaping == "|hex") { // Apply Bin2Hex Encode
 								tmp_marker_val = Bin2Hex(tmp_marker_val)
 							} else if(escaping == "|b64") { // Apply Base64 Encode
@@ -3628,6 +3772,31 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 		template = StrReplaceAll(template, "[%%%|SPACE%%%]", " ")
 	} //end if
 	//--
+	if(escapeRemainingSyntax == true) {
+		//--
+		if(isMainHtml == false) {
+			if(StrContains(template, "[:::")) {
+				log.Println("[WARNING] MarkersTplRender: {### Undefined Placeholders detected in Template ###}")
+			} //end if
+		} //end if
+		if(StrContains(template, "[###")) {
+			log.Println("[WARNING] MarkersTplRender: {### Undefined Markers detected in Template ###}")
+		} //end if
+		if(StrContains(template, "[%%%")) {
+			log.Println("[WARNING] MarkersTplRender: {### Undefined Marker Syntax detected in Template ###}")
+		} //end if
+		if(StrContains(template, "[@@@")) {
+			log.Println("[WARNING] MarkersTplRender: {### Undefined Marker Sub-Templates detected in Template ###}")
+		} //end if
+		//--
+		template = MarkersTplEscapeSyntaxContent(template, isMainHtml) // this will not escape the syntax already prepared by MarkersTplPrepareNosyntaxContent (PrepareNosyntax) that comes from a value, but only remaining syntax
+		//--
+	} //end if
+	//--
+	if(isMainHtml == true) {
+		template = MarkersTplPrepareNosyntaxHtml(template, true) // this will revert to html entities the Syntax or PrepareNosyntax ; but in the case if syntax is escaped above, will just process PrepareNosyntax
+	} //end if
+	//--
 	return template
 	//--
 } //END FUNCTION
@@ -3651,7 +3820,7 @@ func HtmlSimpleTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"BODY-HTML": 	bodyHtml,
 	}
 	//--
-	return MarkersTplRender(HTML_TPL, arr, false, false) + "\n"
+	return MarkersTplRender(HTML_TPL, arr, false, false, true, true) + "\n" // escape remaining syntax + is main html
 	//--
 } //END FUNCTION
 
