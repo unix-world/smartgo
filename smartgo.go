@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220331.2258 :: STABLE
+// r.20220402.0148 :: STABLE
 
 package smartgo
 
@@ -93,25 +93,6 @@ const ( // DO NOT MODIFY THESE CONSTANTS ... EVER !
 
 	FIXED_CRYPTO_SALT = "Smart Framework # スマート フレームワーク" 		// fixed salt data for various crypto contexts
 
-	SVG_SPIN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="grey" id="loading-spin-svg"><path opacity=".25" d="M16 0 A16 16 0 0 0 16 32 A16 16 0 0 0 16 0 M16 4 A12 12 0 0 1 16 28 A12 12 0 0 1 16 4"/><path d="M16 0 A16 16 0 0 1 32 16 L28 16 A12 12 0 0 0 16 4z"><animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite" /></path></svg>`
-
-	HTML_CONTENT_HEADER = "text/html; charset=UTF-8" // keep separate, can be used also by HTTP Headers: Content-Type
-	HTML_TPL = `<!DOCTYPE html>
-<!-- TPL.SmartGo -->
-<html>
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
-<title>[###TITLE|html###]</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-[###HEAD-HTML###]
-</head>
-<body>
-[###BODY-HTML###]
-</body>
-</html>
-<!-- #end TPL -->
-`
 )
 
 
@@ -3397,6 +3378,13 @@ func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int6
 //-----
 
 
+func MarkersTplEscapeTpl(template string) string {
+	//--
+	return RawUrlEncode(template)
+	//--
+} //END FUNCTION
+
+
 func MarkersTplEscapeSyntaxContent(tpl string, isMainHtml bool) string {
 	//--
 	if(tpl == "") {
@@ -3802,9 +3790,16 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 } //END FUNCTION
 
 
-func MarkersTplEscapeTpl(template string) string {
+func RenderMainMarkersTpl(template string, arrobj map[string]string) string {
 	//--
-	return RawUrlEncode(template)
+	return MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
+	//--
+} //END FUNCTION
+
+
+func RenderMarkersTpl(template string, arrobj map[string]string) string {
+	//--
+	return MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
 	//--
 } //END FUNCTION
 
@@ -3820,7 +3815,7 @@ func HtmlSimpleTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"BODY-HTML": 	bodyHtml,
 	}
 	//--
-	return MarkersTplRender(HTML_TPL, arr, false, false, true, true) + "\n" // escape remaining syntax + is main html
+	return RenderMainMarkersTpl(HTML_TPL, arr) + "\n"
 	//--
 } //END FUNCTION
 
@@ -3966,6 +3961,300 @@ func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, 
 	//--
 } //END FUNCTION
 
+
+//-----
+
+const (
+
+	SVG_SPIN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="grey" id="loading-spin-svg"><path opacity=".25" d="M16 0 A16 16 0 0 0 16 32 A16 16 0 0 0 16 0 M16 4 A12 12 0 0 1 16 28 A12 12 0 0 1 16 4"/><path d="M16 0 A16 16 0 0 1 32 16 L28 16 A12 12 0 0 0 16 4z"><animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite" /></path></svg>`
+
+	HTML_CONTENT_HEADER = "text/html; charset=UTF-8" // keep separate, can be used also by HTTP Headers: Content-Type
+
+	BASE_CSS = `
+/* -- CSS Start :: Smart.Framework / Base :: r.20210612 -- */
+
+* {
+	font-family: 'IBM Plex Sans', 'Noto Sans', arial, sans-serif;
+	font-smooth: always;
+}
+
+html, body {
+	margin: 0px;
+	padding: 0px;
+}
+
+/* base styles */
+
+body {
+	background: #FFFFFF;
+	color: #222222;
+	font-size: 16px;
+	line-height: 1.5;
+	margin-left: 10px;
+	margin-right: 10px;
+}
+
+div, p, ol, ul, form, fieldset, blockquote, address, dl {
+	font-size: 0.9375rem; /* 15px */
+	line-height: 1.5;
+}
+
+li {
+	list-style-position: inside; /* bugfix for chrome */
+}
+
+table, pre, code, code * {
+	font-size: 0.875rem; /* 14px */
+	line-height: 1.25;
+}
+
+small {
+	font-size: 0.75rem;
+}
+
+h1 {
+	font-size: 2rem; /* 32px */
+	margin-top: 0.625rem; /* 10px */
+	margin-bottom: 0.625rem; /* 10px */
+}
+h2 {
+	font-size: 1.75rem; /* 28px */
+	margin-top: 0.5rem; /* 8px */
+	margin-bottom: 0.5rem; /* 8px */
+}
+h3 {
+	font-size: 1.5rem; /* 24px */
+	margin-top: 0.375rem; /* 6px */
+	margin-bottom: 0.375rem; /* 6px */
+}
+h4 {
+	font-size: 1.25rem; /* 20px */
+	margin-top: 0.3125rem; /* 5px */
+	margin-bottom: 0.3125rem; /* 5px */
+}
+h5 {
+	font-size: 1.125rem; /* 18px */
+	margin-top: 0.25rem; /* 4px */
+	margin-bottom: 0.25rem; /* 4px */
+}
+h6 {
+	font-size: 1rem; /* 16px */
+	margin-top: 0.1875rem; /* 3px */
+	margin-bottom: 0.1875rem; /* 3px */
+}
+
+img {
+	border: 0;
+}
+
+hr {
+	border: none 0;
+	border-top: 1px solid #CCCCCC;
+	height: 1px;
+}
+
+table {
+	font-weight: normal;
+	text-align:left;
+}
+th {
+	font-weight: bold;
+}
+td {
+	font-weight: normal;
+}
+
+a, a:link, a:visited, a:hover {
+	color: #000000;
+}
+
+/* -- CSS End -- */
+
+/* -- CSS Start :: Smart.Framework / Components / Notifications :: r.8.7 / smart.framework.v.8.7 -- */
+
+/* ----------------------------- */
+
+/* Notifications r.20210610 */
+
+div#operation_info,      div.operation_info,
+div#operation_notice,    div.operation_notice,
+div#operation_important, div.operation_important,
+div#operation_question,  div.operation_question,
+div#operation_success,   div.operation_success,
+div#operation_warn,      div.operation_warn,
+div#operation_error,     div.operation_error {
+	line-height: 36px;
+	text-align: left;
+	font-size: 1.25rem;
+	font-weight: bold;
+	font-style: normal;
+	padding-left: 16px;
+	padding-right: 16px;
+	padding-top: 12px;
+	padding-bottom: 8px;
+	margin-top: 8px;
+	margin-bottom: 8px;
+	max-width: calc(100% - 10px) !important;
+	min-width: 100px;
+	min-height: 40px;
+	height: auto !important;
+	border-radius: 5px;
+	box-sizing: content-box !important;
+	opacity: 1 !important;
+}
+
+/* ----------------------------- */
+
+div#operation_info,
+div.operation_info {
+	background-color: #F7F7F7 !important;
+	color: #333333 !important;
+}
+
+/* -- */
+
+div#operation_notice,
+div.operation_notice {
+	background-color: #E4E3A8 !important;
+	color: #444444 !important;
+}
+
+/* -- */
+
+div#operation_important,
+div.operation_important {
+	background-color: #448FCE !important;
+	color: #FDFDFD !important;
+}
+
+/* -- */
+
+div#operation_question,
+div.operation_question {
+	background-color: #778888 !important;
+	color: #FFFFFF !important;
+}
+
+/* -- */
+
+div#operation_success,
+div.operation_success {
+	background-color: #A9D837 !important;
+	color: #333333 !important;
+}
+
+/* -- */
+
+div#operation_warn,
+div.operation_warn {
+	background-color: #FFD218 !important;
+	color: #3E2723 !important;
+}
+
+/* -- */
+
+div#operation_error,
+div.operation_error {
+	background-color: #C62828 !important;
+	color: #FFFFFF !important;
+}
+
+/* ----------------------------- */
+
+@media all and (max-width:1279px) {
+	div#operation_info,      div.operation_info,
+	div#operation_notice,    div.operation_notice,
+	div#operation_important, div.operation_important,
+	div#operation_question,  div.operation_question,
+	div#operation_success,   div.operation_success,
+	div#operation_warn,      div.operation_warn,
+	div#operation_error,     div.operation_error {
+		max-width: calc(99% - 10px) !important;
+	}
+}
+
+@media all and (max-width:959px) {
+	div#operation_info,      div.operation_info,
+	div#operation_notice,    div.operation_notice,
+	div#operation_important, div.operation_important,
+	div#operation_question,  div.operation_question,
+	div#operation_success,   div.operation_success,
+	div#operation_warn,      div.operation_warn,
+	div#operation_error,     div.operation_error {
+		max-width: calc(98% - 10px) !important;
+	}
+}
+
+@media all and (max-width:767px) {
+	div#operation_info,      div.operation_info,
+	div#operation_notice,    div.operation_notice,
+	div#operation_important, div.operation_important,
+	div#operation_question,  div.operation_question,
+	div#operation_success,   div.operation_success,
+	div#operation_warn,      div.operation_warn,
+	div#operation_error,     div.operation_error {
+		max-width: calc(97% - 10px) !important;
+	}
+}
+
+@media all and (max-width:639px) {
+	div#operation_info,      div.operation_info,
+	div#operation_notice,    div.operation_notice,
+	div#operation_important, div.operation_important,
+	div#operation_question,  div.operation_question,
+	div#operation_success,   div.operation_success,
+	div#operation_warn,      div.operation_warn,
+	div#operation_error,     div.operation_error {
+		max-width: calc(96% - 10px) !important;
+	}
+}
+
+/* ----------------------------- */
+
+/* -- CSS End -- */
+
+</style>
+<style>
+#server-logo {
+	position: absolute;
+	top: 25px;
+	right: 25px;
+}
+#server-signature {
+	color: #333333;
+}
+#title {
+	font-size: 4rem;
+	padding-right: 150px;
+	padding-left: 25px;
+	padding-top: 10px;
+	padding-bottom: 10px;
+	margin: 0px;
+	color: #333333;
+}
+`
+
+	HTML_TPL = `<!DOCTYPE html>
+<!-- TPL.SmartGo -->
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
+<link rel="icon" href="data:,">
+<title>[###TITLE|html###]</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+` + BASE_CSS + `
+</style>
+[###HEAD-HTML###]
+</head>
+<body>
+[###BODY-HTML###]
+</body>
+</html>
+<!-- #end TPL -->
+`
+)
 
 //-----
 
