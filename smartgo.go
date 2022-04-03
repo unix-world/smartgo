@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220402.0148 :: STABLE
+// r.20220403.1947 :: STABLE
 
 package smartgo
 
@@ -63,8 +63,11 @@ import (
 //	"github.com/fatih/color"
 	color "github.com/unix-world/smartgo/colorstring"
 	"github.com/unix-world/smartgo/logutils"
-)
 
+	"embed"
+)
+//go:embed assets/*
+var assets embed.FS
 
 const ( // DO NOT MODIFY THESE CONSTANTS ... EVER !
 	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
@@ -93,6 +96,25 @@ const ( // DO NOT MODIFY THESE CONSTANTS ... EVER !
 
 	FIXED_CRYPTO_SALT = "Smart Framework # スマート フレームワーク" 		// fixed salt data for various crypto contexts
 
+	HTML_CONTENT_HEADER = "text/html; charset=UTF-8" 					// keep separate, can be used also by HTTP Headers: Content-Type
+	HTML_TPL = `<!DOCTYPE html>
+<!-- TPL.SmartGo -->
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
+<link rel="icon" href="data:,">
+<title>[###TITLE|html###]</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+[:::HEAD-CSS-JS:::]
+[###HEAD-HTML###]
+</head>
+<body>
+[###BODY-HTML###]
+</body>
+</html>
+<!-- #end TPL -->
+`
 )
 
 
@@ -255,7 +277,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 // PRIVATE
 func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevelOutput("WARNING", os.Stderr)
 	//--
-	level = strings.ToUpper(StrTrimWhitespaces(level))
+	level = StrToUpper(StrTrimWhitespaces(level))
 	//--
 	var mLevel string = "ERROR"
 	if(level == "WARNING") {
@@ -950,7 +972,7 @@ func blowfishV1SafeKey(plainTextKey string) string {
 		return ""
 	} //end if
 	//--
-	var safeKey string = StrSubstr(Sha512(key), 13, 29+13) + strings.ToUpper(StrSubstr(Sha1(key), 13, 10+13)) + StrSubstr(Md5(key), 13, 9+13)
+	var safeKey string = StrSubstr(Sha512(key), 13, 29+13) + StrToUpper(StrSubstr(Sha1(key), 13, 10+13)) + StrSubstr(Md5(key), 13, 9+13)
 	//--
 	//log.Println("[DEBUG] BfKey (v1):", safeKey)
 	return safeKey
@@ -967,7 +989,7 @@ func blowfishV1SafeIv(plainTextKey string) string {
 		return ""
 	} //end if
 	//--
-	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + strings.ToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
+	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + StrToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
 	safeIv = StrSubstr(safeIv, 1, 8+1)
 	//log.Println("[DEBUG] BfIv (v1):", safeIv)
 	//--
@@ -1109,7 +1131,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//--
 	prePaddingSize := blowfish.BlockSize * 2
 	if(versionDetected == 1) {
-		str = Hex2Bin(strings.Repeat("0", prePaddingSize) + strings.ToLower(str)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
+		str = Hex2Bin(strings.Repeat("0", prePaddingSize) + StrToLower(str)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
 	} else { // v2
 		str = Base64sDecode(str)
 		str = Hex2Bin(strings.Repeat("0", prePaddingSize) + Bin2Hex(str)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
@@ -1388,7 +1410,7 @@ func DataUnArchive(str string) string {
 	} //end if
 	//--
 	if(versionDetected == 1) {
-		darr[0] = Hex2Bin(strings.ToLower(darr[0]))
+		darr[0] = Hex2Bin(StrToLower(darr[0]))
 	} else { // v2
 		darr[0] = Hex2Bin(darr[0])
 	} //end if else
@@ -1617,8 +1639,8 @@ func Sha512(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -1640,8 +1662,8 @@ func Sha384(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -1663,8 +1685,8 @@ func Sha256(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -1685,8 +1707,8 @@ func Sha1(str string) string {
 	hash := sha1.New()
 	hash.Write([]byte(str))
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -1706,8 +1728,8 @@ func Md5(str string) string {
 	hash := md5.New()
 	io.WriteString(hash, str)
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -1727,8 +1749,8 @@ func Crc32b(str string) string {
 	hash := crc32.NewIEEE()
 	hash.Write([]byte(str))
 	//--
-//	return strings.ToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
 
@@ -1738,7 +1760,7 @@ func Crc32bB36(str string) string {
 	hash := crc32.NewIEEE()
 	hash.Write([]byte(str))
 	//--
-	return LeftPad2Len(strings.ToLower(base36.Encode(hash.Sum(nil))), "0", 7)
+	return LeftPad2Len(StrToLower(base36.Encode(hash.Sum(nil))), "0", 7)
 	//--
 } //END FUNCTION
 
@@ -1788,7 +1810,7 @@ func StrPos(haystack string, needle string) int {
 // return -1 if can not find the substring or the position of needle in haystack
 func StrIPos(haystack, needle string) int {
 	//--
-	return StrPos(strings.ToLower(haystack), strings.ToLower(needle))
+	return StrPos(StrToLower(haystack), StrToLower(needle))
 	//--
 } //END FUNCTION
 
@@ -1818,7 +1840,7 @@ func StrRPos(haystack string, needle string) int {
 // return -1 if can not find the substring or the position of needle in haystack
 func StrRIPos(haystack, needle string) int {
 	//--
-	return StrRPos(strings.ToLower(haystack), strings.ToLower(needle))
+	return StrRPos(StrToLower(haystack), StrToLower(needle))
 	//--
 } //END FUNCTION
 
@@ -1835,7 +1857,7 @@ func StrStartsWith(str string, part string) bool {
 
 func StrIStartsWith(str string, part string) bool {
 	//--
-	return strings.HasPrefix(strings.ToLower(str), strings.ToLower(part))
+	return strings.HasPrefix(StrToLower(str), StrToLower(part))
 	//--
 } //END FUNCTION
 
@@ -1849,7 +1871,7 @@ func StrEndsWith(str string, part string) bool {
 
 func StrIEndsWith(str string, part string) bool {
 	//--
-	return strings.HasSuffix(strings.ToLower(str), strings.ToLower(part))
+	return strings.HasSuffix(StrToLower(str), StrToLower(part))
 	//--
 } //END FUNCTION
 
@@ -1863,7 +1885,7 @@ func StrContains(str string, part string) bool {
 
 func StrIContains(str string, part string) bool {
 	//--
-	return strings.Contains(strings.ToLower(str), strings.ToLower(part))
+	return strings.Contains(StrToLower(str), StrToLower(part))
 	//--
 } //END FUNCTION
 
@@ -2179,6 +2201,20 @@ func ParseFloatAsStrFloat(s string) string {
 	s = strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
 	//--
 	return string(s)
+	//--
+} //END FUNCTION
+
+
+func StrToUpper(str string) string {
+	//--
+	return strings.ToUpper(str)
+	//--
+} //END FUNCTION
+
+
+func StrToLower(str string) string {
+	//--
+	return strings.ToLower(str)
 	//--
 } //END FUNCTION
 
@@ -2737,6 +2773,23 @@ func PathGetCurrentExecutableDir() string {
 } //END FUNCTION
 
 
+func PathAddDirLastSlash(dirPath string) string {
+	//--
+	dirPath = StrTrimWhitespaces(dirPath)
+	if((dirPath == "") || (dirPath == ".") || (dirPath == "..") || (dirPath == "/")) {
+		return "./"
+	} //end if
+	//--
+	dirPath = StrTrimRightWhitespaces(StrTrimRight(dirPath, "/"))
+	if((dirPath == "") || (dirPath == ".") || (dirPath == "..") || (dirPath == "/")) {
+		return "./"
+	} //end if
+	//--
+	return dirPath + "/"
+	//--
+} //END FUNCTION
+
+
 //-----
 
 
@@ -2782,7 +2835,6 @@ func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bo
 	return true, ""
 	//--
 } //END FUNCTION
-
 
 
 func SafePathDirDelete(dirPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) { // will delete the dir with all it's (recursive) content
@@ -2893,7 +2945,7 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 		return false, errors.New("WARNING: Dir Path is Empty").Error(), dirs, files
 	} //end if
 	//--
-	dirPath = StrTrimRight(dirPath, "/ ") + "/"
+	dirPath = PathAddDirLastSlash(dirPath)
 	//--
 	if(PathIsBackwardUnsafe(dirPath) == true) {
 		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error(), dirs, files
@@ -2988,8 +3040,8 @@ func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, e
 		return "", err.Error()
 	} //end if
 	//--
-//	hexMd5 := strings.ToLower(fmt.Sprintf("%x", h.Sum(nil)))
-	hexMd5 := strings.ToLower(hex.EncodeToString(h.Sum(nil)))
+//	hexMd5 := StrToLower(fmt.Sprintf("%x", h.Sum(nil)))
+	hexMd5 := StrToLower(hex.EncodeToString(h.Sum(nil)))
 	//--
 	return hexMd5, ""
 	//--
@@ -3037,8 +3089,8 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 		return "", err.Error()
 	} //end if
 	//--
-//	hexSha := strings.ToLower(fmt.Sprintf("%x", h.Sum(nil)))
-	hexSha := strings.ToLower(hex.EncodeToString(h.Sum(nil)))
+//	hexSha := StrToLower(fmt.Sprintf("%x", h.Sum(nil)))
+	hexSha := StrToLower(hex.EncodeToString(h.Sum(nil)))
 	//--
 	return hexSha, ""
 	//--
@@ -3478,6 +3530,48 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 } //END FUNCTION
 
 
+func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
+	//-- syntax: r.20220331
+	if(isEncoded == true) {
+		template = RawUrlDecode(template)
+	} //end if
+	if(revertSyntax == true) {
+		template = MarkersTplRevertNosyntaxContent(template)
+	} //end if
+	//-- trim whitespaces
+	template = StrTrimWhitespaces(template)
+	//--
+	const regexPlaceholderVarName = `^[A-Z0-9_\-]+$`
+	//--
+	if(arrpobj != nil) {
+		for k, v := range arrpobj {
+			if(k != "") {
+				if(StrRegexMatchString(regexPlaceholderVarName, k)) {
+					template = StrReplaceAll(template, "[:::" + k + ":::]", v)
+				} //end if
+			} //end if
+		} //end for
+	} //end if
+	//--
+	if(escapeRemainingSyntax == true) {
+		//--
+		if(StrContains(template, "[:::")) {
+			log.Println("[WARNING] MarkersTplRender: {### Undefined Placeholders detected in Template ###}")
+		} //end if
+		//--
+		template = MarkersTplEscapeSyntaxContent(template, isMainHtml) // this will not escape the syntax already prepared by MarkersTplPrepareNosyntaxContent (PrepareNosyntax) that comes from a value, but only remaining syntax
+		//--
+	} //end if
+	//--
+	if(isMainHtml == true) {
+		template = MarkersTplPrepareNosyntaxHtml(template, false) // this will revert to html entities (incl. Placeholders) the Syntax or PrepareNosyntax ; but in the case if syntax is escaped above, will just process PrepareNosyntax
+	} //end if
+	//--
+	return template
+	//--
+} //END FUNCTION
+
+
 func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
 	//-- syntax: r.20220331
 	if(isEncoded == true) {
@@ -3486,13 +3580,14 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	if(revertSyntax == true) {
 		template = MarkersTplRevertNosyntaxContent(template)
 	} //end if
+	//-- trim whitespaces
 	template = StrTrimWhitespaces(template)
 	//-- replace out comments
 	if((StrContains(template, "[%%%COMMENT%%%]")) && (StrContains(template, "[%%%/COMMENT%%%]"))) {
 		template = StrRegexReplaceAll(`(?s)\s??\[%%%COMMENT%%%\](.*?)??\[%%%\/COMMENT%%%\]\s??`, template, "") // regex syntax as in PHP
 	} //end if
 	//-- process ifs (conditionals)
-	var regexIfVarName = `^[a-zA-Z0-9_\-]+$`
+	const regexIfVarName = `^[a-zA-Z0-9_\-]+$`
 	var regexIfs = regexp.MustCompile(`(?s)(\[%%%IF\:([a-zA-Z0-9_\-]+)\:(\=\=|\!\=){1}(.*?)(;%%%\]){1}){1}(.*?)((\[%%%ELSE\:([a-zA-Z0-9_\-]+)%%%\])(.*?)){0,1}(\[%%%\/IF\:([a-zA-Z0-9_\-]+)%%%\]){1}`) // Go lang have no backreferences in regex, thus it is too complex at the moment to process nested ifs, thus does not support also (0..9) terminators ; because there is no support for loops yet, dissalow "." in variable names ; also operations between different data type gets too much overhead ; thus keep is simple: no nested if syntax ; allow only (strings): == != ; {{{SYNC-MTPL-IFS-OPERATIONS}}}
 	for c, imatch := range regexIfs.FindAllStringSubmatch(template, -1) {
 		//--
@@ -3661,7 +3756,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = ParseFloatAsStrFloat(tmp_marker_val)
 							} else if(escaping == "|idtxt") { // id_txt: Id-Txt
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "_", "-", -1) // replace all
-								tmp_marker_val = strings.Title(strings.ToLower(tmp_marker_val))
+								tmp_marker_val = strings.Title(StrToLower(tmp_marker_val))
 							} else if(escaping == "|slug") { // Slug: a-zA-Z0-9_- / - / -- : -
 								tmp_marker_val = StrCreateSlug(tmp_marker_val)
 							} else if(escaping == "|htmid") { // HTML-ID: a-zA-Z0-9_-
@@ -3688,17 +3783,17 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								xstrnum = ""
 								xnum = 0
 							} else if(escaping == "|lower") { // apply lowercase
-								tmp_marker_val = strings.ToLower(tmp_marker_val)
+								tmp_marker_val = StrToLower(tmp_marker_val)
 							} else if(escaping == "|upper") { // apply uppercase
-								tmp_marker_val = strings.ToUpper(tmp_marker_val)
+								tmp_marker_val = StrToUpper(tmp_marker_val)
 							} else if(escaping == "|ucfirst") { // apply uppercase first character
-								x1st := strings.ToUpper(StrMBSubstr(tmp_marker_val, 0, 1)) // get 1st char
-								xrest := strings.ToLower(StrMBSubstr(tmp_marker_val, 1, 0)) // get the rest of characters
+								x1st := StrToUpper(StrMBSubstr(tmp_marker_val, 0, 1)) // get 1st char
+								xrest := StrToLower(StrMBSubstr(tmp_marker_val, 1, 0)) // get the rest of characters
 								tmp_marker_val = x1st + xrest
 								x1st = ""
 								xrest = ""
 							} else if(escaping == "|ucwords") { // apply uppercase on each word
-								tmp_marker_val = strings.Title(strings.ToLower(tmp_marker_val))
+								tmp_marker_val = strings.Title(StrToLower(tmp_marker_val))
 							} else if(escaping == "|trim") { // apply trim
 								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
 							} else if(escaping == "|url") { // escape URL
@@ -3790,9 +3885,13 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 } //END FUNCTION
 
 
-func RenderMainMarkersTpl(template string, arrobj map[string]string) string {
+func RenderMainMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
 	//--
-	return MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
+	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
+	//--
+	template = PlaceholdersTplRender(template, arrpobj, false, false, true, true) // escape remaining syntax + is main html
+	//--
+	return template
 	//--
 } //END FUNCTION
 
@@ -3807,7 +3906,49 @@ func RenderMarkersTpl(template string, arrobj map[string]string) string {
 //-----
 
 
-func HtmlSimpleTemplate(titleText string, headHtml string, bodyHtml string) string {
+func ReadAsset(path string) string {
+	//--
+	if(PathIsBackwardUnsafe(path) == true) {
+		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # unsafe backward path")
+		return ""
+	} //end if
+	path = StrTrimRightWhitespaces(StrTrim(path, "/"))
+	if(path == "") {
+		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # empty path")
+		return ""
+	} //end if
+	if((path == "") || (path == ".") || (path == "..") || (path == "/")) {
+		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # unsupported path")
+		return ""
+	} //end if
+	if(PathIsAbsolute(path) == true) {
+		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # not a relative path")
+		return ""
+	} //end if
+	//--
+	content, err := assets.ReadFile("assets/" + path)
+	if(err != nil) {
+		log.Println("[WARNING] Failed to Read Asset: `" + path + "`")
+		return ""
+	} //end if
+	//--
+	return string(content)
+	//--
+} //END FUNCTION
+
+
+func HtmlStaticTemplate(titleText string, headHtml string, bodyHtml string) string {
+	//--
+	titleText = StrTrimWhitespaces(titleText)
+	//--
+	headHtml = StrTrimWhitespaces(headHtml)
+	if(headHtml == "") {
+		headHtml = "<!-- Head Html -->"
+	} //end if
+	//--
+	if(StrTrimWhitespaces(bodyHtml) == "") {
+		bodyHtml = "<!-- Body Html -->"
+	} //end if
 	//--
 	var arr = map[string]string{
 		"TITLE": 		titleText,
@@ -3815,7 +3956,33 @@ func HtmlSimpleTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"BODY-HTML": 	bodyHtml,
 	}
 	//--
-	return RenderMainMarkersTpl(HTML_TPL, arr) + "\n"
+	var stylesAll []string
+	//--
+	var stylesBase string = StrTrimWhitespaces(ReadAsset("css/base.css"))
+	if(stylesBase != "") {
+		stylesAll = append(stylesAll, "<style>" + "\n" + stylesBase + "\n" + "</style>")
+	} //end if
+	//--
+	var stylesNotif string = StrTrimWhitespaces(ReadAsset("css/notifications.css"))
+	if(stylesNotif != "") {
+		stylesAll = append(stylesAll, "<style>" + "\n" + stylesNotif + "\n" + "</style>")
+	} //end if
+	//--
+	var stylesToolkit string = StrTrimWhitespaces(ReadAsset("css/ux-toolkit.css"))
+	if(stylesToolkit != "") {
+		stylesAll = append(stylesAll, "<style>" + "\n" + stylesToolkit + "\n" + "</style>")
+	} //end if
+	//--
+	var headCssJs string = "<!-- Head: Css / Js -->"
+	if(len(stylesAll) > 0) {
+		headCssJs = Implode("\n", stylesAll)
+	} //end if
+	//--
+	var parr = map[string]string{
+		"HEAD-CSS-JS": headCssJs,
+	}
+	//--
+	return RenderMainMarkersTpl(HTML_TPL, arr, parr) + "\n" + "<!-- TPL:static -->" + "\n"
 	//--
 } //END FUNCTION
 
@@ -3961,300 +4128,6 @@ func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, 
 	//--
 } //END FUNCTION
 
-
-//-----
-
-const (
-
-	SVG_SPIN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="grey" id="loading-spin-svg"><path opacity=".25" d="M16 0 A16 16 0 0 0 16 32 A16 16 0 0 0 16 0 M16 4 A12 12 0 0 1 16 28 A12 12 0 0 1 16 4"/><path d="M16 0 A16 16 0 0 1 32 16 L28 16 A12 12 0 0 0 16 4z"><animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite" /></path></svg>`
-
-	HTML_CONTENT_HEADER = "text/html; charset=UTF-8" // keep separate, can be used also by HTTP Headers: Content-Type
-
-	BASE_CSS = `
-/* -- CSS Start :: Smart.Framework / Base :: r.20210612 -- */
-
-* {
-	font-family: 'IBM Plex Sans', 'Noto Sans', arial, sans-serif;
-	font-smooth: always;
-}
-
-html, body {
-	margin: 0px;
-	padding: 0px;
-}
-
-/* base styles */
-
-body {
-	background: #FFFFFF;
-	color: #222222;
-	font-size: 16px;
-	line-height: 1.5;
-	margin-left: 10px;
-	margin-right: 10px;
-}
-
-div, p, ol, ul, form, fieldset, blockquote, address, dl {
-	font-size: 0.9375rem; /* 15px */
-	line-height: 1.5;
-}
-
-li {
-	list-style-position: inside; /* bugfix for chrome */
-}
-
-table, pre, code, code * {
-	font-size: 0.875rem; /* 14px */
-	line-height: 1.25;
-}
-
-small {
-	font-size: 0.75rem;
-}
-
-h1 {
-	font-size: 2rem; /* 32px */
-	margin-top: 0.625rem; /* 10px */
-	margin-bottom: 0.625rem; /* 10px */
-}
-h2 {
-	font-size: 1.75rem; /* 28px */
-	margin-top: 0.5rem; /* 8px */
-	margin-bottom: 0.5rem; /* 8px */
-}
-h3 {
-	font-size: 1.5rem; /* 24px */
-	margin-top: 0.375rem; /* 6px */
-	margin-bottom: 0.375rem; /* 6px */
-}
-h4 {
-	font-size: 1.25rem; /* 20px */
-	margin-top: 0.3125rem; /* 5px */
-	margin-bottom: 0.3125rem; /* 5px */
-}
-h5 {
-	font-size: 1.125rem; /* 18px */
-	margin-top: 0.25rem; /* 4px */
-	margin-bottom: 0.25rem; /* 4px */
-}
-h6 {
-	font-size: 1rem; /* 16px */
-	margin-top: 0.1875rem; /* 3px */
-	margin-bottom: 0.1875rem; /* 3px */
-}
-
-img {
-	border: 0;
-}
-
-hr {
-	border: none 0;
-	border-top: 1px solid #CCCCCC;
-	height: 1px;
-}
-
-table {
-	font-weight: normal;
-	text-align:left;
-}
-th {
-	font-weight: bold;
-}
-td {
-	font-weight: normal;
-}
-
-a, a:link, a:visited, a:hover {
-	color: #000000;
-}
-
-/* -- CSS End -- */
-
-/* -- CSS Start :: Smart.Framework / Components / Notifications :: r.8.7 / smart.framework.v.8.7 -- */
-
-/* ----------------------------- */
-
-/* Notifications r.20210610 */
-
-div#operation_info,      div.operation_info,
-div#operation_notice,    div.operation_notice,
-div#operation_important, div.operation_important,
-div#operation_question,  div.operation_question,
-div#operation_success,   div.operation_success,
-div#operation_warn,      div.operation_warn,
-div#operation_error,     div.operation_error {
-	line-height: 36px;
-	text-align: left;
-	font-size: 1.25rem;
-	font-weight: bold;
-	font-style: normal;
-	padding-left: 16px;
-	padding-right: 16px;
-	padding-top: 12px;
-	padding-bottom: 8px;
-	margin-top: 8px;
-	margin-bottom: 8px;
-	max-width: calc(100% - 10px) !important;
-	min-width: 100px;
-	min-height: 40px;
-	height: auto !important;
-	border-radius: 5px;
-	box-sizing: content-box !important;
-	opacity: 1 !important;
-}
-
-/* ----------------------------- */
-
-div#operation_info,
-div.operation_info {
-	background-color: #F7F7F7 !important;
-	color: #333333 !important;
-}
-
-/* -- */
-
-div#operation_notice,
-div.operation_notice {
-	background-color: #E4E3A8 !important;
-	color: #444444 !important;
-}
-
-/* -- */
-
-div#operation_important,
-div.operation_important {
-	background-color: #448FCE !important;
-	color: #FDFDFD !important;
-}
-
-/* -- */
-
-div#operation_question,
-div.operation_question {
-	background-color: #778888 !important;
-	color: #FFFFFF !important;
-}
-
-/* -- */
-
-div#operation_success,
-div.operation_success {
-	background-color: #A9D837 !important;
-	color: #333333 !important;
-}
-
-/* -- */
-
-div#operation_warn,
-div.operation_warn {
-	background-color: #FFD218 !important;
-	color: #3E2723 !important;
-}
-
-/* -- */
-
-div#operation_error,
-div.operation_error {
-	background-color: #C62828 !important;
-	color: #FFFFFF !important;
-}
-
-/* ----------------------------- */
-
-@media all and (max-width:1279px) {
-	div#operation_info,      div.operation_info,
-	div#operation_notice,    div.operation_notice,
-	div#operation_important, div.operation_important,
-	div#operation_question,  div.operation_question,
-	div#operation_success,   div.operation_success,
-	div#operation_warn,      div.operation_warn,
-	div#operation_error,     div.operation_error {
-		max-width: calc(99% - 10px) !important;
-	}
-}
-
-@media all and (max-width:959px) {
-	div#operation_info,      div.operation_info,
-	div#operation_notice,    div.operation_notice,
-	div#operation_important, div.operation_important,
-	div#operation_question,  div.operation_question,
-	div#operation_success,   div.operation_success,
-	div#operation_warn,      div.operation_warn,
-	div#operation_error,     div.operation_error {
-		max-width: calc(98% - 10px) !important;
-	}
-}
-
-@media all and (max-width:767px) {
-	div#operation_info,      div.operation_info,
-	div#operation_notice,    div.operation_notice,
-	div#operation_important, div.operation_important,
-	div#operation_question,  div.operation_question,
-	div#operation_success,   div.operation_success,
-	div#operation_warn,      div.operation_warn,
-	div#operation_error,     div.operation_error {
-		max-width: calc(97% - 10px) !important;
-	}
-}
-
-@media all and (max-width:639px) {
-	div#operation_info,      div.operation_info,
-	div#operation_notice,    div.operation_notice,
-	div#operation_important, div.operation_important,
-	div#operation_question,  div.operation_question,
-	div#operation_success,   div.operation_success,
-	div#operation_warn,      div.operation_warn,
-	div#operation_error,     div.operation_error {
-		max-width: calc(96% - 10px) !important;
-	}
-}
-
-/* ----------------------------- */
-
-/* -- CSS End -- */
-
-</style>
-<style>
-#server-logo {
-	position: absolute;
-	top: 25px;
-	right: 25px;
-}
-#server-signature {
-	color: #333333;
-}
-#title {
-	font-size: 4rem;
-	padding-right: 150px;
-	padding-left: 25px;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	margin: 0px;
-	color: #333333;
-}
-`
-
-	HTML_TPL = `<!DOCTYPE html>
-<!-- TPL.SmartGo -->
-<html>
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
-<link rel="icon" href="data:,">
-<title>[###TITLE|html###]</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-` + BASE_CSS + `
-</style>
-[###HEAD-HTML###]
-</head>
-<body>
-[###BODY-HTML###]
-</body>
-</html>
-<!-- #end TPL -->
-`
-)
 
 //-----
 
