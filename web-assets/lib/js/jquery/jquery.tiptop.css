@@ -1,0 +1,3 @@
+/* CSS-Stylesheet (CS): jquery.tiptop.css @ 2022-04-04 22:54:30 +0000 */
+.tiptop{position:absolute;z-index:9999;max-width:300px;padding:15px;font-size:1rem;color:#FFFFFF;background:#333333;border-radius:3px}.tiptop::before{content:'\025BF';position:absolute;top:-5px;right:5px}
+/* #END */

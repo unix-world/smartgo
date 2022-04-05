@@ -1,0 +1,30 @@
+
+/* -- CSS Start :: Smart.Framework / App (Go) :: r.20220405 -- */
+
+/* ----------------------------- */
+
+/* -- base -- */
+
+@import url("../lib/core/plugins/fonts/typo/sans/ibm-plex-sans.css");
+@import url("../lib/core/plugins/fonts/typo/mono/ibm-plex-mono.css");
+@import url("../lib/core/css/base.css");
+
+/* -- ui toolkit -- */
+
+@import url("../lib/css/toolkit/sf-icons.css");
+@import url("../lib/css/toolkit/ux-toolkit.css");
+@import url("../lib/css/toolkit/ux-toolkit-responsive.css");
+
+/* -- ui toolkit extras -- */
+
+@import url("../lib/css/v-timeline/style.css");
+@import url("../lib/css/v-timeline/style-responsive.css");
+
+/* -- core -- */
+
+@import url("../lib/core/css/notifications.css");
+@import url("../lib/core/css/notifications-icons.css");
+
+/* ----------------------------- */
+
+/* -- CSS End -- */
