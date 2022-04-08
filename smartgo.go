@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220405.0608 :: STABLE
+// r.20220408.2358 :: STABLE
 
 package smartgo
 
@@ -11,6 +11,8 @@ import (
 	"runtime/debug"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 	"context"
 	"errors"
 
@@ -68,34 +70,44 @@ import (
 
 
 const (
-	VERSION = "20220405.0608"
+	VERSION string = "v.20220408.2358"
+	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
-	// DO NOT MODIFY THE DATE CONSTANTS ... EVER ! THEY ARE REFERENCED WITH GO DATE !
-	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
-	DATE_TIME_FMT_ISO_STD_GO_EPOCH    = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
-	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  = "2006-01-02 15:04:05 -0700" 	// GO EPOCH: WITH TIME, WITH TZ OFFSET
+	DEBUG bool = false
 
-	TRIM_WHITESPACES = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
-	NULL_BYTE = "\000" 													// THE NULL BYTE
+	//-- do not modify any constant below ...
 
-	REGEX_SMART_SAFE_PATH_NAME = `^[_a-zA-Z0-9\-\.@#\/]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM PATHS ...
-	REGEX_SMART_SAFE_FILE_NAME = `^[_a-zA-Z0-9\-\.@#]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM FILE AND DIR NAMES ...
-	REGEX_SMART_SAFE_NET_HOSTNAME  = `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
+	CHARSET string = "UTF-8" // don't change !!
 
-	CMD_EXEC_ERR_SIGNATURE = "[SmartGo:cmdExec:Exit:ERROR]" 			// INTERNAL FLAG FOR CMD EXIT ERROR
+	//-- DO NOT MODIFY THE DATE CONSTANTS REFERENCE VALUES ... ! NEVER ! THEY ARE SYNCED WITH GO DATE STANDARDS !
+	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH string = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
+	DATE_TIME_FMT_ISO_STD_GO_EPOCH    string = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
+	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  string = "2006-01-02 15:04:05 -0700" 		// GO EPOCH: WITH TIME, WITH TZ OFFSET
+	DATE_TIME_FMT_RFC1123_GO_EPOCH    string = "Mon, 02 Jan 2006 15:04:05" 		// GO EPOCH: RFC1123
+	//-- #
 
-	SEPARATOR_CHECKSUM_V1 = "#CHECKSUM-SHA1#" 							// only to support v1 unarchive or decrypt ; (for v1 no archive or encrypt is available anymore)
-	SEPARATOR_CHECKSUM_V2 = "#CKSUM256#" 								// current, v2 ; archive + unarchive or encrypt + decrypt
-	SIGNATURE_SFZ_DATA_ARCH_V1 = "PHP.SF.151129/B64.ZLibRaw.HEX" 		// only to support v1 unarchive ; (for v1 no archive is available anymore)
-	SIGNATURE_SFZ_DATA_ARCH_V2 = "SFZ.20210818/B64.ZLibRaw.hex" 		// current, v2 ; archive + unarchive
+	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
+	NULL_BYTE string 		= "\000" 											// THE NULL BYTE
 
-	SIGNATURE_BFISH_V1 = "bf384.v1!" 									// this was not implemented in the v1, if used must be prefixed before decrypt for compatibility ... (for v1 no encrypt is available anymore)
-	SIGNATURE_BFISH_V2 = "bf448.v2!" 									// current, v2 ; encrypt + decrypt
+	REGEX_SMART_SAFE_PATH_NAME string 		= `^[_a-zA-Z0-9\-\.@#\/]+$` 		// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM PATHS ...
+	REGEX_SMART_SAFE_FILE_NAME string 		= `^[_a-zA-Z0-9\-\.@#]+$` 			// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM FILE AND DIR NAMES ...
+	REGEX_SMART_SAFE_NET_HOSTNAME  string 	= `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
 
-	SIGNATURE_3FISH_V1_DEFAULT  = "3f1kD.v1!" 							// current, v1 (default)  ; encrypt + decrypt
-	SIGNATURE_3FISH_V1_ARGON2ID = "3f1kA.v1!" 							// current, v1 (argon2id) ; encrypt + decrypt
+	CMD_EXEC_ERR_SIGNATURE string = "[SmartGo:cmdExec:Exit:ERROR]" 				// INTERNAL FLAG FOR CMD EXIT ERROR
 
-	FIXED_CRYPTO_SALT = "Smart Framework # スマート フレームワーク" 		// fixed salt data for various crypto contexts
+	SEPARATOR_CHECKSUM_V1 string = "#CHECKSUM-SHA1#" 							// only to support v1 unarchive or decrypt ; (for v1 no archive or encrypt is available anymore)
+	SEPARATOR_CHECKSUM_V2 string = "#CKSUM256#" 								// current, v2 ; archive + unarchive or encrypt + decrypt
+
+	SIGNATURE_SFZ_DATA_ARCH_V1 string = "PHP.SF.151129/B64.ZLibRaw.HEX" 		// only to support v1 unarchive ; (for v1 no archive is available anymore)
+	SIGNATURE_SFZ_DATA_ARCH_V2 string = "SFZ.20210818/B64.ZLibRaw.hex" 			// current, v2 ; archive + unarchive
+
+	SIGNATURE_BFISH_V1 string = "bf384.v1!" 									// this was not implemented in the v1, if used must be prefixed before decrypt for compatibility ... (for v1 no encrypt is available anymore)
+	SIGNATURE_BFISH_V2 string = "bf448.v2!" 									// current, v2 ; encrypt + decrypt
+
+	SIGNATURE_3FISH_V1_DEFAULT  string = "3f1kD.v1!" 							// current, v1 (default)  ; encrypt + decrypt
+	SIGNATURE_3FISH_V1_ARGON2ID string = "3f1kA.v1!" 							// current, v1 (argon2id) ; encrypt + decrypt
+
+	FIXED_CRYPTO_SALT string = "Smart Framework # スマート フレームワーク" 			// fixed salt data for various crypto contexts
 )
 
 //-----
@@ -109,19 +121,21 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 	//--
 	if(logColoredOnConsole) {
 		if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
-			theMsg = color.HiRedString(theMsg)
+			theMsg = color.RedString(theMsg)
 		} else if(StrIPos(theMsg, "[WARNING]") == 0) {
-			theMsg = color.YellowString(theMsg)
+			theMsg = color.HiRedString(theMsg)
+		} else if(StrIPos(theMsg, "[INFO]") == 0) {
+			theMsg = color.HiYellowString(theMsg)
 		} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 			theMsg = color.HiBlueString(theMsg)
 		} else if(StrIPos(theMsg, "[DATA]") == 0) {
-			theMsg = color.HiYellowString(string(bytes)) // for data preserve the string how it is !
+			theMsg = color.YellowString(string(bytes)) // for data preserve the string how it is ! ; brown
 		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
 			if(StrIPos(theMsg, "[OK]") == 0) {
 				theMsg = color.HiGreenString(theMsg)
-			} else {
+			} else { // message
 				theMsg = color.HiCyanString(theMsg)
 			} //end if else
 		} //end if else
@@ -153,12 +167,17 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 		theType = "error"
 		if(logColoredOnConsole) {
-			colorMsg = color.HiRedString(colorMsg)
+			colorMsg = color.RedString(colorMsg)
 		} //end if
 	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
 		theType = "warning"
 		if(logColoredOnConsole) {
-			colorMsg = color.YellowString(colorMsg)
+			colorMsg = color.HiRedString(colorMsg)
+		} //end if
+	} else if(StrIPos(theMsg, "[INFO]") == 0) {
+		theType = "info"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiYellowString(colorMsg)
 		} //end if
 	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 		theType = "notice"
@@ -168,20 +187,20 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} else if(StrIPos(theMsg, "[DATA]") == 0) {
 		theType = "data"
 		if(logColoredOnConsole) {
-			colorMsg = color.HiYellowString(colorMsg)
-		}
+			colorMsg = color.YellowString(colorMsg) // brown
+		} //end if
 	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 		theType = "debug"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiMagentaString(colorMsg)
 		} //end if
 	} else { // ALL OTHER CASES
-		theType = "info"
+		theType = "message"
 		if(logColoredOnConsole) {
 			if(StrIPos(theMsg, "[OK]") == 0) {
 				theType = "ok"
 				colorMsg = color.HiGreenString(colorMsg)
-			} else {
+			} else { // message
 				colorMsg = color.HiCyanString(colorMsg)
 			} //end if else
 		} //end if
@@ -262,6 +281,8 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 	var mLevel string = "ERROR"
 	if(level == "WARNING") {
 		mLevel = "WARNING"
+	} else if(level == "INFO") {
+		mLevel = "INFO"
 	} else if(level == "NOTICE") {
 		mLevel = "NOTICE"
 	} else if(level == "DATA") {
@@ -271,7 +292,7 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 	} //end if else
 	//--
 	filter := &logutils.LevelFilter{
-		Levels: []logutils.LogLevel{"DEBUG", "DATA", "NOTICE", "WARNING", "ERROR"},
+		Levels: []logutils.LogLevel{"DEBUG", "DATA", "NOTICE", "INFO", "WARNING", "ERROR"},
 		MinLevel: logutils.LogLevel(mLevel),
 		Writer: output,
 	}
@@ -356,9 +377,38 @@ func ClearPrintTerminal() {
 // call as: defer PanicHandler()
 func PanicHandler() {
 	if panicInfo := recover(); panicInfo != nil {
-		log.Println("[ERROR] PANIC Recovered:", panicInfo)
-		log.Println("[DEBUG] PANIC Trace Stack:", string(debug.Stack()))
+		log.Println("[ERROR] !!! PANIC Recovered:", panicInfo)
+		if(DEBUG == true) {
+			log.Println("[DEBUG] !!! PANIC Trace Stack:", string(debug.Stack()))
+		} //end if
 	} //end if
+} //END FUNCTION
+
+//-----
+
+func CreateNewError(err string) error {
+	return errors.New(err)
+} //END FUNCTION
+
+//-----
+
+func HandleAbortCtrlC(delay uint32) {
+	//--
+	if(delay < 0) {
+		delay = 0
+	} else if(delay > 60) {
+		delay = delay
+	} //end if
+	//--
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Println("[INFO] ^^^^^^^ CTRL+C Exit ... [ delay:", delay, "sec. ] ^^^^^^^")
+		time.Sleep(time.Duration(int(delay)) * time.Second)
+		os.Exit(1)
+	}()
+	//--
 } //END FUNCTION
 
 //-----
@@ -829,7 +879,7 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 		log.Println("[WARNING] ThreefishEncryptCBC:", err)
 		return ""
 	} //end if
-	//fmt.Println("Threefish BlockSize is:", block.BlockSize());
+	//fmt.Println("Threefish BlockSize is:", block.BlockSize())
 	//-- fix padding
 	var slen int = len(str)
 	var modulus int = slen % block.BlockSize()
@@ -1093,12 +1143,12 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//--
 	var versionDetected uint8 = 0
 	if(StrPos(str, SIGNATURE_BFISH_V2) == 0) {
-		versionDetected = 2;
+		versionDetected = 2
 	} else if(StrPos(str, SIGNATURE_BFISH_V1) == 0) {
-		versionDetected = 1;
+		versionDetected = 1
 	} else {
 		str = SIGNATURE_BFISH_V1 + str // if no signature found consider it is v1 and try to dercypt
-		versionDetected = 1;
+		versionDetected = 1
 	} //end if
 	//--
 	sgnArr := Explode("!", str)
@@ -1746,6 +1796,13 @@ func Crc32bB36(str string) string {
 
 
 //-----
+
+
+func ExplodeWithLimit(delimiter string, text string, limit int) []string {
+	//--
+	return strings.SplitN(text, delimiter, limit)
+	//--
+} //END FUNCTION
 
 
 func Explode(delimiter string, text string) []string {
@@ -2615,7 +2672,7 @@ func PathBaseName(filePath string) string { // returns: `file.extenstion` | `las
 } //END FUNCTION
 
 
-func PathBaseExtension(filePath string) string { // returns: .extenstion (includding dot) from `(/)a/path/to/lastDirInPath|file.extension`
+func PathBaseExtension(filePath string) string { // returns: file .extension (includding dot) from `(/)a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
 		return ""
@@ -2663,6 +2720,7 @@ func PathIsAbsolute(filePath string) bool {
 func PathIsBackwardUnsafe(filePath string) bool {
 	//--
 	if(
+		(len(filePath) > 1024) || // check max path length !
 		StrContains(filePath, "/../") ||
 		StrContains(filePath, "/./")  ||
 		StrContains(filePath, "/..")  ||
@@ -3900,27 +3958,6 @@ func RenderMarkersTpl(template string, arrobj map[string]string) string {
 //-----
 
 
-func HtmlErrorPage(titleText string, htmlMessage string) string {
-	//--
-	if(StrTrimWhitespaces(htmlMessage) == "") {
-		htmlMessage = EscapeHtml(HTML_ERR_DEFAULT_MSG)
-	} //end if
-	//--
-	arr := map[string]string{
-		"MESSAGE-TEXT": titleText,
-		"MESSAGE-HTML": htmlMessage,
-		"LOGO-SERVER-HTML": `<img alt="logo-server" title="Go Standalone Web Server" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + EscapeUrl(LOGO_SERVER_SVG) + `">`,
-		"LOGO-RUNTIME-HTML": `<img alt="logo-runtime" title="Built with Go Lang" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + EscapeUrl(LOGO_RUNTIME_SVG) + `">`,
-		"LOGO-FRAMEWORK-HTML": `<img alt="logo-framework" title="Smart.Framework.Go" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + EscapeUrl(LOGO_FRAMEWORK_SVG) + `">`,
-	}
-	//--
-	return RenderMainMarkersTpl(HTML_TPL_ERR, arr, nil) + "\n" + "<!-- TPL:Static.Err -->" + "\n"
-	//--
-} //END FUNCTION
-
-//-----
-
-
 func IsNetValidPortNum(p int64) bool { // can be a valid NUMERIC port between 1 and 65535
 	//--
 	if((p < 1) || (p > 65535)) {
@@ -3945,6 +3982,22 @@ func IsNetValidPortStr(s string) bool { // can be a valid STRING(as NUMERIC) por
 } //END FUNCTION
 
 
+func IsNetValidHostName(s string) bool { // can contains only
+	//--
+	if(StrTrimWhitespaces(s) == "") {
+		return false
+	} //end if
+	//--
+	if(!StrRegexMatchString(REGEX_SMART_SAFE_NET_HOSTNAME, s)) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+
 func IsNetValidIpAddr(s string) bool { // can be IPV4 or IPV6 but non-empty or zero
 	//--
 	if((StrTrimWhitespaces(s) == "") || (StrTrimWhitespaces(s) == "0.0.0.0") || (StrTrimWhitespaces(s) == "0:0:0:0:0:0:0:0") || (StrTrimWhitespaces(s) == "::0") || (StrTrimWhitespaces(s) == "::")) { // dissalow empty or zero IP v4 / v6 addresses
@@ -3960,17 +4013,21 @@ func IsNetValidIpAddr(s string) bool { // can be IPV4 or IPV6 but non-empty or z
 } //END FUNCTION
 
 
-func IsNetValidHostName(s string) bool { // can contains only
+func GetSafeIpAndPortFromRemoteAddr(remoteAddr string) (ipAddr string, portNum string) {
 	//--
-	if(StrTrimWhitespaces(s) == "") {
-		return false
+	ip, port, err := net.SplitHostPort(remoteAddr) // expects: remoteAddr = 127.0.0.1:1234
+	if(err != nil) {
+		return "", "0"
 	} //end if
 	//--
-	if(!StrRegexMatchString(REGEX_SMART_SAFE_NET_HOSTNAME, s)) {
-		return false
+	ip = StrToLower(StrTrimWhitespaces(ip))
+	if(!IsNetValidIpAddr(ip)) {
+		ip = ""
 	} //end if
-	//--
-	return true
+	if(!IsNetValidPortStr(port)) {
+		port = "0"
+	} //end if
+	return ip, port // returns strtolower + trim of IP
 	//--
 } //END FUNCTION
 
@@ -4058,103 +4115,6 @@ func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, 
 	return cmdExec(stopTimeout, captureStdout, captureStderr, additionalEnv, inputStdin, theExe, theArgs ...)
 	//--
 } //END FUNCTION
-
-
-//-----
-
-
-const(
-	HTML_CONTENT_HEADER = "text/html; charset=UTF-8" 					// keep separate, can be used also by HTTP Headers: Content-Type
-	HTML_TPL = `<!DOCTYPE html>
-<!-- TPL.SmartGo -->
-<html>
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
-<link rel="icon" href="data:,">
-<title>[###TITLE|html###]</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-[:::HEAD-CSS-JS:::]
-[###HEAD-HTML###]
-</head>
-<body>
-[###BODY-HTML###]
-</body>
-</html>
-<!-- #end TPL -->
-`
-
-	HTML_STYLE_ERR_PAGE_MSG_DIV = "line-height: 36px; text-align: left; font-size: 1.25rem; font-weight: bold; font-style: normal; padding-left: 16px; padding-right: 16px; padding-top: 12px; padding-bottom: 8px; margin-top: 8px; margin-bottom: 8px; max-width: calc(100% - 10px) !important; min-width: 100px; min-height: 40px; height: auto !important; border-radius: 5px; box-sizing: content-box !important; opacity: 1 !important; background-color: #C62828 !important; color: #FFFFFF !important;"
-	HTML_STYLE_THIN_HR = "height:1px; border:none 0; border-top:1px solid #CCCCCC;"
-	HTML_ERR_DEFAULT_MSG = `The request could not be completed ...`
-	HTML_TPL_ERR = `
-<!DOCTYPE html>
-<!-- TPL.SmartGo.ERR -->
-<html>
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">
-<link rel="icon" href="data:,">
-<title>[###MESSAGE-TEXT|html###]</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>* { font-family: 'IBM Plex Sans', 'Noto Sans', arial, sans-serif; font-smooth: always; }</style>
-</head>
-<body>
-<h1 style="display:inline; font-size:4rem; color:#333333;">[###MESSAGE-TEXT|html###]</h1>
-<br>
-<br>
-<hr style="` + HTML_STYLE_THIN_HR + `">
-<div style="` + HTML_STYLE_ERR_PAGE_MSG_DIV + `">[###MESSAGE-HTML###]</div>
-<hr style="` + HTML_STYLE_THIN_HR + `">
-<br>
-<div align="right">[###LOGO-SERVER-HTML###] &nbsp; [###LOGO-RUNTIME-HTML###] &nbsp; [###LOGO-FRAMEWORK-HTML###]</div>
-</body>
-</html>
-<!-- #end TPL -->
-`
-
-	LOGO_SERVER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="14" height="16" viewBox="0 0 14 16"><path style="fill:#888888;" fill-rule="evenodd" d="M7 1C3.14 1 0 4.14 0 8s3.14 7 7 7c.48 0 .94-.05 1.38-.14-.17-.08-.2-.73-.02-1.09.19-.41.81-1.45.2-1.8-.61-.35-.44-.5-.81-.91-.37-.41-.22-.47-.25-.58-.08-.34.36-.89.39-.94.02-.06.02-.27 0-.33 0-.08-.27-.22-.34-.23-.06 0-.11.11-.2.13-.09.02-.5-.25-.59-.33-.09-.08-.14-.23-.27-.34-.13-.13-.14-.03-.33-.11s-.8-.31-1.28-.48c-.48-.19-.52-.47-.52-.66-.02-.2-.3-.47-.42-.67-.14-.2-.16-.47-.2-.41-.04.06.25.78.2.81-.05.02-.16-.2-.3-.38-.14-.19.14-.09-.3-.95s.14-1.3.17-1.75c.03-.45.38.17.19-.13-.19-.3 0-.89-.14-1.11-.13-.22-.88.25-.88.25.02-.22.69-.58 1.16-.92.47-.34.78-.06 1.16.05.39.13.41.09.28-.05-.13-.13.06-.17.36-.13.28.05.38.41.83.36.47-.03.05.09.11.22s-.06.11-.38.3c-.3.2.02.22.55.61s.38-.25.31-.55c-.07-.3.39-.06.39-.06.33.22.27.02.5.08.23.06.91.64.91.64-.83.44-.31.48-.17.59.14.11-.28.3-.28.3-.17-.17-.19.02-.3.08-.11.06-.02.22-.02.22-.56.09-.44.69-.42.83 0 .14-.38.36-.47.58-.09.2.25.64.06.66-.19.03-.34-.66-1.31-.41-.3.08-.94.41-.59 1.08.36.69.92-.19 1.11-.09.19.1-.06.53-.02.55.04.02.53.02.56.61.03.59.77.53.92.55.17 0 .7-.44.77-.45.06-.03.38-.28 1.03.09.66.36.98.31 1.2.47.22.16.08.47.28.58.2.11 1.06-.03 1.28.31.22.34-.88 2.09-1.22 2.28-.34.19-.48.64-.84.92s-.81.64-1.27.91c-.41.23-.47.66-.66.8 3.14-.7 5.48-3.5 5.48-6.84 0-3.86-3.14-7-7-7L7 1zm1.64 6.56c-.09.03-.28.22-.78-.08-.48-.3-.81-.23-.86-.28 0 0-.05-.11.17-.14.44-.05.98.41 1.11.41.13 0 .19-.13.41-.05.22.08.05.13-.05.14zM6.34 1.7c-.05-.03.03-.08.09-.14.03-.03.02-.11.05-.14.11-.11.61-.25.52.03-.11.27-.58.3-.66.25zm1.23.89c-.19-.02-.58-.05-.52-.14.3-.28-.09-.38-.34-.38-.25-.02-.34-.16-.22-.19.12-.03.61.02.7.08.08.06.52.25.55.38.02.13 0 .25-.17.25zm1.47-.05c-.14.09-.83-.41-.95-.52-.56-.48-.89-.31-1-.41-.11-.1-.08-.19.11-.34.19-.15.69.06 1 .09.3.03.66.27.66.55.02.25.33.5.19.63h-.01z"/></svg>`
-
-	LOGO_RUNTIME_SVG = `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="128" height="128" viewBox="0 0 128.0 128.0" id="golang-logo">
- <defs id="d1" />
- <g id="g1" transform="matrix(0.75306336,0,0,0.74544188,-52.462259,-44.044334)">
-  <g id="g2">
-   <g id="g3">
-    <path d="m 153.1,99.3 c -6.3,1.6 -10.6,2.8 -16.8,4.4 -1.5,0.4 -1.6,0.5 -2.9,-1 -1.5,-1.7 -2.6,-2.8 -4.7,-3.8 -6.3,-3.1 -12.4,-2.2 -18.1,1.5 -6.8,4.4 -10.3,10.9 -10.2,19 0.1,8 5.6,14.6 13.5,15.7 6.8,0.9 12.5,-1.5 17,-6.6 0.9,-1.1 1.7,-2.3 2.7,-3.7 -3.6,0 -8.1,0 -19.3,0 -2.1,0 -2.6,-1.3 -1.9,-3 1.3,-3.1 3.7,-8.3 5.1,-10.9 0.3,-0.6 1,-1.6 2.5,-1.6 5.1,0 23.9,0 36.4,0 -0.2,2.7 -0.2,5.4 -0.6,8.1 -1.1,7.2 -3.8,13.8 -8.2,19.6 -7.2,9.5 -16.6,15.4 -28.5,17 -9.8,1.3 -18.9,-0.6 -26.9,-6.6 -7.4,-5.6 -11.6,-13 -12.7,-22.2 -1.3,-10.9 1.9,-20.7 8.5,-29.3 7.1,-9.3 16.5,-15.2 28,-17.3 9.4,-1.7 18.4,-0.6 26.5,4.9 5.3,3.5 9.1,8.3 11.6,14.1 0.6,0.9 0.2,1.4 -1,1.7 z" id="path28" style="fill:#00aed8;fill-opacity:1" />
-   </g>
-   <g id="g4">
-    <path d="m 186.2,154.6 c -9.1,-0.2 -17.4,-2.8 -24.4,-8.8 -5.9,-5.1 -9.6,-11.6 -10.8,-19.3 -1.8,-11.3 1.3,-21.3 8.1,-30.2 7.3,-9.6 16.1,-14.6 28,-16.7 10.2,-1.8 19.8,-0.8 28.5,5.1 7.9,5.4 12.8,12.7 14.1,22.3 1.7,13.5 -2.2,24.5 -11.5,33.9 -6.6,6.7 -14.7,10.9 -24,12.8 -2.7,0.5 -5.4,0.6 -8,0.9 z M 210,114.2 c -0.1,-1.3 -0.1,-2.3 -0.3,-3.3 -1.8,-9.9 -10.9,-15.5 -20.4,-13.3 -9.3,2.1 -15.3,8 -17.5,17.4 -1.8,7.8 2,15.7 9.2,18.9 5.5,2.4 11,2.1 16.3,-0.6 7.9,-4.1 12.2,-10.5 12.7,-19.1 z" id="path32" style="fill:#00aed8;fill-opacity:1" />
-   </g>
-  </g>
- </g>
- <g id="g5" transform="matrix(1.1,0,0,1.1,6.855,-17.56)">
-  <g id="g6">
-   <path d="m 40.2,101.1 c -0.4,0 -0.5,-0.2 -0.3,-0.5 L 42,97.9 c 0.2,-0.3 0.7,-0.5 1.1,-0.5 h 35.7 c 0.4,0 0.5,0.3 0.3,0.6 l -1.7,2.6 c -0.2,0.3 -0.7,0.6 -1,0.6 z" id="path4" style="fill:#00aed8;fill-opacity:1" />
-  </g>
-  <g id="g7">
-   <path d="m 25.1,110.3 c -0.4,0 -0.5,-0.2 -0.3,-0.5 l 2.1,-2.7 c 0.2,-0.3 0.7,-0.5 1.1,-0.5 h 45.6 c 0.4,0 0.6,0.3 0.5,0.6 l -0.8,2.4 c -0.1,0.4 -0.5,0.6 -0.9,0.6 z" id="path12" style="fill:#00aed8;fill-opacity:1" />
-  </g>
-  <g id="g8">
-   <path d="m 49.3,119.5 c -0.4,0 -0.5,-0.3 -0.3,-0.6 l 1.4,-2.5 c 0.2,-0.3 0.6,-0.6 1,-0.6 h 20 c 0.4,0 0.6,0.3 0.6,0.7 l -0.2,2.4 c 0,0.4 -0.4,0.7 -0.7,0.7 z" id="path20" style="fill:#00aed8;fill-opacity:1" />
-  </g>
- </g>
-</svg>`
-
-	LOGO_FRAMEWORK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" id="smart.framework-logo" version="1.1" viewBox="0 0 128 128" height="128px" width="128px">
-<defs id="defs1466"/>
-<g id="layer1">
-    <g id="g3346" style="fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:none" transform="matrix(1.6895803,0,0,1.6895803,2.9648469,2.9648477)">
-        <path style="fill:#ED2839;fill-opacity:1;fill-rule:evenodd;stroke:#ED2839;stroke-width:14.12108517;stroke-opacity:1" id="path3011" d="m 62.930573,36.124446 a 26.806128,26.806128 0 1 1 -53.6122531,0 26.806128,26.806128 0 1 1 53.6122531,0 z"/>
-        <g id="text3758" style="fill:#000000;fill-opacity:1;stroke:none"/>
-        <g id="text1442" style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.54972863" transform="scale(0.92881066,1.0766457)">
-            <path id="path1444" style="fill:#ffffff;stroke-width:0.54972863" d="M 12.135835,46.916975 V 40.346 l 2.222535,0.01933 q 0.09663,3.285487 1.893987,4.870251 1.816681,1.565439 5.508023,1.565439 3.440099,0 5.237454,-1.352848 1.816681,-1.372174 1.816681,-3.981238 0,-2.087251 -1.101605,-3.208182 -1.082278,-1.120931 -4.599682,-2.183882 l -3.8073,-1.140258 q -4.135849,-1.256215 -5.836572,-3.130876 -1.681396,-1.87466 -1.681396,-5.140821 0,-3.672016 2.609063,-5.701287 2.609064,-2.029272 7.324704,-2.029272 2.009946,0 4.406419,0.444507 2.396473,0.425181 5.102168,1.256216 v 6.145794 h -2.183882 q -0.328549,-3.053571 -2.048598,-4.406418 -1.700723,-1.372174 -5.198801,-1.372174 -3.053571,0 -4.657662,1.256215 -1.584764,1.23689 -1.584764,3.614036 0,2.067925 1.198237,3.246835 1.198236,1.17891 5.082842,2.338494 l 3.575383,1.062952 q 3.923258,1.17891 5.585329,3.014918 1.681396,1.816681 1.681396,4.889578 0,4.193828 -2.686369,6.319731 -2.686369,2.125904 -8.001128,2.125904 -2.377147,0 -4.850926,-0.48316 -2.454452,-0.48316 -5.005536,-1.468806 z"/>
-            <path id="path1446" style="fill:#C2203F;stroke-width:0.54972863" d="m 39.714602,46.29853 q 0,-1.082278 0.734403,-1.836007 0.75373,-0.75373 1.836008,-0.75373 1.082278,0 1.816681,0.75373 0.75373,0.753729 0.75373,1.836007 0,1.082278 -0.734404,1.836008 -0.734403,0.734403 -1.836007,0.734403 -1.101605,0 -1.836008,-0.734403 -0.734403,-0.75373 -0.734403,-1.836008 z m 0,-12.60081 q 0,-1.082278 0.734403,-1.816681 0.75373,-0.75373 1.836008,-0.75373 1.101604,0 1.836007,0.734403 0.734404,0.734403 0.734404,1.836008 0,1.101604 -0.734404,1.836008 -0.734403,0.734403 -1.836007,0.734403 -1.082278,0 -1.836008,-0.734403 -0.734403,-0.75373 -0.734403,-1.836008 z"/>
-            <path id="path1448" style="fill:#222222;stroke-width:0.54972863" d="m 65.9985,23.087528 h -1.874661 q -0.01933,-1.449479 -0.831035,-2.203209 -0.792382,-0.753729 -2.319167,-0.753729 -1.990619,0 -2.802328,1.101604 -0.811708,1.082278 -0.811708,3.884606 v 2.647716 h 5.739939 v 2.067925 h -5.739939 v 16.427436 h 4.561029 v 2.048598 H 50.402098 v -2.048598 h 3.401446 V 29.832441 h -3.401446 v -2.067925 h 3.401446 v -2.57041 q 0,-3.440099 1.778028,-5.198801 1.797355,-1.758702 5.25678,-1.758702 1.294869,0 2.589737,0.231917 1.294869,0.231916 2.570411,0.715076 z"/>
-        </g>
-    </g>
-</g>
-</svg>`
-)
 
 
 //-----

@@ -1,27 +1,38 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220405.0608 :: STABLE
+// r.20220408.1712 :: STABLE
 
 package assetsserver
 
 import (
+	"log"
 	"net/http"
 
-	smart  "github.com/unix-world/smartgo"
-	assets "github.com/unix-world/smartgo/web-assets"
+	smart  			"github.com/unix-world/smartgo"
+	smarthttputils 	"github.com/unix-world/smartgo/web-httputils"
+	assets 			"github.com/unix-world/smartgo/web-assets"
 )
 
 
 //-----
 
+const(
+	VERSION string = "r.20220408.1712"
 
-func WebAssetsHttpHandler (w http.ResponseWriter, r *http.Request) { // OK: serves the assets for a HTTP(S) server under the path: `/lib/*`
+	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
+
+	DEBUG bool = false
+)
+
+//-----
+
+
+func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposition string, cacheMode string) { // serves the assets for a HTTP(S) server under the path: `/lib/*`
 	//--
 	var path string = r.URL.Path
 	path = smart.StrTrimWhitespaces(path)
 	//--
-	//log.Println("[DEBUG] Trying to Serve the Asset: `" + path + "` ...")
 	var assetContent string = ""
 	if(smart.StrStartsWith(path, "/lib/")) {
 		path = smart.StrTrim(path, "/")
@@ -33,19 +44,36 @@ func WebAssetsHttpHandler (w http.ResponseWriter, r *http.Request) { // OK: serv
 	} //end if
 	//--
 	if(assetContent == "") {
-		w.Header().Set("Content-Type", smart.HTML_CONTENT_HEADER)
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(smart.HtmlErrorPage("404 Not Found", "Asset Not Found:`<small>" + smart.EscapeHtml(path) + "</small>`")))
+		log.Println("[WARNING] 404 :: Cannot Serve Asset: `" + path + "` ...")
+		smarthttputils.HttpStatus404(w, r, "Asset Not Found: `" + path + "`", true) // html
 		return
 	} //end if
 	//--
-	var mime string = smart.MimeTypeByFilePath(path)
+	var cExp int = -1
+	var cMod string = ""
+	var cCtl string = "no-cache"
+	switch(cacheMode) {
+		case "cache:public": fallthrough
+		case "cache:private":
+			cExp = int(CACHED_EXP_TIME_SECONDS)
+			cMod = assets.LAST_MODIFIED_DATE_TIME
+			if(cacheMode == "cache:public") {
+				cCtl = "public"
+			} else {
+				cCtl = "private"
+			} //end if else
+			break
+		case "cache:no": fallthrough
+		default:
+			// as defaults (no cache)
+	} //end switch
 	//--
-	//log.Println("[DEBUG] Serving Asset: `" + path + "` as:", mime)
+	if(DEBUG == true) {
+		log.Println("[DATA] Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; contentDisposition: `" + contentDisposition + "` ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
+	} //end if
+	log.Println("[NOTICE] Serving Asset: `" + path + "` ;", len(assetContent), "bytes")
 	//--
-	w.Header().Add("Content-Type", mime)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(assetContent))
+	smarthttputils.HttpStatus200(w, r, assetContent, path, contentDisposition, cExp, cMod, cCtl, nil)
 	//--
 } //END FUNCTION
 
@@ -116,7 +144,7 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--
-	return smart.RenderMainMarkersTpl(smart.HTML_TPL, arr, parr) + "\n" + "<!-- TPL:Dynamic -->" + "\n"
+	return smart.RenderMainMarkersTpl(assets.HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:Dynamic -->" + "\n"
 	//--
 } //END FUNCTION
 

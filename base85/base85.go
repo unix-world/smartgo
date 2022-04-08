@@ -1,101 +1,43 @@
+
+// Go Lang Base85
+// (c) 2021-2022 unix-world.org
+// License: BSD
+// v.20220408.1556
+
 package base85
 
-// adapted by unixman from github.com/akamensky/base58
-// v.20210813
-// License: BSD
-
 import (
-	"fmt"
-	"math/big"
-	"strings"
+	bconv "github.com/unix-world/smartgo/baseconv"
 )
 
-const encodeStd = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#"
 
-var (
-	bigZero  = big.NewInt(0)
-	bigRadix = big.NewInt(85)
-	isTableInit = false
-	encodeTable = [256]byte{}
-	alphabet = []string{}
-)
+const name string = "Base85"
+const radix int64 = 85
+const encodeStd string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#" // base85 charset
 
-// initEncodingTable returns a new Encoding defined by the given alphabet,
-// which must be a 85-byte string.
-func initEncodingTable() {
-	if(isTableInit == true) {
-		return
-	}
-	alphabet = strings.Split(encodeStd, "")
-	for i := 0; i < len(encodeTable); i++ {
-		encodeTable[i] = 0xFF
-	}
-	for i := 0; i < len(encodeStd); i++ {
-		encodeTable[encodeStd[i]] = byte(i)
-	}
-	isTableInit = true
-}
 
-// Encode takes a slice of bytes and encodes it to base85 string.
-// Leading zero bytes are kept in place for precise decoding.
+//--
+
+var bConv *bconv.BaseConv = bconv.NewBaseConv(name, radix, encodeStd)
+
+//--
+
+// Encode takes a slice of bytes and encodes it to baseXY string. Leading zero bytes are kept in place for precise decoding.
 func Encode(input []byte) (output string) {
+	//--
+	return bConv.Encode(input) // output
+	//--
+} //END FUNCTION
 
-	initEncodingTable()
+//--
 
-	num := new(big.Int).SetBytes(input)
-
-	for num.Cmp(bigZero) > 0 {
-		mod := new(big.Int)
-		num.DivMod(num, bigRadix, mod)
-		output = alphabet[mod.Int64()] + output
-	}
-
-	for _, i := range input {
-		if i != 0 {
-			break
-		}
-		output = alphabet[0] + output
-	}
-
-	return
-}
-
-// Decode takes string as an input and returns decoded string and error
-// If provided string contains characters illegal for base85 the returned error will be <notnil>
+// Decode takes string as an input and returns decoded string and error. If provided string contains characters illegal for baseXY the returned error will be <notnil>
 func Decode(input string) (output []byte, err error) {
+	//--
+	return bConv.Decode(input) // output, err
+	//--
+} //END FUNCTION
 
-	initEncodingTable()
-
-	result := big.NewInt(0)
-	multi := big.NewInt(1)
-
-	tmpBig := new(big.Int)
-
-	for i := len(input) - 1; i >= 0; i-- {
-		tmp := encodeTable[input[i]]
-		if tmp == 255 {
-			err = fmt.Errorf("invalid Base85 input string at character \"%s\", position %d", string(input[i]), i)
-			return
-		}
-		tmpBig.SetInt64(int64(tmp))
-		tmpBig.Mul(multi, tmpBig)
-		result.Add(result, tmpBig)
-		multi.Mul(multi, bigRadix)
-	}
-
-	tmpBytes := result.Bytes()
-
-	var numZeros int
-	for numZeros = 0; numZeros < len(input); numZeros++ {
-		if input[numZeros] != encodeStd[0] {
-			break
-		}
-	}
-	length := numZeros + len(tmpBytes)
-	output = make([]byte, length)
-	copy(output[numZeros:], tmpBytes)
-
-	return
-}
+//--
 
 // #END
