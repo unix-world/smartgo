@@ -1,0 +1,5 @@
+v.20220410.0712
+
+original version: @head.20181202 # github.com/vaughan0/go-ini
+
+modified by unixman

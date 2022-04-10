@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220408.2358 :: STABLE
+// r.20220410.0450 :: STABLE
 
 package smartgo
 
@@ -70,7 +70,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220408.2358"
+	VERSION string = "v.20220410.0450"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
@@ -95,7 +95,7 @@ const (
 
 	CMD_EXEC_ERR_SIGNATURE string = "[SmartGo:cmdExec:Exit:ERROR]" 				// INTERNAL FLAG FOR CMD EXIT ERROR
 
-	SEPARATOR_CHECKSUM_V1 string = "#CHECKSUM-SHA1#" 							// only to support v1 unarchive or decrypt ; (for v1 no archive or encrypt is available anymore)
+	SEPARATOR_CHECKSUM_V1 string = "#CHECKSUM-SHA1#" 							// only to support v1 unarchive or decrypt ; (for v1 no archive or encrypt is available anymore ; use v2 !)
 	SEPARATOR_CHECKSUM_V2 string = "#CKSUM256#" 								// current, v2 ; archive + unarchive or encrypt + decrypt
 
 	SIGNATURE_SFZ_DATA_ARCH_V1 string = "PHP.SF.151129/B64.ZLibRaw.HEX" 		// only to support v1 unarchive ; (for v1 no archive is available anymore)
@@ -141,7 +141,11 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		} //end if else
 	} //end if
 	//--
-	return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + theMsg)
+	if(logColoredOnConsole) {
+		return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + theMsg)
+	} else {
+		return fmt.Println("LOG | " + DateNowUtc() + " | " + theMsg)
+	} //end if else
 	//--
 } //END FUNCTION
 
@@ -265,7 +269,11 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} //end if
 	//--
 	if(logToFileAlsoOnConsole) {
-		return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + colorMsg)
+		if(logColoredOnConsole) {
+			return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + colorMsg)
+		} else {
+			return fmt.Println("LOG | " + DateNowUtc() + " | " + colorMsg)
+		} //end if else
 	} //end if
 	//--
 	return len(bytes), nil
@@ -355,7 +363,9 @@ func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole
 		//--
 	} else {
 		//--
-		LogToConsole(level, true)
+		LogToConsole(level, withColorsOnConsole)
+		//--
+		log.Println("[ERROR] !!!!!!! Cannot Log to File !!!!!!! the Log Path is Invalid or does not exists: `" + pathForLogs + "` ... will log to console")
 		//--
 	} //end if
 	//--
@@ -367,7 +377,7 @@ func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole
 
 func ClearPrintTerminal() {
 	//--
-	print("\033[H\033[2J") // try to clear the terminal (should work on *nix and windows) ; for *nix only can be: fmt.Println("\033[2J")
+	print("\033[H\033[2J") // try to clear the terminal (should work on *nix and windows) ; for *nix only it can be: fmt.Println("\033[2J")
 	//--
 } //END FUNCTION
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220408.2358 :: STABLE
+// r.20220410.0450 :: STABLE
 
 package httputils
 
@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"net/http"
+	"crypto/tls"
+	"crypto/x509"
 	"crypto/subtle"
 
 	smart 		"github.com/unix-world/smartgo"
@@ -21,7 +23,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220408.2358"
+	VERSION string = "r.20220410.0450"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -75,7 +77,111 @@ const (
 
 //-----
 
-var memAuthCache *smartcache.InMemCache = smartcache.NewCache("smart.httputils.auth.inMemCache", time.Duration(CACHE_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
+var memAuthCache *smartcache.InMemCache = nil
+
+//-----
+
+
+func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
+	//--
+	cfg := &tls.Config{
+		InsecureSkipVerify: insecureSkipVerify,
+	}
+	//--
+	if(insecureSkipVerify == true) {
+		cfg.InsecureSkipVerify = true
+		log.Println("[NOTICE] TlsConfigClient: InsecureSkipVerify was set to TRUE")
+	} else {
+		cfg.InsecureSkipVerify = false
+	} //end if
+	//--
+	serverPEM = smart.StrTrimWhitespaces(serverPEM)
+	if(serverPEM != "") {
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM([]byte(serverPEM))
+		if(ok) {
+			cfg.RootCAs = roots
+			log.Println("[NOTICE] TlsConfigClient: Appending a custom Server Certificate to the default x509 Root:", len(serverPEM), "bytes")
+		} else {
+			log.Println("[ERROR] TlsConfigClient: Failed to parse server certificate")
+		} //end if
+	} //end if
+	//--
+	return cfg
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func TlsConfigServer() *tls.Config {
+	//--
+	cfg := &tls.Config{
+		MinVersion: 		tls.VersionTLS12,
+		MaxVersion: 		tls.VersionTLS13,
+		CurvePreferences: 	[]tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, // tls1.2
+			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, // tls1.2
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384, // tls1.2
+			tls.TLS_RSA_WITH_AES_256_CBC_SHA, // tls1.2
+			tls.TLS_AES_256_GCM_SHA384, // tls1.3
+			tls.TLS_CHACHA20_POLY1305_SHA256, // tls1.3
+		},
+	}
+	//--
+	return cfg
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func TLSProtoHttpV1Server() map[string]func(*http.Server, *tls.Conn, http.Handler) {
+	//--
+	return make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0) // disable HTTP/2 on TLS (on non-TLS is always HTTP/1.1)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool) (*http.ServeMux, *http.Server) {
+	//--
+	mux := http.NewServeMux()
+	//--
+	srv := &http.Server{
+		Addr: 				srvAddr,
+		Handler: 			mux,
+		TLSConfig: 			TlsConfigServer(),
+		ReadTimeout: 		time.Duration(timeoutSec) * time.Second,
+		ReadHeaderTimeout: 	0, // if set to zero, the value of ReadTimeout is used
+		IdleTimeout:        0, // if set to zero, the value of ReadTimeout is used
+		WriteTimeout: 		time.Duration(timeoutSec) * time.Second,
+	}
+	//--
+	if(forceHttpV1 == true) {
+		srv.TLSNextProto = TLSProtoHttpV1Server() // disable HTTP/2 on TLS (on non-TLS is always HTTP/1.1)
+		log.Println("[NOTICE] HttpMuxServer: HTTP/1.1")
+	} //end if
+	//--
+	return mux, srv
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.Header {
+	//--
+	return http.Header{"Authorization": {"Basic " + smart.Base64Encode(authUsername + ":" + authPassword)}}
+	//--
+} //END FUNCTION
+
 
 //-----
 
@@ -299,7 +405,7 @@ func HttpStatus208(w http.ResponseWriter, r *http.Request, content string, conte
 func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageText string, outputHtml bool) {
 	//--
 	var title string = ""
-	var displayAuthLogo bool = false;
+	var displayAuthLogo bool = false
 	switch(code) {
 		case 400:
 			title = HTTP_STATUS_400
@@ -423,8 +529,12 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			HttpStatus403(w, r, err, outputHtml)
 			return err
 		} //end if
+		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW :: Client: `<" + ip + ">` match the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
 	//--
+	if(memAuthCache == nil) { // start cache just on 1st auth ... otherwise all scripts using this library will run the cache in background, but is needed only by this method !
+		memAuthCache = smartcache.NewCache("smart.httputils.auth.inMemCache", time.Duration(CACHE_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
+	} //end if
 	if(DEBUG_CACHE == true) {
 		log.Println("[DATA] HttpBasicAuthCheck :: memAuthCache:", memAuthCache)
 	} //end if
@@ -485,7 +595,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			w.Write([]byte(HTTP_STATUS_401 + "\n"))
 		} //end if else
 		//--
-		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED :: [%s %s %s] %s [%s] for client %s\n", r.Method, r.URL, r.Proto, "401", r.Host, r.RemoteAddr)
+		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED :: UserName: `" + user + "` # [%s %s %s] %s [%s] for client %s\n", r.Method, r.URL, r.Proto, "401", r.Host, r.RemoteAddr)
 		//--
 		return err
 		//--
