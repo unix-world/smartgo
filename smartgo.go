@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220410.0450 :: STABLE
+// r.20220411.1745 :: STABLE
 
 package smartgo
 
@@ -70,7 +70,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220410.0450"
+	VERSION string = "v.20220411.1745"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
@@ -2093,6 +2093,19 @@ func TextCutByLimit(s string, length int) string {
 } //END FUNCTION
 
 
+//-----
+
+
+func ConvertJsonNumberToStr(data interface{}) string { // after convert to string can be re-converted into int64 / float64 / ...
+	//--
+	return data.(json.Number).String()
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func ConvertIntToStr(i int) string {
 	//--
 	return strconv.Itoa(i)
@@ -2103,6 +2116,20 @@ func ConvertIntToStr(i int) string {
 func ConvertUIntToStr(i uint) string {
 	//--
 	return strconv.Itoa(int(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt8ToStr(i int8) string {
+	//--
+	return strconv.FormatInt(int64(i), 10)
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt8ToStr(i uint8) string {
+	//--
+	return strconv.FormatUint(uint64(i), 10)
 	//--
 } //END FUNCTION
 
@@ -2149,17 +2176,21 @@ func ConvertUInt64ToStr(i uint64) string {
 } //END FUNCTION
 
 
-func ParseStringAsBoolStr(s string) string {
+func ConvertFloat32ToStr(f float32) string {
 	//--
-	if((s != "") && (s != "0")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
-		s = "true"
-	} else {
-		s = "false"
-	} //end if else
-	//--
-	return s
+	return ConvertFloat64ToStr(float64(f)) // use precision 14 as in PHP
 	//--
 } //END FUNCTION
+
+
+func ConvertFloat64ToStr(f float64) string {
+	//--
+	return strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
+	//--
+} //END FUNCTION
+
+
+//-----
 
 
 func ParseIntegerStrAsInt(s string) int {
@@ -2219,26 +2250,7 @@ func ParseInteger64StrAsStr(s string) string {
 } //END FUNCTION
 
 
-func ParseFloatAsStrDecimal(s string, d int) string {
-	//--
-	if(d < 1) {
-		d = 1
-	} else if(d > 8) {
-		d = 8
-	} //end if else
-	//--
-	var f float64 = 0
-	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
-		f = tmpFlt
-	} //end if
-	s = fmt.Sprintf("%." + ConvertIntToStr(d) + "f", f)
-	//--
-	return string(s)
-	//--
-} //END FUNCTION
-
-
-func ParseFloatAsStrFloat(s string) string {
+func ParseFloatStrAsStr(s string) string {
 	//--
 	var f float64 = 0
 	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
@@ -2250,6 +2262,41 @@ func ParseFloatAsStrFloat(s string) string {
 	return string(s)
 	//--
 } //END FUNCTION
+
+
+func ParseFloatStrAsDecimalStr(s string, d uint8) string {
+	//--
+	if(d < 1) {
+		d = 1
+	} else if(d > 8) {
+		d = 8
+	} //end if else
+	//--
+	var f float64 = 0
+	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
+		f = tmpFlt
+	} //end if
+	s = fmt.Sprintf("%." + ConvertUInt8ToStr(d) + "f", f)
+	//--
+	return string(s)
+	//--
+} //END FUNCTION
+
+
+func ParseBoolStrAsStr(s string) string {
+	//--
+	if((s != "") && (s != "0")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
+		s = "true"
+	} else {
+		s = "false"
+	} //end if else
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+//-----
 
 
 func StrToUpper(str string) string {
@@ -2432,13 +2479,16 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 	//--
 	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
-		log.Println("[NOTICE] Hex2Bin: ", err)
+		log.Println("[NOTICE] Hex2Bin Failed:", err)
 		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
 	return string(decoded)
 	//--
 } //END FUNCTION
+
+
+//-----
 
 
 func jsonEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
@@ -2485,7 +2535,7 @@ func JsonRawEncode(data interface{}) string { // HTML Not Safe (raw)
 } //END FUNCTION
 
 
-func JsonDecode(data string) map[string]interface{} {
+func JsonObjDecode(data string) map[string]interface{} { // can decode just a JSON Object as {"key1":..., "key2":...}
 	//-- no need any panic handler
 	if(data == "") {
 		return nil
@@ -2494,15 +2544,64 @@ func JsonDecode(data string) map[string]interface{} {
 	var dat map[string]interface{}
 	dataReader := strings.NewReader(data)
 	decoder := json.NewDecoder(dataReader)
+	decoder.UseNumber()
 	err := decoder.Decode(&dat)
 	if(err != nil) {
-		log.Println("[NOTICE] JsonDecode Failed:", err)
+		log.Println("[NOTICE] JsonObjDecode Failed:", err)
 		return nil
 	} //end if
 	//--
 	return dat
 	//--
 } //END FUNCTION
+
+
+func JsonArrDecode(data string) []interface{} { // can decode just a JSON Array as ["a", 2, "c", { "e": "f" }, ...]
+	//-- no need any panic handler
+	if(data == "") {
+		return nil
+	} //end if
+	//--
+	var dat []interface{}
+	dataReader := strings.NewReader(data)
+	decoder := json.NewDecoder(dataReader)
+	decoder.UseNumber()
+	err := decoder.Decode(&dat)
+	if(err != nil) {
+		log.Println("[NOTICE] JsonArrDecode Failed:", err)
+		return nil
+	} //end if
+	//--
+	return dat
+	//--
+} //END FUNCTION
+
+
+func JsonStrDecode(data string) string {
+	//-- no need any panic handler
+	if(data == "") {
+		return ""
+	} //end if
+	//--
+	var dat string
+	dataReader := strings.NewReader(data)
+	decoder := json.NewDecoder(dataReader)
+	decoder.UseNumber()
+	err := decoder.Decode(&dat)
+	if(err != nil) {
+		log.Println("[NOTICE] JsonStrDecode Failed:", err)
+		return ""
+	} //end if
+	//--
+	return dat
+	//--
+} //END FUNCTION
+
+
+// The following JSON structures can be parsed directly: int / float / bool / null
+
+
+//-----
 
 
 func AddCSlashes(s string, c string) string {
@@ -3803,19 +3902,19 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 						//	log.Println("[DEBUG] escaping + " # found Marker Escaping [Arr] at index: " + ConvertIntToStr(i) + "." + ConvertIntToStr(j))
 							//--
 							if(escaping == "|bool") { // Boolean
-								tmp_marker_val = ParseStringAsBoolStr(tmp_marker_val)
+								tmp_marker_val = ParseBoolStrAsStr(tmp_marker_val)
 							} else if(escaping == "|int") { // Integer
 								tmp_marker_val = ParseInteger64StrAsStr(tmp_marker_val)
 							} else if(escaping == "|dec1") { // Decimals: 1
-								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 1)
+								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 1)
 							} else if(escaping == "|dec2") { // Decimals: 2
-								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 2)
+								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 2)
 							} else if(escaping == "|dec3") { // Decimals: 3
-								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 3)
+								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 3)
 							} else if(escaping == "|dec4") { // Decimals: 4
-								tmp_marker_val = ParseFloatAsStrDecimal(tmp_marker_val, 4)
+								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 4)
 							} else if(escaping == "|num") { // Number (Float / Decimal / Integer)
-								tmp_marker_val = ParseFloatAsStrFloat(tmp_marker_val)
+								tmp_marker_val = ParseFloatStrAsStr(tmp_marker_val)
 							} else if(escaping == "|idtxt") { // id_txt: Id-Txt
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "_", "-", -1) // replace all
 								tmp_marker_val = strings.Title(StrToLower(tmp_marker_val))
@@ -3861,7 +3960,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|url") { // escape URL
 								tmp_marker_val = EscapeUrl(tmp_marker_val)
 							} else if(escaping == "|json") { // format as Json Data ; expects pure JSON !!!
-								jsonObj := JsonDecode(tmp_marker_val)
+								jsonObj := JsonObjDecode(tmp_marker_val)
 								if(jsonObj == nil) {
 									tmp_marker_val = "null"
 								} else {
