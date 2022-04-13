@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220411.1745 :: STABLE
+// r.20220413.2128 :: STABLE
 
 package smartgo
 
@@ -24,6 +24,7 @@ import (
 	"log"
 	"fmt"
 
+	"math"
 	"bytes"
 	"strings"
 	"strconv"
@@ -66,11 +67,12 @@ import (
 //	"github.com/fatih/color"
 	color "github.com/unix-world/smartgo/colorstring"
 	"github.com/unix-world/smartgo/logutils"
+	"github.com/unix-world/smartgo/parseini"
 )
 
 
 const (
-	VERSION string = "v.20220411.1745"
+	VERSION string = "v.20220413.1948"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
@@ -2103,7 +2105,7 @@ func ConvertJsonNumberToStr(data interface{}) string { // after convert to strin
 } //END FUNCTION
 
 
-//-----
+//----- IMPORTANT: never use string(number) ... it will lead to strange situations ... use the convert methods from below
 
 
 func ConvertIntToStr(i int) string {
@@ -2193,73 +2195,29 @@ func ConvertFloat64ToStr(f float64) string {
 //-----
 
 
-func ParseIntegerStrAsInt(s string) int {
+func ParseBoolStrAsBool(s string) bool {
 	//--
-	var Int int = 0 // set the integer as zero Int, in the case of parseInt Error
-	if tmpInt, convErr := strconv.Atoi(s); convErr == nil {
-		Int = tmpInt
-	} //end if else
+	s = ParseBoolStrAsStdBoolStr(s)
 	//--
-	return Int
-	//--
-} //END FUNCTION
-
-
-func ParseIntegerStrAsUInt(s string) uint {
-	//--
-	var Int int = ParseIntegerStrAsInt(s)
-	//--
-	return uint(Int)
+	if(s == "true") {
+		return true
+	} //end if
+	return false
 	//--
 } //END FUNCTION
 
 
-func ParseIntegerStrAsInt64(s string) int64 {
+func ParseBoolStrAsStdBoolStr(s string) string {
 	//--
-	var Int64 int64 = 0 // set the integer as zero Int64, in the case of parseInt Error
+	s = StrToLower(StrTrimWhitespaces(s))
 	//--
-	tmpInt64, err := strconv.ParseInt(s, 10, 64)
-	if(err == nil) {
-		Int64 = tmpInt64
-	} //end if else
-	//--
-	return Int64
-	//--
-} //END FUNCTION
-
-
-func ParseIntegerStrAsUInt64(s string) uint64 {
-	//--
-	var Int64 int64 = ParseIntegerStrAsInt64(s)
-	//--
-	return uint64(Int64)
-	//--
-} //END FUNCTION
-
-
-func ParseInteger64StrAsStr(s string) string {
-	//--
-	if tmpInt, convErr := strconv.ParseInt(s, 10, 64); convErr == nil {
-		s = strconv.FormatInt(tmpInt, 10)
+	if((s != "") && (s != "0") && (s != "false")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
+		s = "true"
 	} else {
-		s = "0" // set the integer as zero (string), in the case of parseInt Error
+		s = "false"
 	} //end if else
 	//--
 	return s
-	//--
-} //END FUNCTION
-
-
-func ParseFloatStrAsStr(s string) string {
-	//--
-	var f float64 = 0
-	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
-		f = tmpFlt
-	} //end if
-	//--
-	s = strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
-	//--
-	return string(s)
 	//--
 } //END FUNCTION
 
@@ -2283,15 +2241,54 @@ func ParseFloatStrAsDecimalStr(s string, d uint8) string {
 } //END FUNCTION
 
 
-func ParseBoolStrAsStr(s string) string {
+func ParseStrAsFloat64(s string) float64 {
 	//--
-	if((s != "") && (s != "0")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
-		s = "true"
-	} else {
-		s = "false"
+	var num float64 = 0
+	conv, err := strconv.ParseFloat(s, 64)
+	if(err == nil) {
+		num = conv
 	} //end if else
 	//--
-	return s
+	return num
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsFloat64StrFixedPrecision(s string) string {
+	//--
+	s = strconv.FormatFloat(ParseStrAsFloat64(s), 'g', 14, 64) // use precision 14 as in PHP
+	//--
+	return string(s)
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsUInt64(s string) uint64 {
+	//--
+	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
+	//--
+	var num uint64 = 0
+	conv, err := strconv.ParseUint(s, 10, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	return num
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsInt64(s string) int64 {
+	//--
+	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
+	//--
+	var num int64 = 0
+	conv, err := strconv.ParseInt(s, 10, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	return num
 	//--
 } //END FUNCTION
 
@@ -3302,6 +3299,50 @@ func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent stri
 } //END FUNCTION
 
 
+func SafePathIniFileRead(iniFilePath string, allowAbsolutePath bool, iniKeys []string) (iniMap map[string]string, errMsg string) {
+	//--
+	iniContent, iniFileErr := SafePathFileRead(iniFilePath, true)
+	if(iniFileErr != "") {
+		return nil, "INI Settings # Read Failed `" + iniFilePath + "`: " + iniFileErr
+	} //end if
+	if(StrTrimWhitespaces(iniContent) == "") {
+		return nil, "INI Settings # Content is Empty `" + iniFilePath + "`"
+	} //end if
+	//--
+	iniData, errParseIni := parseini.Load(iniContent)
+	if(errParseIni != nil) {
+		return nil, "INI Settings # Parse Error `" + iniFilePath + "`: " + errParseIni.Error()
+	} //end if
+	//--
+	var settings map[string]string = map[string]string{}
+	if(iniKeys != nil) { // get all these keys ; if key does not exist will fill it with an empty string ; ex: []string where each value is "section:key"
+		for i := 0; i < len(iniKeys); i++ {
+			if(StrContains(iniKeys[i], ":")) {
+				sk := Explode(":", iniKeys[i])
+				if(len(sk) == 2) {
+					sk[0] = StrTrimWhitespaces(sk[0])
+					sk[1] = StrTrimWhitespaces(sk[1])
+					if((sk[0] != "") && (sk[1] != "")) {
+						settings[sk[0] + ":" + sk[1]] = parseini.GetIniStrVal(iniData, sk[0], sk[1])
+					} //end if
+				} //end if
+			} //end if
+		} //end for
+	} else { // get all existing keys from ini
+		for k, v := range iniData {
+			if(v != nil) {
+				for kk, _ := range v {
+					settings[k + ":" + kk] = parseini.GetIniStrVal(iniData, k, kk)
+				} //end for
+			} //end if
+		} //end for
+	} //end if else
+	//--
+	return settings, ""
+	//--
+} //END FUNCTION
+
+
 func SafePathFileWrite(fileContent string, wrMode string, filePath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
 	//--
 	// wrMode : "a" for append | "w" for write
@@ -3902,9 +3943,9 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 						//	log.Println("[DEBUG] escaping + " # found Marker Escaping [Arr] at index: " + ConvertIntToStr(i) + "." + ConvertIntToStr(j))
 							//--
 							if(escaping == "|bool") { // Boolean
-								tmp_marker_val = ParseBoolStrAsStr(tmp_marker_val)
+								tmp_marker_val = ParseBoolStrAsStdBoolStr(tmp_marker_val)
 							} else if(escaping == "|int") { // Integer
-								tmp_marker_val = ParseInteger64StrAsStr(tmp_marker_val)
+								tmp_marker_val = ConvertInt64ToStr(ParseStrAsInt64(tmp_marker_val))
 							} else if(escaping == "|dec1") { // Decimals: 1
 								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 1)
 							} else if(escaping == "|dec2") { // Decimals: 2
@@ -3914,7 +3955,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 							} else if(escaping == "|dec4") { // Decimals: 4
 								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 4)
 							} else if(escaping == "|num") { // Number (Float / Decimal / Integer)
-								tmp_marker_val = ParseFloatStrAsStr(tmp_marker_val)
+								tmp_marker_val = ParseStrAsFloat64StrFixedPrecision(tmp_marker_val)
 							} else if(escaping == "|idtxt") { // id_txt: Id-Txt
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "_", "-", -1) // replace all
 								tmp_marker_val = strings.Title(StrToLower(tmp_marker_val))
@@ -3926,7 +3967,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 								tmp_marker_val = StrCreateJsVarName(tmp_marker_val)
 							} else if((StrSubstr(escaping, 0, 7) == "|substr") || (StrSubstr(escaping, 0, 7) == "|subtxt")) { // Sub(String|Text) (0,num)
 								xstrnum := StrTrimWhitespaces(StrSubstr(escaping, 7, 0))
-								xnum := ParseIntegerStrAsInt(xstrnum)
+								xnum := int(ParseStrAsInt64(xstrnum))
 								if(xnum < 1) {
 									xnum = 1
 								} else if(xnum > 65535) {
@@ -4084,7 +4125,7 @@ func IsNetValidPortStr(s string) bool { // can be a valid STRING(as NUMERIC) por
 		return false
 	} //end if
 	//--
-	var p int64 = ParseIntegerStrAsInt64(s)
+	var p int64 = ParseStrAsInt64(s)
 	//--
 	return IsNetValidPortNum(p)
 	//--
