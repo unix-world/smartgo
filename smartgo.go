@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220413.2128 :: STABLE
+// r.20220414.1044 :: STABLE
 
 package smartgo
 
@@ -72,7 +72,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220413.1948"
+	VERSION string = "v.20220414.1044"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
@@ -416,7 +416,7 @@ func HandleAbortCtrlC(delay uint32) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		log.Println("[INFO] ^^^^^^^ CTRL+C Exit ... [ delay:", delay, "sec. ] ^^^^^^^")
+		log.Println("[INFO] »»»»»»» CTRL+C Exit ... [ delay:", delay, "sec. ] «««««««")
 		time.Sleep(time.Duration(int(delay)) * time.Second)
 		os.Exit(1)
 	}()

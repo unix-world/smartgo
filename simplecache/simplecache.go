@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Simple Cache (in-Memory) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220410.0216 :: STABLE
+// r.20220414.1044 :: STABLE
 
 // inspired from: forPelevin/go-cache/main/local.go # license: (golang, default) Apache
 
@@ -15,7 +15,11 @@ import (
 
 //-----
 
-const VERSION string = "r.20220410.0216"
+const (
+	VERSION string = "r.20220414.1044"
+
+	LOG_INTERVAL_SEC uint16 = 60 // log every 60 seconds
+)
 
 //-----
 
@@ -98,14 +102,17 @@ func (lc *InMemCache) loopCleanExpired(interval time.Duration) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	//--
+	a := time.NewTicker(time.Duration(LOG_INTERVAL_SEC) * time.Second)
+	defer a.Stop()
+	//--
 	for {
 		select {
 			case <-lc.stop:
 				return
+			case <-a.C:
+				now := time.Now().UTC()
+				log.Println("[NOTICE] ±±±±±±± InMemCache [" + lc.name + "] Objects ±±±±±±± #", len(lc.objects), "@ CleanUp Interval:", interval, now.Second())
 			case <-t.C:
-				//-- do not condition this message by debug on/off
-				log.Println("[DEBUG] ~~~~~~~ InMemCache [" + lc.name + "] Objects ~~~~~~~ #", len(lc.objects), "@ CleanUp Interval:", interval)
-				//--
 				if(len(lc.objects) > 0) {
 					lc.mu.Lock()
 					for uid, cu := range lc.objects {
@@ -118,7 +125,6 @@ func (lc *InMemCache) loopCleanExpired(interval time.Duration) {
 					} //end for
 					lc.mu.Unlock()
 				} //end if
-				//--
 		} //end select
 	} //end for
 	//--
