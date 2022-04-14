@@ -1,8 +1,9 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220410.0450 :: STABLE
+// r.20220415.0128 :: STABLE
 
+// Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
 
 import (
@@ -23,7 +24,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220410.0450"
+	VERSION string = "r.20220415.0128"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false

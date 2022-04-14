@@ -1,11 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220414.1044 :: STABLE
+// r.20220415.0128 :: STABLE
 
+// REQUIRE: go 1.16 or later
 package smartgo
-
-// REQUIRE: go 1.13 or later
 
 import (
 	"runtime/debug"
@@ -72,7 +71,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220414.1044"
+	VERSION string = "v.20220415.0128"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
