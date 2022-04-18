@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo/Uuid :: Smart.Go.Framework
-// (c) 2020 unix-world.org
-// r.20200507.1905 :: STABLE
+// (c) 2020-2022 unix-world.org
+// r.20220416.1958 :: STABLE
 
 package uuid
 
@@ -13,22 +13,20 @@ import (
 )
 
 
-var counterLock sync.Mutex
-var counterValue int = 0
-// returns an id guarenteed to be unique within the session (just a simple counter ; starts at 1)
-func UuidSessionSequence() (uid int) { // taken from: https://github.com/chrisfarms/jsapi/uuid.go
+var uuidSessSeqMutex sync.Mutex
+var uuidSessSeqCntVal uint64 = 0
+func UuidSessionSequence() uint64 { // returns an id guarenteed to be unique within the session (just a simple counter ; starts at 1) ; taken from: https://github.com/chrisfarms/jsapi/uuid.go
 	//--
-	counterLock.Lock()
-	counterValue += 1
-	uid = counterValue
-	counterLock.Unlock()
+	uuidSessSeqMutex.Lock()
+	uuidSessSeqCntVal += 1
+	uuidSessSeqMutex.Unlock()
 	//--
-	return uid
+	return uuidSessSeqCntVal
 	//--
 } //END FUNCTION
 
 
-func Uuid1013Str(uidLength uint64) (Uuid string) { // based on PHP Smart.Framework ; combines the: Smart/uuid_10_str() with Smart/uuid_13_str()
+func Uuid1013Str(uidLength uint8) string { // based on PHP Smart.Framework ; combines the: Smart/uuid_10_str() with Smart/uuid_13_str()
 	//--
 	if(uidLength == 13) {
 		uidLength = 13
@@ -36,18 +34,18 @@ func Uuid1013Str(uidLength uint64) (Uuid string) { // based on PHP Smart.Framewo
 		uidLength = 10
 	} //end if else
 	//--
-	var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var chars string = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	//-- expand the chars as the randomizer have a low chance to get 1st or last character
-	chars = chars + chars // 2x
-	chars = chars + chars // 3x
-	chars = chars + chars // 4x
-	chars = chars + chars // 5x
+	chars += chars // 2x
+	chars += chars // 3x
+	chars += chars // 4x
+	chars += chars // 5x
 	//--
 	rSource := rand.NewSource(time.Now().UnixNano())
 	rHandle := rand.New(rSource)
 	//--
 	var uid string = ""
-	var i uint64
+	var i uint8
 	var r int = 0
 	var l int = len(chars)
 	var m int = 0

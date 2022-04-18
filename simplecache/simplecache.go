@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Simple Cache (in-Memory) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220414.1044 :: STABLE
+// r.20220416.2202 :: STABLE
 
 // inspired from: forPelevin/go-cache/main/local.go # license: (golang, default) Apache
 
@@ -16,7 +16,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220414.1044"
+	VERSION string = "r.20220416.2202"
 
 	LOG_INTERVAL_SEC uint16 = 60 // log every 60 seconds
 )
@@ -71,32 +71,6 @@ func NewCache(name string, cleanupInterval time.Duration, debug bool) *InMemCach
 
 //-----
 
-func (lc *InMemCache) GetName() string {
-	//--
-	if(lc.debug == true) {
-		log.Println("[DEBUG] InMemCache [" + lc.name + "] :: GetName")
-	} //end if
-	//--
-	return lc.name
-	//--
-} //END FUNCTION
-
-//-----
-
-func (lc *InMemCache) GetSize() int {
-	//--
-	var size int = len(lc.objects)
-	//--
-	if(lc.debug == true) {
-		log.Println("[DEBUG] InMemCache [" + lc.name + "] :: GetSize:", size)
-	} //end if
-	//--
-	return size
-	//--
-} //END FUNCTION
-
-//-----
-
 func (lc *InMemCache) loopCleanExpired(interval time.Duration) {
 	//--
 	t := time.NewTicker(interval)
@@ -113,8 +87,8 @@ func (lc *InMemCache) loopCleanExpired(interval time.Duration) {
 				now := time.Now().UTC()
 				log.Println("[NOTICE] ±±±±±±± InMemCache [" + lc.name + "] Objects ±±±±±±± #", len(lc.objects), "@ CleanUp Interval:", interval, now.Second())
 			case <-t.C:
+				lc.mu.Lock() // keep above the IF as it reads ...
 				if(len(lc.objects) > 0) {
-					lc.mu.Lock()
 					for uid, cu := range lc.objects {
 						if((cu.expireAtTimestamp > 0) && (cu.expireAtTimestamp <= time.Now().UTC().Unix())) {
 							delete(lc.objects, uid)
@@ -123,8 +97,8 @@ func (lc *InMemCache) loopCleanExpired(interval time.Duration) {
 							} //end if
 						} //end if
 					} //end for
-					lc.mu.Unlock()
 				} //end if
+				lc.mu.Unlock()
 		} //end select
 	} //end for
 	//--
@@ -143,6 +117,36 @@ func (lc *InMemCache) stopCleanExpired() {
 	//--
 } //END FUNCTION
 */
+//-----
+
+func (lc *InMemCache) GetName() string {
+	//--
+	if(lc.debug == true) {
+		log.Println("[DEBUG] InMemCache [" + lc.name + "] :: GetName")
+	} //end if
+	//--
+	return lc.name
+	//--
+} //END FUNCTION
+
+//-----
+
+func (lc *InMemCache) GetSize() int {
+	//--
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	//--
+	var size int = len(lc.objects)
+	//--
+	if(lc.debug == true) {
+		log.Println("[DEBUG] InMemCache [" + lc.name + "] :: GetSize:", size)
+	} //end if
+	//--
+	return size
+	//--
+} //END FUNCTION
+
+
 //-----
 
 func (lc *InMemCache) Unset(id string) bool {

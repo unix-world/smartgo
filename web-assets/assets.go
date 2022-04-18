@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220415.0128 :: STABLE
+// r.20220416.1958 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webassets
@@ -19,7 +19,7 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20220415.0128"
+	VERSION string = "r.20220416.1958"
 
 	LAST_MODIFIED_DATE_TIME string = "2022-04-07 23:28:00" 	// (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
@@ -124,7 +124,7 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 		bodyHtml = "<!-- Body Html -->"
 	} //end if
 	//--
-	var arr = map[string]string{
+	arr := map[string]string{
 		"TITLE": 		titleText,
 		"HEAD-HTML": 	headHtml,
 		"BODY-HTML": 	bodyHtml,
@@ -170,7 +170,7 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 		headCssJs = smart.Implode("\n", assetsAll)
 	} //end if
 	//--
-	var parr = map[string]string{
+	parr := map[string]string{
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--

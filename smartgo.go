@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220415.0128 :: STABLE
+// r.20220418.2028 :: STABLE
 
 // REQUIRE: go 1.16 or later
 package smartgo
@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"math"
+	"math/rand"
 	"bytes"
 	"strings"
 	"strconv"
@@ -71,7 +72,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220415.0128"
+	VERSION string = "v.20220418.2028"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
@@ -421,6 +422,19 @@ func HandleAbortCtrlC(delay uint32) {
 	}()
 	//--
 } //END FUNCTION
+
+//-----
+
+
+func TimeUnixNanoMathRandHandler() *rand.Rand {
+	//--
+	rSource := rand.NewSource(time.Now().UnixNano())
+	rHandle := rand.New(rSource)
+	//--
+	return rHandle
+	//--
+} //END FUNCTION
+
 
 //-----
 

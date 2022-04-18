@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220415.0128 :: STABLE
+// r.20220416.1958 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20220415.0128"
+	VERSION string = "r.20220416.1958"
 
 	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
 
@@ -95,7 +95,7 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 		bodyHtml = "<!-- Body Html -->"
 	} //end if
 	//--
-	var arr = map[string]string{
+	arr := map[string]string{
 		"TITLE": 		titleText,
 		"HEAD-HTML": 	headHtml,
 		"BODY-HTML": 	bodyHtml,
@@ -141,7 +141,7 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 		headCssJs = smart.Implode("\n", assetsAll)
 	} //end if
 	//--
-	var parr = map[string]string{
+	parr := map[string]string{
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220415.0128 :: STABLE
+// r.20220416.1958 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -9,6 +9,8 @@ package httputils
 import (
 	"log"
 	"time"
+
+	"sync"
 
 	"net/http"
 	"crypto/tls"
@@ -24,7 +26,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220415.0128"
+	VERSION string = "r.20220416.1958"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -78,6 +80,7 @@ const (
 
 //-----
 
+var memAuthMutex sync.Mutex
 var memAuthCache *smartcache.InMemCache = nil
 
 //-----
@@ -533,9 +536,12 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW :: Client: `<" + ip + ">` match the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
 	//--
+	memAuthMutex.Lock()
 	if(memAuthCache == nil) { // start cache just on 1st auth ... otherwise all scripts using this library will run the cache in background, but is needed only by this method !
 		memAuthCache = smartcache.NewCache("smart.httputils.auth.inMemCache", time.Duration(CACHE_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
 	} //end if
+	memAuthMutex.Unlock()
+	//--
 	if(DEBUG_CACHE == true) {
 		log.Println("[DATA] HttpBasicAuthCheck :: memAuthCache:", memAuthCache)
 	} //end if

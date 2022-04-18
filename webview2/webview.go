@@ -1,3 +1,12 @@
+
+//--
+// MIT License
+// Copyright (c) 2017 Serge Zaitsev
+//
+// Copyright (c) 2018-2022 unix-world.org
+// v.20220415.2336
+//--
+
 package webview2
 
 /*
@@ -321,3 +330,5 @@ func (w *webview) Bind(name string, f interface{}) error {
 	C.CgoWebViewBind(w.w, cname, C.uintptr_t(index))
 	return nil
 }
+
+// #END
