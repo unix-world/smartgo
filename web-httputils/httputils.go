@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220416.1958 :: STABLE
+// r.20220418.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -10,9 +10,15 @@ import (
 	"log"
 	"time"
 
+	"io"
+	"io/ioutil"
+	"strings"
+
 	"sync"
 
+	"net/url"
 	"net/http"
+	"net/http/httputil"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/subtle"
@@ -26,7 +32,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220416.1958"
+	VERSION string = "r.20220418.2358"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -119,6 +125,125 @@ func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
 //-----
 
 
+func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.Header {
+	//--
+	return http.Header{"Authorization": {"Basic " + smart.Base64Encode(authUsername + ":" + authPassword)}}
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpClientRequest(method string, uri string, reqArr map[string][]string, tlsServerPEM string, tlsInsecureSkipVerify bool, timeoutSec uint32, authUsername string, authPassword string) (errCli string, status int, hdr string, bdy string) {
+	//--
+	transport := &http.Transport{
+		TLSClientConfig: TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM),
+	}
+	//--
+	method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
+	var isPost bool = false
+	switch(method) {
+		case "GET":
+			break
+		case "POST":
+			isPost = true
+			break
+		default:
+			return "ERR: Invalid Method: `" + method + "`", -101, "", ""
+	} //end switch
+	//--
+	uri = smart.StrTrimWhitespaces(uri)
+	if(uri == "") {
+		return "ERR: Empty URL", -102, "", ""
+	} //end if
+	//--
+	if(timeoutSec < 5) {
+		timeoutSec = 5
+	} else if(timeoutSec > 720) {
+		timeoutSec = 720
+	} //end if else
+	//--
+	client := &http.Client{
+		Timeout: time.Duration(timeoutSec) * time.Second,
+		Transport: transport,
+	}
+	//--
+	var reqData io.Reader = nil
+	if((isPost == true) && (reqArr != nil)) {
+		reqValues := url.Values{}
+		for vr, val := range reqArr {
+			for z:=0; z<len(val); z++ {
+				reqValues.Add(vr, val[z])
+				if(DEBUG == true) {
+					log.Println("[DEBUG] SmartHttpCli :: Post Variable Add: `" + vr + "`: `" + val[z] + "` #", z)
+				} //end if
+			} //end for
+		} //end for
+		reqData = strings.NewReader(reqValues.Encode())
+		reqValues = nil // free mem
+	} //end if
+	var havePostData bool = false
+	if(reqData != nil) {
+		havePostData = true
+	} //end if
+	//--
+	req, errReq := http.NewRequest(method, uri, reqData)
+	if(errReq != nil) {
+		return "ERR: Invalid Request: " + errReq.Error(), -103, "", ""
+	} //end if
+	//--
+	req.Header = map[string][]string{} // init
+	//--
+	if(authUsername != "") {
+		authHead := HttpClientAuthBasicHeader(authUsername, authPassword)
+		for k, v := range authHead {
+			if(k != "") {
+				if(v != nil) {
+					for i:=0; i<len(v); i++ {
+						req.Header.Add(k, v[i])
+						if(DEBUG == true) {
+							log.Println("[DEBUG] SmartHttpCli :: Add Auth Header: `" + k + ": " + v[i] + "` #", i)
+						} //end if
+					} //end for
+				} //end if
+			} //end if
+		} //endfor
+	} //end if
+	//--
+	if(havePostData == true) {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if(DEBUG == true) {
+			log.Println("[DEBUG] SmartHttpCli :: Set Header : `Content-Type: application/x-www-form-urlencoded`")
+		} //end if
+	} //end if
+	//--
+	resp, errResp := client.Do(req)
+	if(errResp != nil) {
+		return "ERR: Invalid Response: " + errResp.Error(), -104, "", ""
+	} //end if
+	defer resp.Body.Close()
+	//--
+	var statusCode int = resp.StatusCode
+	//--
+	headData, rdHeadErr := httputil.DumpResponse(resp, false) // if true will include also the body
+	if(rdHeadErr != nil) {
+		return "ERR: Failed to Read Response Header: " + rdHeadErr.Error(), -105, "", ""
+	} //end if
+	//--
+	bodyData, rdBodyErr := ioutil.ReadAll(resp.Body)
+	if(rdBodyErr != nil) {
+		return "ERR: Failed to Read Response Body: " + rdBodyErr.Error(), -106, "", ""
+	} //end if
+	//--
+	return "", statusCode, string(headData), string(bodyData)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func TlsConfigServer() *tls.Config {
 	//--
 	cfg := &tls.Config{
@@ -173,16 +298,6 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool) (*http.S
 	} //end if
 	//--
 	return mux, srv
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.Header {
-	//--
-	return http.Header{"Authorization": {"Basic " + smart.Base64Encode(authUsername + ":" + authPassword)}}
 	//--
 } //END FUNCTION
 
