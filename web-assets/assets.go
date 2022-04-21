@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220416.1958 :: STABLE
+// r.20220419.1308 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20220416.1958"
+	VERSION string = "r.20220419.1308"
 
-	LAST_MODIFIED_DATE_TIME string = "2022-04-07 23:28:00" 	// (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2022-04-18 23:58:00" // (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	DEBUG bool = false
 )
@@ -76,14 +76,14 @@ func ReadWebAsset(path string) string { // OK
 //-----
 
 
-func HtmlErrorPage(titleText string, messageText string, displayAuthLogo bool) string {
+func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool) string {
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	messageText = smart.StrTrimWhitespaces(messageText)
 	//--
 	if(titleText == "") {
 		titleText = "Untitled"
-		log.Println("[ERROR] Smart Assets: HtmlErrorPage requires a non-empty Title !")
+		log.Println("[ERROR] Smart Assets: HtmlStatusPage requires a non-empty Title !")
 	} //end if
 	if(messageText == "") {
 		messageText = "Unknown Error ..."
@@ -103,7 +103,7 @@ func HtmlErrorPage(titleText string, messageText string, displayAuthLogo bool) s
 							`<img alt="logo-framework" title="Smart.Framework.Go" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/framework/img/sf-logo.svg")) + `">` + "\n",
 	}
 	//--
-	return smart.RenderMainMarkersTpl(HTML_TPL_ERR, arr, nil) + "\n" + "<!-- TPL:Static.Err -->" + "\n"
+	return smart.RenderMainMarkersTpl(HTML_TPL_STATUS, arr, nil) + "\n" + "<!-- TPL:Static.Status -->" + "\n"
 	//--
 } //END FUNCTION
 
@@ -189,8 +189,8 @@ const (
 	HTML_META_VIEWPORT  string = `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
 	HTML_META_CHAREQUIV string = `<meta charset="` + smart.CHARSET + `"><meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">`
 
-	HTML_TPL_ERR string = `<!DOCTYPE html>
-<!-- TPL.SmartGo.ERR -->
+	HTML_TPL_STATUS string = `<!DOCTYPE html>
+<!-- TPL.SmartGo.STATUS -->
 <html>
 <head>
 ` + HTML_META_CHAREQUIV + `

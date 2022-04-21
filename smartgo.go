@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220418.2358 :: STABLE
+// r.20220421.0407 :: STABLE
 
 // REQUIRE: go 1.16 or later
 package smartgo
@@ -72,7 +72,8 @@ import (
 
 
 const (
-	VERSION string = "v.20220418.2358"
+	VERSION string = "v.20220421.0407"
+	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
 	DEBUG bool = false
@@ -87,6 +88,11 @@ const (
 	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  string = "2006-01-02 15:04:05 -0700" 		// GO EPOCH: WITH TIME, WITH TZ OFFSET
 	DATE_TIME_FMT_RFC1123_GO_EPOCH    string = "Mon, 02 Jan 2006 15:04:05" 		// GO EPOCH: RFC1123
 	//-- #
+
+	SIZE_BYTES_16M uint64 = 16777216
+
+	CHOWN_DIRS  os.FileMode = 0755
+	CHOWN_FILES os.FileMode = 0644
 
 	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
 	NULL_BYTE string 		= "\000" 											// THE NULL BYTE
@@ -314,7 +320,8 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 // PRIVATE
 func isLogPathSafeDir(pathForLogs string) bool {
 	//--
-	if((PathIsEmptyOrRoot(pathForLogs)) ||
+	if((!PathIsSafeValidPath(pathForLogs)) ||
+		(PathIsEmptyOrRoot(pathForLogs)) ||
 		(PathIsBackwardUnsafe(pathForLogs)) ||
 		(!PathExists(pathForLogs)) ||
 		(!PathIsDir(pathForLogs)) ||
@@ -2791,6 +2798,16 @@ func PathBaseName(filePath string) string { // returns: `file.extenstion` | `las
 } //END FUNCTION
 
 
+func PathBaseNoExtName(filePath string) string { // returns: `file` (without extension) | `lastDirInPath` from `(/)a/path/to/lastDirInPath|file.extension`
+	//--
+	var fWithExt string = PathBaseName(filePath)
+	var fExt string = PathBaseExtension(fWithExt)
+	//--
+	return strings.TrimSuffix(fWithExt, fExt)
+	//--
+} //END FUNCTION
+
+
 func PathBaseExtension(filePath string) string { // returns: file .extension (includding dot) from `(/)a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
@@ -2802,7 +2819,56 @@ func PathBaseExtension(filePath string) string { // returns: file .extension (in
 } //END FUNCTION
 
 
+func PathIsSafeValidFileName(fileName string) bool { // fileName must not contain: / or : spaces and must not be only spaces ; it detects and convert to spaces all characters handled by StrNormalizeSpaces(), includding NULL byte
+	//--
+	fileName = StrNormalizeSpaces(fileName) // normalize all kind of spaces to detect below ; spaces of any kind or NULL byte are not allowed in filenames or paths ...
+	//--
+	if((StrTrimWhitespaces(fileName) == "") || StrContains(fileName, " ") || StrContains(fileName, "/") || StrContains(fileName, "\\") || StrContains(fileName, ":")) {
+		return false
+	} //end if
+	//--
+	fileName = StrTrimWhitespaces(fileName)
+	fileName = StrReplaceAll(fileName, ".", "")
+	if(fileName == "") {
+		return false // must not be composed only of dots, especially: . or ..
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func PathIsSafeValidPath(filePath string) bool { // path must not contain spaces and must not be only spaces ; it detects and convert to spaces all characters handled by StrNormalizeSpaces(), includding NULL byte
+	//--
+	if(filePath == "./") { // {{{SYNC-SMARTGO-SAMEDIR-MIN-PATH}}}
+		return true
+	} //end if
+	//--
+	filePath = StrNormalizeSpaces(filePath) // normalize all kind of spaces to detect below ; spaces of any kind or NULL byte are not allowed in filenames or paths ...
+	//--
+	if((StrTrimWhitespaces(filePath) == "") || StrContains(filePath, " ")) {
+		return false
+	} //end if
+	//--
+	filePath = StrTrimWhitespaces(filePath)
+	filePath = StrReplaceAll(filePath, ".", "")
+	filePath = StrReplaceAll(filePath, "/", "")
+	filePath = StrReplaceAll(filePath, "\\", "")
+	filePath = StrReplaceAll(filePath, ":", "")
+	if(filePath == "") {
+		return false // must not be composed only of dots, especially: . or .. ; and/or: / ; and/or \ ; and or: :
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
 func PathIsEmptyOrRoot(filePath string) bool { // dissalow a path under 3 characters
+	//--
+	if(filePath == "./") { // {{{SYNC-SMARTGO-SAMEDIR-MIN-PATH}}}
+		return false
+	} //end if
 	//--
 	filePath = StrReplaceAll(filePath, "/", "")  // test for linux/unix file system
 	filePath = StrReplaceAll(filePath, "\\", "") // test for network shares
@@ -2842,8 +2908,10 @@ func PathIsBackwardUnsafe(filePath string) bool {
 		(len(filePath) > 1024) || // check max path length !
 		StrContains(filePath, "/../") ||
 		StrContains(filePath, "/./")  ||
-		StrContains(filePath, "/..")  ||
-		StrContains(filePath, "../")) {
+		StrContains(filePath, "/..")  || // also covers a path that must not end with /..
+		StrContains(filePath, "../")  ||
+		StrEndsWith(filePath, "/.")   || // must not end with /.
+		(filePath == ".") || (filePath == "..")) { // must not be one or two dots
 		return true
 	} //end if
 	//--
@@ -2983,6 +3051,10 @@ func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bo
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
 	} //end if
 	//--
+	if(PathIsSafeValidPath(dirPath) != true) {
+		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error()
+	} //end if
+	//--
 	if(PathIsBackwardUnsafe(dirPath) == true) {
 		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error()
 	} //end if
@@ -3006,9 +3078,9 @@ func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bo
 		//--
 		var err error = nil
 		if(allowRecursive == true) {
-			err = os.MkdirAll(dirPath, 0755)
+			err = os.MkdirAll(dirPath, CHOWN_DIRS)
 		} else {
-			err = os.Mkdir(dirPath, 0755)
+			err = os.Mkdir(dirPath, CHOWN_DIRS)
 		} //end if else
 		if(err != nil) {
 			return false, err.Error()
@@ -3025,6 +3097,10 @@ func SafePathDirDelete(dirPath string, allowAbsolutePath bool) (isSuccess bool, 
 	//--
 	if(StrTrimWhitespaces(dirPath) == "") {
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(dirPath) != true) {
+		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(dirPath) == true) {
@@ -3064,6 +3140,10 @@ func SafePathDirRename(dirPath string, dirNewPath string, allowAbsolutePath bool
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
 	} //end if
 	//--
+	if(PathIsSafeValidPath(dirPath) != true) {
+		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error()
+	} //end if
+	//--
 	if(PathIsBackwardUnsafe(dirPath) == true) {
 		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error()
 	} //end if
@@ -3076,6 +3156,10 @@ func SafePathDirRename(dirPath string, dirNewPath string, allowAbsolutePath bool
 	//--
 	if(StrTrimWhitespaces(dirNewPath) == "") {
 		return false, errors.New("WARNING: New Dir Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(dirNewPath) != true) {
+		return false, errors.New("WARNING: New Dir Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(dirNewPath) == true) {
@@ -3130,6 +3214,10 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 	} //end if
 	//--
 	dirPath = PathAddDirLastSlash(dirPath)
+	//--
+	if(PathIsSafeValidPath(dirPath) != true) {
+		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error(), dirs, files
+	} //end if
 	//--
 	if(PathIsBackwardUnsafe(dirPath) == true) {
 		return false, errors.New("WARNING: Dir Path is Backward Unsafe").Error(), dirs, files
@@ -3201,6 +3289,10 @@ func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, e
 		return "", errors.New("WARNING: File Path is Empty").Error()
 	} //end if
 	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return "", errors.New("WARNING: File Path is Invalid Unsafe").Error()
+	} //end if
+	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
 		return "", errors.New("WARNING: File Path is Backward Unsafe").Error()
 	} //end if
@@ -3237,6 +3329,10 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return "", errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return "", errors.New("WARNING: File Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
@@ -3286,6 +3382,10 @@ func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent stri
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return "", errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return "", errors.New("WARNING: File Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
@@ -3364,6 +3464,10 @@ func SafePathFileWrite(fileContent string, wrMode string, filePath string, allow
 		return false, errors.New("WARNING: File Path is Empty").Error()
 	} //end if
 	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return false, errors.New("WARNING: File Path is Invalid Unsafe").Error()
+	} //end if
+	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
 		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
 	} //end if
@@ -3379,7 +3483,7 @@ func SafePathFileWrite(fileContent string, wrMode string, filePath string, allow
 	} //end if
 	//--
 	if(wrMode == "a") { // append mode
-		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, CHOWN_FILES)
 		if(err != nil) {
 			return false, err.Error()
 		} //end if
@@ -3388,7 +3492,7 @@ func SafePathFileWrite(fileContent string, wrMode string, filePath string, allow
 			return false, err.Error()
 		} //end if
 	} else if(wrMode == "w") { // write mode
-		err := ioutil.WriteFile(filePath, []byte(fileContent), 0644)
+		err := ioutil.WriteFile(filePath, []byte(fileContent), CHOWN_FILES)
 		if(err != nil) {
 			return false, err.Error()
 		} //end if
@@ -3405,6 +3509,10 @@ func SafePathFileDelete(filePath string, allowAbsolutePath bool) (isSuccess bool
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return false, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return false, errors.New("WARNING: File Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
@@ -3444,6 +3552,10 @@ func SafePathFileRename(filePath string, fileNewPath string, allowAbsolutePath b
 		return false, errors.New("WARNING: File Path is Empty").Error()
 	} //end if
 	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return false, errors.New("WARNING: File Path is Invalid Unsafe").Error()
+	} //end if
+	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
 		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
 	} //end if
@@ -3456,6 +3568,10 @@ func SafePathFileRename(filePath string, fileNewPath string, allowAbsolutePath b
 	//--
 	if(StrTrimWhitespaces(fileNewPath) == "") {
 		return false, errors.New("WARNING: New File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(fileNewPath) != true) {
+		return false, errors.New("WARNING: New File Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(fileNewPath) == true) {
@@ -3506,6 +3622,10 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 		return false, errors.New("WARNING: File Path is Empty").Error()
 	} //end if
 	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return false, errors.New("WARNING: File Path is Invalid Unsafe").Error()
+	} //end if
+	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
 		return false, errors.New("WARNING: File Path is Backward Unsafe").Error()
 	} //end if
@@ -3518,6 +3638,10 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 	//--
 	if(StrTrimWhitespaces(fileNewPath) == "") {
 		return false, errors.New("WARNING: New File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(fileNewPath) != true) {
+		return false, errors.New("WARNING: New File Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(fileNewPath) == true) {
@@ -3559,7 +3683,7 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 	if(err != nil) {
 		return false, err.Error()
 	} //end if
-	err = ioutil.WriteFile(fileNewPath, data, 0644)
+	err = ioutil.WriteFile(fileNewPath, data, CHOWN_FILES)
 	if(err != nil) {
 		return false, err.Error()
 	} //end if
@@ -3590,9 +3714,9 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 	if(!PathIsFile(fileNewPath)) {
 		return false, errors.New("WARNING: New File Path cannot be found after copy").Error()
 	} //end if
-	errChmod := os.Chmod(fileNewPath, 0644)
+	errChmod := os.Chmod(fileNewPath, CHOWN_FILES)
 	if(err != nil) {
-		log.Println("[WARNING] Failed to CHMOD 0644 the Destination File after copy", fileNewPath, errChmod)
+		log.Println("[WARNING] Failed to CHMOD the Destination File after copy", fileNewPath, errChmod)
 	} //end if
 	//--
 	fSizeOrigin, errMsg := SafePathFileGetSize(filePath, allowAbsolutePath)
@@ -3624,6 +3748,10 @@ func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int6
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return 0, errors.New("WARNING: File Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return 0, errors.New("WARNING: File Path is Invalid Unsafe").Error()
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
@@ -4276,6 +4404,25 @@ func ExecCmd(captureStdout string, captureStderr string, additionalEnv string, i
 func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
 	//--
 	return cmdExec(stopTimeout, captureStdout, captureStderr, additionalEnv, inputStdin, theExe, theArgs ...)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+func PrettyPrintBytes(b int64) string {
+	//--
+	const unit int64 = 1024
+	if(b < unit) {
+		return fmt.Sprintf("%d B", b)
+	} //end if
+	div, exp := unit, 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	} //end for
+	//--
+	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 	//--
 } //END FUNCTION
 

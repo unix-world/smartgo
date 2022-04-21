@@ -1,22 +1,28 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220418.2358 :: STABLE
+// r.20220421.0407 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
 
 import (
+	"os"
+	"runtime"
+
 	"log"
+	"fmt"
 	"time"
 
 	"io"
-	"io/ioutil"
-	"strings"
+//	"io/ioutil"
+	"bytes"
+
+	"mime"
+	"mime/multipart"
 
 	"sync"
 
-	"net/url"
 	"net/http"
 	"net/http/httputil"
 	"crypto/tls"
@@ -26,25 +32,47 @@ import (
 	smart 		"github.com/unix-world/smartgo"
 	smartcache 	"github.com/unix-world/smartgo/simplecache"
 	assets 		"github.com/unix-world/smartgo/web-assets"
+	pbar 		"github.com/unix-world/smartgo/progressbar"
 )
 
 
 //-----
 
 const (
-	VERSION string = "r.20220418.2358"
+	VERSION string = "r.20220421.0407"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
 
-	DEFAULT_REALM string = "SmartGO Web Server" // must be min 7 chars
+	//--
+	DEFAULT_CLIENT_UA string = "NetSurf/3.9"
+	//--
+	HTTP_CLI_DEF_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M 		//  16MB
+	HTTP_CLI_MAX_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M * 32 	// 512MB
+	//--
+	HTTP_CLI_MAX_POST_VAL_SIZE  uint64 = smart.SIZE_BYTES_16M 		//  16MB
+	HTTP_CLI_MAX_POST_FILE_SIZE uint64 = smart.SIZE_BYTES_16M * 16 	// 256MB
+	HTTP_CLI_MAX_POST_DATA_SIZE uint64 = smart.SIZE_BYTES_16M * 24 	// 384MB
+	//--
+	HTTP_CLI_MAX_REDIRECTS uint8 = 25
+	//--
+	HTTP_CLI_MIN_TIMEOUT uint32 =     5 // 5 seconds
+	HTTP_CLI_DEF_TIMEOUT uint32 =   720 // 12 minutes
+	HTTP_CLI_MAX_TIMEOUT uint32 = 86400 // 24 hours
+	//--
 
+	//--
+	DEFAULT_REALM string = "SmartGO Web Server" // must be min 7 chars
+	//--
 	DISP_TYPE_INLINE string = "inline"
 	DISP_TYPE_ATTACHMENT string = "attachment"
 	MIME_TYPE_DEFAULT string = "application/octet-stream"
-
+	//--
 	CACHE_CLEANUP_INTERVAL uint32 = 5 // 5 seconds
 	CACHE_EXPIRATION uint32 = 300 // 300 seconds = 5 mins
+	//--
+	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-]+$`
+	//--
 
 	//--
 	HTTP_STATUS_200 string = "200 OK"
@@ -62,6 +90,9 @@ const (
 	HTTP_STATUS_429 string = "429 Too Many Requests"
 	//--
 	HTTP_STATUS_500 string = "500 Internal Server Error"
+	HTTP_STATUS_502 string = "502 Bad Gateway"
+	HTTP_STATUS_503 string = "503 Service Unavailable"
+	HTTP_STATUS_504 string = "504 Gateway Timeout"
 	//--
 
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
@@ -80,6 +111,14 @@ const (
 	HTTP_HEADER_SERVER_DATE string = "date"
 	HTTP_HEADER_SERVER_SIGN string = "server"
 	HTTP_HEADER_SERVER_POWERED string = "x-powered-by"
+	//--
+	HTTP_HEADER_REDIRECT_LOCATION string = "location"
+	//--
+	HTTP_HEADER_AUTH_AUTHORIZATION string = "authorization"
+	HTTP_HEADER_AUTH_AUTHENTICATE string = "www-authenticate"
+	HTTP_HEADER_VALUE_AUTH_TYPE_BASIC string = "Basic" // keep camel case
+	//--
+	HTTP_HEADER_USER_AGENT string = "user-agent"
 	//-- #end sync
 )
 
@@ -88,6 +127,16 @@ const (
 
 var memAuthMutex sync.Mutex
 var memAuthCache *smartcache.InMemCache = nil
+
+//-----
+
+
+func httpHeaderSignatureUserAgent() string {
+	//--
+	return DEFAULT_CLIENT_UA + " (" + smart.DESCRIPTION + " " + smart.VERSION + " " + VERSION + "; " + runtime.GOOS + "/" + runtime.GOARCH + "; " + "GoLang/" + runtime.Version() + ")"
+	//--
+} //END FUNCTION
+
 
 //-----
 
@@ -127,7 +176,7 @@ func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
 
 func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.Header {
 	//--
-	return http.Header{"Authorization": {"Basic " + smart.Base64Encode(authUsername + ":" + authPassword)}}
+	return http.Header{HTTP_HEADER_AUTH_AUTHORIZATION: {HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + " " + smart.Base64Encode(authUsername + ":" + authPassword)}}
 	//--
 } //END FUNCTION
 
@@ -135,67 +184,521 @@ func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.He
 //-----
 
 
-func HttpClientRequest(method string, uri string, reqArr map[string][]string, tlsServerPEM string, tlsInsecureSkipVerify bool, timeoutSec uint32, authUsername string, authPassword string) (errCli string, status int, hdr string, bdy string) {
+type HttpClientRequest struct {
+	Errors                string   `json:"errors"`
+	ConnTimeout           uint32   `json:"connTimeout,string"`
+	MaxDownloadSize       uint64   `json:"maxDownloadSize,string"`
+	HttpMethod            string   `json:"httpMethod"`
+	AuthUserName          string   `json:"authUserName"`
+	Uri                   string   `json:"uri"`
+	MaxRedirects          uint8    `json:"maxRedirects,string"`
+	NumRedirects          uint8    `json:"numRedirects,string"`
+	RedirUris             []string `json:"redirUris"`
+	LastUri               string   `json:"lastUri"`
+	UploadLocalFile       string   `json:"uploadLocalFile"` // PUT
+	UploadFileName        string   `json:"uploadFileName"` // PUT
+	UploadDataSize        int64    `json:"uploadDataSize,string"` // POST | PUT
+	HttpStatus            int      `json:"httpStatus,string"`
+	HeadData              string   `json:"headData"`
+	HeadDataSize          uint64   `json:"headDataSize,string"`
+	MimeType              string   `json:"mimeType"`
+	MimeDisp              string   `json:"mimeDisp"`
+	MimeFileName          string   `json:"mimeFileName"`
+	ContentLength         int64    `json:"contentLength,string"`
+	BodyData              string   `json:"bodyData"`
+	BodyDataSize          uint64   `json:"bodyDataSize,string"` // unencoded
+	BodyDataEncoding      string   `json:"bodyDataEncoding"` // plain | base64 | log
+	DownloadLocalDir      string   `json:"downloadLocalDir"`
+	DownloadLocalFileName string   `json:"downloadLocalFileName"`
+}
+
+
+//-----
+
+
+func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+	//--
+	var method string = "HEAD"
+	var reqArr map[string][]string = nil
+	var putLocalFilePath string = ""
+	var downloadLocalDirPath string = ""
+	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
+	//--
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, reqArr, putLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	//--
+} //END FUNCTION
+
+
+// IMPORTANT: will not rewrite the download file if exists ... must be previous deleted !
+// can handle: GET or POST
+func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, reqArr map[string][]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+	//--
+	var putLocalFilePath string = ""
+	//--
+	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
+	if((downloadLocalDirPath == "") || (downloadLocalDirPath == ".") || (downloadLocalDirPath == "..") || (downloadLocalDirPath == "/") || (downloadLocalDirPath == "./")) { // the `/` will be converted to `./` after add dir last slash in httpClientDoRequest
+		downloadLocalDirPath = "./downloads/" // dissalow empty directory ; for downloads a directory is mandatory ; dissalow download in the same dir as executable is, there is a risk to rewrite the executable !!!
+	} //end if
+	//--
+	method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
+	if(method != "POST") {
+		method = "GET"
+	} //end if
+	if(reqArr == nil) {
+		method = "GET"
+	} //end if
+	//--
+	var maxBytesRead uint64 = 0 // there is no limit when saving to a file ...
+	//--
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, reqArr, putLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	//--
+} //END FUNCTION
+
+
+func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+	//--
+	var method string = "GET"
+	var reqArr map[string][]string = nil
+	var putLocalFilePath string = ""
+	var downloadLocalDirPath string = ""
+	//--
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, reqArr, putLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	//--
+} //END FUNCTION
+
+
+func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, reqArr map[string][]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+	//--
+	var method string = "POST"
+	var putLocalFilePath string = ""
+	var downloadLocalDirPath string = ""
+	//--
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, reqArr, putLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	//--
+} //END FUNCTION
+
+
+func HttpClientDoRequestPUT(putLocalFilePath string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+	//--
+	var method string = "PUT"
+	var reqArr map[string][]string = nil
+	var downloadLocalDirPath string = ""
+	//--
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, reqArr, putLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *bytes.Buffer, multipartType string) {
+	//--
+	// This will create the form data or multi/part form data by reading all files in memory
+	//--
+	var emptyData *bytes.Buffer = &bytes.Buffer{}
+	var postData  *bytes.Buffer = &bytes.Buffer{}
+	//--
+	if(reqArr == nil) {
+		return "", emptyData, ""
+	} //end if
+	//--
+	w := multipart.NewWriter(postData)
+	defer w.Close()
+	//--
+	var validPostVarsOrFiles int = 0
+	//--
+	for key, val := range reqArr {
+		key = smart.StrTrimWhitespaces(key)
+		if(key != "") {
+			if(smart.StrRegexMatchString(REGEX_SAFE_HTTP_FORM_VAR_NAME, key)) { // form field
+				for z:=0; z<len(val); z++ {
+					if(int64(len(val[z])) > int64(HTTP_CLI_MAX_POST_VAL_SIZE)) {
+						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + smart.ConvertIntToStr(len(val[z])) + "` bytes ; Oversized #" + smart.ConvertIntToStr(z), emptyData, ""
+					} //end if
+					v, ev := w.CreateFormField(key)
+					if(ev != nil) {
+						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + val[z] + "` #" + smart.ConvertIntToStr(z) + ": " + ev.Error(), emptyData, ""
+					} //end if
+					v.Write([]byte(val[z]))
+					validPostVarsOrFiles++
+					if(DEBUG == true) {
+						log.Println("[DEBUG] reqArrToHttpFormData :: Post Form Variable Add: `" + key + "`: `" + val[z] + "` #", z)
+					} //end if
+				} //end for
+			} else if(key == "@file") { // form file
+				for z:=0; z<len(val); z++ {
+					var uploadFilePath string = val[z]
+					if(!smart.PathIsSafeValidPath(uploadFilePath)) {
+						return "ERR: The POST File Path is Invalid or Unsafe: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					if(smart.PathIsEmptyOrRoot(uploadFilePath)) {
+						return "ERR: The POST File Path is Empty or is Root: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					if(smart.PathIsAbsolute(uploadFilePath)) {
+						return "ERR: The POST File Path is Absolute, must be Relative: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					if(smart.PathIsBackwardUnsafe(uploadFilePath)) {
+						return "ERR: The POST File Path is Backward Unsafe: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					if(!smart.PathExists(uploadFilePath)) {
+						return "ERR: The POST File Path does NOT Exists: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					if(smart.PathIsDir(uploadFilePath)) {
+						return "ERR: The POST File Path is a Directory: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					if(!smart.PathIsFile(uploadFilePath)) {
+						return "ERR: The POST File Path is NOT a File: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					var fName string = smart.StrTrimWhitespaces(smart.PathBaseName(uploadFilePath))
+					if((fName == "") || (!smart.PathIsSafeValidFileName(fName))) {
+						return "ERR: FAILED to detect the File Name from the POST File Path: `" + uploadFilePath + "`", emptyData, ""
+					} //end if
+					f, ef := w.CreateFormFile("file", fName)
+					if(ef != nil) {
+						return "ERR: FAILED to add the POST File Path: `" + uploadFilePath + "`: " + ef.Error(), emptyData, ""
+					} //end if
+					stat, errStat := os.Stat(uploadFilePath)
+					if(errStat != nil) {
+						return "ERR: FAILED to stat the POST File Path: `" + uploadFilePath + "`: " + errStat.Error(), emptyData, ""
+					} //end if
+					if(stat.Size() > int64(HTTP_CLI_MAX_POST_FILE_SIZE)) {
+						return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: File is Oversized: " + smart.ConvertInt64ToStr(stat.Size()), emptyData, ""
+					} //end if
+					file, errOpen := os.Open(uploadFilePath)
+					if(errOpen != nil) {
+						return "ERR: FAILED to open for read the POST File Path: `" + uploadFilePath + "`: " + errOpen.Error(), emptyData, ""
+					} //end if
+					_, errCopy := io.Copy(f, file)
+					file.Close()
+					if(errCopy != nil) {
+						return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: " + errCopy.Error(), emptyData, ""
+					} //end if
+					validPostVarsOrFiles++
+					if(DEBUG == true) {
+						log.Println("[DEBUG] reqArrToHttpFormData :: Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
+					} //end if
+				} //end for
+			} else {
+				return "ERR: Invalid Key in Request Arr Data: `" + key + "`", emptyData, ""
+			} //end if else
+		} else {
+			return "ERR: Empty Key in Request Arr Data", emptyData, ""
+		} //end if
+		if(int64(len(postData.Bytes())) > int64(HTTP_CLI_MAX_POST_DATA_SIZE)) {
+			return "ERR: POST Data is Oversized,Max Limit is: " + smart.ConvertUInt64ToStr(HTTP_CLI_MAX_POST_DATA_SIZE) + " bytes", emptyData, ""
+		} //end if
+	} //end for
+	//--
+	if(validPostVarsOrFiles <= 0) {
+		return "ERR: No Valid POST Data found", emptyData, ""
+	} //end if
+	//--
+	return "", postData, w.FormDataContentType()
+	//--
+} //END FUNCTION
+
+
+// If Auth User/Pass is set will dissalow redirects, by auto-setting maxRedirects=0 !
+// Min Read Limit is 10MB (set maxBytesRead=0 as default) ; Max Read Limit is 1GB (because is in memory !)
+func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, reqArr map[string][]string, putLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult *HttpClientRequest) {
+	//--
+	httpResult = &HttpClientRequest {
+		Errors: "?",
+		ConnTimeout: timeoutSec,
+		MaxDownloadSize: maxBytesRead,
+		HttpMethod: method,
+		AuthUserName: authUsername,
+		Uri: uri,
+		MaxRedirects: maxRedirects,
+		NumRedirects: 0,
+		RedirUris: []string{},
+		LastUri: uri,
+		UploadLocalFile: putLocalFilePath,
+		UploadFileName: "",
+		UploadDataSize: 0,
+		HttpStatus: -555,
+		HeadData: "",
+		HeadDataSize: 0,
+		MimeType: "",
+		MimeDisp: "",
+		MimeFileName: "",
+		ContentLength: 0,
+		BodyData: "",
+		BodyDataSize: 0,
+		BodyDataEncoding: "plain",
+		DownloadLocalDir: downloadLocalDirPath,
+		DownloadLocalFileName: "",
+	}
 	//--
 	transport := &http.Transport{
 		TLSClientConfig: TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM),
 	}
 	//--
+	uri = smart.StrTrimWhitespaces(uri)
+	if(uri == "") {
+		httpResult.Uri = ""
+		httpResult.Errors = "ERR: Empty URL"
+		httpResult.HttpStatus = -101
+		return
+	} //end if
+	httpResult.Uri = uri
+	//--
 	method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
 	var isPost bool = false
+	var isPut bool = false
 	switch(method) {
+		case "HEAD":
+			break
 		case "GET":
 			break
 		case "POST":
-			isPost = true
+			if(reqArr != nil) {
+				isPost = true
+			} else { // if no POST data, fallback to GET method
+				method = "GET"
+			} //end if else
+			break
+		case "PUT":
+			if(!smart.PathIsSafeValidPath(putLocalFilePath)) {
+				httpResult.Errors = "ERR: The PUT File Path is Invalid or Unsafe: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -701
+				return
+			} //end if
+			if(smart.PathIsEmptyOrRoot(putLocalFilePath)) {
+				httpResult.Errors = "ERR: The PUT File Path is Empty or is Root: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -702
+				return
+			} //end if
+			if(smart.PathIsAbsolute(putLocalFilePath)) { // {{{SYNC-HTTPCLI-UPLOAD-PATH-ALLOW-ABSOLUTE}}}
+				httpResult.Errors = "ERR: The PUT File Path is Absolute, must be Relative: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -703
+				return
+			} //end if
+			if(smart.PathIsBackwardUnsafe(putLocalFilePath)) {
+				httpResult.Errors = "ERR: The PUT File Path is Backward Unsafe: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -704
+				return
+			} //end if
+			if(!smart.PathExists(putLocalFilePath)) {
+				httpResult.Errors = "ERR: The PUT File Path does NOT Exists: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -705
+				return
+			} //end if
+			if(smart.PathIsDir(putLocalFilePath)) {
+				httpResult.Errors = "ERR: The PUT File Path is a Directory: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -706
+				return
+			} //end if
+			if(!smart.PathIsFile(putLocalFilePath)) {
+				httpResult.Errors = "ERR: The PUT File Path is NOT a File: `" + putLocalFilePath + "`"
+				httpResult.HttpStatus = -707
+				return
+			} //end if
+			var fName string = smart.StrTrimWhitespaces(smart.PathBaseName(putLocalFilePath))
+			if((fName == "") || (!smart.PathIsSafeValidFileName(fName))) {
+				httpResult.Errors = "ERR: FAILED to detect a valid File Name from the PUT File Path: `" + putLocalFilePath + "` as `" + fName + "`"
+				httpResult.HttpStatus = -708
+				return
+			} //end if
+			putFSize, putFSizeErr := smart.SafePathFileGetSize(putLocalFilePath, false) // {{{SYNC-HTTPCLI-UPLOAD-PATH-ALLOW-ABSOLUTE}}}
+			if(putFSizeErr != "") {
+				httpResult.Errors = "ERR: FAILED to determine a valid File Size from the PUT File Path: `" + putLocalFilePath + "` # " + putFSizeErr
+				httpResult.HttpStatus = -709
+				return
+			} //end if
+			if(putFSize <= 0) {
+				httpResult.Errors = "ERR: The File Size of the PUT File Path: `" + putLocalFilePath + "` Must be Greater than Zero"
+				httpResult.HttpStatus = -710
+				return
+			} //end if
+			uri = smart.StrTrimRight(uri, "/") + "/" + smart.EscapeUrl(fName)
+			httpResult.Uri = uri
+			httpResult.UploadFileName = fName
+			httpResult.UploadDataSize = putFSize
+			isPut = true
 			break
 		default:
-			return "ERR: Invalid Method: `" + method + "`", -101, "", ""
+			httpResult.Errors = "ERR: Invalid Method: `" + method + "`"
+			httpResult.HttpStatus = -102
+			return
 	} //end switch
 	//--
-	uri = smart.StrTrimWhitespaces(uri)
-	if(uri == "") {
-		return "ERR: Empty URL", -102, "", ""
+	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
+	var downloadBodyToFile bool = false
+	if(downloadLocalDirPath != "") {
+		downloadLocalDirPath = smart.PathAddDirLastSlash(downloadLocalDirPath)
+		if(!smart.PathIsSafeValidPath(downloadLocalDirPath)) {
+			httpResult.Errors = "ERR: The DOWNLOAD File Path is Invalid or Unsafe: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -801
+			return
+		} //end if
+		if(smart.PathIsEmptyOrRoot(downloadLocalDirPath)) {
+			httpResult.Errors = "ERR: The DOWNLOAD File Path is Empty or is Root: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -802
+			return
+		} //end if
+		if(smart.PathIsAbsolute(downloadLocalDirPath)) { // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+			httpResult.Errors = "ERR: The DOWNLOAD File Path is Absolute, must be Relative: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -803
+			return
+		} //end if
+		if(smart.PathIsBackwardUnsafe(downloadLocalDirPath)) {
+			httpResult.Errors = "ERR: The DOWNLOAD File Path is Backward Unsafe: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -804
+			return
+		} //end if
+		if(!smart.PathExists(downloadLocalDirPath)) {
+			httpResult.Errors = "ERR: The DOWNLOAD File Path does NOT Exists: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -805
+			return
+		} //end if
+		if(!smart.PathIsDir(downloadLocalDirPath)) {
+			httpResult.Errors = "ERR: The DOWNLOAD File Path is not a Directory: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -806
+			return
+		} //end if
+		if(smart.PathIsFile(downloadLocalDirPath)) {
+			httpResult.Errors = "ERR: The DOWNLOAD File Path is a File: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -807
+			return
+		} //end if
+		downloadBodyToFile = true
 	} //end if
-	//--
-	if(timeoutSec < 5) {
-		timeoutSec = 5
-	} else if(timeoutSec > 720) {
-		timeoutSec = 720
+	if(downloadBodyToFile == true) {
+		httpResult.DownloadLocalDir = downloadLocalDirPath
+	} else {
+		httpResult.DownloadLocalDir = ""
 	} //end if else
+	//--
+	if(timeoutSec == 0) {
+		timeoutSec = HTTP_CLI_DEF_TIMEOUT
+	} //end if
+	if(timeoutSec < HTTP_CLI_MIN_TIMEOUT) {
+		timeoutSec = HTTP_CLI_MIN_TIMEOUT
+	} else if(timeoutSec > HTTP_CLI_MAX_TIMEOUT) {
+		timeoutSec = HTTP_CLI_MAX_TIMEOUT // max is 24 hours (for downloading large files ...)
+	} //end if else
+	httpResult.ConnTimeout = timeoutSec
+	//--
+	if(downloadBodyToFile == true) {
+		maxBytesRead = 0 // no limit
+	} else {
+		if(maxBytesRead < HTTP_CLI_DEF_BODY_READ_SIZE) {
+			maxBytesRead = HTTP_CLI_DEF_BODY_READ_SIZE // min is 16 MB
+		} else if(maxBytesRead > HTTP_CLI_MAX_BODY_READ_SIZE) {
+			maxBytesRead = HTTP_CLI_MAX_BODY_READ_SIZE // max 1 GB ; avoid to read in memory more than this !
+		} //end if
+	} //end if
+	httpResult.MaxDownloadSize = maxBytesRead
+	//--
+	var useAuth bool = false
+	if(authUsername != "") {
+		useAuth = true
+		httpResult.AuthUserName = authUsername
+	} else {
+		httpResult.AuthUserName = ""
+	} //end if else
+	//--
+	if(useAuth == true) {
+		maxRedirects = 0
+	} else { // safe redirects if 301/302 if no auth/credentials ; min: 0 ; max: 10 ; {{{SYNC-SAFE-HTTP-REDIRECT-POLICY}}}
+		if(maxRedirects < 0) {
+			maxRedirects = 0
+		} else if(maxRedirects > HTTP_CLI_MAX_REDIRECTS) {
+			maxRedirects = HTTP_CLI_MAX_REDIRECTS
+		} //end if else
+	} //end if else
+	httpResult.MaxRedirects = maxRedirects
+	//--
+	safeCheckRedirect := func(req *http.Request, numReqs []*http.Request) error { // default behavior in GoLang : HTTP client will follow 10 redirects, and then it will return an error
+		var crrRedirNum int = len(numReqs) - 1 // substract the last req. which is always served even if is redirect !
+		if(crrRedirNum >= int(maxRedirects)) {
+			return smart.CreateNewError("Redirect Policy Limit: Stop after: " + smart.ConvertUInt8ToStr(maxRedirects) + " times")
+		} //end if
+		httpResult.LastUri = req.URL.String()
+		httpResult.NumRedirects++
+		httpResult.RedirUris = append(httpResult.RedirUris, httpResult.LastUri)
+		return nil
+	} //end function
 	//--
 	client := &http.Client{
 		Timeout: time.Duration(timeoutSec) * time.Second,
 		Transport: transport,
+		CheckRedirect: safeCheckRedirect,
 	}
 	//--
-	var reqData io.Reader = nil
-	if((isPost == true) && (reqArr != nil)) {
-		reqValues := url.Values{}
-		for vr, val := range reqArr {
-			for z:=0; z<len(val); z++ {
-				reqValues.Add(vr, val[z])
-				if(DEBUG == true) {
-					log.Println("[DEBUG] SmartHttpCli :: Post Variable Add: `" + vr + "`: `" + val[z] + "` #", z)
-				} //end if
-			} //end for
-		} //end for
-		reqData = strings.NewReader(reqValues.Encode())
-		reqValues = nil // free mem
-	} //end if
-	var havePostData bool = false
-	if(reqData != nil) {
-		havePostData = true
+	var errData string = ""
+	var formData *bytes.Buffer = &bytes.Buffer{}
+	var multipartType string = ""
+	var formDataLen int64 = 0
+	var putDataLen int64 = 0
+	var req *http.Request
+	var errReq error
+	if(isPost == true) { // POST must have some data to post
+		errData, formData, multipartType = reqArrToHttpFormData(reqArr)
+		if(errData != "") {
+			httpResult.Errors = "ERR: Invalid POST Form Data: " + errData
+			httpResult.HttpStatus = -103
+			return
+		} //end if
+		formDataLen = int64(len(formData.Bytes()))
+		obar := pbar.NewOptions64(
+			formDataLen,
+			pbar.OptionSetBytes64(formDataLen),
+			pbar.OptionThrottle(time.Duration(500) * time.Millisecond),
+			pbar.OptionSetDescription("[SmartHttpCli:Posting]"),
+			pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
+		)
+		obar.RenderBlank()
+		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(formData))
+		log.Println("[INFO] SmartHttpCli :: Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(formDataLen) + ")")
+	} else if(isPut == true) {
+		stat, errStat := os.Stat(putLocalFilePath)
+		if(errStat != nil) {
+			httpResult.Errors = "ERR: FAILED to stat the PUT File Path: `" + putLocalFilePath + "`: " + errStat.Error()
+			httpResult.HttpStatus = -711
+			return
+		} //end if
+		file, errOpen := os.Open(putLocalFilePath)
+		if(errOpen != nil) {
+			httpResult.Errors = "ERR: FAILED to open for read the PUT File Path: `" + putLocalFilePath + "`: " + errOpen.Error()
+			httpResult.HttpStatus = -712
+			return
+		} //end if
+		defer file.Close()
+		putDataLen = stat.Size()
+		if(DEBUG == true) {
+			log.Println("[DEBUG] SmartHttpCli :: Put File: `" + putLocalFilePath + "` ; Size:", putDataLen, "bytes")
+		} //end if
+		ubar := pbar.NewOptions64(
+			putDataLen,
+			pbar.OptionSetBytes64(putDataLen),
+			pbar.OptionThrottle(time.Duration(500) * time.Millisecond),
+			pbar.OptionSetDescription("[SmartHttpCli:Uploading]"),
+			pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
+		)
+		ubar.RenderBlank()
+		req, errReq = http.NewRequest(method, uri, ubar.NewProxyReader(file))
+		log.Println("[INFO] SmartHttpCli :: Upload File: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(putDataLen) + ")")
+	} else {
+		req, errReq = http.NewRequest(method, uri, nil)
+	} //end if else
+	//--
+	if(errReq != nil) {
+		httpResult.Errors = "ERR: Invalid Request: " + errReq.Error()
+		httpResult.HttpStatus = -104
+		return
 	} //end if
 	//--
-	req, errReq := http.NewRequest(method, uri, reqData)
-	if(errReq != nil) {
-		return "ERR: Invalid Request: " + errReq.Error(), -103, "", ""
+	if(isPut == true) {
+		req.TransferEncoding = []string{"identity"} // forces to change from the default chunked transfer encoding to linear or gzip (support wider servers)
+		req.ContentLength = putDataLen
 	} //end if
 	//--
 	req.Header = map[string][]string{} // init
 	//--
-	if(authUsername != "") {
+	if(useAuth == true) {
 		authHead := HttpClientAuthBasicHeader(authUsername, authPassword)
 		for k, v := range authHead {
 			if(k != "") {
@@ -211,16 +714,20 @@ func HttpClientRequest(method string, uri string, reqArr map[string][]string, tl
 		} //endfor
 	} //end if
 	//--
-	if(havePostData == true) {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if(isPost == true) {
+		req.Header.Set(HTTP_HEADER_CONTENT_TYPE, multipartType)
 		if(DEBUG == true) {
-			log.Println("[DEBUG] SmartHttpCli :: Set Header : `Content-Type: application/x-www-form-urlencoded`")
+			log.Println("[DEBUG] SmartHttpCli :: Set POST Data Header : `" + HTTP_HEADER_CONTENT_TYPE + ": " + multipartType + "`")
 		} //end if
 	} //end if
 	//--
+	req.Header.Set(HTTP_HEADER_USER_AGENT, httpHeaderSignatureUserAgent())
+	//--
 	resp, errResp := client.Do(req)
 	if(errResp != nil) {
-		return "ERR: Invalid Response: " + errResp.Error(), -104, "", ""
+		httpResult.Errors = "ERR: Invalid Response: " + errResp.Error()
+		httpResult.HttpStatus = -105
+		return
 	} //end if
 	defer resp.Body.Close()
 	//--
@@ -228,15 +735,198 @@ func HttpClientRequest(method string, uri string, reqArr map[string][]string, tl
 	//--
 	headData, rdHeadErr := httputil.DumpResponse(resp, false) // if true will include also the body
 	if(rdHeadErr != nil) {
-		return "ERR: Failed to Read Response Header: " + rdHeadErr.Error(), -105, "", ""
+		httpResult.Errors = "ERR: Failed to Read Response Header: " + rdHeadErr.Error()
+		httpResult.HttpStatus = -106
+		return
 	} //end if
 	//--
-	bodyData, rdBodyErr := ioutil.ReadAll(resp.Body)
-	if(rdBodyErr != nil) {
-		return "ERR: Failed to Read Response Body: " + rdBodyErr.Error(), -106, "", ""
+	httpResult.HttpStatus = statusCode
+	httpResult.ContentLength = resp.ContentLength
+	httpResult.HeadData = string(headData)
+	httpResult.HeadDataSize = uint64(len(headData))
+	//-- HINT: can detect content type: mimeType := http.DetectContentType(buffer) ; can determine file extension with: fext, _ := mime.ExtensionsByType(mimeType)
+	var mType string = smart.StrToLower(smart.StrTrimWhitespaces(resp.Header.Get(HTTP_HEADER_CONTENT_TYPE)))
+	var cDisp string = smart.StrTrimWhitespaces(resp.Header.Get(HTTP_HEADER_CONTENT_DISP))
+	var mFileName string = ""
+	var mDisp string = ""
+	if(cDisp != "") {
+		dispType, dispParams, dispErr := mime.ParseMediaType(cDisp)
+		if(dispErr == nil) {
+			mFileName = smart.StrTrimWhitespaces(dispParams["filename"])
+			mDisp = smart.StrToLower(smart.StrTrimWhitespaces(dispType))
+		} //end if
+	} //end if
+	httpResult.MimeType = mType
+	httpResult.MimeDisp = mDisp
+	httpResult.MimeFileName = mFileName
+	//--
+	if(method == "HEAD") { // return everything except the body
+		httpResult.Errors = ""
+		return
 	} //end if
 	//--
-	return "", statusCode, string(headData), string(bodyData)
+	if(downloadBodyToFile != true) { // if download in memory use a hardcoded limit
+		if(resp.ContentLength > 0) {
+			httpResult.BodyDataSize = uint64(resp.ContentLength)
+			if(resp.ContentLength > int64(maxBytesRead)) {
+				httpResult.Errors = "ERR: Body is Oversized: " + smart.ConvertInt64ToStr(resp.ContentLength) + " bytes / Max Limit Set is: " + smart.ConvertUInt64ToStr(maxBytesRead) + " bytes"
+				httpResult.HttpStatus = -107
+				return
+			} //end if
+		} //end if
+	} //end if
+	//--
+	dbar := pbar.NewOptions64(
+		resp.ContentLength,
+		pbar.OptionSetBytes64(resp.ContentLength),
+		pbar.OptionThrottle(time.Duration(500) * time.Millisecond),
+		pbar.OptionSetDescription("[SmartHttpCli:Download]"),
+		pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
+	)
+	dbar.RenderBlank()
+	//--
+	var bodyData *bytes.Buffer = &bytes.Buffer{}
+	var bytesCopied int64 = 0
+	var rdBodyErr error
+	//--
+	var useB64Encoding bool = true
+	if(
+		(httpResult.MimeType == "application/javascript") || (httpResult.MimeType == "application/json") ||
+		(httpResult.MimeType == "application/xml") || (httpResult.MimeType == "image/svg+xml") ||
+		(httpResult.MimeType == "application/x-php") ||
+		(httpResult.MimeType == "message/rfc822") ||
+		(smart.StrStartsWith(httpResult.MimeType, "text/"))) {
+			useB64Encoding = false
+	} //end if
+	//--
+	if(downloadBodyToFile == true) { // download body to a file ; bodyData will return the path to this file
+		//--
+		var dFileName string = ""
+		var dFileExt string = ""
+		if(dFileExt == "") {
+			if(cDisp != "") {
+				if(mFileName != "") {
+					dFileName = smart.PathBaseNoExtName(mFileName)
+					dFileExt  = smart.PathBaseExtension(mFileName)
+				} //end if
+			} //end if
+		} //end if
+		if(dFileExt == "") {
+			if(mType != "") {
+				dFileExts, dExtErr := mime.ExtensionsByType(mType)
+				if(dExtErr == nil) {
+					if(len(dFileExts) > 0) {
+						dFileExt = dFileExts[0]
+					} //end if
+				} //end if
+			} //end if
+		} //end if
+		if(dFileName == "") {
+			dFileName = smart.PathBaseNoExtName(smart.StrTrimWhitespaces(uri))
+			if(dFileExt == "") {
+				dFileExt = smart.PathBaseExtension(smart.StrTrimWhitespaces(uri))
+			} //end if
+		} //end if
+		//--
+		dFileName = smart.StrTrimWhitespaces(dFileName)
+		dFileExt = smart.StrTrimWhitespaces(smart.StrToLower(smart.StrTrim(smart.StrTrimWhitespaces(dFileExt), ".")))
+		//--
+		if(dFileName == "") {
+			dFileName = "file"
+		} //end if
+		if(dFileExt == "") {
+			dFileExt = "download"
+		} //end if
+		//--
+		dFileName = dFileName + "." + dFileExt
+		if((statusCode < 200) || (statusCode >= 300)) {
+			dFileName = "file-err-" + smart.ConvertIntToStr(statusCode) + ".download"
+		} //end if
+		//-- do minimalistict safety checks, the rest of checks were made above
+		if(!smart.PathIsSafeValidFileName(dFileName)) {
+			dFileName = "file.download"
+		} //end if
+		httpResult.DownloadLocalFileName = dFileName
+		var dFullPath string = downloadLocalDirPath + dFileName
+		if((!smart.PathIsSafeValidPath(dFullPath)) || smart.PathIsBackwardUnsafe(dFullPath)) {
+			httpResult.Errors = "ERR: Failed to resolve a Download Safe Path: `" + dFullPath + "`"
+			httpResult.HttpStatus = -808
+			return
+		} //end if
+		//--
+		var theDwnLockFile string = dFullPath + ".tmp"
+		//--
+		if(!smart.PathExists(theDwnLockFile)) {
+			if(smart.PathExists(dFullPath)) {
+				if(smart.PathIsFile(dFullPath)) {
+					smart.SafePathFileDelete(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+				} else {
+					httpResult.Errors = "ERR: Failed to clear the Download File for writing: `" + dFullPath + "`"
+					httpResult.HttpStatus = -809
+					return
+				} //end if
+			} //end if
+		} //end if
+		dFile, dErr := os.OpenFile(dFullPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, smart.CHOWN_FILES)
+		if(dErr != nil) {
+			httpResult.Errors = "ERR: Failed to open the Download File for writing: `" + dFullPath + "`: " + dErr.Error()
+			httpResult.HttpStatus = -810
+			return
+		} //end if
+		smart.SafePathFileWrite(smart.DateNowLocal() + "\n" + dFullPath + "\n", "a", theDwnLockFile, false) // append, to see if there are colissions {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+		defer func() {
+			dFile.Close()
+			smart.SafePathFileDelete(theDwnLockFile, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+		}()
+		//--
+		log.Println("[INFO] SmartHttpCli :: Download File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		//--
+		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
+		//--
+		dwFSize, dwFSizErr := smart.SafePathFileGetSize(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+		if(dwFSizErr != "") {
+			dwFSize = 0
+		} //end if
+		//--
+		httpResult.Errors = ""
+		httpResult.BodyDataEncoding = "log"
+		httpResult.BodyData = "SmartHttpCli :: Saved to Local Downloads Folder as `" + dFullPath + "`"
+		httpResult.BodyDataSize = uint64(dwFSize)
+		return
+		//--
+	} else { // download in memory
+		//--
+		log.Println("[INFO] SmartHttpCli :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		//--
+		limitedReader := &io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
+		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(bodyData, dbar), limitedReader)
+		if(rdBodyErr != nil) {
+			httpResult.Errors = "ERR: Failed to Read Response Body (" + smart.ConvertInt64ToStr(bytesCopied) + "bytes read): " + rdBodyErr.Error()
+			httpResult.HttpStatus = -108
+			return
+		} //end if
+		//--
+		var sizeRead int64 = int64(len(bodyData.Bytes()))
+		if(sizeRead > int64(maxBytesRead)) {
+			var displayBodySize int64 = sizeRead
+			if(resp.ContentLength > 0) {
+				displayBodySize = resp.ContentLength
+			} //end if
+			httpResult.Errors = "ERR: Body is Oversized: " + smart.ConvertInt64ToStr(displayBodySize) + " bytes / Max Limit Set is: " + smart.ConvertUInt64ToStr(maxBytesRead) + " bytes"
+			httpResult.HttpStatus = -109
+			return
+		} //end if
+		//--
+	} //end if else
+	//--
+	httpResult.Errors = ""
+	httpResult.BodyData = string(bodyData.Bytes())
+	httpResult.BodyDataSize = uint64(len(httpResult.BodyData))
+	if(useB64Encoding == true) {
+		httpResult.BodyDataEncoding = "base64"
+		httpResult.BodyData = smart.Base64Encode(httpResult.BodyData)
+	} //end if else
+	return
 	//--
 } //END FUNCTION
 
@@ -313,7 +1003,7 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 	//--
 	now := time.Now().UTC()
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-	w.Header().Set(HTTP_HEADER_SERVER_POWERED, "Smart.Framework.Go :: " + smart.VERSION)
+	w.Header().Set(HTTP_HEADER_SERVER_POWERED, smart.DESCRIPTION + " :: " + smart.VERSION)
 	w.Header().Set(HTTP_HEADER_SERVER_SIGN, DEFAULT_REALM + " / " + VERSION)
 	w.Header().Set(HTTP_HEADER_SERVER_DATE, now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC)
 	//--
@@ -521,6 +1211,78 @@ func HttpStatus208(w http.ResponseWriter, r *http.Request, content string, conte
 //-----
 
 
+func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirectUrl string, outputHtml bool) {
+	//--
+	var title string = ""
+	var displayAuthLogo bool = false
+	switch(code) {
+		case 301:
+			title = HTTP_STATUS_301
+			break
+		case 302:
+			title = HTTP_STATUS_302
+			displayAuthLogo = true
+			break
+		default:
+			log.Println("[ERROR] httpStatus3XX: Invalid Status Code:", code, "FallBack to HTTP Status 301")
+			title = HTTP_STATUS_301
+			code = 301
+	} //end switch
+	//--
+	var contentType = ""
+	if(outputHtml == true) {
+		contentType = assets.HTML_CONTENT_HEADER
+	} else {
+		contentType = assets.TEXT_CONTENT_HEADER
+	} //end if
+	//--
+	redirectUrl = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(redirectUrl))
+	if(redirectUrl == "") {
+		log.Println("[ERROR]: httpStatus3XX: Empty Redirect URL:", code, "FallBack to HTTP Status 500")
+		HttpStatus500(w, r, "Invalid Redirect URL for Status: " + title, outputHtml)
+		return
+	} //end if
+	//--
+	var content string = ""
+	if(outputHtml == true) { // html
+		content = assets.HtmlStatusPage(title, redirectUrl, displayAuthLogo)
+	} else { // text
+		content += title
+		if(redirectUrl != "") {
+			content += "\n\n" + redirectUrl
+		} //end if
+		content += "\n"
+	} //end if else
+	//--
+	httpHeadersCacheControl(w, r, -1, "", "no-cache")
+	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
+	w.Header().Set(HTTP_HEADER_REDIRECT_LOCATION, redirectUrl)
+	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
+	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
+	w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	w.WriteHeader(int(code)) // status code must be after set headers
+	w.Write([]byte(content))
+	//--
+} //END FUNCTION
+
+
+func HttpStatus301(w http.ResponseWriter, r *http.Request, redirectUrl string, outputHtml bool) {
+	//--
+	httpStatus3XX(w, r, 301, redirectUrl, outputHtml)
+	//--
+} //END FUNCTION
+
+
+func HttpStatus302(w http.ResponseWriter, r *http.Request, redirectUrl string, outputHtml bool) {
+	//--
+	httpStatus3XX(w, r, 302, redirectUrl, outputHtml)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageText string, outputHtml bool) {
 	//--
 	var title string = ""
@@ -543,8 +1305,17 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 		case 500:
 			title = HTTP_STATUS_500
 			break
+		case 502:
+			title = HTTP_STATUS_502
+			break
+		case 503:
+			title = HTTP_STATUS_503
+			break
+		case 504:
+			title = HTTP_STATUS_504
+			break
 		default:
-			log.Println("[ERROR] httpStatusERR: Invalid Status Code:", code)
+			log.Println("[ERROR] httpStatusERR: Invalid Status Code:", code, "FallBack to HTTP Status 500")
 			title = HTTP_STATUS_500
 			code = 500
 	} //end switch
@@ -559,7 +1330,7 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 	messageText = smart.StrTrimWhitespaces(messageText)
 	var content string = ""
 	if(outputHtml == true) { // html
-		content = assets.HtmlErrorPage(title, messageText, displayAuthLogo)
+		content = assets.HtmlStatusPage(title, messageText, displayAuthLogo)
 	} else { // text
 		content += title
 		if(messageText != "") {
@@ -613,6 +1384,27 @@ func HttpStatus429(w http.ResponseWriter, r *http.Request, messageText string, o
 func HttpStatus500(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 500, messageText, outputHtml)
+	//--
+} //END FUNCTION
+
+
+func HttpStatus502(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 502, messageText, outputHtml)
+	//--
+} //END FUNCTION
+
+
+func HttpStatus503(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 503, messageText, outputHtml)
+	//--
+} //END FUNCTION
+
+
+func HttpStatus504(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 504, messageText, outputHtml)
 	//--
 } //END FUNCTION
 
@@ -701,7 +1493,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED for IP: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 		httpHeadersCacheControl(w, r, -1, "", "no-cache")
-		w.Header().Set("www-authenticate", `Basic realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
+		w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
 		//--
 		if(outputHtml == true) {
 			w.Header().Set(HTTP_HEADER_CONTENT_TYPE, assets.HTML_CONTENT_HEADER) // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
@@ -712,7 +1504,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		w.WriteHeader(401) // status code must be after set headers
 		//--
 		if(outputHtml == true) {
-			w.Write([]byte(assets.HtmlErrorPage(HTTP_STATUS_401, "Access to this area requires Authentication", true)))
+			w.Write([]byte(assets.HtmlStatusPage(HTTP_STATUS_401, "Access to this area requires Authentication", true)))
 		} else {
 			w.Write([]byte(HTTP_STATUS_401 + "\n"))
 		} //end if else
