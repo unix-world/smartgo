@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220421.0407 :: STABLE
+// r.20220422.1951 :: STABLE
 
 // REQUIRE: go 1.16 or later
 package smartgo
@@ -72,7 +72,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220421.0407"
+	VERSION string = "v.20220422.1951"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
@@ -254,7 +254,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	//--
 	var theLogFile string = logFilePath + theLogPfx + "log" + "-" + dtObjUtc.Years + "-" + dtObjUtc.Months + "-" + dtObjUtc.Days + "-" + dtObjUtc.Hours + ".log"
 	//--
-	isSuccess, errMsg := SafePathFileWrite(theFmtMsg + "\n", "a", theLogFile, true)
+	isSuccess, errMsg := SafePathFileWrite(theLogFile, "a", true, theFmtMsg + "\n")
 	//--
 	if(errMsg != "") {
 		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") write Error `" + theLogFile + "` :: " + errMsg
@@ -374,7 +374,7 @@ func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole
 		//--
 		LogToConsole(level, withColorsOnConsole)
 		//--
-		log.Println("[ERROR] !!!!!!! Cannot Log to File !!!!!!! the Log Path is Invalid or does not exists: `" + pathForLogs + "` ... will log to console")
+		log.Fatal("[ERROR] !!!!!!! Cannot Log to File !!!!!!! the Log Path is Invalid or does not exists: `" + pathForLogs + "` !!!!!!!")
 		//--
 	} //end if
 	//--
@@ -3456,7 +3456,7 @@ func SafePathIniFileRead(iniFilePath string, allowAbsolutePath bool, iniKeys []s
 } //END FUNCTION
 
 
-func SafePathFileWrite(fileContent string, wrMode string, filePath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, fileContent string) (isSuccess bool, errMsg string) {
 	//--
 	// wrMode : "a" for append | "w" for write
 	//--
