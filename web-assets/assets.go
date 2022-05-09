@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220419.1308 :: STABLE
+// r.20220428.2253 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20220419.1308"
+	VERSION string = "r.20220428.2253"
 
-	LAST_MODIFIED_DATE_TIME string = "2022-04-18 23:58:00" // (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2022-04-28 22:53:00" // (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	DEBUG bool = false
 )

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220422.1951 :: STABLE
+// r.20220428.2324 :: STABLE
 
 // REQUIRE: go 1.16 or later
 package smartgo
@@ -72,7 +72,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220422.1951"
+	VERSION string = "v.20220428.2324"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
@@ -2980,17 +2980,17 @@ func PathExists(thePath string) bool {
 
 func PathGetAbsoluteFromRelative(thePath string) string {
 	//--
-	if(!PathExists(thePath)) {
-		return ""
-	} //end if
-	//--
-	absPath, err := filepath.Abs(thePath)
+	absPath, err := filepath.Abs("./")
 	//--
 	if(err != nil) {
-		return ""
+		return "/tmp/err-absolute-path/invalid-path/"
 	} //end if
 	//--
-	return absPath
+	if((StrTrimWhitespaces(absPath) == "") || (absPath == "/") || (absPath == ".") || (absPath == "..")) {
+		return "/tmp/err-absolute-path/empty-or-root-path/"
+	} //end if
+	//--
+	return PathAddDirLastSlash(absPath) + StrTrimLeft(thePath, "./")
 	//--
 } //END FUNCTION
 
@@ -3378,6 +3378,68 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 } //END FUNCTION
 
 
+//-----
+
+
+func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]string, errMsg string) {
+	//--
+	iniData, errParseIni := parseini.Load(iniContent)
+	if(errParseIni != nil) {
+		return nil, "INI Settings # Parse Error: " + errParseIni.Error()
+	} //end if
+	//--
+	var settings map[string]string = map[string]string{}
+	if(iniKeys != nil) { // get all these keys ; if key does not exist will fill it with an empty string ; ex: []string where each value is "section:key"
+		for i := 0; i < len(iniKeys); i++ {
+			if(StrContains(iniKeys[i], ":")) {
+				sk := Explode(":", iniKeys[i])
+				if(len(sk) == 2) {
+					sk[0] = StrTrimWhitespaces(sk[0])
+					sk[1] = StrTrimWhitespaces(sk[1])
+					if((sk[0] != "") && (sk[1] != "")) {
+						settings[sk[0] + ":" + sk[1]] = parseini.GetIniStrVal(iniData, sk[0], sk[1])
+					} //end if
+				} //end if
+			} //end if
+		} //end for
+	} else { // get all existing keys from ini
+		for k, v := range iniData {
+			if(v != nil) {
+				for kk, _ := range v {
+					settings[k + ":" + kk] = parseini.GetIniStrVal(iniData, k, kk)
+				} //end for
+			} //end if
+		} //end for
+	} //end if else
+	//--
+	return settings, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathIniFileReadAndParse(iniFilePath string, allowAbsolutePath bool, iniKeys []string) (iniMap map[string]string, errMsg string) {
+	//--
+	iniContent, iniFileErr := SafePathFileRead(iniFilePath, true)
+	if(iniFileErr != "") {
+		return nil, "INI Settings # Read Failed `" + iniFilePath + "`: " + iniFileErr
+	} //end if
+	if(StrTrimWhitespaces(iniContent) == "") {
+		return nil, "INI Settings # Content is Empty `" + iniFilePath + "`"
+	} //end if
+	//--
+	settings, err := IniContentParse(iniContent, iniKeys)
+	if(err != "") {
+		return nil, err + " # `" + iniFilePath + "`"
+	} //end if
+	//--
+	return settings, ""
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent string, errMsg string) {
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
@@ -3408,50 +3470,6 @@ func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent stri
 	} //end if
 	//--
 	return string(content), ""
-	//--
-} //END FUNCTION
-
-
-func SafePathIniFileRead(iniFilePath string, allowAbsolutePath bool, iniKeys []string) (iniMap map[string]string, errMsg string) {
-	//--
-	iniContent, iniFileErr := SafePathFileRead(iniFilePath, true)
-	if(iniFileErr != "") {
-		return nil, "INI Settings # Read Failed `" + iniFilePath + "`: " + iniFileErr
-	} //end if
-	if(StrTrimWhitespaces(iniContent) == "") {
-		return nil, "INI Settings # Content is Empty `" + iniFilePath + "`"
-	} //end if
-	//--
-	iniData, errParseIni := parseini.Load(iniContent)
-	if(errParseIni != nil) {
-		return nil, "INI Settings # Parse Error `" + iniFilePath + "`: " + errParseIni.Error()
-	} //end if
-	//--
-	var settings map[string]string = map[string]string{}
-	if(iniKeys != nil) { // get all these keys ; if key does not exist will fill it with an empty string ; ex: []string where each value is "section:key"
-		for i := 0; i < len(iniKeys); i++ {
-			if(StrContains(iniKeys[i], ":")) {
-				sk := Explode(":", iniKeys[i])
-				if(len(sk) == 2) {
-					sk[0] = StrTrimWhitespaces(sk[0])
-					sk[1] = StrTrimWhitespaces(sk[1])
-					if((sk[0] != "") && (sk[1] != "")) {
-						settings[sk[0] + ":" + sk[1]] = parseini.GetIniStrVal(iniData, sk[0], sk[1])
-					} //end if
-				} //end if
-			} //end if
-		} //end for
-	} else { // get all existing keys from ini
-		for k, v := range iniData {
-			if(v != nil) {
-				for kk, _ := range v {
-					settings[k + ":" + kk] = parseini.GetIniStrVal(iniData, k, kk)
-				} //end for
-			} //end if
-		} //end for
-	} //end if else
-	//--
-	return settings, ""
 	//--
 } //END FUNCTION
 

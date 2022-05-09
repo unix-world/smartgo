@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220422.1951 :: STABLE
+// r.20220428.2253 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,13 +38,13 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220422.1951"
+	VERSION string = "r.20220428.2253"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
 
 	//--
-	DEFAULT_CLIENT_UA string = "NetSurf/3.9"
+	DEFAULT_CLIENT_UA string = "NetSurf/3.10"
 	//--
 	HTTP_CLI_DEF_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M 		//  16MB
 	HTTP_CLI_MAX_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M * 32 	// 512MB
@@ -920,7 +920,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			formDataLen,
 			pbar.OptionSetBytes64(formDataLen),
 			pbar.OptionThrottle(time.Duration(500) * time.Millisecond),
-			pbar.OptionSetDescription("[SmartHttpCli:Posting]"),
+			pbar.OptionSetDescription("[SmartHttpCli:PostData]"),
 			pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
 		)
 		obar.RenderBlank()
@@ -1231,7 +1231,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			smart.SafePathFileDelete(theDwnLockFile, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
 		}()
 		//--
-		log.Println("[INFO] SmartHttpCli :: Download File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		log.Println("[INFO] SmartHttpCli [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
 		//--
@@ -1248,7 +1248,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		//--
 	} else { // download in memory
 		//--
-		log.Println("[INFO] SmartHttpCli :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		log.Println("[INFO] SmartHttpCli [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
 		limitedReader := &io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(bodyData, dbar), limitedReader)
@@ -1320,7 +1320,7 @@ func TLSProtoHttpV1Server() map[string]func(*http.Server, *tls.Conn, http.Handle
 //-----
 
 
-func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool) (*http.ServeMux, *http.Server) {
+func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, description string) (*http.ServeMux, *http.Server) {
 	//--
 	mux := http.NewServeMux()
 	//--
@@ -1336,7 +1336,7 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool) (*http.S
 	//--
 	if(forceHttpV1 == true) {
 		srv.TLSNextProto = TLSProtoHttpV1Server() // disable HTTP/2 on TLS (on non-TLS is always HTTP/1.1)
-		log.Println("[NOTICE] HttpMuxServer: HTTP/1.1")
+		log.Println("[NOTICE] Smart.HttpMuxServer: HTTP/1.1", description)
 	} //end if
 	//--
 	return mux, srv
@@ -1792,7 +1792,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			HttpStatus403(w, r, err, outputHtml)
 			return err
 		} //end if
-		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW :: Client: `<" + ip + ">` match the IP Addr Allowed List: `" + allowedIPs + "`")
+		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` match the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
 	//--
 	memAuthMutex.Lock()
@@ -1802,7 +1802,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	memAuthMutex.Unlock()
 	//--
 	if(DEBUG_CACHE == true) {
-		log.Println("[DATA] HttpBasicAuthCheck :: memAuthCache:", memAuthCache)
+		log.Println("[DATA] HttpBasicAuthCheck [" + authRealm + "] :: memAuthCache:", memAuthCache)
 	} //end if
 	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(ip)
 	if(cacheExists == true) {
@@ -1842,7 +1842,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			cachedObj.Data += "."
 		} //end if
 		memAuthCache.Set(cachedObj, uint64(CACHE_EXPIRATION))
-		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED for IP: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
+		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED [" + authRealm + "] for IP: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 		httpHeadersCacheControl(w, r, -1, "", "no-cache")
 		w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
@@ -1861,7 +1861,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			w.Write([]byte(HTTP_STATUS_401 + "\n"))
 		} //end if else
 		//--
-		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED :: UserName: `" + user + "` # [%s %s %s] %s [%s] for client %s\n", r.Method, r.URL, r.Proto, "401", r.Host, r.RemoteAddr)
+		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s [%s] for client %s\n", r.Method, r.URL, r.Proto, "401", r.Host, r.RemoteAddr)
 		//--
 		return err
 		//--
@@ -1871,7 +1871,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		memAuthCache.Unset(ip) // unset on 1st successful login
 	} //end if
 	//--
-	log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.SUCCESS :: UserName: `" + user + "` # From IPAddress: `" + ip + "` on Port: `" + port + "`")
+	log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.SUCCESS [" + authRealm + "] :: UserName: `" + user + "` # From IPAddress: `" + ip + "` on Port: `" + port + "`")
 	//--
 	return ""
 	//--

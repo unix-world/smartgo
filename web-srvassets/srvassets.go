@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220416.1958 :: STABLE
+// r.20220428.2253 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20220416.1958"
+	VERSION string = "r.20220428.2253"
 
 	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
 
