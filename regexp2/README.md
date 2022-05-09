@@ -6,7 +6,7 @@ The engine is ported from the .NET framework's System.Text.RegularExpressions.Re
 
 ## Installing
 This is a go-gettable library, so install is easy:
-Tis is a custom version based on: github.com/dlclark/regexp2
+This is a custom version based on: github.com/dlclark/regexp2
 
     go get github.com/unix-world/smartgo
 
