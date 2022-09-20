@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220428.2324 :: STABLE
+// r.20220916.1858 :: STABLE
 
 // REQUIRE: go 1.16 or later
 package smartgo
@@ -72,7 +72,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220428.2324"
+	VERSION string = "v.20220916.1858"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
@@ -3505,20 +3505,31 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 		if(err != nil) {
 			return false, err.Error()
 		} //end if
-		defer f.Close()
+	//	defer f.Close() // changes as below to log if not closing a file the issue with 'too many open files'
+		fClose := func() { // because this method in append mode is used for writing also the log files make defer a bit more safe, from above
+			if err := f.Close(); err != nil {
+				log.Println("[ERROR] SafePathFileWrite:", "FAILED to explicit Close an Opened File (write:append mode): `" + filePath + "` # Errors:", err)
+			} else {
+				if(DEBUG == true) { // !!! need this because actually this method will write also to log files so this will repeat on each logged message !!!
+					log.Println("[DEBUG] SafePathFileWrite:", "An Opened File (write:append mode) was explicit Closed: `" + filePath) // this is important, as all logs that write to files must be able to watch this ... to monitor (debug) if the past issue with too many opened files persists after new fixes ...
+				} //end if
+			} //end if
+		} //end function
 		if _, err := f.WriteString(fileContent); err != nil {
+			fClose()
 			return false, err.Error()
 		} //end if
+		fClose()
+		return true, "" // must return here to avoid defered f to be out of scope
 	} else if(wrMode == "w") { // write mode
 		err := ioutil.WriteFile(filePath, []byte(fileContent), CHOWN_FILES)
 		if(err != nil) {
 			return false, err.Error()
 		} //end if
-	} else {
-		return false, errors.New("WARNING: Invalid File Write Mode: `" + wrMode + "`").Error()
-	} //end if
+		return true, "" // return here, keep the same logic as above
+	} //end if else
 	//--
-	return true, ""
+	return false, errors.New("WARNING: Invalid File Write Mode: `" + wrMode + "`").Error()
 	//--
 } //END FUNCTION
 

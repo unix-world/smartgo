@@ -1,3 +1,3 @@
-// JS-Script (US): settings-jquery.js @ 2022-04-04 22:54:32 +0000
+// JS-Script (UM): settings-jquery.js @ 2022-09-20 09:51:16 +0000
 jQuery.ajaxSetup({timeout:0,cache:false});
 // #END

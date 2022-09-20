@@ -1,3 +1,3 @@
-// JS-Script (US): jquery.timepicker-en.js @ 2022-04-04 22:54:24 +0000
-jQuery(function($){$.timepicker.regional["en"]={hourText:"Hours",minuteText:"Minutes",amPmText:["AM","PM"],closeButtonText:"Close",nowButtonText:"Now",deselectButtonText:"Deselect"};$.timepicker.setDefaults($.timepicker.regional["en"])});
+// JS-Script (UM): jquery.timepicker-en.js @ 2022-09-20 09:51:08 +0000
+jQuery(function(e){e.timepicker.regional["en"]={hourText:"Hours",minuteText:"Minutes",amPmText:["AM","PM"],closeButtonText:"Close",nowButtonText:"Now",deselectButtonText:"Deselect"};e.timepicker.setDefaults(e.timepicker.regional["en"])});
 // #END
