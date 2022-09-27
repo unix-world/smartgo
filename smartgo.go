@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220916.1858 :: STABLE
+// r.20220927.1537 :: STABLE
 
 // REQUIRE: go 1.16 or later
 package smartgo
@@ -72,7 +72,7 @@ import (
 
 
 const (
-	VERSION string = "v.20220916.1858"
+	VERSION string = "v.20220927.1537"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2022 unix-world.org"
 
@@ -3809,6 +3809,43 @@ func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int6
 	var size int64 = fd.Size()
 	//--
 	return size, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathGetMTime(thePath string, allowAbsolutePath bool) (mTime int64, errMsg string) {
+	//--
+	if(StrTrimWhitespaces(thePath) == "") {
+		return 0, errors.New("WARNING: The Path is Empty").Error()
+	} //end if
+	//--
+	if(PathIsSafeValidPath(thePath) != true) {
+		return 0, errors.New("WARNING: The Path is Invalid Unsafe").Error()
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(thePath) == true) {
+		return 0, errors.New("WARNING: The Path is Backward Unsafe").Error()
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(thePath) == true) {
+			return 0, errors.New("NOTICE: The Path is Absolute but not allowed to be absolute by the calling parameters").Error()
+		} //end if
+	} //end if
+	//--
+	if(!PathExists(thePath)) {
+		return 0, errors.New("WARNING: The Path does not exist").Error()
+	} //end if
+	//--
+	fd, err := os.Stat(thePath)
+	if(err != nil) {
+		if(os.IsNotExist(err)) {
+			return 0, err.Error()
+		} //end if
+	} //end if
+	modifTime := fd.ModTime()
+	//--
+	return int64(modifTime.Unix()), ""
 	//--
 } //END FUNCTION
 
