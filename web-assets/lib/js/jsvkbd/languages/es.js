@@ -1,0 +1,3 @@
+// JS-Script (US): es.js @ 2022-09-28 13:44:59 +0000
+jQuery.keyboard.language.es={language:"Espa\xf1ol (Spanish)",display:{a:"\u2714:Acceptar (Cambio+Inscribir)",accept:"Acceptar:Acceptar (Cambio+Inscribir)",alt:"AltGr:Grafemas Alternativos",b:"\u2190:Retroceso",bksp:"Bksp:Retroceso",c:"\u2716:Cancelar (Esc)",cancel:"Cancelar:Cancelar (Esc)",clear:"C:Vaciar",combo:"\xf6:Alternar las Teclas Combinados",dec:",:Decimal",e:"\u21b5:Inscribir",enter:"Inscribir:Inscribir",lock:"\u21ea Bloq:May\xfas",s:"\u21e7:Cambio",shift:"Cambio:Cambio",sign:"\xb1:Cambiar Signo",space:"&nbsp;:Espacio",t:"\u21e5:Tab",tab:"\u21e5 Tab:Tab"},wheelMessage:"Utilice la rueda del mouse para ver otras teclas"};
+// #END
