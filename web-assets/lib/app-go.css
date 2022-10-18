@@ -1,38 +1,28 @@
 
-/* -- CSS Start :: Smart.Framework / App (Go) :: r.20220909 -- */
+/* -- CSS Start :: Smart.Framework / App (Go) :: r.20221018 -- */
 
 /* ----------------------------- */
 
-/* -- base -- */
+/* -- Fonts -- */
 
 @import url("../lib/core/plugins/fonts/typo/sans/ibm-plex-sans.css");
 @import url("../lib/core/plugins/fonts/typo/mono/ibm-plex-mono.css");
-/* @import url("../lib/core/plugins/fonts/typo/serif/ibm-plex-serif.css"); */
 
-@import url("../lib/core/css/base.css");
+/* -- Default -- */
 
-/* -- ui toolkit -- */
+@import url("../lib/css/default.css");
 
-@import url("../lib/css/toolkit/ux-toolkit.css");
-@import url("../lib/css/toolkit/ux-toolkit-responsive.css");
-
-/* -- ui iconic font -- */
+/* -- Iconic Font -- */
 
 @import url("../lib/css/toolkit/sf-icons.css");
 
-/* -- core -- */
+/* -- UX Toolkit + UI Extras -- */
 
-@import url("../lib/core/css/custom.css");
+@import url("../lib/css/app.pak.css");
 
-@import url("../lib/core/css/notifications.css");
-@import url("../lib/core/css/notifications-icons.css");
+/* -- Custom, Notifications, Tpl -- */
 
-/* -- ui toolkit extras -- */
-
-@import url("../lib/css/animate/animate.css");
-
-@import url("../lib/css/v-timeline/style.css");
-@import url("../lib/css/v-timeline/style-responsive.css");
+@import url("../lib/core/css/app.pak.css");
 
 /* ----------------------------- */
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220928.1644 :: STABLE
+// r.20221018.1832 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220928.1644"
+	VERSION string = "r.20221018.1832"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -566,6 +566,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	transport := &http.Transport{
 		TLSClientConfig: TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM),
+		DisableKeepAlives: true, // fix ; {{{SYNC-GO-ERR-HTTP-CLI-TOO-MANY-OPEN-FILES}}} : this is a fix for too many open files # this is requires as well as resp.Body.Close() which is handled below
 	}
 	//--
 	uri = smart.StrTrimWhitespaces(uri)
@@ -977,6 +978,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		req, errReq = http.NewRequest(method, uri, nil)
 	} //end if else
 	//--
+	req.Close = true // force to close connection at the end ; {{{SYNC-GO-ERR-HTTP-CLI-TOO-MANY-OPEN-FILES}}} : this is a fix for too many open files # this is requires as well as resp.Body.Close() which is handled below
+	//--
 	if(errReq != nil) {
 		httpResult.Errors = "ERR: Invalid Request: " + errReq.Error()
 		httpResult.HttpStatus = -104
@@ -1375,13 +1378,13 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 			modified = dtObjUtc.Years + "-" + dtObjUtc.Months + "-" + dtObjUtc.Days + " " + dtObjUtc.Hours + ":" + dtObjUtc.Minutes + ":" + dtObjUtc.Seconds // YYYY-MM-DD HH:II:SS
 		} else {
 			log.Println("[ERROR] HttpHeadersCacheControl: Invalid Modified Date:", modified)
-			modified = now.Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) // YYYY-MM-DD HH:II:SS
+			modified = now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) // YYYY-MM-DD HH:II:SS
 		} //end if
 		if(DEBUG == true) {
 			log.Println("[DEBUG] HttpHeadersCacheControl: Modified Date:", modified)
 		} //end if
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-		w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0
+		w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0
 		w.Header().Set(HTTP_HEADER_CACHE_PGMA, "cache") // HTTP 1.0 cache
 		w.Header().Set(HTTP_HEADER_CACHE_LMOD, modified + " " + TZ_UTC)
 		w.Header().Set(HTTP_HEADER_CACHE_CTRL, control + ", max-age=" + smart.ConvertIntToStr(expiration)) // HTTP 1.1 HTTP 1.1 (private will dissalow proxies to cache the content)
@@ -1390,14 +1393,14 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 		//--
 	} //end if else
 	//-- {{{SYNC-HTTP-NOCACHE-HEADERS}}} ; // default expects ; expiration=-1 ; modified="" ; control=""
-	expdate := now.AddDate(-1, 0, 0)
+	expdate := now.AddDate(-1, 0, 0) // minus one year
 	//--
 	control = "no-cache"
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 	w.Header().Set(HTTP_HEADER_CACHE_CTRL, "no-cache, must-revalidate") // HTTP 1.1 no-cache, not use their stale copy
 	w.Header().Set(HTTP_HEADER_CACHE_PGMA, "no-cache") // HTTP 1.0 no-cache
-	w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0 no-cache expires
-	w.Header().Set(HTTP_HEADER_CACHE_LMOD, now.Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " " + TZ_UTC)
+	w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0 no-cache expires
+	w.Header().Set(HTTP_HEADER_CACHE_LMOD, now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC)
 	//--
 	return false // no cache
 	//--

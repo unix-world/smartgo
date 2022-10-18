@@ -1,3 +1,3 @@
-// JS-Script (US): it.js @ 2022-09-28 13:44:59 +0000
+// JS-Script (US): it.js @ 2022-10-18 14:27:25 +0000
 jQuery.keyboard.language.it={language:"Italiano (Italian)",display:{a:"\u2714:Accetta (Shift+Enter)",accept:"Accetta:Accetta (Shift+Enter)",alt:"AltGr:Grafemi Alternativi",b:"\u2190:Cancella",bksp:"Canc:Cancella",c:"\u2716:Annulla (Esc)",cancel:"Annulla:Annulla (Esc)",clear:"C:Pulisci",combo:"\xf6:Tasti Combinati",dec:",:Decimale",e:"\u21b5:Invio",enter:"Invio:Invio",lock:"\u21ea Bloc:Bloc Maiusc",s:"\u21e7:Maiusc",shift:"Maiusc:Maiusc",sign:"\xb1:Cambia Segno",space:"&nbsp;:Spazio",t:"\u21e5:Tab",tab:"\u21e5 Tab:Tab"},wheelMessage:"Usa la rotella del mouse per vedere altri tasti"};
 // #END

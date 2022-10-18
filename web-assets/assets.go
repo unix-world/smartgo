@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220928.1644 :: STABLE
+// r.20221018.1832 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20220928.1644"
+	VERSION string = "r.20221018.1832"
 
-	LAST_MODIFIED_DATE_TIME string = "2022-09-28 16:58:00" // (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2022-10-18 14:58:00" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	DEBUG bool = false
 )
@@ -138,25 +138,30 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 	var headCssJs string = "<!-- Head: Css / Js -->"
 	var assetsAll []string
 	assetsAll = append(assetsAll, headCssJs)
-	//--
-	var cssBase string = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/base.css"))
-	if(cssBase != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(cssBase)) + cssEndTag)
+	//-- # start: sync with app-go.css
+	var theCss string = "" // init
+	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/default.css"))
+	if(theCss != "") {
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
 	} //end if
-	var cssNotif string = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/notifications.css"))
-	if(cssNotif != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(cssNotif)) + cssEndTag)
+	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit.css"))
+	if(theCss != "") {
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
 	} //end if
-	//--
-	var cssToolkit string = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit.css"))
-	if(cssToolkit != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(cssToolkit)) + cssEndTag)
+	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit-responsive.css"))
+	if(theCss != "") {
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
 	} //end if
-	var cssResponsiveToolkit string = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit-responsive.css"))
-	if(cssResponsiveToolkit != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(cssResponsiveToolkit)) + cssEndTag)
+	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/custom.css"))
+	if(theCss != "") {
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
 	} //end if
-	//--
+	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/notifications.css"))
+	if(theCss != "") {
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
+	} //end if
+	theCss = "" // clear
+	//-- # end: sync with app-go.css
 	var jsSmarSettings string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/settings.js"))
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(smart.EscapeUrl(jsSmarSettings)) + jsEndTag)
 	var jsSmartUtilsCore string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/core_utils.js"))

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
-// r.20220928.1644 :: STABLE
+// r.20221018.1832 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20220928.1644"
+	VERSION string = "r.20221018.1832"
 
 	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
 
@@ -130,8 +130,6 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 	const jsJQueryAlertable = "lib/js/jquery/jquery.alertable.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryAlertable) + jsEndTag)
 	//--
-	const jsES6Check = "lib/js/check-es-runtime.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsES6Check) + jsEndTag)
 	const jsSfSettings = "lib/js/framework/smart-framework-settings.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfSettings) + jsEndTag)
 	const jsSfPak = "lib/js/framework/smart-framework.pak.js"
