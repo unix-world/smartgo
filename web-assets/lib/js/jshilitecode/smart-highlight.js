@@ -1,3 +1,3 @@
-// JS-Script (US): smart-highlight.js @ 2022-10-18 14:27:27 +0000
+// JS-Script (US): smart-highlight.js @ 2022-10-19 22:06:01 +0000
 if(typeof SmartJS_Custom_Syntax_Highlight!="function"){var SmartJS_Custom_Syntax_Highlight=selector=>{const $=jQuery;setTimeout(()=>{$(String(selector)+" pre > code").each((i,el)=>{let $el=$(el);let theSyntax=$el.attr("data-syntax");let theTitle="";if(theSyntax!=undefined&&theSyntax!=""){theTitle=theSyntax;$el.attr("title","Syntax: "+String(theTitle)).addClass("syntax").addClass("language-"+theSyntax);$el.parent().addClass("syntax").addClass("line-numbers");try{Prism.highlightElement(el)}catch(err){console.error("SmartJS_Custom_Syntax_Highlight","ERR: Failed to instantiate for selector #"+i+" @ for syntax: "+String(theSyntax),err)}theTitle=null;theSyntax=null;$el=null}})},50)}}
 // #END

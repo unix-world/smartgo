@@ -1,3 +1,3 @@
-/* CSS-Stylesheet (CS): keyboard-previewkeyset.css @ 2022-10-18 14:27:24 +0000 */
+/* CSS-Stylesheet (CS): keyboard-previewkeyset.css @ 2022-10-19 22:06:02 +0000 */
 .ui-keyboard-keyset .ui-keyboard-button{position:relative}.ui-keyboard-keyset-normal .ui-keyboard-button::after{content:attr(data-shift);font-size:0.6em;color:#999;position:absolute;top:-1em;left:2px;z-index:167002}.ui-keyboard-keyset-shift .ui-keyboard-button::after{content:attr(data-normal);font-size:0.6em;color:#999;position:absolute;top:-1em;left:2px;z-index:167002}.ui-keyboard-keyset-alt .ui-keyboard-button::after{content:attr(data-alt-shift);font-size:0.6em;color:#999;position:absolute;top:-1em;left:2px;z-index:167002}.ui-keyboard-keyset-alt-shift .ui-keyboard-button::after{content:attr(data-alt);font-size:0.6em;color:#999;position:absolute;top:-1em;left:2px;z-index:167002}
 /* #END */
