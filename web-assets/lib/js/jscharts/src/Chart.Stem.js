@@ -1,3 +1,3 @@
-// JS-Script (US): Chart.Stem.js @ 2022-10-19 22:05:37 +0000
+// JS-Script (US): Chart.Stem.js @ 2022-11-22 11:35:50 +0000
 (function(){Chart.ErrorBar=Chart.Rectangle.extend({draw:function(){var ctx=this.ctx,halfWidth=this.width/2,leftX=this.x-halfWidth,rightX=this.x+halfWidth,top=this.base-(this.base-this.yUp),bottom=this.base-(this.base-this.yDown),middle=this.base-(this.base-this.y);ctx.strokeStyle=this.errorStrokeColor;ctx.lineWidth=this.errorStrokeWidth;if(this.errorDir!="down"){ctx.beginPath();ctx.moveTo(this.x,middle);ctx.lineTo(this.x,top);ctx.stroke();ctx.beginPath();ctx.moveTo(leftX,top);ctx.lineTo(rightX,top);ctx.stroke()}if(this.errorDir!="up"){ctx.beginPath();ctx.moveTo(this.x,middle);ctx.lineTo(this.x,bottom);ctx.stroke();ctx.beginPath();ctx.moveTo(leftX,bottom);ctx.lineTo(rightX,bottom);ctx.stroke()}}})}).call(this);
 // #END
