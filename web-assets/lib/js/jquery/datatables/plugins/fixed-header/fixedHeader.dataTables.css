@@ -1,3 +1,3 @@
-/* CSS-Stylesheet (CS): fixedHeader.dataTables.css @ 2022-11-22 11:35:37 +0000 */
+/* CSS-Stylesheet (CS): fixedHeader.dataTables.css @ 2023-01-21 15:28:17 +0000 */
 table.fixedHeader-floating{position:fixed!important;background-color:white}table.fixedHeader-floating.no-footer{border-bottom-width:0}table.fixedHeader-locked{position:absolute!important;background-color:white}@media print{table.fixedHeader-floating{display:none}}
 /* #END */

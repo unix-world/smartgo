@@ -1,3 +1,3 @@
-// JS-Script (US): de.js @ 2022-11-22 11:36:09 +0000
+// JS-Script (US): de.js @ 2023-01-21 15:28:30 +0000
 jQuery.keyboard.language.de={language:"Deutsch (German)",display:{a:"\u2714:\xdcbernehmen (Umschalt+Enter)",accept:"\xdcbernehmen:\xdcbernehmen (Umschalt+Enter)",alt:"AltGr:Alt Graph",b:"\u2190:R\xfccktaste",bksp:"R\xfcck:R\xfccktaste",c:"\u2716:Abbrechen (Esc)",cancel:"Abbrechen:Abbrechen (Esc)",clear:"C:L\xf6schen",combo:"\xf6:Tottasten umschalten",dec:",:Dezimal",e:"\u21b5:Eingabe",enter:"Enter:Eingabe",lock:"\u21e9:Feststelltaste",s:"\u21e7:Umschalttaste",shift:"Umschalt:Umschalttaste",sign:"\xb1:Vorzeichen wechseln",space:"&nbsp;:Leertaste",t:"\u21e5:Tabulatortaste",tab:"\u21e5 Tab:Tabulatortaste"},wheelMessage:"Mausrad benutzen, um weitere Tasten zu sehen"};
 // #END
