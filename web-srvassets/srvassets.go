@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
-// (c) 2020-2022 unix-world.org
-// r.20221018.1832 :: STABLE
+// (c) 2020-2023 unix-world.org
+// r.20230122.0126 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20221018.1832"
+	VERSION string = "r.20230122.0126"
 
 	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
 
@@ -143,7 +143,7 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--
-	return smart.RenderMainMarkersTpl(assets.HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:Dynamic -->" + "\n"
+	return smart.RenderMainHtmlMarkersTpl(assets.HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:Dynamic -->" + "\n"
 	//--
 } //END FUNCTION
 

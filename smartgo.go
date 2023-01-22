@@ -1,9 +1,9 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230121.2358 :: STABLE
+// r.20230122.0126 :: STABLE
 
-// REQUIRE: go 1.16 or later
+// REQUIRE: go 1.17 or later
 package smartgo
 
 import (
@@ -75,7 +75,7 @@ import (
 
 
 const (
-	VERSION string = "v.20230121.2358"
+	VERSION string = "v.20230122.0126"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -3940,37 +3940,6 @@ func MarkersTplEscapeSyntaxContent(tpl string, isMainHtml bool) string {
 } //END FUNCTION
 
 
-func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
-	//--
-	if(tpl == "") {
-		return ""
-	} //end if
-	//--
-	tpl = StrReplaceAll(tpl, "[###", "&lbrack;&num;&num;&num;")
-	tpl = StrReplaceAll(tpl, "###]", "&num;&num;&num;&rbrack;")
-	tpl = StrReplaceAll(tpl, "[%%%", "&lbrack;&percnt;&percnt;&percnt;")
-	tpl = StrReplaceAll(tpl, "%%%]", "&percnt;&percnt;&percnt;&rbrack;")
-	tpl = StrReplaceAll(tpl, "[@@@", "&lbrack;&commat;&commat;&commat;")
-	tpl = StrReplaceAll(tpl, "@@@]", "&commat;&commat;&commat;&rbrack;")
-	if(isMainHtml == false) { // for a main template these must remain to be able to post replace placeholders
-		tpl = StrReplaceAll(tpl, "[:::", "&lbrack;&colon;&colon;&colon;")
-		tpl = StrReplaceAll(tpl, ":::]", "&colon;&colon;&colon;&rbrack;")
-	} //end if
-	//--
-	tpl = StrReplaceAll(tpl, "［###", "&lbrack;&num;&num;&num;")
-	tpl = StrReplaceAll(tpl, "###］", "&num;&num;&num;&rbrack;")
-	tpl = StrReplaceAll(tpl, "［%%%", "&lbrack;&percnt;&percnt;&percnt;")
-	tpl = StrReplaceAll(tpl, "%%%］", "&percnt;&percnt;&percnt;&rbrack;")
-	tpl = StrReplaceAll(tpl, "［@@@", "&lbrack;&commat;&commat;&commat;")
-	tpl = StrReplaceAll(tpl, "@@@］", "&commat;&commat;&commat;&rbrack;")
-	tpl = StrReplaceAll(tpl, "［:::", "&lbrack;&colon;&colon;&colon;")
-	tpl = StrReplaceAll(tpl, ":::］", "&colon;&colon;&colon;&rbrack;")
-	//--
-	return tpl
-	//--
-} //END FUNCTION
-
-
 func MarkersTplPrepareNosyntaxContent(tpl string) string {
 	//--
 	if(tpl == "") {
@@ -4005,6 +3974,37 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 	tpl = StrReplaceAll(tpl, "@@@］", "@@@]")
 	tpl = StrReplaceAll(tpl, "［:::", "[:::")
 	tpl = StrReplaceAll(tpl, ":::］", ":::]")
+	//--
+	return tpl
+	//--
+} //END FUNCTION
+
+
+func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
+	//--
+	if(tpl == "") {
+		return ""
+	} //end if
+	//--
+	tpl = StrReplaceAll(tpl, "[###", "&lbrack;&num;&num;&num;")
+	tpl = StrReplaceAll(tpl, "###]", "&num;&num;&num;&rbrack;")
+	tpl = StrReplaceAll(tpl, "[%%%", "&lbrack;&percnt;&percnt;&percnt;")
+	tpl = StrReplaceAll(tpl, "%%%]", "&percnt;&percnt;&percnt;&rbrack;")
+	tpl = StrReplaceAll(tpl, "[@@@", "&lbrack;&commat;&commat;&commat;")
+	tpl = StrReplaceAll(tpl, "@@@]", "&commat;&commat;&commat;&rbrack;")
+	if(isMainHtml == false) { // for a main template these must remain to be able to post replace placeholders
+		tpl = StrReplaceAll(tpl, "[:::", "&lbrack;&colon;&colon;&colon;")
+		tpl = StrReplaceAll(tpl, ":::]", "&colon;&colon;&colon;&rbrack;")
+	} //end if
+	//--
+	tpl = StrReplaceAll(tpl, "［###", "&lbrack;&num;&num;&num;")
+	tpl = StrReplaceAll(tpl, "###］", "&num;&num;&num;&rbrack;")
+	tpl = StrReplaceAll(tpl, "［%%%", "&lbrack;&percnt;&percnt;&percnt;")
+	tpl = StrReplaceAll(tpl, "%%%］", "&percnt;&percnt;&percnt;&rbrack;")
+	tpl = StrReplaceAll(tpl, "［@@@", "&lbrack;&commat;&commat;&commat;")
+	tpl = StrReplaceAll(tpl, "@@@］", "&commat;&commat;&commat;&rbrack;")
+	tpl = StrReplaceAll(tpl, "［:::", "&lbrack;&colon;&colon;&colon;")
+	tpl = StrReplaceAll(tpl, ":::］", "&colon;&colon;&colon;&rbrack;")
 	//--
 	return tpl
 	//--
@@ -4484,7 +4484,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 } //END FUNCTION
 
 
-func RenderMainMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
+func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
 	//--
 	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
 	//--

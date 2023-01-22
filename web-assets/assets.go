@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230121.1738 :: STABLE
+// r.20230122.0126 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20230121.1738"
+	VERSION string = "r.20230122.0126"
 
-	LAST_MODIFIED_DATE_TIME string = "2023-01-21 14:38:00" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2023-01-21 17:38:00" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	DEBUG bool = false
 )
@@ -103,7 +103,7 @@ func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool) 
 							`<img alt="logo-framework" title="Smart.Framework.Go" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/framework/img/sf-logo.svg")) + `">` + "\n",
 	}
 	//--
-	return smart.RenderMainMarkersTpl(HTML_TPL_STATUS, arr, nil) + "\n" + "<!-- TPL:Static.Status -->" + "\n"
+	return smart.RenderMainHtmlMarkersTpl(HTML_TPL_STATUS, arr, nil) + "\n" + "<!-- TPL:Static.Status -->" + "\n"
 	//--
 } //END FUNCTION
 
@@ -179,7 +179,7 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--
-	return smart.RenderMainMarkersTpl(HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:static -->" + "\n"
+	return smart.RenderMainHtmlMarkersTpl(HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:static -->" + "\n"
 	//--
 } //END FUNCTION
 
