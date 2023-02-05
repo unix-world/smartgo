@@ -1,3 +1,0 @@
-// JS-Script (US): fr.js @ 2023-01-21 15:28:29 +0000
-jQuery.keyboard.language.fr={language:"Fran\xe7ais (French)",display:{a:"\u2714:Valider (Shift+Enter)",accept:"Valider:Valider (Shift+Enter)",alt:"AltGr:Charact\xe8re alternatif",b:"\u2190:Suppr arri\xe8re",bksp:"\u2190Suppr:Suppr arri\xe8re",c:"\u2716:Annuler",cancel:"Annuler:Annuler (\xc9chap)",clear:"C:Effacer",combo:"\xf6:Bacsuler les touches combo",dec:".:Decimal",e:"\u21b5:Entr\xe9e",enter:"Entr\xe9e:Entr\xe9e",lock:"\u21ea Verr Mag:Verouillage majuscule",s:"\u21e7:Majuscule",shift:"Maj:Majuscule",sign:"\xb1:Change de signe",space:"&nbsp;:Espace",t:"\u21e5:Tabulation",tab:"\u21e5 Tab:Tabulation"},wheelMessage:"Utiliser la molette de la souris pour voir les autres lettres"};
-// #END

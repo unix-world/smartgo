@@ -1,3 +1,0 @@
-// JS-Script (US): ro.js @ 2023-01-21 15:28:30 +0000
-jQuery.keyboard.language.ro={language:"Rom\xe2n\u0103 (Romanian)",display:{a:"\u2714:Accept (Shift+Enter)",accept:"Accept:Accept (Shift+Enter)",alt:"AltGr:Alternate Graphemes",b:"\u2190:Backspace",bksp:"Bksp:Backspace",c:"\u2716:Cancel (Esc)",cancel:"Cancel:Cancel (Esc)",clear:"C:Clear",combo:"\xf6:Toggle Combo Keys",dec:",:Decimal",e:"\u21b5:Enter",enter:"Enter:Enter",lock:"\u21ea Lock:Caps Lock",s:"\u21e7:Shift",shift:"Shift:Shift",sign:"\xb1:Schimba semnul",space:"&nbsp;:Spatiu",t:"\u21e5:Tab",tab:"\u21e5 Tab:Tab"},wheelMessage:"Foloseste rotita mouse-ului pentru a vedea si celelalte caractere"};
-// #END

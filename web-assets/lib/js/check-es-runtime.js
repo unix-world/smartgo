@@ -1,3 +1,3 @@
-// JS-Script (US): check-es-runtime.js @ 2023-01-21 15:28:10 +0000
+// JS-Script (US): check-es-runtime.js @ 2023-02-05 17:46:11 +0000
 (function(){"use strict";var checkJsRuntime=function(){try{var testPassFx=()=>{const ES6FxClass=Function("const testES6 = new class{constructor(){ let es6Test = true; const Es6Test = () => { return !! es6Test; }; this.Es6Test = Es6Test; }}; return testES6;");if(typeof ES6FxClass!="function"){return"Cannot define ES6 Function"}let ES6Class=ES6FxClass();if(typeof ES6FxClass!="function"){return"ES6 Function Class is not accesible"}return ES6Class.Es6Test()};return testPassFx()}catch(err){return String(err)}};window.checkJsRuntime=checkJsRuntime})();
 // #END
