@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230517.1024 :: STABLE
+// r.20230517.1348 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -37,6 +37,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 
+	"embed"
 	"path/filepath"
 	"net"
 	"net/url"
@@ -75,7 +76,7 @@ import (
 
 
 const (
-	VERSION string = "v.20230517.1024"
+	VERSION string = "v.20230517.1348"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -3359,6 +3360,62 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 	} //end if else
 	//--
 	return true, "", dirs, files
+	//--
+} //END FUNCTION
+
+
+// ex call (req. go ambed fs assets): SafePathEmbedDirScan(&assets, "assets/", true)
+func SafePathEmbedDirScan(efs *embed.FS, dirPath string, recursive bool) (isSuccess bool, err error, arrDirs []string, arrFiles []string) {
+	//--
+	if(dirPath == "") {
+		return false, nil, nil, nil
+	} //end if
+	dirPath = SafePathFixSeparator(dirPath)
+	dirPath = StrTrimRight(dirPath, "/")
+	dirPath = StrTrimWhitespaces(dirPath)
+	if(dirPath == "") {
+		return false, nil, nil, nil
+	} //end if
+	//--
+	entries, err := efs.ReadDir(dirPath)
+	if(err != nil) {
+		return false, err, nil, nil
+	} //end if
+	//--
+	for _, entry := range entries {
+	//	fp := path.Join(dirPath, entry.Name()) // works better on windows but is unsafe
+		fp := filepath.Join(dirPath, entry.Name())
+		if(entry.IsDir()) {
+			arrDirs = append(arrDirs, fp)
+			if(recursive) {
+				rIsSuccess, rErr, rArrDirs, rArrFiles := SafePathEmbedDirScan(efs, fp, recursive)
+				if(!rIsSuccess || rErr != nil) {
+					return false, rErr, nil, nil
+				} //end if
+				arrDirs  = append(arrDirs,  rArrDirs...)
+				arrFiles = append(arrFiles, rArrFiles...)
+				continue
+			} //end if
+		} else {
+			arrFiles = append(arrFiles, fp)
+		} //end if else
+	} //end for
+	//--
+	return true, nil, arrDirs, arrFiles
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SafePathFixSeparator(p string) string {
+	//--
+	if(p == "") {
+		return ""
+	} //end if
+	//--
+	return StrReplaceAll(p, "\\", "/")
 	//--
 } //END FUNCTION
 
