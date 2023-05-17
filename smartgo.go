@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230205.2014 :: STABLE
+// r.20230517.1024 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -75,7 +75,7 @@ import (
 
 
 const (
-	VERSION string = "v.20230205.2014"
+	VERSION string = "v.20230517.1024"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -2322,6 +2322,13 @@ func ParseStrAsInt64(s string) int64 {
 //-----
 
 
+func StrToLower(str string) string {
+	//--
+	return strings.ToLower(str)
+	//--
+} //END FUNCTION
+
+
 func StrToUpper(str string) string {
 	//--
 	return strings.ToUpper(str)
@@ -2329,9 +2336,27 @@ func StrToUpper(str string) string {
 } //END FUNCTION
 
 
-func StrToLower(str string) string {
+func StrUcFirst(s string) string {
+	//-- the previous approach was to take the first character from string, make it upper using strings and append the rest ; this appear a better approach
+	if(s == "") {
+		return ""
+	} //end if
 	//--
-	return strings.ToLower(str)
+	runes := []rune(s)
+	runes[0] = unicode.ToUpper(runes[0])
+	//--
+	return string(runes)
+	//--
+} //END FUNCTION
+
+
+func StrUcWords(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	return strings.Title(StrToLower(s))
 	//--
 } //END FUNCTION
 
@@ -4327,7 +4352,7 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 								tmp_marker_val = ParseStrAsFloat64StrFixedPrecision(tmp_marker_val)
 							} else if(escaping == "|idtxt") { // id_txt: Id-Txt
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "_", "-", -1) // replace all
-								tmp_marker_val = strings.Title(StrToLower(tmp_marker_val))
+								tmp_marker_val = StrUcWords(tmp_marker_val)
 							} else if(escaping == "|slug") { // Slug: a-zA-Z0-9_- / - / -- : -
 								tmp_marker_val = StrCreateSlug(tmp_marker_val)
 							} else if(escaping == "|htmid") { // HTML-ID: a-zA-Z0-9_-
@@ -4358,13 +4383,9 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 							} else if(escaping == "|upper") { // apply uppercase
 								tmp_marker_val = StrToUpper(tmp_marker_val)
 							} else if(escaping == "|ucfirst") { // apply uppercase first character
-								x1st := StrToUpper(StrMBSubstr(tmp_marker_val, 0, 1)) // get 1st char
-								xrest := StrToLower(StrMBSubstr(tmp_marker_val, 1, 0)) // get the rest of characters
-								tmp_marker_val = x1st + xrest
-								x1st = ""
-								xrest = ""
+								tmp_marker_val = StrUcFirst(tmp_marker_val)
 							} else if(escaping == "|ucwords") { // apply uppercase on each word
-								tmp_marker_val = strings.Title(StrToLower(tmp_marker_val))
+								tmp_marker_val = StrUcWords(tmp_marker_val)
 							} else if(escaping == "|trim") { // apply trim
 								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
 							} else if(escaping == "|url") { // escape URL
