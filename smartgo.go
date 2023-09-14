@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230517.1348 :: STABLE
+// r.20230914.1542 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -76,7 +76,7 @@ import (
 
 
 const (
-	VERSION string = "v.20230517.1348"
+	VERSION string = "v.20230914.1542"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -2636,10 +2636,10 @@ func JsonRawEncode(data interface{}) string { // HTML Not Safe (raw)
 } //END FUNCTION
 
 
-func JsonObjDecode(data string) map[string]interface{} { // can decode just a JSON Object as {"key1":..., "key2":...}
+func JsonObjDecode(data string) (map[string]interface{}, error) { // can decode just a JSON Object as {"key1":..., "key2":...}
 	//-- no need any panic handler
 	if(data == "") {
-		return nil
+		return nil, nil
 	} //end if
 	//--
 	var dat map[string]interface{}
@@ -2648,19 +2648,18 @@ func JsonObjDecode(data string) map[string]interface{} { // can decode just a JS
 	decoder.UseNumber()
 	err := decoder.Decode(&dat)
 	if(err != nil) {
-		log.Println("[NOTICE] JsonObjDecode Failed:", err)
-		return nil
+		return nil, err
 	} //end if
 	//--
-	return dat
+	return dat, nil
 	//--
 } //END FUNCTION
 
 
-func JsonArrDecode(data string) []interface{} { // can decode just a JSON Array as ["a", 2, "c", { "e": "f" }, ...]
+func JsonArrDecode(data string) ([]interface{}, error) { // can decode just a JSON Array as ["a", 2, "c", { "e": "f" }, ...]
 	//-- no need any panic handler
 	if(data == "") {
-		return nil
+		return nil, nil
 	} //end if
 	//--
 	var dat []interface{}
@@ -2669,19 +2668,18 @@ func JsonArrDecode(data string) []interface{} { // can decode just a JSON Array 
 	decoder.UseNumber()
 	err := decoder.Decode(&dat)
 	if(err != nil) {
-		log.Println("[NOTICE] JsonArrDecode Failed:", err)
-		return nil
+		return nil, err
 	} //end if
 	//--
-	return dat
+	return dat, nil
 	//--
 } //END FUNCTION
 
 
-func JsonStrDecode(data string) string {
+func JsonStrDecode(data string) (string, error) {
 	//-- no need any panic handler
 	if(data == "") {
-		return ""
+		return "", nil
 	} //end if
 	//--
 	var dat string
@@ -2690,11 +2688,10 @@ func JsonStrDecode(data string) string {
 	decoder.UseNumber()
 	err := decoder.Decode(&dat)
 	if(err != nil) {
-		log.Println("[NOTICE] JsonStrDecode Failed:", err)
-		return ""
+		return "", err
 	} //end if
 	//--
-	return dat
+	return dat, nil
 	//--
 } //END FUNCTION
 
@@ -4448,8 +4445,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 							} else if(escaping == "|url") { // escape URL
 								tmp_marker_val = EscapeUrl(tmp_marker_val)
 							} else if(escaping == "|json") { // format as Json Data ; expects pure JSON !!!
-								jsonObj := JsonObjDecode(tmp_marker_val)
-								if(jsonObj == nil) {
+								jsonObj, jsonErrObj := JsonObjDecode(tmp_marker_val)
+								if((jsonErrObj != nil) || (jsonObj == nil)) {
 									tmp_marker_val = "null"
 								} else {
 									tmp_marker_val = StrTrimWhitespaces(JsonEncode(jsonObj))
