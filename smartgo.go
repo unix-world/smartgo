@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230914.1542 :: STABLE
+// r.20230915.0918 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -76,7 +76,7 @@ import (
 
 
 const (
-	VERSION string = "v.20230914.1542"
+	VERSION string = "v.20230915.0918"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -235,6 +235,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		return 0, errors.New(theErr)
 	} //end if
 	//--
+	var theErrFmtMsg error = nil
 	var theFmtMsg string = ""
 	var theLogPfx string = ""
 	if(logFileFormat == "json") {
@@ -244,7 +245,11 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 			DateUtc : DateNowUtc(),
 			Message : theMsg, // not necessary to normalize spaces
 		}
-		theFmtMsg = JsonEncode(jsonLogStruct)
+		theFmtMsg, theErrFmtMsg = JsonEncode(jsonLogStruct, false, false)
+		if(theErrFmtMsg != nil) {
+			theFmtMsg = ""
+			fmt.Println(color.RedString("[ERROR] SmartGo Log JSON Encoding") + " : " + theErrFmtMsg.Error())
+		}
 	} else if(logFileFormat == "plain") {
 		theFmtMsg = StrNormalizeSpaces(theMsg)
 	} else {
@@ -2592,7 +2597,7 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 //-----
 
 
-func jsonEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
+func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, error) {
 	//-- no need any panic handler
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
@@ -2603,35 +2608,19 @@ func jsonEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
 	//--
 	err := encoder.Encode(data)
 	if(err != nil) {
-		log.Println("[NOTICE] JsonEncode Failed:", err)
-		return ""
+		return "", err
 	} //end if
 	//--
-	return StrTrimWhitespaces(buffer.String()) // must trim as will add a new line at the end ...
+	return StrTrimWhitespaces(buffer.String()), nil // must trim as will add a new line at the end ...
 	//--
 } //END FUNCTION
 
 
-func JsonEncodePretty(data interface{}) string { // HTML Safe, Pretty
+func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
 	//--
-	return jsonEncode(data, true, true)
+	str, _ := JsonEncode(data, prettyprint, htmlsafe)
 	//--
-} //END FUNCTION
-func JsonRawEncodePretty(data interface{}) string { // HTML Not Safe (raw), Pretty
-	//--
-	return jsonEncode(data, true, false)
-	//--
-} //END FUNCTION
-
-
-func JsonEncode(data interface{}) string { // HTML Safe
-	//--
-	return jsonEncode(data, false, true)
-	//--
-} //END FUNCTION
-func JsonRawEncode(data interface{}) string { // HTML Not Safe (raw)
-	//--
-	return jsonEncode(data, false, false)
+	return str
 	//--
 } //END FUNCTION
 
@@ -4449,7 +4438,7 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 								if((jsonErrObj != nil) || (jsonObj == nil)) {
 									tmp_marker_val = "null"
 								} else {
-									tmp_marker_val = StrTrimWhitespaces(JsonEncode(jsonObj))
+									tmp_marker_val = StrTrimWhitespaces(JsonNoErrChkEncode(jsonObj, false, true)) // json HTMLSafe
 									if(tmp_marker_val == "") {
 										tmp_marker_val = "null"
 									} //end if
