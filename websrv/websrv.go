@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230922.2252 :: STABLE
+// r.20230922.2322 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -18,11 +18,12 @@ import (
 
 	smart "github.com/unix-world/smartgo"
 	assets "github.com/unix-world/smartgo/web-assets"
+	srvassets "github.com/unix-world/smartgo/web-srvassets"
 	smarthttputils "github.com/unix-world/smartgo/web-httputils"
 )
 
 const (
-	VERSION string = "r.20230922.2252"
+	VERSION string = "r.20230922.2322"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -61,7 +62,7 @@ var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content stri
 		var headHtml string = ""
 		var serverSignature bytes.Buffer = wSrvSignature()
 		var bodyHtml string = "<h1>" + "Sample Home Page ..." + "</h1>" + "<h3>" + smart.StrNl2Br(smart.EscapeHtml(serverSignature.String())) + "</h3>"
-		content = assets.HtmlStandaloneTemplate(TheStrSignature, headHtml, bodyHtml)
+		content = srvassets.HtmlServerTemplate(TheStrSignature, headHtml, bodyHtml)
 		contentFnameOrRedirUrl = "index.html"
 		contentDisposition = ""
 		cacheExpiration = -1
@@ -190,6 +191,10 @@ func WebServerRun(storagePath string, serveSecure bool, certifPath string, httpA
 		theUrlPath = smart.StrTrimWhitespaces(theUrlPath)
 		if(theUrlPath == "") {
 			theUrlPath = "/"
+		}
+		if(smart.StrStartsWith(theUrlPath, "/lib/")) {
+			srvassets.WebAssetsHttpHandler(w, r, "", "cache:private") // use default mime disposition ; private cache mode
+			return
 		}
 		fx, okPath := UrlHandlersMap[theUrlPath]
 		if((okPath != true) || (fx == nil)) {

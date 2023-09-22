@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230922.2150 :: STABLE
+// r.20230922.2322 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,7 +19,7 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20230922.2150"
+	VERSION string = "r.20230922.2322"
 
 	LAST_MODIFIED_DATE_TIME string = "2023-09-05 09:04:00" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
@@ -119,14 +119,14 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 } //END FUNCTION
 
 
-func HtmlStandaloneFaviconTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // OK: can be used as standalone
+func HtmlStandaloneFaviconTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // OK: can be used as standalone with a static favicon as data
 	//--
 	return htmlStandaloneChooseTemplate(titleText, headHtml, bodyHtml, favicon)
 	//--
 } //END FUNCTION
 
 
-func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // OK: can be used as standalone
+func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string {
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	//--
@@ -144,6 +144,7 @@ func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml st
 		"HEAD-HTML": 	headHtml,
 		"BODY-HTML": 	bodyHtml,
 	}
+	//--
 	favicon = smart.StrTrimWhitespaces(favicon)
 	var theTpl string = HTML_TPL_DEF
 	if(favicon != "") {

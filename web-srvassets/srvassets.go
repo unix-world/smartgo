@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230922.2252 :: STABLE
+// r.20230922.2322 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20230922.2252"
+	VERSION string = "r.20230922.2322"
 
 	DEBUG bool = false
 )
@@ -79,8 +79,21 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposi
 
 //-----
 
-
 func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) string { // require: a HTTP or HTTPS service, serving assets as: /lib/*
+	//--
+	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, "")
+	//--
+} //END FUNCTION
+
+
+func HtmlServerFaviconTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // require: a HTTP or HTTPS service, serving assets as: /lib/* and a favicon
+	//--
+	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, favicon)
+	//--
+} //END FUNCTION
+
+
+func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string {
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	//--
@@ -97,6 +110,13 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"TITLE": 		titleText,
 		"HEAD-HTML": 	headHtml,
 		"BODY-HTML": 	bodyHtml,
+	}
+	//--
+	favicon = smart.StrTrimWhitespaces(favicon)
+	var theTpl string = assets.HTML_TPL_DEF
+	if(favicon != "") {
+		arr["FAVICON"] = favicon
+		theTpl = assets.HTML_TPL_FAVICON_DEF
 	}
 	//--
 	var headCssJs string = "<!-- Head: Css / Js -->"
@@ -141,7 +161,7 @@ func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) stri
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--
-	return smart.RenderMainHtmlMarkersTpl(assets.HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:Dynamic -->" + "\n"
+	return smart.RenderMainHtmlMarkersTpl(theTpl, arr, parr) + "\n" + "<!-- TPL:Dynamic -->" + "\n"
 	//--
 } //END FUNCTION
 
