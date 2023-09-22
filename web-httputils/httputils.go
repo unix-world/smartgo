@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
-// (c) 2020-2022 unix-world.org
-// r.20221018.1832 :: STABLE
+// (c) 2020-2023 unix-world.org
+// r.20230922.2117 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20221018.1832"
+	VERSION string = "r.20230922.2117"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -72,6 +72,9 @@ const (
 	//--
 	CACHE_CLEANUP_INTERVAL uint32 = 5 // 5 seconds
 	CACHE_EXPIRATION uint32 = 300 // 300 seconds = 5 mins
+	CACHE_CONTROL_NOCACHE = "no-cache"
+	CACHE_CONTROL_PRIVATE = "private"
+	CACHE_CONTROL_PUBLIC = "public"
 	//--
 	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-]+$`
 	//--
@@ -89,9 +92,11 @@ const (
 	HTTP_STATUS_401 string = "401 Unauthorized"
 	HTTP_STATUS_403 string = "403 Forbidden"
 	HTTP_STATUS_404 string = "404 Not Found"
+	HTTP_STATUS_410 string = "410 Gone"
 	HTTP_STATUS_429 string = "429 Too Many Requests"
 	//--
 	HTTP_STATUS_500 string = "500 Internal Server Error"
+	HTTP_STATUS_501 string = "501 Not Implemented"
 	HTTP_STATUS_502 string = "502 Bad Gateway"
 	HTTP_STATUS_503 string = "503 Service Unavailable"
 	HTTP_STATUS_504 string = "504 Gateway Timeout"
@@ -1369,8 +1374,8 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 		} //end if
 		expdate := now.Add(time.Duration(expiration) * time.Second)
 		//--
-		if(control != "public") {
-			control = "private"
+		if(control != CACHE_CONTROL_PUBLIC) {
+			control = CACHE_CONTROL_PRIVATE
 		} //end if
 		//--
 		dtObjUtc := smart.DateTimeStructUtc(modified)
@@ -1395,10 +1400,10 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 	//-- {{{SYNC-HTTP-NOCACHE-HEADERS}}} ; // default expects ; expiration=-1 ; modified="" ; control=""
 	expdate := now.AddDate(-1, 0, 0) // minus one year
 	//--
-	control = "no-cache"
+	control = CACHE_CONTROL_NOCACHE
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-	w.Header().Set(HTTP_HEADER_CACHE_CTRL, "no-cache, must-revalidate") // HTTP 1.1 no-cache, not use their stale copy
-	w.Header().Set(HTTP_HEADER_CACHE_PGMA, "no-cache") // HTTP 1.0 no-cache
+	w.Header().Set(HTTP_HEADER_CACHE_CTRL, control + ", must-revalidate") // HTTP 1.1 no-cache, not use their stale copy
+	w.Header().Set(HTTP_HEADER_CACHE_PGMA, control) // HTTP 1.0 no-cache
 	w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0 no-cache expires
 	w.Header().Set(HTTP_HEADER_CACHE_LMOD, now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC)
 	//--
@@ -1569,14 +1574,12 @@ func HttpStatus208(w http.ResponseWriter, r *http.Request, content string, conte
 func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirectUrl string, outputHtml bool) {
 	//--
 	var title string = ""
-	var displayAuthLogo bool = false
 	switch(code) {
 		case 301:
 			title = HTTP_STATUS_301
 			break
 		case 302:
 			title = HTTP_STATUS_302
-			displayAuthLogo = true
 			break
 		default:
 			log.Println("[ERROR] httpStatus3XX: Invalid Status Code:", code, "FallBack to HTTP Status 301")
@@ -1600,7 +1603,7 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 	//--
 	var content string = ""
 	if(outputHtml == true) { // html
-		content = assets.HtmlStatusPage(title, redirectUrl, displayAuthLogo)
+		content = assets.HtmlStatusPage(title, smart.EscapeHtml(redirectUrl), false)
 	} else { // text
 		content += title
 		if(redirectUrl != "") {
@@ -1609,7 +1612,7 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 		content += "\n"
 	} //end if else
 	//--
-	httpHeadersCacheControl(w, r, -1, "", "no-cache")
+	httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 	w.Header().Set(HTTP_HEADER_REDIRECT_LOCATION, redirectUrl)
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
@@ -1646,6 +1649,10 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 		case 400:
 			title = HTTP_STATUS_400
 			break
+		case 401:
+			title = HTTP_STATUS_401
+			displayAuthLogo = true
+			break
 		case 403:
 			title = HTTP_STATUS_403
 			displayAuthLogo = true
@@ -1653,12 +1660,18 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 		case 404:
 			title = HTTP_STATUS_404
 			break
+		case 410:
+			title = HTTP_STATUS_410
+			break
 		case 429:
 			title = HTTP_STATUS_429
 			displayAuthLogo = true
 			break
 		case 500:
 			title = HTTP_STATUS_500
+			break
+		case 501:
+			title = HTTP_STATUS_501
 			break
 		case 502:
 			title = HTTP_STATUS_502
@@ -1694,7 +1707,7 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 		content += "\n"
 	} //end if else
 	//--
-	httpHeadersCacheControl(w, r, -1, "", "no-cache")
+	httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
@@ -1714,6 +1727,11 @@ func HttpStatus400(w http.ResponseWriter, r *http.Request, messageText string, o
 	//--
 } //END FUNCTION
 
+func HttpStatus401(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 401, messageText, outputHtml)
+	//--
+} //END FUNCTION
 
 func HttpStatus403(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
@@ -1721,13 +1739,17 @@ func HttpStatus403(w http.ResponseWriter, r *http.Request, messageText string, o
 	//--
 } //END FUNCTION
 
-
 func HttpStatus404(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 404, messageText, outputHtml)
 	//--
 } //END FUNCTION
 
+func HttpStatus410(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 410, messageText, outputHtml)
+	//--
+} //END FUNCTION
 
 func HttpStatus429(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
@@ -1742,6 +1764,11 @@ func HttpStatus500(w http.ResponseWriter, r *http.Request, messageText string, o
 	//--
 } //END FUNCTION
 
+func HttpStatus501(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 501, messageText, outputHtml)
+	//--
+} //END FUNCTION
 
 func HttpStatus502(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
@@ -1749,13 +1776,11 @@ func HttpStatus502(w http.ResponseWriter, r *http.Request, messageText string, o
 	//--
 } //END FUNCTION
 
-
 func HttpStatus503(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 503, messageText, outputHtml)
 	//--
 } //END FUNCTION
-
 
 func HttpStatus504(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
@@ -1826,7 +1851,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		(!smart.StrRegexMatchString(`^[a-z0-9\.]+$`, authUsername)) || // {{{SYNC-SF:REGEX_VALID_USER_NAME}}}
 		//--
 		(smart.StrTrimWhitespaces(authPassword) == "") ||
-		((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 30)) || // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
+		((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 255)) || // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
 		//--
 		(len(user) != len(authUsername)) ||
 		(len(pass) != len(authPassword)) ||
@@ -1847,7 +1872,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		memAuthCache.Set(cachedObj, uint64(CACHE_EXPIRATION))
 		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED [" + authRealm + "] for IP: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-		httpHeadersCacheControl(w, r, -1, "", "no-cache")
+		httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 		w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
 		//--
 		if(outputHtml == true) {

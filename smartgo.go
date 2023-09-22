@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230915.0918 :: STABLE
+// r.20230922.2245 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -76,7 +76,7 @@ import (
 
 
 const (
-	VERSION string = "v.20230915.0918"
+	VERSION string = "v.20230922.2245"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 

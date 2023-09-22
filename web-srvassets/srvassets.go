@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230122.0126 :: STABLE
+// r.20230922.2252 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -11,17 +11,15 @@ import (
 	"net/http"
 
 	smart  			"github.com/unix-world/smartgo"
-	smarthttputils 	"github.com/unix-world/smartgo/web-httputils"
 	assets 			"github.com/unix-world/smartgo/web-assets"
+	smarthttputils 	"github.com/unix-world/smartgo/web-httputils"
 )
 
 
 //-----
 
 const(
-	VERSION string = "r.20230122.0126"
-
-	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
+	VERSION string = "r.20230922.2252"
 
 	DEBUG bool = false
 )
@@ -52,16 +50,16 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposi
 	//--
 	var cExp int = -1
 	var cMod string = ""
-	var cCtl string = "no-cache"
+	var cCtl string = smarthttputils.CACHE_CONTROL_NOCACHE
 	switch(cacheMode) {
 		case "cache:public": fallthrough
 		case "cache:private":
-			cExp = int(CACHED_EXP_TIME_SECONDS)
+			cExp = int(assets.CACHED_EXP_TIME_SECONDS)
 			cMod = assets.LAST_MODIFIED_DATE_TIME
 			if(cacheMode == "cache:public") {
-				cCtl = "public"
+				cCtl = smarthttputils.CACHE_CONTROL_PUBLIC
 			} else {
-				cCtl = "private"
+				cCtl = smarthttputils.CACHE_CONTROL_PRIVATE
 			} //end if else
 			break
 		case "cache:no": fallthrough

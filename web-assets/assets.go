@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230915.1104 :: STABLE
+// r.20230922.2150 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,11 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20230915.1104"
+	VERSION string = "r.20230922.2150"
 
 	LAST_MODIFIED_DATE_TIME string = "2023-09-05 09:04:00" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+
+	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
 
 	DEBUG bool = false
 )
@@ -110,8 +112,21 @@ func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool) 
 
 //-----
 
-
 func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) string { // OK: can be used as standalone
+	//--
+	return htmlStandaloneChooseTemplate(titleText, headHtml, bodyHtml, "")
+	//--
+} //END FUNCTION
+
+
+func HtmlStandaloneFaviconTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // OK: can be used as standalone
+	//--
+	return htmlStandaloneChooseTemplate(titleText, headHtml, bodyHtml, favicon)
+	//--
+} //END FUNCTION
+
+
+func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // OK: can be used as standalone
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	//--
@@ -129,11 +144,12 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 		"HEAD-HTML": 	headHtml,
 		"BODY-HTML": 	bodyHtml,
 	}
-	//--
-	const cssStartTag = `<link rel="stylesheet" type="text/css" href="data:text/css,`
-	const cssEndTag = `">`
-	const jsStartTag = `<script src="data:application/javascript,`
-	const jsEndTag = `"></script>`
+	favicon = smart.StrTrimWhitespaces(favicon)
+	var theTpl string = HTML_TPL_DEF
+	if(favicon != "") {
+		arr["FAVICON"] = favicon
+		theTpl = HTML_TPL_FAVICON_DEF
+	}
 	//--
 	var headCssJs string = "<!-- Head: Css / Js -->"
 	var assetsAll []string
@@ -142,34 +158,34 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 	var theCss string = "" // init
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/default.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
+		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
+		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit-responsive.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
+		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/custom.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
+		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/notifications.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(smart.EscapeUrl(theCss)) + cssEndTag)
+		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
 	} //end if
 	theCss = "" // clear
 	//-- # end: sync with app-go.css
 	var jsSmarSettings string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/settings.js"))
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(smart.EscapeUrl(jsSmarSettings)) + jsEndTag)
+	assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmarSettings)) + TAG_JS_END)
 	var jsSmartUtilsCore string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/core_utils.js"))
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCore)) + jsEndTag)
+	assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCore)) + TAG_JS_END)
 	var jsSmartUtilsDate string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/date_utils.js"))
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsDate)) + jsEndTag)
+	assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsDate)) + TAG_JS_END)
 	var jsSmartUtilsCrypt string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/crypt_utils.js"))
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCrypt)) + jsEndTag)
+	assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCrypt)) + TAG_JS_END)
 	//--
 	if(len(assetsAll) > 0) {
 		headCssJs = smart.Implode("\n", assetsAll)
@@ -179,7 +195,7 @@ func HtmlStandaloneTemplate(titleText string, headHtml string, bodyHtml string) 
 		"HEAD-CSS-JS": headCssJs,
 	}
 	//--
-	return smart.RenderMainHtmlMarkersTpl(HTML_TPL_DEF, arr, parr) + "\n" + "<!-- TPL:static -->" + "\n"
+	return smart.RenderMainHtmlMarkersTpl(theTpl, arr, parr) + "\n" + "<!-- TPL:static -->" + "\n"
 	//--
 } //END FUNCTION
 
@@ -193,6 +209,11 @@ const (
 	HTML_META_FAVICON   string = `<link rel="icon" href="data:,">`
 	HTML_META_VIEWPORT  string = `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
 	HTML_META_CHAREQUIV string = `<meta charset="` + smart.CHARSET + `"><meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">`
+
+	TAG_CSS_START = `<link rel="stylesheet" type="text/css" href="data:text/css,`
+	TAG_CSS_END = `">`
+	TAG_JS_START = `<script src="data:application/javascript,`
+	TAG_JS_END = `"></script>`
 
 	HTML_TPL_STATUS string = `<!DOCTYPE html>
 <!-- TPL.SmartGo.STATUS -->
@@ -229,6 +250,24 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <head>
 ` + HTML_META_CHAREQUIV + `
 ` + HTML_META_FAVICON + `
+<title>[###TITLE|html###]</title>
+` + HTML_META_VIEWPORT + `
+[:::HEAD-CSS-JS:::]
+[###HEAD-HTML###]
+</head>
+<body>
+[###BODY-HTML###]
+</body>
+</html>
+<!-- #end TPL -->
+`
+
+	HTML_TPL_FAVICON_DEF string = `<!DOCTYPE html>
+<!-- TPL.SmartGo.FAV.DEF -->
+<html>
+<head>
+` + HTML_META_CHAREQUIV + `
+` + `<link rel="icon" href="[###FAVICON|html###]">` + `
 <title>[###TITLE|html###]</title>
 ` + HTML_META_VIEWPORT + `
 [:::HEAD-CSS-JS:::]

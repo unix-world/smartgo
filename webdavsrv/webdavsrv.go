@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230122.0126 :: STABLE
+// r.20230922.2252 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -18,11 +18,11 @@ import (
 
 	smart "github.com/unix-world/smartgo"
 	assets "github.com/unix-world/smartgo/web-assets"
-	smarthttputils 	"github.com/unix-world/smartgo/web-httputils"
+	smarthttputils "github.com/unix-world/smartgo/web-httputils"
 )
 
 const (
-	VERSION string = "r.20230122.0126"
+	VERSION string = "r.20230922.2252"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -58,8 +58,8 @@ func WebdavServerRun(storagePath string, serveSecure bool, certifPath string, ht
 		log.Println("[ERROR] WebDAV Server: Empty Auth Password")
 		return false
 	} //end if
-	if((len(smart.StrTrimWhitespaces(authPass)) < 7) || (len(authPass) > 30)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
-		log.Println("[ERROR] WebDAV Server: Invalid Auth UserName Length: must be between 7 and 30 characters")
+	if((len(smart.StrTrimWhitespaces(authPass)) < 7) || (len(authPass) > 255)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
+		log.Println("[ERROR] WebDAV Server: Invalid Auth UserName Length: must be between 7 and 255 characters")
 		return false
 	} //end if
 
@@ -102,7 +102,7 @@ func WebdavServerRun(storagePath string, serveSecure bool, certifPath string, ht
 
 	//-- for web
 
-	var theStrSignature string = "GO WebDAV Server " + VERSION
+	var theStrSignature string = "SmartGO WebDAV Server " + VERSION
 
 	var serverSignature bytes.Buffer
 	serverSignature.WriteString(theStrSignature + "\n")
@@ -155,13 +155,13 @@ func WebdavServerRun(storagePath string, serveSecure bool, certifPath string, ht
 		var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 		var bodyHtml string = `<div class="status"><img alt="Status: Up and Running ..." title="Status: Up and Running ..." width="64" height="64" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(serverSignature.String()) + "</pre>" + "\n" + "</div>"
 		log.Printf("[OK] WebDAV Server :: DEFAULT [%s %s %s] %s [%s] %s\n", r.Method, r.URL, r.Proto, strconv.Itoa(202), r.Host, r.RemoteAddr)
-		smarthttputils.HttpStatus202(w, r, assets.HtmlStandaloneTemplate(theStrSignature, headHtml, bodyHtml), "index.html", "", -1, "", "no-cache", nil)
+		smarthttputils.HttpStatus202(w, r, assets.HtmlStandaloneTemplate(theStrSignature, headHtml, bodyHtml), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
 	})
 
 	// http version handler : 203
 	mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[OK] WebDAV Server :: VERSION [%s %s %s] %s [%s] %s\n", r.Method, r.URL, r.Proto, strconv.Itoa(203), r.Host, r.RemoteAddr)
-		smarthttputils.HttpStatus203(w, r, theStrSignature + "\n", "version.txt", "", -1, "", "no-cache", nil)
+		smarthttputils.HttpStatus203(w, r, theStrSignature + "\n", "version.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
 	})
 
 	// webdav handler : all webdav status codes ...
