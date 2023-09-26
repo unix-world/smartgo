@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230922.2252 :: STABLE
+// r.20230926.1746 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"bytes"
 
+	"context"
 	"net/http"
 	"golang.org/x/net/webdav"
 
@@ -22,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20230922.2252"
+	VERSION string = "r.20230926.1746"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -39,7 +40,14 @@ const (
 )
 
 
-func WebdavServerRun(storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string) bool {
+func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string) bool {
+
+	//-- settings
+
+	httpHeaderKeyRealIp = smart.StrToUpper(smart.StrTrimWhitespaces(httpHeaderKeyRealIp))
+	if(httpHeaderKeyRealIp != "") { // if no proxy, don't set
+		smart.SetSafeRealClientIpHeaderKey(httpHeaderKeyRealIp)
+	} //end if
 
 	//-- auth user / pass
 
@@ -136,10 +144,11 @@ func WebdavServerRun(storagePath string, serveSecure bool, certifPath string, ht
 		FileSystem: webdav.Dir(STORAGE_DIR),
 		LockSystem: webdav.NewMemLS(),
 		Logger: func(r *http.Request, err error) {
+			_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
 			if(err != nil) {
-				log.Printf("[WARNING] WebDAV Server :: WEBDAV.ERROR: %s [%s %s %s] %s [%s] %s\n", err, r.Method, r.URL, r.Proto, "*", r.Host, r.RemoteAddr)
+				log.Printf("[WARNING] WebDAV Server :: WEBDAV.ERROR: %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", err, "*", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 			} else {
-				log.Printf("[OK] WebDAV Server :: WEBDAV [%s %s %s] %s [%s] %s\n", r.Method, r.URL, r.Proto, "*", r.Host, r.RemoteAddr)
+				log.Printf("[OK] WebDAV Server :: WEBDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "*", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 			} //end if else
 		},
 	}
@@ -152,27 +161,45 @@ func WebdavServerRun(storagePath string, serveSecure bool, certifPath string, ht
 			smarthttputils.HttpStatus404(w, r, "WebDAV Resource Not Found: `" + r.URL.Path + "`", false)
 			return
 		} //end if
+		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
+		log.Printf("[OK] WebDAV Server :: DEFAULT :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 		var bodyHtml string = `<div class="status"><img alt="Status: Up and Running ..." title="Status: Up and Running ..." width="64" height="64" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(serverSignature.String()) + "</pre>" + "\n" + "</div>"
-		log.Printf("[OK] WebDAV Server :: DEFAULT [%s %s %s] %s [%s] %s\n", r.Method, r.URL, r.Proto, strconv.Itoa(202), r.Host, r.RemoteAddr)
 		smarthttputils.HttpStatus202(w, r, assets.HtmlStandaloneTemplate(theStrSignature, headHtml, bodyHtml), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
 	})
 
 	// http version handler : 203
 	mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[OK] WebDAV Server :: VERSION [%s %s %s] %s [%s] %s\n", r.Method, r.URL, r.Proto, strconv.Itoa(203), r.Host, r.RemoteAddr)
+		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
+		log.Printf("[OK] WebDAV Server :: VERSION :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		smarthttputils.HttpStatus203(w, r, theStrSignature + "\n", "version.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
 	})
 
 	// webdav handler : all webdav status codes ...
-	mux.HandleFunc(DAV_PATH + "/", func(w http.ResponseWriter, r *http.Request) {
+	davHandler := func(w http.ResponseWriter, r *http.Request) {
 		var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, false) // outputs: TEXT
 		if(authErr != "") {
 			log.Println("[WARNING] WebDAV Server / Storage Area :: Authentication Failed:", authErr)
 			return
 		} //end if
+
+		if(r.Method == http.MethodGet) {
+			var wdirPath string = smart.StrSubstr(r.URL.Path, len(DAV_PATH), 0)
+			if(smart.StrTrimWhitespaces(wdirPath) == "") {
+				wdirPath = "/"
+			} //end if
+			info, err := wdav.FileSystem.Stat(context.TODO(), wdirPath)
+			if(err == nil) {
+				if(info.IsDir()) {
+					r.Method = "PROPFIND" // this is a mapping for a directory from GET to PROPFIND ; TODO: it can be later supplied as a HTML Page listing all entries ; by mapping to PROPFIND will serve an XML
+				} //end if
+			} //end if
+		} //end if
+
 		wdav.ServeHTTP(w, r) // if all ok above (basic auth + credentials ok, serve ...)
-	})
+	}
+	mux.HandleFunc(DAV_PATH, davHandler) // serve without "/" suffix # this is a fix to work also with gvfs
+	mux.HandleFunc(DAV_PATH + "/", davHandler) // serve classic, with "/" suffix
 
 	// serve logic
 

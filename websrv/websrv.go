@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230922.2322 :: STABLE
+// r.20230926.1746 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,19 +23,21 @@ import (
 )
 
 const (
-	VERSION string = "r.20230922.2322"
+	VERSION string = "r.20230926.1746"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
 	SERVER_PORT uint16 = 13788
 
-	STORAGE_DIR  string = "./public"
+	WEBROOT_DIR  string = "./public"
 
 	CERTIFICATES_DEFAULT_PATH string = "./ssl"
 	CERTIFICATE_PEM_CRT string = "cert.crt"
 	CERTIFICATE_PEM_KEY string = "cert.key"
 
 	HTTP_AUTH_REALM string = "Smart.Web Server: Auth Area"
+
+	REAL_IP_HEADER_KEY = "" // if used behind a proxy, can be set as: X-REAL-IP, X-FORWARDED-FOR, HTTP-X-CLIENT-IP, ... or any other trusted proxy header ; if no proxy is used, set as an empty string
 )
 
 var TheStrSignature string = "SmartGO Web Server " + VERSION
@@ -68,7 +70,8 @@ var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content stri
 		cacheExpiration = -1
 		cacheLastModified = ""
 		cacheControl = smarthttputils.CACHE_CONTROL_NOCACHE
-		headers = nil
+		headers = make(map[string]string)
+		headers["Z-Sample-Header"] = "Home Page"
 		return
 	},
 	"/status": func(r *http.Request) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
@@ -101,7 +104,14 @@ var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content stri
 }
 
 
-func WebServerRun(storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string) bool {
+func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string) bool {
+
+	//-- settings
+
+	httpHeaderKeyRealIp = smart.StrToUpper(smart.StrTrimWhitespaces(httpHeaderKeyRealIp))
+	if(httpHeaderKeyRealIp != "") { // if no proxy, don't set
+		smart.SetSafeRealClientIpHeaderKey(httpHeaderKeyRealIp)
+	} //end if
 
 	//-- auth user / pass
 
@@ -147,14 +157,14 @@ func WebServerRun(storagePath string, serveSecure bool, certifPath string, httpA
 		certifPath = CERTIFICATES_DEFAULT_PATH
 	} //end if
 
-	storagePath = smart.StrTrimWhitespaces(storagePath)
-	if((storagePath == "") || (smart.PathIsBackwardUnsafe(storagePath) == true)) {
-		storagePath = STORAGE_DIR
+	webRootPath = smart.StrTrimWhitespaces(webRootPath)
+	if((webRootPath == "") || (smart.PathIsBackwardUnsafe(webRootPath) == true)) {
+		webRootPath = WEBROOT_DIR
 	} //end if
-	storagePath = smart.PathGetAbsoluteFromRelative(storagePath)
-	storagePath = smart.PathAddDirLastSlash(storagePath)
-	if((!smart.PathExists(storagePath)) || (!smart.PathIsDir(storagePath))) {
-		log.Println("[ERROR] Web Server: Storage Path does not Exists or Is Not a Valid Directory:", storagePath)
+	webRootPath = smart.PathGetAbsoluteFromRelative(webRootPath)
+	webRootPath = smart.PathAddDirLastSlash(webRootPath)
+	if((!smart.PathExists(webRootPath)) || (!smart.PathIsDir(webRootPath))) {
+		log.Println("[ERROR] Web Server: WebRoot Path does not Exists or Is Not a Valid Directory:", webRootPath)
 		return false
 	} //end if
 
@@ -176,7 +186,7 @@ func WebServerRun(storagePath string, serveSecure bool, certifPath string, httpA
 		log.Println("Starting Web Server: https://" + httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort) + " @ HTTPS/Mux/TLS # " + VERSION)
 		log.Println("[NOTICE] Web Server Certificates Path:", certifPath)
 	} //end if else
-	log.Println("[INFO] Web Server Storage Path:", storagePath)
+	log.Println("[INFO] Web Server WebRoot Path:", webRootPath)
 
 	//-- server
 
@@ -191,33 +201,34 @@ func WebServerRun(storagePath string, serveSecure bool, certifPath string, httpA
 		theUrlPath = smart.StrTrimWhitespaces(theUrlPath)
 		if(theUrlPath == "") {
 			theUrlPath = "/"
-		}
+		} //end if
 		if(smart.StrStartsWith(theUrlPath, "/lib/")) {
 			srvassets.WebAssetsHttpHandler(w, r, "", "cache:private") // use default mime disposition ; private cache mode
 			return
-		}
+		} //end if
 		fx, okPath := UrlHandlersMap[theUrlPath]
 		if((okPath != true) || (fx == nil)) {
 			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + smart.EscapeHtml(r.URL.Path) + "`", true)
 			return
-		}
+		} //end if
 		var useAuth bool = true
 		skipAuth, okAuth := UrlHandlersSkipAuth[theUrlPath]
 		if((okAuth == true) && (skipAuth == true)) {
 			useAuth = false
-		}
+		} //end if
 		if((isAuthActive == true) && (useAuth == true)) { // this check must be before executing fx below
 			var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, true) // outputs: HTML
 			if(authErr != "") {
 				log.Println("[WARNING] Web Server / Index Area :: Authentication Failed:", authErr)
 				return
 			} //end if
-		}
+		} //end if
 		timerStart := time.Now()
 		code, content, contentFnameOrRedirUrl, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers := fx(r)
 		timerDuration := time.Since(timerStart)
-		log.Printf("[OK] Web Server :: DEFAULT [%s %s %s] %s [%s] %s\n", r.Method, r.URL, r.Proto, strconv.Itoa(int(code)), r.Host, r.RemoteAddr)
-		log.Println("StatusCode:", code, "ExecutionTime:", timerDuration)
+		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
+		log.Printf("[OK] Web Server :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		log.Println("StatusCode:", code, "# Web Server Path: `" + theUrlPath + "`", "# ExecutionTime:", timerDuration)
 		switch(code) {
 			//-- ok status codes
 			case 200:
@@ -278,7 +289,7 @@ func WebServerRun(storagePath string, serveSecure bool, certifPath string, httpA
 			default: // fallback to 500
 				log.Println("[ERROR] Web Server / Invalid Application Level Status Code for the URL Path [" + theUrlPath + "]:", code)
 				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + strconv.Itoa(int(code)) + "` for the URL Path: `" + smart.EscapeHtml(r.URL.Path) + "`", true)
-		}
+		} //end switch
 	})
 
 	// serve logic

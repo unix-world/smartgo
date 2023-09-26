@@ -8,6 +8,6 @@ golang.org/x/crypto/blowfish
 # golang.org/x/text v0.3.5
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
-# golang.org/x/net @ 20230122
+# golang.org/x/net @ 20230921
 golang.org/x/net/webdav
 ####### # #######

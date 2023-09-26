@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230922.2117 :: STABLE
+// r.20230926.1746 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20230922.2117"
+	VERSION string = "r.20230926.1746"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -58,6 +58,8 @@ const (
 	HTTP_CLI_MIN_TIMEOUT uint32 =     5 // 5 seconds
 	HTTP_CLI_DEF_TIMEOUT uint32 =   720 // 12 minutes
 	HTTP_CLI_MAX_TIMEOUT uint32 = 86400 // 24 hours
+	//--
+	HTTP_CLI_TLS_TIMEOUT uint32 =    15 // 15 seconds (default is 10 seconds, as defined in the net library)
 	//--
 	HTTP_MAX_SIZE_SAFE_COOKIE uint16 = 4096 // max safe raw size is 4096, which includes also the variable name
 	HTTP_MAX_SIZE_SAFE_URL uint16 = 4096
@@ -571,6 +573,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	transport := &http.Transport{
 		TLSClientConfig: TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM),
+		TLSHandshakeTimeout: time.Duration(HTTP_CLI_TLS_TIMEOUT) * time.Second, // fix for TLS handshake error ; default is 10 seconds
 		DisableKeepAlives: true, // fix ; {{{SYNC-GO-ERR-HTTP-CLI-TOO-MANY-OPEN-FILES}}} : this is a fix for too many open files # this is requires as well as resp.Body.Close() which is handled below
 	}
 	//--
@@ -1808,19 +1811,46 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	//--
 	var err string = ""
 	//--
-	ip, port := smart.GetSafeIpAndPortFromRemoteAddr(r.RemoteAddr)
+	var rAddr string = r.RemoteAddr
+	ip, port := smart.GetSafeIpAndPortFromRequestRemoteAddr(r) // this is using r.RemoteAddr
 	if(ip == "") {
-		err = "ERROR: Invalid or Empty Client IP: `" + r.RemoteAddr + "`"
+		err = "ERROR: Empty or Invalid Client Remote Address: `" + rAddr + "`"
 		HttpStatus500(w, r, err, outputHtml)
 		return err
 	} //end if
+	//--
+	isOkClientRealIp, realClientIp, rawHdrRealIpVal, rawHdrRealIpKey := smart.GetSafeRealClientIpFromRequestHeaders(r) // this is using r.Header.Get() with value from
+	if(DEBUG == true) {
+		log.Println("[DEBUG] HttpBasicAuthCheck :: realClientIp: `" + realClientIp + "` ; rawHdrRealIpVal: `" + rawHdrRealIpVal + "` ; rawHdrRealIpKey: `" + rawHdrRealIpKey + "`")
+	} //end if
+	//--
 	if(allowedIPs != "") {
 		if((ip == "") || (!smart.StrContains(allowedIPs, "<" + ip + ">"))) {
-			err = "The access to this service is disabled. The IP: `" + ip + "` at port `" + port + "` is not allowed by current IP Address list ..."
+			err = "The access to this service is disabled. The IP: `" + ip + "` is not allowed by current IP Address list ..."
+		} //end if
+		if(isOkClientRealIp == true) {
+			if((realClientIp == "") || (!smart.StrContains(allowedIPs, "<" + realClientIp + ">"))) {
+				err = "The access to this service is disabled. The Client IP: `" + realClientIp + "` is not allowed by current IP Address list ..."
+			} //end if
+		} //end if
+		if(err != "") {
+			log.Println("[WARNING] HTTP(S) Server :: BASIC.AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 			HttpStatus403(w, r, err, outputHtml)
 			return err
 		} //end if
-		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` match the IP Addr Allowed List: `" + allowedIPs + "`")
+		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
+	} //end if
+	//--
+	var cacheKeyCliIpAddr string = ip
+	var isAuthMemKeyUsingProxyRealClientIp bool = false
+	if(isOkClientRealIp == true) {
+		if((smart.StrTrimWhitespaces(realClientIp) != "") && (realClientIp != smart.DEFAULT_FAKE_IP_CLIENT)) {
+			cacheKeyCliIpAddr = realClientIp // if behind a proxy and detected ok, use this
+			isAuthMemKeyUsingProxyRealClientIp = true
+		} //end if
+	} //end if
+	if(DEBUG == true) {
+		log.Println("[DEBUG] HttpBasicAuthCheck :: Auth MemCache Key: `" + cacheKeyCliIpAddr + "` ; Using Proxy Real Client IP:", isAuthMemKeyUsingProxyRealClientIp)
 	} //end if
 	//--
 	memAuthMutex.Lock()
@@ -1832,10 +1862,11 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	if(DEBUG_CACHE == true) {
 		log.Println("[DATA] HttpBasicAuthCheck [" + authRealm + "] :: memAuthCache:", memAuthCache)
 	} //end if
-	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(ip)
+	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(cacheKeyCliIpAddr)
 	if(cacheExists == true) {
-		if((cachedObj.Id == ip) && (len(cachedObj.Data) >= 10)) { // allow max 10 invalid attempts then lock for 5 mins ... for this IP
-			err = "Invalid Login Timeout for IP: `" + ip + "` at port `" + port + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(CACHE_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+		if((cachedObj.Id == cacheKeyCliIpAddr) && (len(cachedObj.Data) >= 10)) { // allow max 10 invalid attempts then lock for 5 mins ... for this cacheKeyCliIpAddr
+			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(CACHE_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+			w.Header().Set(HTTP_HEADER_RETRY_AFTER, time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " UTC")
 			HttpStatus429(w, r, err, outputHtml)
 			return err
 		} //end if
@@ -1864,13 +1895,13 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	if(err != "") {
 		//-- write to cache invalid login
 		if(cacheExists != true) {
-			cachedObj.Id = ip
+			cachedObj.Id = cacheKeyCliIpAddr
 			cachedObj.Data = "."
 		} else {
 			cachedObj.Data += "."
 		} //end if
 		memAuthCache.Set(cachedObj, uint64(CACHE_EXPIRATION))
-		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED [" + authRealm + "] for IP: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
+		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED [" + authRealm + "] for Client: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 		httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 		w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
@@ -1889,17 +1920,17 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			w.Write([]byte(HTTP_STATUS_401 + "\n"))
 		} //end if else
 		//--
-		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s [%s] for client %s\n", r.Method, r.URL, r.Proto, "401", r.Host, r.RemoteAddr)
+		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 		//--
 		return err
 		//--
 	} //end if
 	//--
 	if(cacheExists == true) {
-		memAuthCache.Unset(ip) // unset on 1st successful login
+		memAuthCache.Unset(cacheKeyCliIpAddr) // unset on 1st successful login
 	} //end if
 	//--
-	log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.SUCCESS [" + authRealm + "] :: UserName: `" + user + "` # From IPAddress: `" + ip + "` on Port: `" + port + "`")
+	log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.SUCCESS [" + authRealm + "] :: UserName: `" + user + "` # From RemoteAddress: `" + ip + "` on Port: `" + port + "`" + " # RealClientIP: `" + realClientIp + "` # Using Proxy Detected RealClientIP: [", isAuthMemKeyUsingProxyRealClientIp, "] # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 	//--
 	return ""
 	//--
