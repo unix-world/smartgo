@@ -1,5 +1,5 @@
 
-// GO Lang :: SmartGo/Uuid :: Smart.Go.Framework
+// GO Lang (1.11 or later) :: SmartGo/Uuid :: Smart.Go.Framework
 // (c) 2020-2022 unix-world.org
 // r.20220416.1958 :: STABLE
 

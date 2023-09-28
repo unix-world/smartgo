@@ -1,0 +1,4 @@
+v.20230928
+Go 1.17 or later
+
+golang.org/x/text v0.13.0

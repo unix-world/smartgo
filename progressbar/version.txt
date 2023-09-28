@@ -1,0 +1,11 @@
+v.20220420.1730
+
+Go 1.11 or later
+
+original version: @head # github.com/schollz/progressbar/v2
+
+# refactored by unixman as:
+github.com/unix-world/smartgo/progressbar
+
+# modified by unixman
+

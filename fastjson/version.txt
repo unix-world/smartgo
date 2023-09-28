@@ -1,1 +1,9 @@
-v.20221229
+v1.6.4 @ 20221229
+
+Go 1.12 or later
+
+github.com/valyala/fastjson
+
+# refactored by unixman as:
+github.com/unix-world/smartgo/fastjson
+

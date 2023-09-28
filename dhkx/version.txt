@@ -1,0 +1,11 @@
+@head.20200429
+
+Go 1.11 or later
+
+github.com/monnand/dhkx
+
+# refactored by unixman as:
+github.com/unix-world/smartgo/dhkx
+
+# modified by unixman
+

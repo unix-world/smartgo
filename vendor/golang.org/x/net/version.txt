@@ -1,0 +1,4 @@
+v.20230928
+Go 1.17 or later
+
+golang.org/x/net v0.15.0
