@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230926.1746 :: STABLE
+// r.20230927.1645 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20230926.1746"
+	VERSION string = "r.20230927.1645"
 
 	DEBUG bool = false
 )
@@ -43,7 +43,7 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposi
 	} //end if
 	//--
 	if(assetContent == "") {
-		log.Println("StatusCode: 404 # Failed to Serve Asset: `" + path + "`", "# Not Found")
+		log.Println("StatusCode: 404 # Failed to Serve Asset: `" + path + "`", "# Not Found", "::", smart.CurrentFunctionName())
 		smarthttputils.HttpStatus404(w, r, "Asset Not Found: `" + path + "`", true) // html
 		return
 	} //end if
@@ -68,9 +68,9 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposi
 	} //end switch
 	//--
 	if(DEBUG == true) {
-		log.Println("[DATA] Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; contentDisposition: `" + contentDisposition + "` ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
+		log.Println("[DATA] " + smart.CurrentFunctionName() + ": Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; contentDisposition: `" + contentDisposition + "` ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
 	} //end if
-	log.Println("[NOTICE] Serving Asset: `" + path + "` ;", len(assetContent), "bytes")
+	log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Serving Asset: `" + path + "` ;", len(assetContent), "bytes")
 	//--
 	smarthttputils.HttpStatus200(w, r, assetContent, path, contentDisposition, cExp, cMod, cCtl, nil)
 	//--

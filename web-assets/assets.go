@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230926.1746 :: STABLE
+// r.20230927.1645 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,7 +19,7 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20230926.1746"
+	VERSION string = "r.20230927.1645"
 
 	LAST_MODIFIED_DATE_TIME string = "2023-09-05 10:04:00" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
@@ -34,40 +34,40 @@ const(
 func ReadWebAsset(path string) string { // OK
 	//--
 	if(DEBUG == true) {
-		log.Println("[DEBUG] Trying to Read the Asset: `" + path + "` ...")
+		log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Trying to Read the Asset: `" + path + "` ...")
 	} //end if
 	//--
 	if(smart.PathIsBackwardUnsafe(path) == true) {
-		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # unsafe backward path")
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsafe backward path")
 		return ""
 	} //end if
 	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/"))
 	if(path == "") {
-		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # empty path")
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # empty path")
 		return ""
 	} //end if
 	if(!smart.StrStartsWith(path, "lib/")) {
-		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # path must start with `lib/`")
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # path must start with `lib/`")
 		return ""
 	} //end if
 	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/"))
 	if((path == "") || (path == ".") || (path == "..") || (path == "/")) {
-		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # unsupported path")
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsupported path")
 		return ""
 	} //end if
 	if(smart.PathIsAbsolute(path) == true) {
-		log.Println("[WARNING] Failed to Read Asset: `" + path + "` # not a relative path")
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # not a relative path")
 		return ""
 	} //end if
 	//--
 	content, err := assets.ReadFile(path)
 	if(err != nil) {
-		log.Println("[WARNING] Failed to Read Asset: `" + path + "` #", err) // mostly will cover 404
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` #", err) // mostly will cover 404
 		return ""
 	} //end if
 	//--
 	if(DEBUG == true) {
-		log.Println("[DATA] Reading Asset: `" + path + "` [DONE] :: ContentLength=", len(content), "bytes")
+		log.Println("[DATA] " + smart.CurrentFunctionName() + ": Reading Asset: `" + path + "` [DONE] :: ContentLength=", len(content), "bytes")
 	} //end if
 	//--
 	return string(content)
@@ -85,7 +85,7 @@ func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool) 
 	//--
 	if(titleText == "") {
 		titleText = "Untitled"
-		log.Println("[ERROR] Smart Assets: HtmlStatusPage requires a non-empty Title !")
+		log.Println("[ERROR] " + smart.CurrentFunctionName() + ": requires a non-empty Title !")
 	} //end if
 	if(messageText == "") {
 		messageText = "Unknown Error ..."

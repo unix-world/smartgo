@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230926.1746 :: STABLE
+// r.20230927.1645 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20230926.1746"
+	VERSION string = "r.20230927.1645"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -164,7 +164,7 @@ func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
 	//--
 	if(insecureSkipVerify == true) {
 		cfg.InsecureSkipVerify = true
-		log.Println("[NOTICE] TlsConfigClient: InsecureSkipVerify was set to TRUE")
+		log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": InsecureSkipVerify was set to TRUE")
 	} else {
 		cfg.InsecureSkipVerify = false
 	} //end if
@@ -175,9 +175,9 @@ func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
 		ok := roots.AppendCertsFromPEM([]byte(serverPEM))
 		if(ok) {
 			cfg.RootCAs = roots
-			log.Println("[NOTICE] TlsConfigClient: Appending a custom Server Certificate to the default x509 Root:", len(serverPEM), "bytes")
+			log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Appending a custom Server Certificate to the default x509 Root:", len(serverPEM), "bytes")
 		} else {
-			log.Println("[ERROR] TlsConfigClient: Failed to parse server certificate")
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Failed to parse server certificate")
 		} //end if
 	} //end if
 	//--
@@ -455,7 +455,7 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *byt
 					v.Write([]byte(val[z]))
 					validPostVarsOrFiles++
 					if(DEBUG == true) {
-						log.Println("[DEBUG] reqArrToHttpFormData :: Post Form Variable Add: `" + key + "`: `" + val[z] + "` #", z)
+						log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post Form Variable Add: `" + key + "`: `" + val[z] + "` #", z)
 					} //end if
 				} //end for
 			} else if(key == "@file") { // form file
@@ -508,7 +508,7 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *byt
 					} //end if
 					validPostVarsOrFiles++
 					if(DEBUG == true) {
-						log.Println("[DEBUG] reqArrToHttpFormData :: Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
+						log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
 					} //end if
 				} //end for
 			} else {
@@ -934,7 +934,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		)
 		obar.RenderBlank()
 		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(formData))
-		log.Println("[INFO] SmartHttpCli :: Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(formDataLen) + ")")
+		log.Println("[INFO] " + smart.CurrentFunctionName() + ": Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(formDataLen) + ")")
 	} else if(isPut == true) {
 		var ubar *pbar.ProgressBar
 		if(isFilePut == true) {
@@ -953,7 +953,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			defer file.Close()
 			putDataLen = stat.Size()
 			if(DEBUG == true) {
-				log.Println("[DEBUG] SmartHttpCli :: Put File: `" + putLocalFilePath + "` ; Size:", putDataLen, "bytes")
+				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Put File: `" + putLocalFilePath + "` ; Size:", putDataLen, "bytes")
 			} //end if
 			ubar = pbar.NewOptions64(
 				putDataLen,
@@ -964,12 +964,12 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			)
 			ubar.RenderBlank()
 			req, errReq = http.NewRequest(method, uri, ubar.NewProxyReader(file))
-			log.Println("[INFO] SmartHttpCli :: Upload File [" + httpResult.UploadFileName + "]: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(putDataLen) + ")")
+			log.Println("[INFO] " + smart.CurrentFunctionName() + ": Upload File [" + httpResult.UploadFileName + "]: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(putDataLen) + ")")
 		} else {
 			res := bytes.NewBuffer([]byte(reqArr["@put:data"][0]))
 			putDataLen = int64(len(reqArr["@put:data"][0]))
 			if(DEBUG == true) {
-				log.Println("[DEBUG] SmartHttpCli :: Put Data ; Size:", putDataLen, "bytes")
+				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Put Data ; Size:", putDataLen, "bytes")
 			} //end if
 			ubar = pbar.NewOptions64(
 				putDataLen,
@@ -980,7 +980,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			)
 			ubar.RenderBlank()
 			req, errReq = http.NewRequest(method, uri, ubar.NewProxyReader(res))
-			log.Println("[INFO] SmartHttpCli :: Upload Data: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(putDataLen) + ")")
+			log.Println("[INFO] " + smart.CurrentFunctionName() + ": Upload Data: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(putDataLen) + ")")
 		} //end if else
 	} else {
 		req, errReq = http.NewRequest(method, uri, nil)
@@ -1012,7 +1012,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 					Value: cV,
 				})
 				if(DEBUG == true) {
-					log.Println("[DEBUG] SmartHttpCli :: Set Cookie: `" + cK + "`: `" + cV + "`")
+					log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Set Cookie: `" + cK + "`: `" + cV + "`")
 				} //end if
 			} //end if
 		} //end for
@@ -1037,7 +1037,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 					for i:=0; i<len(v); i++ {
 						req.Header.Add(k, v[i])
 						if(DEBUG == true) {
-							log.Println("[DEBUG] SmartHttpCli :: Add Auth Header: `" + k + ": " + v[i] + "` #", i)
+							log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Add Auth Header: `" + k + ": " + v[i] + "` #", i)
 						} //end if
 					} //end for
 				} //end if
@@ -1048,7 +1048,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	if(isPost == true) {
 		req.Header.Set(HTTP_HEADER_CONTENT_TYPE, multipartType)
 		if(DEBUG == true) {
-			log.Println("[DEBUG] SmartHttpCli :: Set POST Data Header : `" + HTTP_HEADER_CONTENT_TYPE + ": " + multipartType + "`")
+			log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Set POST Data Header : `" + HTTP_HEADER_CONTENT_TYPE + ": " + multipartType + "`")
 		} //end if
 	} //end if
 	//--
@@ -1242,7 +1242,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			smart.SafePathFileDelete(theDwnLockFile, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
 		}()
 		//--
-		log.Println("[INFO] SmartHttpCli [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
 		//--
@@ -1259,7 +1259,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		//--
 	} else { // download in memory
 		//--
-		log.Println("[INFO] SmartHttpCli [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
 		limitedReader := &io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(bodyData, dbar), limitedReader)
@@ -1347,7 +1347,7 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, descript
 	//--
 	if(forceHttpV1 == true) {
 		srv.TLSNextProto = TLSProtoHttpV1Server() // disable HTTP/2 on TLS (on non-TLS is always HTTP/1.1)
-		log.Println("[NOTICE] Smart.HttpMuxServer: HTTP/1.1", description)
+		log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": HTTP/1.1", description)
 	} //end if
 	//--
 	return mux, srv
@@ -1385,11 +1385,11 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 		if(dtObjUtc.Status == "OK") {
 			modified = dtObjUtc.Years + "-" + dtObjUtc.Months + "-" + dtObjUtc.Days + " " + dtObjUtc.Hours + ":" + dtObjUtc.Minutes + ":" + dtObjUtc.Seconds // YYYY-MM-DD HH:II:SS
 		} else {
-			log.Println("[ERROR] HttpHeadersCacheControl: Invalid Modified Date:", modified)
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Invalid Modified Date:", modified)
 			modified = now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) // YYYY-MM-DD HH:II:SS
 		} //end if
 		if(DEBUG == true) {
-			log.Println("[DEBUG] HttpHeadersCacheControl: Modified Date:", modified)
+			log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Modified Date:", modified)
 		} //end if
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 		w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0
@@ -1435,7 +1435,7 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 		case 208:
 			break
 		default:
-			log.Println("[ERROR] httpStatusOKX: Invalid Status Code:", code)
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Invalid Status Code:", code)
 			code = 200
 	} //end switch
 	//--
@@ -1475,7 +1475,7 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 			w.Header().Set(HTTP_HEADER_ETAG_SUM, eTag)
 			var match string = smart.StrTrimWhitespaces(r.Header.Get(HTTP_HEADER_ETAG_IFNM))
 			if(DEBUG == true) {
-				log.Println("[DEBUG] If None Match (Header):", match)
+				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": If None Match (Header):", match)
 			} //end if
 			if(match != "") {
 				if(match == eTag) {
@@ -1520,10 +1520,10 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 			//-- the rest
 			default:
 				if(key == "") {
-					log.Println("[ERROR] httpStatusOKX: Empty Key ; Value:", val)
+					log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Empty Key / Value:", val)
 				} else {
 					if(DEBUG == true) {
-						log.Println("[DEBUG] httpStatusOKX: Set Header Value:", key, val)
+						log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Set Header Key / Value:", key, "=", val)
 					} //end if
 					w.Header().Set(key, val)
 				} //end if
@@ -1585,7 +1585,7 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 			title = HTTP_STATUS_302
 			break
 		default:
-			log.Println("[ERROR] httpStatus3XX: Invalid Status Code:", code, "FallBack to HTTP Status 301")
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Invalid Status Code:", code, "FallBack to HTTP Status 301")
 			title = HTTP_STATUS_301
 			code = 301
 	} //end switch
@@ -1599,7 +1599,7 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 	//--
 	redirectUrl = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(redirectUrl))
 	if(redirectUrl == "") {
-		log.Println("[ERROR]: httpStatus3XX: Empty Redirect URL:", code, "FallBack to HTTP Status 500")
+		log.Println("[ERROR]: " + smart.CurrentFunctionName() + ": Empty Redirect URL:", code, "FallBack to HTTP Status 500")
 		HttpStatus500(w, r, "Invalid Redirect URL for Status: " + title, outputHtml)
 		return
 	} //end if
@@ -1686,7 +1686,7 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			title = HTTP_STATUS_504
 			break
 		default:
-			log.Println("[ERROR] httpStatusERR: Invalid Status Code:", code, "FallBack to HTTP Status 500")
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Invalid Status Code:", code, "FallBack to HTTP Status 500")
 			title = HTTP_STATUS_500
 			code = 500
 	} //end switch
@@ -1805,7 +1805,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	allowedIPs = smart.StrTrimWhitespaces(allowedIPs)
 	//--
 	if((authRealm == "") || (len(authRealm) < 7) || (len(authRealm) > 50) || (!smart.StrRegexMatchString(`^[ _a-zA-Z0-9\-\.@\/\:]+$`, authRealm))) {
-		log.Println("[WARNING] HTTP(S) Server :: BASIC.AUTH.FIX :: Invalid Realm `" + authRealm + "` ; The Realm was set to default: `" + DEFAULT_REALM + "`")
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FIX :: Invalid Realm `" + authRealm + "` ; The Realm was set to default: `" + DEFAULT_REALM + "`")
 		authRealm = DEFAULT_REALM
 	} //end if
 	//--
@@ -1821,7 +1821,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	//--
 	isOkClientRealIp, realClientIp, rawHdrRealIpVal, rawHdrRealIpKey := smart.GetSafeRealClientIpFromRequestHeaders(r) // this is using r.Header.Get() with value from
 	if(DEBUG == true) {
-		log.Println("[DEBUG] HttpBasicAuthCheck :: realClientIp: `" + realClientIp + "` ; rawHdrRealIpVal: `" + rawHdrRealIpVal + "` ; rawHdrRealIpKey: `" + rawHdrRealIpKey + "`")
+		log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": realClientIp: `" + realClientIp + "` ; rawHdrRealIpVal: `" + rawHdrRealIpVal + "` ; rawHdrRealIpKey: `" + rawHdrRealIpKey + "`")
 	} //end if
 	//--
 	if(allowedIPs != "") {
@@ -1834,11 +1834,11 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			} //end if
 		} //end if
 		if(err != "") {
-			log.Println("[WARNING] HTTP(S) Server :: BASIC.AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
+			log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 			HttpStatus403(w, r, err, outputHtml)
 			return err
 		} //end if
-		log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
+		log.Println("[OK] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
 	//--
 	var cacheKeyCliIpAddr string = ip
@@ -1850,7 +1850,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		} //end if
 	} //end if
 	if(DEBUG == true) {
-		log.Println("[DEBUG] HttpBasicAuthCheck :: Auth MemCache Key: `" + cacheKeyCliIpAddr + "` ; Using Proxy Real Client IP:", isAuthMemKeyUsingProxyRealClientIp)
+		log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": :: Auth MemCache Key: `" + cacheKeyCliIpAddr + "` ; Using Proxy Real Client IP:", isAuthMemKeyUsingProxyRealClientIp)
 	} //end if
 	//--
 	memAuthMutex.Lock()
@@ -1860,7 +1860,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	memAuthMutex.Unlock()
 	//--
 	if(DEBUG_CACHE == true) {
-		log.Println("[DATA] HttpBasicAuthCheck [" + authRealm + "] :: memAuthCache:", memAuthCache)
+		log.Println("[DATA] " + smart.CurrentFunctionName() + ": [" + authRealm + "] :: memAuthCache:", memAuthCache)
 	} //end if
 	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(cacheKeyCliIpAddr)
 	if(cacheExists == true) {
@@ -1901,7 +1901,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			cachedObj.Data += "."
 		} //end if
 		memAuthCache.Set(cachedObj, uint64(CACHE_EXPIRATION))
-		log.Println("[NOTICE] HttpBasicAuthCheck: Set-In-Cache: AUTH.FAILED [" + authRealm + "] for Client: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
+		log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Set-In-Cache: AUTH.FAILED [" + authRealm + "] for Client: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 		httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 		w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
@@ -1920,7 +1920,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			w.Write([]byte(HTTP_STATUS_401 + "\n"))
 		} //end if else
 		//--
-		log.Printf("[WARNING] HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
+		log.Printf("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 		//--
 		return err
 		//--
@@ -1930,7 +1930,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		memAuthCache.Unset(cacheKeyCliIpAddr) // unset on 1st successful login
 	} //end if
 	//--
-	log.Println("[OK] HTTP(S) Server :: BASIC.AUTH.SUCCESS [" + authRealm + "] :: UserName: `" + user + "` # From RemoteAddress: `" + ip + "` on Port: `" + port + "`" + " # RealClientIP: `" + realClientIp + "` # Using Proxy Detected RealClientIP: [", isAuthMemKeyUsingProxyRealClientIp, "] # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
+	log.Println("[OK] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.SUCCESS [" + authRealm + "] :: UserName: `" + user + "` # From RemoteAddress: `" + ip + "` on Port: `" + port + "`" + " # RealClientIP: `" + realClientIp + "` # Using Proxy Detected RealClientIP: [", isAuthMemKeyUsingProxyRealClientIp, "] # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 	//--
 	return ""
 	//--
@@ -2180,7 +2180,7 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 				} //end if
 			} //end if
 			if(DEBUG == true) {
-				log.Println("[DEBUG] FallBack on MimeType:", mimeType)
+				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Fallback on MimeType:", mimeType)
 			} //end if
 		//--------------
 	} //end switch

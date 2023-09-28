@@ -1,12 +1,13 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230926.1746 :: STABLE
+// r.20230928.0157 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
 
 import (
+	"runtime"
 	"runtime/debug"
 	"os"
 	"os/exec"
@@ -15,14 +16,10 @@ import (
 	"context"
 	"errors"
 
-	"io"
-	"io/ioutil"
-
-	"time"
-
 	"log"
 	"fmt"
 
+	"time"
 	"math"
 	"math/rand"
 	"bytes"
@@ -37,6 +34,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 
+	"io"
 	"embed"
 	"path/filepath"
 	"net"
@@ -76,7 +74,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20230926.1746"
+	VERSION string = "v.20230928.0157"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -105,6 +103,7 @@ const (
 	REGEX_SMART_SAFE_FILE_NAME string 		= `^[_a-zA-Z0-9\-\.@#]+$` 			// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM FILE AND DIR NAMES ...
 	REGEX_SMART_SAFE_NET_HOSTNAME  string 	= `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
 	REGEX_SMART_SAFE_HTTP_HEADER_KEY string = `^[A-Z0-9\-]+$` 					// SAFETY: SUPPORT ONLY THESE CHARACTERS IN HEADER KEY VALUES
+	REGEX_SMART_SAFE_NUMBER_FLOAT string    = `^[0-9\-\.]+$` 					// SAFETY: SUPPORT ONLY THESE CHARACTERS IN SAFE FLOAT (ex: JSON)
 
 	CMD_EXEC_ERR_SIGNATURE string = "[SmartGo:cmdExec:Exit:ERROR]" 				// INTERNAL FLAG FOR CMD EXIT ERROR
 
@@ -119,6 +118,8 @@ const (
 
 	SIGNATURE_3FISH_V1_DEFAULT  string = "3f1kD.v1!" 							// current, v1 (default)  ; encrypt + decrypt
 	SIGNATURE_3FISH_V1_ARGON2ID string = "3f1kA.v1!" 							// current, v1 (argon2id) ; encrypt + decrypt
+
+	SIGNATURE_PASSWORD_SMART = "sfpass.v2!" 									// curent, v2, smart framework password
 
 	FIXED_CRYPTO_SALT string = "Smart Framework # スマート フレームワーク" 			// fixed salt data for various crypto contexts
 
@@ -410,12 +411,35 @@ func ClearPrintTerminal() {
 
 //-----
 
+
+func CurrentFunctionName() string {
+	//--
+	counter, _, _, success := runtime.Caller(1)
+	//--
+    if(!success) {
+		return "[Unknown]"
+	} //end if
+	//--
+	var name string = runtime.FuncForPC(counter).Name() // ex: github.com/unix-world/smartgo.CurrentFunctionName
+	//--
+	if(DEBUG != true) { // if no debug get just the short method name instead of full method name
+		arr := Explode(".", name)
+		name = arr[len(arr)-1]
+	} //end if
+	//--
+	return name
+	//--
+} //END FUNCTION
+
+
+//-----
+
 // call as: defer PanicHandler()
 func PanicHandler() {
 	if panicInfo := recover(); panicInfo != nil {
-		log.Println("[ERROR] !!! PANIC Recovered:", panicInfo)
+		log.Println("[ERROR] !!! PANIC Recovered:", panicInfo, "by", CurrentFunctionName())
 		if(DEBUG == true) {
-			log.Println("[DEBUG] !!! PANIC Trace Stack:", string(debug.Stack()))
+			log.Println("[DEBUG] !!! PANIC Trace Stack:", string(debug.Stack()), "from", CurrentFunctionName())
 		} //end if
 	} //end if
 } //END FUNCTION
@@ -688,13 +712,13 @@ func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DER
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
 	if(plainTextKey != key) {
-		log.Println("[WARNING] safePassComposedKey:", "Key is invalid, must not contain trailing spaces !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is invalid, must not contain trailing spaces !")
 		return ""
 	} //end if
 	//--
 	var klen int = len(key)
 	if(klen < 7) { // {{{SYNC-CRYPTO-KEY-MIN}}} ; minimum acceptable secure key is 7 characters long
-		log.Println("[WARNING] safePassComposedKey:", "Key Size is lower than 7 bytes (", klen, ") which is not safe against brute force attacks !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key Size is lower than 7 bytes (", klen, ") which is not safe against brute force attacks !")
 		return ""
 	} else if(klen > 4096) { // {{{SYNC-CRYPTO-KEY-MAX}}} ; max key size is enforced to allow ZERO theoretical colissions on any of: md5, sha1, sha256 or sha512
 		//-- as a precaution, use the lowest supported value which is 4096 (as the md5 supports) ; under this value all the hashes are safe against colissions (in theory)
@@ -703,7 +727,7 @@ func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DER
 		// SHA-256 produces 256 bits which is 32 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 32*256 =  8192 bytes
 		// SHA-512 produces 512 bits which is 64 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 64*256 = 16384 bytes
 		//-- anyway, as a more precaution, combine all hashes thus a key should produce a colission at the same time in all: md5, sha1, sha256 and sha512 ... which in theory, event with bad implementations of the hashing functions this is excluded !
-		log.Println("[WARNING] safePassComposedKey:", "Key Size is higher than 4096 bytes (", klen, ") which is not safe against collisions !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key Size is higher than 4096 bytes (", klen, ") which is not safe against collisions !")
 		return ""
 	} //end if else
 	//--
@@ -725,17 +749,63 @@ func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DER
 //-----
 
 
-func SafePassHashArgon2id824(plainTextKey string) string {
+func SafePassHashSmart(plainPass string, customSalt string) string {
 	//--
-	var composedKey string = safePassComposedKey(plainTextKey)
+	if((len(plainPass) > 2048) || (len(customSalt) > 2048)) { // {{{SYNC-CRYPTO-KEY-MAX}}}
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password or Salt is too long !")
+		return ""
+	} //end if
+	//-- // SIGNATURE_PASSWORD_SMART
+	var composedKey string = safePassComposedKey(plainPass) // no need for right padding min 7, in smartgo
 	var len_composedKey int = len(composedKey)
-	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
+	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey)) // no need for right padding min 7, in smartgo
 	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
-		log.Println("[WARNING] SafePassHashArgon2id824:", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		return ""
+	} //end if
+	//--
+	var salt string = Sha512(customSalt + " " + FIXED_CRYPTO_SALT)
+	var pass string = Sha512B64(Sha256(salt) + " " + composedKey + " " + salt)
+	var minpasslen float64 = math.Ceil(128 / 2 * 1.33)
+	if(len(pass) < int(minpasslen)) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password hash must be at least:", minpasslen, "bytes !")
+		return ""
+	} //end if
+	const hashlen int = 128
+	var padlen int = hashlen - len(SIGNATURE_PASSWORD_SMART)
+	pass = SIGNATURE_PASSWORD_SMART + StrPad2LenRight(pass, "*", padlen) // {{{SYNC-AUTHADM-PASS-PADD}}}
+	if(len(pass) != hashlen) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password hash must be:", hashlen, "bytes !")
+		return ""
+	} //end if
+	//--
+	return pass
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SafePassHashArgon2id824(plainPass string, customSalt string) string {
+	//--
+	if((len(plainPass) > 2048) || (len(customSalt) > 2048)) { // {{{SYNC-CRYPTO-KEY-MAX}}}
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password or Salt is too long !")
+		return ""
+	} //end if
+	//--
+	var composedKey string = safePassComposedKey(plainPass)
+	var len_composedKey int = len(composedKey)
+	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey)) // no need for right padding min 7, in smartgo
+	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
 		return ""
 	} //end if
 	//--
 	var salt string = FIXED_CRYPTO_SALT + NULL_BYTE // use a fixed salt with a safe composed derived key to be safe against colissions ; if the salt is random there is no more safety against colissions ...
+	if(customSalt != "") {
+		salt = customSalt + " " + salt // prepend
+	} //end if
 	salt = Bin2Hex(salt)
 	salt = base32.Encode([]byte(salt))
 	salt = base36.Encode([]byte(salt))
@@ -743,12 +813,20 @@ func SafePassHashArgon2id824(plainTextKey string) string {
 	salt = base62.Encode([]byte(salt))
 	salt = Base64sEncode(salt)
 	salt = base85.Encode([]byte(salt))
-	salt = StrSubstr(RightPad2Len(Md5B64(salt), "#", 28), 0, 28)
+	salt = StrSubstr(StrPad2LenRight(Md5B64(salt), "#", 28), 0, 28)
 	//fmt.Println("Argon2id Salt:", salt)
 	//--
-	key := argon2.IDKey([]byte(composedKey), []byte(salt), 21, 512*1024, 1, 103) // Argon2id resources: 21 cycles, 512MB memory, 1 thread, 103 bytes = 824 bits ; return as base92 encoded with a fixed length of 128 bytes (1024 bits) by padding b92 encoded data on the right with ' character
+	var key []byte = argon2.IDKey([]byte(composedKey), []byte(salt), 21, 512*1024, 1, 103) // Argon2id resources: 21 cycles, 512MB memory, 1 thread, 103 bytes = 824 bits ; return as base92 encoded with a fixed length of 128 bytes (1024 bits) by padding b92 encoded data on the right with ' character
 	//--
-	return StrSubstr(RightPad2Len(base92.Encode(key), "'", 128), 0, 128) // add right padding with '
+	const hashlen int = 128
+	var pass string = StrPad2LenRight(base92.Encode(key), "'", hashlen) // add right padding with '
+
+	if(len(pass) != hashlen) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password hash must be:", hashlen, "bytes !")
+		return ""
+	} //end if
+	//--
+	return pass
 	//--
 } //END FUNCTION
 
@@ -761,17 +839,17 @@ func cryptoPacketCheckAndDecode(str string, fx string, ver uint8) string {
 	defer PanicHandler() // req. by b64 decrypt panic handler with malformed data
 	//--
 	if((ver != 2) && (ver != 1)) {
-		log.Println("[NOTICE]", fx, "Invalid Version:", ver)
+		log.Println("[NOTICE]", fx, "Invalid Version:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	//--
 	if(str == "") {
-		log.Println("[NOTICE]", fx, "Empty Data Packet, v:", ver)
+		log.Println("[NOTICE]", fx, "Empty Data Packet, v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
-		log.Println("[NOTICE]", fx, "Invalid Data Packet, v:", ver)
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	//--
@@ -782,12 +860,12 @@ func cryptoPacketCheckAndDecode(str string, fx string, ver uint8) string {
 		separator = SEPARATOR_CHECKSUM_V2
 	} //end if else
 	if(separator == "") {
-		log.Println("[NOTICE]", fx, "Empty Data Packet Checksum Separator, v:", ver)
+		log.Println("[NOTICE]", fx, "Empty Data Packet Checksum Separator, v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	//--
 	if(!StrContains(str, separator)) {
-		log.Println("[NOTICE]", fx, "Invalid Data Packet, no Checksum v:", ver)
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, no Checksum v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	//--
@@ -795,28 +873,28 @@ func cryptoPacketCheckAndDecode(str string, fx string, ver uint8) string {
 	str = ""
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		log.Println("[NOTICE]", fx, "Invalid Data Packet, Checksum not found v:", ver)
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, Checksum not found v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		log.Println("[NOTICE]", fx, "Invalid Data Packet, Checksum is Empty v:", ver)
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, Checksum is Empty v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	if(darr[0] == "") {
-		log.Println("[NOTICE]", fx, "Invalid Data Packet, Packed Data not found v:", ver)
+		log.Println("[NOTICE]", fx, "Invalid Data Packet, Packed Data not found v:", ver, CurrentFunctionName())
 		return ""
 	} //end if
 	//--
 	if(ver == 1) {
 		if(Sha1(darr[0]) != darr[1]) {
-			log.Println("[NOTICE]", fx, "Invalid Data Packet (v.1), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
+			log.Println("[NOTICE]", fx, "Invalid Data Packet (v.1), Checksum FAILED :: A checksum was found but is invalid:", darr[1], CurrentFunctionName())
 			return ""
 		} //end if
 	} else {
 		if(Sha256B64(darr[0]) != darr[1]) {
-			log.Println("[NOTICE]", fx, "Invalid Data Packet (v.2), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
+			log.Println("[NOTICE]", fx, "Invalid Data Packet (v.2), Checksum FAILED :: A checksum was found but is invalid:", darr[1], CurrentFunctionName())
 			return ""
 		} //end if
 	} //end if else
@@ -837,13 +915,14 @@ func threefishSafeKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE
 	var len_composedKey int = len(composedKey)
 	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
 	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
-		log.Println("[WARNING] threefishSafeKey:", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
 		return ""
 	} //end if
 	//--
-	var derivedKey string = LeftPad2Len(Crc32bB36(composedKey), "0", 8) + "'" + base92.Encode([]byte(Hex2Bin(Sha512(composedKey)))) + "'" + base92.Encode([]byte(Hex2Bin(Sha256(composedKey))))
-	var safeKey string = StrSubstr(RightPad2Len(derivedKey, "'", 128), 0, 1024/8) // 1024/8
-	//log.Println("[DEBUG] 3fKey:", safeKey)
+	var derivedKey string = StrPad2LenLeft(Crc32bB36(composedKey), "0", 8) + "'" + base92.Encode([]byte(Hex2Bin(Sha512(composedKey)))) + "'" + base92.Encode([]byte(Hex2Bin(Sha256(composedKey))))
+	var safeKey string = StrSubstr(StrPad2LenRight(derivedKey, "'", 128), 0, 1024/8) // 1024/8
+	//--
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeKey)
 	return safeKey
 	//--
 } //END FUNCTION
@@ -853,13 +932,13 @@ func threefishSafeIv(plainTextKey string) string {
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
 	if(key == "") {
-		log.Println("[WARNING] threefishSafeIv:", "Key is Empty !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
 		return ""
 	} //end if
 	//--
 	var safeIv string = StrSubstr(Sha512(key), 0, 1024/8) // 1024/8
 	//--
-	//log.Println("[DEBUG] 3fIv:", safeIv)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeIv)
 	return safeIv
 	//--
 } //END FUNCTION
@@ -869,18 +948,18 @@ func threefishSafeTweak(plainTextKey string, derivedKey string) string {
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
 	if(key == "") {
-		log.Println("[WARNING] threefishSafeTweak:", "Key is Empty !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
 		return ""
 	} //end if
 	//--
 	if(StrTrimWhitespaces(derivedKey) == "") {
-		log.Println("[WARNING] threefishSafeTweak:", "Derived Key is Empty !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key is Empty !")
 		return ""
 	} //end if
 	//--
-	var safeTweak string = LeftPad2Len(StrSubstr(Crc32b(key) + Crc32b(derivedKey), 0, 128/8), "0", 128/8) // 128/8
+	var safeTweak string = StrPad2LenLeft(StrSubstr(Crc32b(key) + Crc32b(derivedKey), 0, 128/8), "0", 128/8) // 128/8
 	//--
-	//log.Println("[DEBUG] 3fTweak:", safeTweak)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeTweak)
 	return safeTweak
 	//--
 } //END FUNCTION
@@ -897,35 +976,35 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 	str = Base64Encode(str)
 	cksum := Sha256B64(str)
 	str = str + SEPARATOR_CHECKSUM_V2 + cksum
-	//log.Println("[DEBUG] BfTxt: " + str)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ": " + str)
 	//--
 	var theSignature string = ""
 	var derivedKey string = "" // 128 bytes
 	if(useArgon2id == true) {
 		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
-		derivedKey = SafePassHashArgon2id824(key) // b92
+		derivedKey = SafePassHashArgon2id824(key, "") // b92
 	} else {
 		theSignature = SIGNATURE_3FISH_V1_DEFAULT
 		derivedKey = threefishSafeKey(key) // ~ b92
 	} //end if else
 	if(len(derivedKey) != 128) {
-		log.Println("[WARNING] ThreefishEncryptCBC:", "Derived Key Size must be 128 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 128 bytes")
 		return ""
 	} //end if
 	var tweak string = threefishSafeTweak(key, derivedKey) // 16 bytes, hex
 	if(len(tweak) != 16) {
-		log.Println("[WARNING] ThreefishEncryptCBC:", "Tweak Size must be 16 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Tweak Size must be 16 bytes")
 		return ""
 	} //end if
 	var iv string = threefishSafeIv(key) // 128 bytes, hex
 	if(len(iv) != 128) {
-		log.Println("[WARNING] ThreefishEncryptCBC:", "iV Size must be 128 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
 		return ""
 	} //end if
 	//--
 	block, err := threefish.New1024([]byte(derivedKey), []byte(tweak))
 	if(err != nil) {
-		log.Println("[WARNING] ThreefishEncryptCBC:", err)
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	//fmt.Println("Threefish BlockSize is:", block.BlockSize())
@@ -934,7 +1013,7 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 	var modulus int = slen % block.BlockSize()
 	if(modulus > 0) {
 		var padlen int = block.BlockSize() - modulus
-		str = RightPad2Len(str, " ", slen + padlen) // pad with spaces
+		str = StrPad2LenRight(str, " ", slen + padlen) // pad with spaces
 		slen = slen + padlen
 	} //end if
 	//-- encrypt
@@ -945,12 +1024,12 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 	var encTxt string = StrTrimWhitespaces(Bin2Hex(string(ciphertext))) // prepare output
 	ciphertext = nil
 	if(StrSubstr(encTxt, 0, block.BlockSize()*2) != strings.Repeat("0", block.BlockSize()*2)) { // {{{FIX-GOLANG-THREEFISH-1ST-128-NULL-BYTES}}}
-		log.Println("[WARNING] ThreefishEncryptCBC: Invalid Hex Header")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Invalid Hex Header")
 		return ""
 	} //end if
 	encTxt = StrTrimWhitespaces(StrSubstr(encTxt, block.BlockSize()*2, 0)) // fix: {{{FIX-GOLANG-THREEFISH-1ST-128-NULL-BYTES}}} ; there are 256 trailing zeroes that represent the HEX of 128 null bytes ; remove them
 	if(encTxt == "") {
-		log.Println("[WARNING] ThreefishEncryptCBC: Empty Hex Body") // must be some data after the 128 null bytes null header
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Empty Hex Body") // must be some data after the 128 null bytes null header
 		return ""
 	} //end if
 	//--
@@ -972,54 +1051,54 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 	var derivedKey string = "" // 128 bytes
 	if(useArgon2id == true) {
 		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
-		derivedKey = SafePassHashArgon2id824(key) // b92
+		derivedKey = SafePassHashArgon2id824(key, "") // b92
 	} else {
 		theSignature = SIGNATURE_3FISH_V1_DEFAULT
 		derivedKey = threefishSafeKey(key) // ~ b92
 	} //end if else
 	if(len(derivedKey) != 128) {
-		log.Println("[WARNING] ThreefishDecryptCBC:", "Derived Key Size must be 128 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 128 bytes")
 		return ""
 	} //end if
 	var tweak string = threefishSafeTweak(key, derivedKey) // 16 bytes, hex
 	if(len(tweak) != 16) {
-		log.Println("[WARNING] ThreefishDecryptCBC:", "Tweak Size must be 16 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Tweak Size must be 16 bytes")
 		return ""
 	} //end if
 	var iv string = threefishSafeIv(key) // 128 bytes, hex
 	if(len(iv) != 128) {
-		log.Println("[WARNING] ThreefishDecryptCBC:", "iV Size must be 128 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
 		return ""
 	} //end if
 	//--
 	block, err := threefish.New1024([]byte(derivedKey), []byte(tweak))
 	if(err != nil) {
-		log.Println("[WARNING] ThreefishDecryptCBC:", err)
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	//--
 	if(StrTrimWhitespaces(theSignature) == "") {
-		log.Println("[WARNING] ThreefishDecryptCBC Empty Signature provided")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Empty Signature provided")
 	} //end if
 	if(!StrContains(str, theSignature)) {
-		log.Println("[WARNING] ThreefishDecryptCBC Signature was not found")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Signature was not found")
 		return ""
 	} //end if
 	sgnArr := Explode("!", str)
 	str = StrTrimWhitespaces(sgnArr[1])
 	sgnArr = nil
 	if(str == "") {
-		log.Println("[WARNING] ThreefishDecryptCBC B64s Part not found")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": B64s Part not found")
 		return ""
 	} //end if
 	str = Base64sDecode(str)
 	if(str == "") {
-		log.Println("[WARNING] ThreefishDecryptCBC B64s Decode Failed")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": B64s Decode Failed")
 		return ""
 	} //end if
 	str = Hex2Bin(strings.Repeat("0", block.BlockSize()*2) + Bin2Hex(str)) // fix: {{{FIX-GOLANG-THREEFISH-1ST-128-NULL-BYTES}}} ; add back the 256 trailing null bytes as HEX
 	if(str == "") {
-		log.Println("[WARNING] ThreefishDecryptCBC Hex Header Restore and Decode Failed")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Hex Header Restore and Decode Failed")
 		return ""
 	} //end if
 	//--
@@ -1028,13 +1107,13 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 	decrypted := et[block.BlockSize():]
 	et = nil
 	if(len(decrypted) % block.BlockSize() != 0) { //-- check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
-		log.Println("[NOTICE] ThreefishDecryptCBC: decrypted is not a multiple of block.BlockSize() #", block.BlockSize())
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": decrypted is not a multiple of block.BlockSize() #", block.BlockSize())
 		return ""
 	} //end if
 	dcbc := cipher.NewCBCDecrypter(block, []byte(iv))
 	dcbc.CryptBlocks(decrypted, decrypted)
 	//--
-	return cryptoPacketCheckAndDecode(string(decrypted), "ThreefishDecryptCBC", 2)
+	return cryptoPacketCheckAndDecode(string(decrypted), CurrentFunctionName(), 2)
 	//--
 } //END FUNCTION
 
@@ -1047,13 +1126,13 @@ func blowfishV1SafeKey(plainTextKey string) string {
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey)
 	if(key == "") {
-		log.Println("[WARNING] blowfishV1SafeKey:", "Key is Empty !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
 		return ""
 	} //end if
 	//--
 	var safeKey string = StrSubstr(Sha512(key), 13, 29+13) + StrToUpper(StrSubstr(Sha1(key), 13, 10+13)) + StrSubstr(Md5(key), 13, 9+13)
 	//--
-	//log.Println("[DEBUG] BfKey (v1):", safeKey)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + " (v1):", safeKey)
 	return safeKey
 	//--
 } //END FUNCTION
@@ -1064,13 +1143,13 @@ func blowfishV1SafeIv(plainTextKey string) string {
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey)
 	if(key == "") {
-		log.Println("[WARNING] blowfishV1SafeKey:", "Key is Empty !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
 		return ""
 	} //end if
 	//--
 	var safeIv string = Base64Encode(Sha1("@Smart.Framework-Crypto/BlowFish:" + key + "#" + Sha1("BlowFish-iv-SHA1" + key) + "-" + StrToUpper(Md5("BlowFish-iv-MD5" + key)) + "#"))
 	safeIv = StrSubstr(safeIv, 1, 8+1)
-	//log.Println("[DEBUG] BfIv (v1):", safeIv)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + " (v1):", safeIv)
 	//--
 	return safeIv
 	//--
@@ -1086,13 +1165,13 @@ func blowfishSafeKey(plainTextKey string) string {
 	var len_composedKey int = len(composedKey)
 	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
 	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
-		log.Println("[WARNING] blowfishSafeKey:", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Composed Key is invalid (", len_composedKey, "/", len_trimmed_composedKey, ") !")
 		return ""
 	} //end if
 	//--
 	var derivedKey string = base92.Encode([]byte(Hex2Bin(Sha256(composedKey)))) + "'" + base92.Encode([]byte(Hex2Bin(Md5(composedKey))))
 	var safeKey string = StrSubstr(derivedKey, 0, 448/8) // 448/8
-	//log.Println("[DEBUG] BfKey:", safeKey)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeKey)
 	return safeKey
 	//--
 } //END FUNCTION
@@ -1103,14 +1182,14 @@ func blowfishSafeIv(plainTextKey string) string {
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
 	if(key == "") {
-		log.Println("[WARNING] blowfishSafeIv:", "Key is Empty !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
 		return ""
 	} //end if
 	//--
-	var data string = LeftPad2Len(Crc32bB36(key), "0", 8)
+	var data string = StrPad2LenLeft(Crc32bB36(key), "0", 8)
 	var safeIv string = StrSubstr(data + ":" + Sha1B64(key), 0, 64/8) // 64/8
 	//--
-	//log.Println("[DEBUG] BfIv:", safeIv)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeIv)
 	return safeIv
 	//--
 } //END FUNCTION
@@ -1127,30 +1206,30 @@ func BlowfishEncryptCBC(str string, key string) string {
 	str = Base64Encode(str)
 	cksum := Sha256B64(str)
 	str = str + SEPARATOR_CHECKSUM_V2 + cksum
-	//log.Println("[DEBUG] BfTxt: " + str)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ": " + str)
 	//-- fix padding
 	var slen int = len(str)
 	var modulus int = slen % blowfish.BlockSize
 	if(modulus > 0) {
 		var padlen int = blowfish.BlockSize - modulus
-		str = RightPad2Len(str, " ", slen + padlen) // pad with spaces
+		str = StrPad2LenRight(str, " ", slen + padlen) // pad with spaces
 		slen = slen + padlen
 	} //end if
 	//--
 	var derivedKey string = blowfishSafeKey(key) // 56 bytes
 	if(len(derivedKey) != 56) {
-		log.Println("[WARNING] BlowfishEncryptCBC:", "Derived Key Size must be 56 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 56 bytes")
 		return ""
 	} //end if
 	var iv string = blowfishSafeIv(key) // 8 bytes
 	if(len(iv) != 8) {
-		log.Println("[WARNING] BlowfishEncryptCBC:", "iV Size must be 128 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
 		return ""
 	} //end if
 	//-- create the cipher
 	ecipher, err := blowfish.NewCipher([]byte(derivedKey))
 	if(err != nil) {
-		log.Println("[WARNING] BlowfishEncryptCBC:", err)
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	//-- make ciphertext big enough to store data
@@ -1167,12 +1246,12 @@ func BlowfishEncryptCBC(str string, key string) string {
 	ciphertext = nil
 	prePaddingSize := blowfish.BlockSize * 2
 	if(StrSubstr(encTxt, 0, prePaddingSize) != strings.Repeat("0", prePaddingSize)) { // {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}}
-		log.Println("[WARNING] BlowfishEncryptCBC: Invalid Hex Header")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Invalid Hex Header")
 		return ""
 	} //end if
 	encTxt = StrTrimWhitespaces(StrSubstr(encTxt, prePaddingSize, 0)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; there are 16 trailing zeroes that represent the HEX of 8 null bytes ; remove them
 	if(encTxt == "") {
-		log.Println("[WARNING] BlowfishEncryptCBC: Empty Hex Body") // must be some data after the 8 bytes null header
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Empty Hex Body") // must be some data after the 8 bytes null header
 		return ""
 	} //end if
 	//--
@@ -1204,7 +1283,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	str = StrTrimWhitespaces(sgnArr[1])
 	sgnArr = nil
 	if(str == "") {
-		log.Println("[WARNING] BlowfishDecryptCBC B64s Part not found")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": B64s Part not found")
 		return ""
 	} //end if
 	//--
@@ -1216,7 +1295,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 		str = Hex2Bin(strings.Repeat("0", prePaddingSize) + Bin2Hex(str)) // fix: {{{FIX-GOLANG-BLOWFISH-1ST-8-NULL-BYTES}}} ; add back the 8 trailing null bytes as HEX
 	} //end if else
 	if(str == "") {
-		log.Println("[WARNING] BlowfishDecryptCBC Hex Header Restore and Decode Failed")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Hex Header Restore and Decode Failed")
 		return ""
 	} //end if
 	//-- cast string to bytes
@@ -1227,13 +1306,13 @@ func BlowfishDecryptCBC(str string, key string) string {
 	if(versionDetected == 1) { // v1
 		derivedKey = blowfishV1SafeKey(key) // 48 bytes
 		if(len(derivedKey) != 48) {
-			log.Println("[WARNING] BlowfishDecryptCBC (v1):", "Derived Key Size must be 48 bytes")
+			log.Println("[WARNING] " + CurrentFunctionName() + " (v1):", "Derived Key Size must be 48 bytes")
 			return ""
 		} //end if
 	} else { // v2
 		derivedKey = blowfishSafeKey(key) // 56 bytes
 		if(len(derivedKey) != 56) {
-			log.Println("[WARNING] BlowfishDecryptCBC (v2):", "Derived Key Size must be 56 bytes")
+			log.Println("[WARNING] " + CurrentFunctionName() + " (v2):", "Derived Key Size must be 56 bytes")
 			return ""
 		} //end if
 	} //end if else
@@ -1244,14 +1323,14 @@ func BlowfishDecryptCBC(str string, key string) string {
 		iv = blowfishSafeIv(key) // 8 bytes
 	} //end if else
 	if(len(iv) != 8) {
-		log.Println("[WARNING] BlowfishDecryptCBC:", "iV Size must be 128 bytes")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
 		return ""
 	} //end if
 	//-- create the cipher
 	dcipher, err := blowfish.NewCipher([]byte(derivedKey))
 	if(err != nil) {
 		//-- fix this. its okay for this tester program, but...
-		log.Println("[WARNING] BlowfishDecryptCBC:", err)
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	//-- make initialisation vector {{{SYNC-BLOWFISH-IV}}}
@@ -1259,7 +1338,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//-- check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
 	decrypted := et[blowfish.BlockSize:]
 	if(len(decrypted) % blowfish.BlockSize != 0) {
-		log.Println("[NOTICE] BlowfishDecryptCBC: decrypted is not a multiple of blowfish.BlockSize")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": decrypted is not a multiple of blowfish.BlockSize")
 		return ""
 	} //end if
 	//-- ok, all good... create the decrypter
@@ -1267,7 +1346,7 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//-- decrypt
 	dcbc.CryptBlocks(decrypted, decrypted)
 	//--
-	return cryptoPacketCheckAndDecode(string(decrypted), "BlowfishDecryptCBC", versionDetected)
+	return cryptoPacketCheckAndDecode(string(decrypted), CurrentFunctionName(), versionDetected)
 	//--
 } //END FUNCTION
 
@@ -1291,7 +1370,7 @@ func GzEncode(str string, level int) string {
 	w, err := gzip.NewWriterLevel(&b, level) // RFC 1952 (gzip compatible)
 	//--
 	if(err != nil) {
-		log.Println("[NOTICE] GzDeflate:", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	//--
@@ -1300,7 +1379,7 @@ func GzEncode(str string, level int) string {
 	//--
 	var out string = b.String()
 	if(out == "") {
-		log.Println("[NOTICE] GzEncode:", "Empty Arch Data")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty Arch Data")
 		return ""
 	} //end if
 	//--
@@ -1321,7 +1400,7 @@ func GzDecode(str string) string {
 	b := bytes.NewReader([]byte(str))
 	r, err := gzip.NewReader(b) // RFC 1952 (gzip compatible)
 	if(err != nil) {
-		log.Println("[NOTICE] GzDecode:", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	bb2 := new(bytes.Buffer)
@@ -1331,7 +1410,7 @@ func GzDecode(str string) string {
 	//--
 	var out string = string(byts)
 	if(out == "") {
-		log.Println("[NOTICE] GzDecode:", "Empty UnArch Data")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty UnArch Data")
 		return ""
 	} //end if
 	//--
@@ -1359,7 +1438,7 @@ func GzDeflate(str string, level int) string {
 	w, err := flate.NewWriter(&b, level) // RFC 1951
 	//--
 	if(err != nil) {
-		log.Println("[NOTICE] GzDeflate:", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", err)
 		return ""
 	} //end if
 	//--
@@ -1368,7 +1447,7 @@ func GzDeflate(str string, level int) string {
 	//--
 	var out string = b.String()
 	if(out == "") {
-		log.Println("[NOTICE] GzDeflate:", "Empty Arch Data")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty Arch Data")
 		return ""
 	} //end if
 	//--
@@ -1395,7 +1474,7 @@ func GzInflate(str string) string {
 	//--
 	var out string = string(byts)
 	if(out == "") {
-		log.Println("[NOTICE] GzInflate:", "Empty UnArch Data")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty UnArch Data")
 		return ""
 	} //end if
 	//--
@@ -1422,13 +1501,13 @@ func DataUnArchive(str string) string {
 	//--
 	arr[0] = StrTrimWhitespaces(arr[0])
 	if(arr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid Package Format")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package Format")
 		return ""
 	} //end if
 	//--
 	var versionDetected uint8 = 0
 	if(alen < 2) {
-		log.Println("[NOTICE] Data Unarchive // Empty Package Signature")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Package Signature")
 		//arr = append(arr, "") // fix: add missing arr[1] to avoid panic below ; no more needed as will exit below if this err happen
 		return ""
 	} else {
@@ -1439,20 +1518,20 @@ func DataUnArchive(str string) string {
 			versionDetected = 1
 		} //end if else
 		if(versionDetected <= 0) {
-			log.Println("[NOTICE] Data Unarchive // Invalid Package (version:", versionDetected, ") Signature:", arr[1])
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Signature:", arr[1])
 			return ""
 		} //end if
 	} //end if
 	//--
 	arr[0] = Base64Decode(arr[0])
 	if(arr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid B64 Data for packet (version:", versionDetected, ") with signature:", arr[1])
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid B64 Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
 	} //end if
 	//--
 	arr[0] = GzInflate(arr[0])
 	if(arr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid Zlib GzInflate Data for packet (version:", versionDetected, ") with signature:", arr[1])
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Zlib GzInflate Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
 	} //end if
 	//--
@@ -1466,7 +1545,7 @@ func DataUnArchive(str string) string {
 	} //end if else
 	//--
 	if((versionCksumSeparator == "") || (!StrContains(arr[0], versionCksumSeparator))) {
-		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), no Checksum:", txtErrExpl)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Packet (version:", versionDetected, "), no Checksum:", txtErrExpl)
 		return ""
 	} //end if
 	//--
@@ -1474,17 +1553,17 @@ func DataUnArchive(str string) string {
 	arr = nil
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), Checksum not found:", txtErrExpl)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Packet (version:", versionDetected, "), Checksum not found:", txtErrExpl)
 		return ""
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), Checksum is Empty:", txtErrExpl)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Packet (version:", versionDetected, "), Checksum is Empty:", txtErrExpl)
 		return ""
 	} //end if
 	if(darr[0] == "") {
-		log.Println("[NOTICE] Invalid Packet (version:", versionDetected, "), Data not found:", txtErrExpl)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Packet (version:", versionDetected, "), Data not found:", txtErrExpl)
 		return ""
 	} //end if
 	//--
@@ -1494,7 +1573,7 @@ func DataUnArchive(str string) string {
 		darr[0] = Hex2Bin(darr[0])
 	} //end if else
 	if(darr[0] == "") {
-		log.Println("[NOTICE] Data Unarchive // Invalid HEX Data for packet (version:", versionDetected, ") with signature:", arr[1])
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid HEX Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
 	} //end if
 	//--
@@ -1510,7 +1589,7 @@ func DataUnArchive(str string) string {
 	} //end if else
 	//--
 	if(chkSignature != true) {
-		log.Println("[NOTICE] Data Unarchive // Invalid Packet (version:", versionDetected, "), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Packet (version:", versionDetected, "), Checksum FAILED :: A checksum was found but is invalid:", darr[1])
 		return ""
 	} //end if
 	//--
@@ -1536,54 +1615,31 @@ func DataArchive(str string) string {
 	var alen int = len(arch)
 	//--
 	if((arch == "") || (alen <= 0)) { // check also division by zero
-		log.Println("[ERROR] Data Archive // ZLib Deflated Data is Empty")
+		log.Println("[ERROR] " + CurrentFunctionName() + ": ZLib Deflated Data is Empty")
 		return ""
 	} //end if
 	//--
 	var ratio = float64(ulen) / float64(alen) // division by zero is checked above by (alen <= 0)
 	if(ratio <= 0) {
-		log.Println("[ERROR] Data Archive // ZLib Data Ratio is zero:", ratio)
+		log.Println("[ERROR] " + CurrentFunctionName() + ": ZLib Data Ratio is zero:", ratio)
 		return ""
 	} //end if
 	if(ratio > 32768) { // check for this bug in ZLib {{{SYNC-GZ-ARCHIVE-ERR-CHECK}}}
-		log.Println("[ERROR] Data Archive // ZLib Data Ratio is higher than 32768:", ratio)
+		log.Println("[ERROR] " + CurrentFunctionName() + ": ZLib Data Ratio is higher than 32768:", ratio)
 		return ""
 	} //end if
-	//log.Println("[DEBUG] Data Archive // ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ": ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
 	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + SIGNATURE_SFZ_DATA_ARCH_V2
 	//--
 	var unarch_chksum string = Sha256(DataUnArchive(arch))
 	if(unarch_chksum != chksum) {
-		log.Println("[ERROR] Data Archive // Data Encode Check Failed")
+		log.Println("[ERROR] " + CurrentFunctionName() + ": Data Encode Check Failed")
 		return ""
 	} //end if
 	//--
 	return arch
 	//-- str
-} //END FUNCTION
-
-
-//-----
-
-
-func LeftPad2Len(s string, padStr string, overallLen int) string { // LeftPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
-	//--
-	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
-	var retStr string = strings.Repeat(padStr, padCountInt) + s
-	//--
-	return retStr[(len(retStr) - overallLen):]
-	//--
-} //END FUNCTION
-
-
-func RightPad2Len(s string, padStr string, overallLen int) string { // RightPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
-	//--
-	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
-	var retStr string = s + strings.Repeat(padStr, padCountInt)
-	//--
-	return retStr[:overallLen]
-	//--
 } //END FUNCTION
 
 
@@ -1614,7 +1670,7 @@ func BaseEncode(data []byte, toBase string) string {
 		return Bin2Hex(string(data))
 	} //end if else
 	//--
-	log.Println("[ERROR] BaseEncode:", "Invalid Encoding Base: `" + toBase + "`")
+	log.Println("[ERROR] " + CurrentFunctionName() + ":", "Invalid Encoding Base: `" + toBase + "`")
 	return ""
 	//--
 } //END FUNCTION
@@ -1650,7 +1706,7 @@ func BaseDecode(data string, fromBase string) []byte {
 	} //end if else
 	//--
 	if(err != nil) {
-		log.Println("[ERROR] BaseDecode:", err)
+		log.Println("[ERROR] " + CurrentFunctionName() + ":", err)
 		return nil
 	} //end if
 	//--
@@ -1675,7 +1731,7 @@ func Base64Decode(data string) string {
 	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if(err != nil) {
-		log.Println("[NOTICE] Base64Decode: ", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": ", err)
 		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
@@ -1839,7 +1895,7 @@ func Crc32bB36(str string) string {
 	hash := crc32.NewIEEE()
 	hash.Write([]byte(str))
 	//--
-	return LeftPad2Len(StrToLower(base36.Encode(hash.Sum(nil))), "0", 7)
+	return StrPad2LenLeft(StrToLower(base36.Encode(hash.Sum(nil))), "0", 7)
 	//--
 } //END FUNCTION
 
@@ -2372,6 +2428,26 @@ func StrUcWords(s string) string {
 } //END FUNCTION
 
 
+func StrPad2LenLeft(s string, padStr string, overallLen int) string { // LeftPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
+	//--
+	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
+	var retStr string = strings.Repeat(padStr, padCountInt) + s
+	//--
+	return retStr[(len(retStr) - overallLen):]
+	//--
+} //END FUNCTION
+
+
+func StrPad2LenRight(s string, padStr string, overallLen int) string { // RightPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
+	//--
+	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
+	var retStr string = s + strings.Repeat(padStr, padCountInt)
+	//--
+	return retStr[:overallLen]
+	//--
+} //END FUNCTION
+
+
 // ChunkSplit chunk_split()
 func StrChunkSplit(body string, chunklen uint, end string) string { // github.com/syyongx/php2go/blob/master/php.go
 	//--
@@ -2508,7 +2584,7 @@ func StrRegex2FindAllStringMatches(mode string, rexp string, s string, maxRecurs
 		m, _ = re.FindNextMatch(m)
 		max--
 		if(max <= 0) {
-			log.Println("[WARNING] Regexp2 max recursion limit ...")
+			log.Println("[WARNING] " + CurrentFunctionName() + ": Regexp2 max recursion limit ...")
 			break
 		} //end if
 	} //end for
@@ -2590,7 +2666,7 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 	//--
 	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
-		log.Println("[NOTICE] Hex2Bin Failed:", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + " Failed:", err)
 		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
@@ -2630,8 +2706,9 @@ func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) strin
 } //END FUNCTION
 
 
-func JsonObjDecode(data string) (map[string]interface{}, error) { // can decode just a JSON Object as {"key1":..., "key2":...}
+func JsonObjDecode(data string) (map[string]interface{}, error) { // can parse just a JSON Object as {"key1":..., "key2":...}
 	//-- no need any panic handler
+	data = StrTrimWhitespaces(data)
 	if(data == "") {
 		return nil, nil
 	} //end if
@@ -2650,8 +2727,9 @@ func JsonObjDecode(data string) (map[string]interface{}, error) { // can decode 
 } //END FUNCTION
 
 
-func JsonArrDecode(data string) ([]interface{}, error) { // can decode just a JSON Array as ["a", 2, "c", { "e": "f" }, ...]
+func JsonArrDecode(data string) ([]interface{}, error) { // can parse just a JSON Array as ["a", 2, "c", { "e": "f" }, ...]
 	//-- no need any panic handler
+	data = StrTrimWhitespaces(data)
 	if(data == "") {
 		return nil, nil
 	} //end if
@@ -2670,13 +2748,14 @@ func JsonArrDecode(data string) ([]interface{}, error) { // can decode just a JS
 } //END FUNCTION
 
 
-func JsonStrDecode(data string) (string, error) {
+func JsonStrDecode(data string) (string, error) { // can parse: only a JSON String
 	//-- no need any panic handler
+	data = StrTrimWhitespaces(data)
 	if(data == "") {
 		return "", nil
 	} //end if
 	//--
-	var dat string
+	var dat string = ""
 	dataReader := strings.NewReader(data)
 	decoder := json.NewDecoder(dataReader)
 	decoder.UseNumber()
@@ -2690,7 +2769,38 @@ func JsonStrDecode(data string) (string, error) {
 } //END FUNCTION
 
 
-// The following JSON structures can be parsed directly: int / float / bool / null
+func JsonScalarDecodeToStr(data string) (string, error) { // can parse the following JSON Scalar Types: Int / Float / Bool / Null, String :: will re-map any of these as string only
+	//--
+	data = StrTrimWhitespaces(data)
+	if(data == "") {
+		return "", nil
+	} //end if
+	//--
+	switch(data) {
+		case "NULL": fallthrough
+		case "Null": fallthrough
+		case "null":
+			data = `""`
+			break
+		case "FALSE": fallthrough
+		case "False": fallthrough
+		case "false":
+			data = `"false"`
+			break
+		case "TRUE": fallthrough
+		case "True": fallthrough
+		case "true":
+			data = `"true"`
+			break
+		default:
+			if(StrRegexMatchString(REGEX_SMART_SAFE_NUMBER_FLOAT, data)) {
+				data = `"` + data + `"`
+			} //end if
+	} //end switch
+	//--
+	return JsonStrDecode(data)
+	//--
+} //END FUNCTION
 
 
 //-----
@@ -3332,7 +3442,11 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 		//--
 	} else {
 		//--
-		paths, err := ioutil.ReadDir(dirPath)
+		dir, derr := os.Open(dirPath)
+		if(derr != nil) {
+			return false, derr.Error(), dirs, files
+		} //end if
+		paths, err := dir.Readdir(0)
 		if(err != nil) {
 			return false, err.Error(), dirs, files
 		} //end if
@@ -3595,7 +3709,7 @@ func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent stri
 		return "", errors.New("WARNING: File Path is a Directory not a File").Error()
 	} //end if
 	//--
-	content, err := ioutil.ReadFile(filePath)
+	content, err := os.ReadFile(filePath)
 	if(err != nil) {
 		return "", err.Error()
 	} //end if
@@ -3639,10 +3753,10 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 	//	defer f.Close() // changes as below to log if not closing a file the issue with 'too many open files'
 		fClose := func() { // because this method in append mode is used for writing also the log files make defer a bit more safe, from above
 			if err := f.Close(); err != nil {
-				log.Println("[ERROR] SafePathFileWrite:", "FAILED to explicit Close an Opened File (write:append mode): `" + filePath + "` # Errors:", err)
+				log.Println("[ERROR] " + CurrentFunctionName() + ":", "FAILED to explicit Close an Opened File (write:append mode): `" + filePath + "` # Errors:", err)
 			} else {
 				if(DEBUG == true) { // !!! need this because actually this method will write also to log files so this will repeat on each logged message !!!
-					log.Println("[DEBUG] SafePathFileWrite:", "An Opened File (write:append mode) was explicit Closed: `" + filePath) // this is important, as all logs that write to files must be able to watch this ... to monitor (debug) if the past issue with too many opened files persists after new fixes ...
+					log.Println("[DEBUG] " + CurrentFunctionName() + ":", "An Opened File (write:append mode) was explicit Closed: `" + filePath) // this is important, as all logs that write to files must be able to watch this ... to monitor (debug) if the past issue with too many opened files persists after new fixes ...
 				} //end if
 			} //end if
 		} //end function
@@ -3653,7 +3767,7 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 		fClose()
 		return true, "" // must return here to avoid defered f to be out of scope
 	} else if(wrMode == "w") { // write mode
-		err := ioutil.WriteFile(filePath, []byte(fileContent), CHOWN_FILES)
+		err := os.WriteFile(filePath, []byte(fileContent), CHOWN_FILES)
 		if(err != nil) {
 			return false, err.Error()
 		} //end if
@@ -3837,17 +3951,6 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 			return false, errors.New("WARNING: Cannot Remove existing Destination File: " + errMsg).Error()
 		} //end if
 	} //end if
-	//--
-	/* this commented code would copy files using in-memory read of origin file and after that write to destination file which is not memory efficient when copying large files ; below is a revised version that copies through a pipe
-	data, err := ioutil.ReadFile(filePath)
-	if(err != nil) {
-		return false, err.Error()
-	} //end if
-	err = ioutil.WriteFile(fileNewPath, data, CHOWN_FILES)
-	if(err != nil) {
-		return false, err.Error()
-	} //end if
-	*/
 	//-- revised copy file, using pipe
 	sourceFileStat, err := os.Stat(filePath)
 	if(err != nil) {
@@ -3876,7 +3979,7 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 	} //end if
 	errChmod := os.Chmod(fileNewPath, CHOWN_FILES)
 	if(err != nil) {
-		log.Println("[WARNING] Failed to CHMOD the Destination File after copy", fileNewPath, errChmod)
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to CHMOD the Destination File after copy", fileNewPath, errChmod)
 	} //end if
 	//--
 	fSizeOrigin, errMsg := SafePathFileGetSize(filePath, allowAbsolutePath)
@@ -4338,7 +4441,7 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 			} //end if
 			//--
 			if(isConditionalBlockERR != "") {
-				log.Println("[WARNING] MarkersTplRender: {### Invalid Conditional #" + ConvertIntToStr(c) + ": [" + isConditionalBlockERR + "] for Block `" + tmp_ifs_cond_block + "`" + " ###}")
+				log.Println("[WARNING] " + CurrentFunctionName() + ": {### Invalid Conditional #" + ConvertIntToStr(c) + ": [" + isConditionalBlockERR + "] for Block `" + tmp_ifs_cond_block + "`" + " ###}")
 			} //end if
 			//--
 		} //end if
@@ -4367,10 +4470,10 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 			//--
 			if((tmp_marker_id != "") && (tmp_marker_key != "")) {
 				//--
-			//	log.Println("[DEBUG] ---------- : " + tmp_marker_val)
-			//	log.Println("[DEBUG] tmp_marker_id  + " # found Marker at index: " + ConvertIntToStr(i))
-			//	log.Println("[DEBUG] tmp_marker_key + " # found Marker Key at index:", ConvertIntToStr(i))
-			//	log.Println("[DEBUG] tmp_marker_esc + " # found Marker Escaping at index:", ConvertIntToStr(i))
+			//	log.Println("[DEBUG] " + CurrentFunctionName() + ": ---------- : " + tmp_marker_val)
+			//	log.Println("[DEBUG] " + CurrentFunctionName() + ": tmp_marker_id  + " # found Marker at index: " + ConvertIntToStr(i))
+			//	log.Println("[DEBUG] " + CurrentFunctionName() + ": tmp_marker_key + " # found Marker Key at index:", ConvertIntToStr(i))
+			//	log.Println("[DEBUG] " + CurrentFunctionName() + ": tmp_marker_esc + " # found Marker Escaping at index:", ConvertIntToStr(i))
 				//--
 				if(tmp_marker_esc != "") {
 					//--
@@ -4382,7 +4485,7 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 							//--
 							var escaping string = "|" + tmp_marker_each_esc
 							//--
-						//	log.Println("[DEBUG] escaping + " # found Marker Escaping [Arr] at index: " + ConvertIntToStr(i) + "." + ConvertIntToStr(j))
+						//	log.Println("[DEBUG] " + CurrentFunctionName() + ": escaping + " # found Marker Escaping [Arr] at index: " + ConvertIntToStr(i) + "." + ConvertIntToStr(j))
 							//--
 							if(escaping == "|bool") { // Boolean
 								tmp_marker_val = ParseBoolStrAsStdBoolStr(tmp_marker_val)
@@ -4469,7 +4572,7 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 							} else if(escaping == "|sha1") { // Apply SHA1 Encode
 								tmp_marker_val = Sha1(tmp_marker_val)
 							} else {
-								log.Println("[WARNING] MarkersTplRender: {### Invalid or Undefined Escaping " + escaping + " [" + ConvertIntToStr(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + ConvertIntToStr(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
+								log.Println("[WARNING] " + CurrentFunctionName() + ": {### Invalid or Undefined Escaping " + escaping + " [" + ConvertIntToStr(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + ConvertIntToStr(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
 							} //end if
 							//--
 						} //end if
@@ -4527,17 +4630,17 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 		//--
 		if(isMainHtml == false) {
 			if(StrContains(template, "[:::")) {
-				log.Println("[WARNING] MarkersTplRender: {### Undefined Placeholders detected in Template ###}")
+				log.Println("[WARNING] " + CurrentFunctionName() + ": {### Undefined Placeholders detected in Template ###}")
 			} //end if
 		} //end if
 		if(StrContains(template, "[###")) {
-			log.Println("[WARNING] MarkersTplRender: {### Undefined Markers detected in Template ###}")
+			log.Println("[WARNING] " + CurrentFunctionName() + ": {### Undefined Markers detected in Template ###}")
 		} //end if
 		if(StrContains(template, "[%%%")) {
-			log.Println("[WARNING] MarkersTplRender: {### Undefined Marker Syntax detected in Template ###}")
+			log.Println("[WARNING] " + CurrentFunctionName() + ": {### Undefined Marker Syntax detected in Template ###}")
 		} //end if
 		if(StrContains(template, "[@@@")) {
-			log.Println("[WARNING] MarkersTplRender: {### Undefined Marker Sub-Templates detected in Template ###}")
+			log.Println("[WARNING] " + CurrentFunctionName() + ": {### Undefined Marker Sub-Templates detected in Template ###}")
 		} //end if
 		//--
 		template = MarkersTplEscapeSyntaxContent(template, isMainHtml) // this will not escape the syntax already prepared by MarkersTplPrepareNosyntaxContent (PrepareNosyntax) that comes from a value, but only remaining syntax
@@ -4633,22 +4736,22 @@ func GetSafeIpAndPortFromRequestRemoteAddr(r *http.Request) (ipAddr string, port
 	//--
 	var remoteAddr string = StrTrimWhitespaces(r.RemoteAddr)
 	if(remoteAddr == "") {
-		log.Println("[WARNING] Get Safe IP and Port from RemoteAddress Failed, empty")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, empty")
 		return "", "0"
 	} //end if
 	ip, port, err := net.SplitHostPort(remoteAddr) // expects: remoteAddr = 127.0.0.1:1234
 	if(err != nil) {
-		log.Println("[WARNING] Get Safe IP and Port from RemoteAddress Failed, invalid format")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid format")
 		return "", "0"
 	} //end if
 	//--
 	ip = StrToLower(StrTrimWhitespaces(ip))
 	if(!IsNetValidIpAddr(ip)) {
-		log.Println("[WARNING] Get Safe IP and Port from RemoteAddress Failed, invalid IP:", ip)
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid IP:", ip)
 		ip = ""
 	} //end if
 	if(!IsNetValidPortStr(port)) {
-		log.Println("[WARNING] Get Safe IP and Port from RemoteAddress Failed, invalid Port", port)
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid Port", port)
 		port = "0"
 	} //end if
 	return ip, port // returns strtolower + trim of IP
@@ -4661,21 +4764,21 @@ func SetSafeRealClientIpHeaderKey(hdrKey string) bool {
 	hdrKey = StrToUpper(StrTrimWhitespaces(hdrKey))
 	//--
 	if(hdrKey == "") {
-		log.Println("[WARNING] Set Real Client IP Proxy Header Key Failed, empty")
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, empty")
 		return false
 	} //end if
 	if(!StrRegexMatchString(REGEX_SMART_SAFE_HTTP_HEADER_KEY, hdrKey)) {
-		log.Println("[WARNING] Set Real Client IP Proxy Header Key Failed, invalid:", hdrKey)
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, invalid:", hdrKey)
 		return false
 	} //end if
 	if(requestProxyRealIpHeaderKey != "") {
-		log.Println("[WARNING] Set Real Client IP Proxy Header Key Failed, already set as:", requestProxyRealIpHeaderKey)
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, already set as:", requestProxyRealIpHeaderKey)
 		return false
 	} //end if
 	//--
 	requestProxyRealIpHeaderKey = hdrKey
 	if(DEBUG == true) {
-		log.Println("[DEBUG] Set Real Client IP Proxy Header Key, successful as:", requestProxyRealIpHeaderKey)
+		log.Println("[DEBUG] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key, successful as:", requestProxyRealIpHeaderKey)
 	} //end if
 	return true
 	//--

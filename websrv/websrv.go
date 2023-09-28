@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230926.1746 :: STABLE
+// r.20230927.1645 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20230926.1746"
+	VERSION string = "r.20230927.1645"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -135,12 +135,12 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 
 	httpAddr = smart.StrTrimWhitespaces(httpAddr)
 	if((!smart.IsNetValidIpAddr(httpAddr)) && (!smart.IsNetValidHostName(httpAddr))) {
-		log.Println("[WARNING] Invalid Server Address (Host):", httpAddr, "using the default host:", SERVER_ADDR)
+		log.Println("[WARNING] Web Server: Invalid Server Address (Host):", httpAddr, "using the default host:", SERVER_ADDR)
 		httpAddr = SERVER_ADDR
 	} //end if
 
 	if(!smart.IsNetValidPortNum(int64(httpPort))) {
-		log.Println("[WARNING] Invalid Server Address (Port):", httpPort, "using the default port:", SERVER_PORT)
+		log.Println("[WARNING] Web Server: Invalid Server Address (Port):", httpPort, "using the default port:", SERVER_PORT)
 		httpPort = SERVER_PORT
 	} //end if
 
@@ -219,7 +219,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 		if((isAuthActive == true) && (useAuth == true)) { // this check must be before executing fx below
 			var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, true) // outputs: HTML
 			if(authErr != "") {
-				log.Println("[WARNING] Web Server / Index Area :: Authentication Failed:", authErr)
+				log.Println("[WARNING] Web Server: Authentication Failed:", authErr)
 				return
 			} //end if
 		} //end if
@@ -228,7 +228,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 		timerDuration := time.Since(timerStart)
 		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
 		log.Printf("[OK] Web Server :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-		log.Println("StatusCode:", code, "# Web Server Path: `" + theUrlPath + "`", "# ExecutionTime:", timerDuration)
+		log.Println("Web Server: StatusCode:", code, "# Path: `" + theUrlPath + "`", "# ExecutionTime:", timerDuration)
 		switch(code) {
 			//-- ok status codes
 			case 200:
@@ -287,7 +287,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 				break
 			//--
 			default: // fallback to 500
-				log.Println("[ERROR] Web Server / Invalid Application Level Status Code for the URL Path [" + theUrlPath + "]:", code)
+				log.Println("[ERROR] Web Server: Invalid Application Level Status Code for the URL Path [" + theUrlPath + "]:", code)
 				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + strconv.Itoa(int(code)) + "` for the URL Path: `" + smart.EscapeHtml(r.URL.Path) + "`", true)
 		} //end switch
 	})

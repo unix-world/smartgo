@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230926.1746 :: STABLE
+// r.20230927.1712 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20230926.1746"
+	VERSION string = "r.20230927.1712"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -75,12 +75,12 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	httpAddr = smart.StrTrimWhitespaces(httpAddr)
 	if((!smart.IsNetValidIpAddr(httpAddr)) && (!smart.IsNetValidHostName(httpAddr))) {
-		log.Println("[WARNING] Invalid Server Address (Host):", httpAddr, "using the default host:", SERVER_ADDR)
+		log.Println("[WARNING] WebDAV Server: Invalid Server Address (Host):", httpAddr, "using the default host:", SERVER_ADDR)
 		httpAddr = SERVER_ADDR
 	} //end if
 
 	if(!smart.IsNetValidPortNum(int64(httpPort))) {
-		log.Println("[WARNING] Invalid Server Address (Port):", httpPort, "using the default port:", SERVER_PORT)
+		log.Println("[WARNING] WebDAV Server: Invalid Server Address (Port):", httpPort, "using the default port:", SERVER_PORT)
 		httpPort = SERVER_PORT
 	} //end if
 
@@ -192,9 +192,11 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 			if(err == nil) {
 				if(info.IsDir()) {
 					r.Method = "PROPFIND" // this is a mapping for a directory from GET to PROPFIND ; TODO: it can be later supplied as a HTML Page listing all entries ; by mapping to PROPFIND will serve an XML
+					r.Header.Set("Depth", "1") // fix: ignore depth infinity, to avoid overload the file system
 				} //end if
 			} //end if
 		} //end if
+		log.Println("[DEBUG", "WebDAV Server", "Method:", r.Method, "Depth:", r.Header.Get("Depth"))
 
 		wdav.ServeHTTP(w, r) // if all ok above (basic auth + credentials ok, serve ...)
 	}

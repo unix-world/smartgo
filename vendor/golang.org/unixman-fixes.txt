@@ -1,0 +1,3 @@
+Go 1.17 or later
+
+* fixed as in mainstream to use os instead of ioutil in x/sys/cpu/hwcap_linux.go
