@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230927.1645 :: STABLE
+// r.20230928.1807 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20230927.1645"
+	VERSION string = "r.20230928.1807"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"

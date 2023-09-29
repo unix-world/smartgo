@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230928.1807 :: STABLE
+// r.20230929.0246 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -74,7 +74,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20230928.1807"
+	VERSION string = "v.20230929.0246"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -116,10 +116,11 @@ const (
 	SIGNATURE_BFISH_V1 string = "bf384.v1!" 									// this was not implemented in the v1, if used must be prefixed before decrypt for compatibility ... (for v1 no encrypt is available anymore)
 	SIGNATURE_BFISH_V2 string = "bf448.v2!" 									// current, v2 ; encrypt + decrypt
 
-	SIGNATURE_3FISH_V1_DEFAULT  string = "3f1kD.v1!" 							// current, v1 (default)  ; encrypt + decrypt
+	SIGNATURE_3FISH_V1_DEFAULT string  = "3f1kD.v1!" 							// current, v1 (default)  ; encrypt + decrypt
 	SIGNATURE_3FISH_V1_ARGON2ID string = "3f1kA.v1!" 							// current, v1 (argon2id) ; encrypt + decrypt
 
-	SIGNATURE_PASSWORD_SMART = "sfpass.v2!" 									// curent, v2, smart framework password
+	SIGNATURE_PASSWORD_SMART string   = "sfpass.v2!" 							// curent, v2, smart framework password
+	SIGNATURE_PASSWORD_A2ID824 string = "a2idpass.v2!" 							// curent, v2, argon2id.824 password
 
 	FIXED_CRYPTO_SALT string = "Smart Framework # スマート フレームワーク" 			// fixed salt data for various crypto contexts
 
@@ -702,7 +703,31 @@ func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
 //-----
 
 
-func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
+func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
+	//--
+	// Create a safe checksum of data
+	// It will append the salt to the end of data to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
+	// Protected by SHA384 that has 128-bit resistance against the length extension attacks since the attacker needs to guess the 128-bit to perform the attack, due to the truncation
+	//--
+	defer PanicHandler() // req. by b64 decrypt panic handler with malformed data
+	//--
+	customSalt = StrTrimWhitespaces(customSalt)
+	if(customSalt == "") {
+		customSalt = FIXED_CRYPTO_SALT // dissalow empty salt, fallback to have at least something
+	} //end if
+	//--
+	var b64CkSum string = Sha384B64(plainTextData + "#" + customSalt) // sha384 is a better choice than sha256/sha512 because is more resistant to length attacks
+	var rawCkSum string = Base64Decode(b64CkSum)
+	//--
+	return base62.Encode([]byte(rawCkSum))
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}} [PHP]
 	//--
 	// This should be used as the basis for a derived key, will be 100% in theory and practice agains hash colissions (see the comments below)
 	// It implements a safe mechanism that in order that a key to produce a colission must collide at the same time in all hashing mechanisms: md5, sha1, ha256 and sha512 + crc32b control
@@ -749,7 +774,17 @@ func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DER
 //-----
 
 
-func SafePassHashSmart(plainPass string, customSalt string) string {
+func SafePassHashSmart(plainPass string, customSalt string) string { // {{{SYNC-HASH-PASSWORD}}} [PHP]
+	//--
+	// It uses a custom salt + an internally hard-coded salt to avoid rainbow attack
+	//--
+	// the password salt must not be too complex related to the password itself # http://stackoverflow.com/questions/5482437/md5-hashing-using-password-as-salt
+	// nn extraordinary good salt + a weak password may increase the risk of colissions
+	// just sensible salt + strong password = safer
+	// for passwords the best is to pre-pend the salt: http://stackoverflow.com/questions/4171859/password-salts-prepending-vs-appending
+	// for checksuming is better to append the salt to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
+	// ex: azA-Z09 pass, prepend needs 26^6 permutations while append 26^10, so append adds more complexity
+	// SHA512 is high complexity: O(2^n/2) # http://stackoverflow.com/questions/6776050/how-long-to-brute-force-a-salted-sha-512-hash-salt-provided
 	//--
 	if((len(plainPass) > 2048) || (len(customSalt) > 2048)) { // {{{SYNC-CRYPTO-KEY-MAX}}}
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password or Salt is too long !")
@@ -787,7 +822,10 @@ func SafePassHashSmart(plainPass string, customSalt string) string {
 //-----
 
 
-func SafePassHashArgon2id824(plainPass string, customSalt string) string {
+func SafePassHashArgon2id824(plainPass string, customSalt string, usePrefix bool) string { // Go lang only, no interchange with PHP
+	//--
+	// without prefix is 128 bytes
+	// with prefix is 160 bytes, extra-padded to fixed length
 	//--
 	if((len(plainPass) > 2048) || (len(customSalt) > 2048)) { // {{{SYNC-CRYPTO-KEY-MAX}}}
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password or Salt is too long !")
@@ -813,17 +851,21 @@ func SafePassHashArgon2id824(plainPass string, customSalt string) string {
 	salt = base62.Encode([]byte(salt))
 	salt = Base64sEncode(salt)
 	salt = base85.Encode([]byte(salt))
-	salt = StrSubstr(StrPad2LenRight(Md5B64(salt), "#", 28), 0, 28)
+	salt = Sha384B64(Md5B64(salt) + NULL_BYTE + salt)
+	salt = StrSubstr(StrPad2LenRight(salt, "#", 28), 0, 28)
 	//fmt.Println("Argon2id Salt:", salt)
 	//--
 	var key []byte = argon2.IDKey([]byte(composedKey), []byte(salt), 21, 512*1024, 1, 103) // Argon2id resources: 21 cycles, 512MB memory, 1 thread, 103 bytes = 824 bits ; return as base92 encoded with a fixed length of 128 bytes (1024 bits) by padding b92 encoded data on the right with ' character
 	//--
 	const hashlen int = 128
 	var pass string = StrPad2LenRight(base92.Encode(key), "'", hashlen) // add right padding with '
-
 	if(len(pass) != hashlen) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password hash must be:", hashlen, "bytes !")
 		return ""
+	} //end if
+	//--
+	if(usePrefix == true) {
+		pass = StrPad2LenRight(SIGNATURE_PASSWORD_A2ID824 + pass, " ", hashlen + 31) + "'" // add prefix and extra padding with spaces and ending '
 	} //end if
 	//--
 	return pass
@@ -936,7 +978,8 @@ func threefishSafeIv(plainTextKey string) string {
 		return ""
 	} //end if
 	//--
-	var safeIv string = StrSubstr(Sha512(key), 0, 1024/8) // 1024/8
+	var strSafeHash string = Sha384(key) // sha384 is a better choice than sha512 because is more resistant to length attacks
+	var safeIv string = StrSubstr(strSafeHash + StrRev(strSafeHash), 0, 1024/8) // 1024/8
 	//--
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeIv)
 	return safeIv
@@ -982,10 +1025,10 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 	var derivedKey string = "" // 128 bytes
 	if(useArgon2id == true) {
 		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
-		derivedKey = SafePassHashArgon2id824(key, "") // b92
+		derivedKey = SafePassHashArgon2id824(key, "", false) // b92, don't use prefix (without prefix is 128 bytes)
 	} else {
 		theSignature = SIGNATURE_3FISH_V1_DEFAULT
-		derivedKey = threefishSafeKey(key) // ~ b92
+		derivedKey = threefishSafeKey(key) // ~ b92, (128 bytes)
 	} //end if else
 	if(len(derivedKey) != 128) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 128 bytes")
@@ -1051,10 +1094,10 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 	var derivedKey string = "" // 128 bytes
 	if(useArgon2id == true) {
 		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
-		derivedKey = SafePassHashArgon2id824(key, "") // b92
+		derivedKey = SafePassHashArgon2id824(key, "", false) // b92, don't use prefix (without prefix is 128 bytes)
 	} else {
 		theSignature = SIGNATURE_3FISH_V1_DEFAULT
-		derivedKey = threefishSafeKey(key) // ~ b92
+		derivedKey = threefishSafeKey(key) // ~ b92, (128 bytes)
 	} //end if else
 	if(len(derivedKey) != 128) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 128 bytes")
@@ -1803,6 +1846,13 @@ func Sha384(str string) string {
 } //END FUNCTION
 
 
+//-#
+// SHA384 is roughly 50% faster than SHA-256 on 64-bit machines
+// SHA384 has resistances to length extension attack but SHA512 doesn't have
+// SHA384 128-bit resistance against the length extension attacks is because the attacker needs to guess the 128-bit to perform the attack, due to the truncation
+//-#
+
+
 func Sha384B64(str string) string {
 	//--
 	hash := sha512.New384()
@@ -2507,6 +2557,24 @@ func isUnicodeNonspacingMarks(r rune) bool {
 	//--
 } //END FUNCTION
 //==
+
+
+func StrRev(s string) string { // PHP compatible
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	n := len(s)
+	runes := make([]rune, n)
+	for _, rune := range s {
+		n--
+		runes[n] = rune
+	} //end for
+	//--
+	return string(runes[n:])
+	//--
+} //END FUNCTION
 
 
 func StrDeaccent(s string) string {

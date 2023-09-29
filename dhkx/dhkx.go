@@ -1,6 +1,6 @@
 
 // (c) 2021-2022 unix-world.org
-// r.20220418.1012
+// r.20230928.2358
 
 //=======
 // This is an implementation of Diffie-Hellman Key Exchange algorithm for a Client/Server suite, based on: github.com/monnand/dhkx
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	VERSION = "r.20220418.1012"
+	VERSION = "r.20230928.2358"
 )
 
 
@@ -272,7 +272,7 @@ func DhKxServerFinalizeExchange(g *DHGroup, priv *DHKey, handleDhkxSrvRecvFunc H
 		return "ERR dhKxStep2: Server Public Key Mismatch:", pubKeyClient, ""
 	} //end if
 
-	var chkSrvPubKey string = smart.ThreefishDecryptCBC(string(shardExchCli), smart.Sha512B64(string(sharedSecret)), false)
+	var chkSrvPubKey string = smart.ThreefishDecryptCBC(string(shardExchCli), smart.Sha384B64(string(sharedSecret)), false)
 	chkSrvPubKey = smart.Base64Decode(chkSrvPubKey)
 	if(smart.StrTrimWhitespaces(chkSrvPubKey) == "") {
 		return "ERR Finalize Exchange: Shared Exchange is Empty or Invalid", pubKeyClient, ""
@@ -329,7 +329,7 @@ func DhKxClientExchange(handleDhkxCliRecvFunc HandleDhkxCliRecvFunc, handleDhkxC
 		return "ERR dhKxStep2: Shared Secret is NULL", grpCli, privCli, pubCli, pubKeyServer, "", ""
 	} //end if
 
-	var shardExch string = smart.ThreefishEncryptCBC(smart.Base64Encode(string(pubKeyServer)), smart.Sha512B64(string(shardCli)), false)
+	var shardExch string = smart.ThreefishEncryptCBC(smart.Base64Encode(string(pubKeyServer)), smart.Sha384B64(string(shardCli)), false)
 	errSendCliSend := handleDhkxCliSendFunc(pubCli, []byte(shardExch))
 	if(errSendCliSend != "") {
 		return "ERR Send to Server: " + errSendCliSend, grpCli, privCli, pubCli, pubKeyServer, "", ""
