@@ -1,0 +1,11 @@
+@head.20200717
+
+Go 1.14 or later
+
+module github.com/sym01/htmlsanitizer
+
+# refactored by unixman as:
+github.com/unix-world/smartgo/htmlsanitizer
+
+# modified by unixman
+

@@ -1,0 +1,11 @@
+@head.20230922
+
+Go 1.12 or later
+
+module github.com/gomarkdown/markdown
+
+# refactored by unixman as:
+github.com/unix-world/smartgo/markdown
+
+# modified by unixman
+

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230929.0246 :: STABLE
+// r.20230929.2004 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -67,14 +67,23 @@ import (
 //	"github.com/fatih/color"
 	color "github.com/unix-world/smartgo/colorstring"
 	"github.com/unix-world/smartgo/logutils"
+	uid "github.com/unix-world/smartgo/uuid"
 	"github.com/unix-world/smartgo/parseini"
 
 	"github.com/unix-world/smartgo/regexp2"
 	"github.com/unix-world/smartgo/fastjson"
+
+	xnethtml "golang.org/x/net/html"
+	"github.com/unix-world/smartgo/htmlsanitizer"
+
+	"github.com/unix-world/smartgo/markdown"
+	mkparser "github.com/unix-world/smartgo/markdown/parser"
+	mkhtml   "github.com/unix-world/smartgo/markdown/html"
+	mkast    "github.com/unix-world/smartgo/markdown/ast"
 )
 
 const (
-	VERSION string = "v.20230929.0246"
+	VERSION string = "v.20230929.2004"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -972,14 +981,17 @@ func threefishSafeKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE
 
 func threefishSafeIv(plainTextKey string) string {
 	//--
+	defer PanicHandler() // req. by cipher encrypt panic handler with wrong padded data
+	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
 	if(key == "") {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
 		return ""
 	} //end if
 	//--
-	var strSafeHash string = Sha384(key) // sha384 is a better choice than sha512 because is more resistant to length attacks
-	var safeIv string = StrSubstr(strSafeHash + StrRev(strSafeHash), 0, 1024/8) // 1024/8
+	var b64CkSum string = Sha384B64(NULL_BYTE + "#" + key) // sha384 is a better choice than sha256/sha512 because is more resistant to length attacks
+	var rawCkSum string = Base64Decode(b64CkSum)
+	var safeIv string = StrSubstr(base85.Encode([]byte(rawCkSum)) + base92.Encode([]byte(rawCkSum)) + b64CkSum + StrRev(b64CkSum) + Sha384(key), 0, 1024/8) // 1024/8 ; // sha384 is a better choice than sha512 because is more resistant to length attacks
 	//--
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeIv)
 	return safeIv
@@ -988,6 +1000,8 @@ func threefishSafeIv(plainTextKey string) string {
 
 
 func threefishSafeTweak(plainTextKey string, derivedKey string) string {
+	//--
+	defer PanicHandler() // req. by cipher encrypt panic handler with wrong padded data
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
 	if(key == "") {
@@ -1000,9 +1014,18 @@ func threefishSafeTweak(plainTextKey string, derivedKey string) string {
 		return ""
 	} //end if
 	//--
-	var safeTweak string = StrPad2LenLeft(StrSubstr(Crc32b(key) + Crc32b(derivedKey), 0, 128/8), "0", 128/8) // 128/8
+	var ckSumCrc32bKeyHex string = Crc32b(key)
+	var ckSumCrc32bDKeyHex string = Crc32b(derivedKey)
+	var ckSumCrc32bKeyRaw string = Hex2Bin(ckSumCrc32bKeyHex)
+	var ckSumCrc32bDKeyRaw string = Hex2Bin(ckSumCrc32bDKeyHex)
+	var ckSumCrc32bKeyEnc string = base62.Encode([]byte(ckSumCrc32bKeyRaw + ckSumCrc32bDKeyRaw))
+	var ckSumCrc32bDKeyEnc string = base58.Encode([]byte(ckSumCrc32bDKeyRaw + ckSumCrc32bKeyRaw))
+	var ckSumSha384B64 string = Sha384B64(FIXED_CRYPTO_SALT + NULL_BYTE + ckSumCrc32bKeyEnc + ckSumCrc32bDKeyEnc)
 	//--
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", ckSumSha384B64, ckSumCrc32bKeyEnc, ckSumCrc32bDKeyEnc)
+	var safeTweak string = StrPad2LenLeft(StrSubstr(ckSumSha384B64, 0, 128/8), "0", 128/8) // 128/8
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", safeTweak)
+	//--
 	return safeTweak
 	//--
 } //END FUNCTION
@@ -4607,6 +4630,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 								tmp_marker_val = StrUcWords(tmp_marker_val)
 							} else if(escaping == "|trim") { // apply trim
 								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
+							} else if(escaping == "|rev") { // reverse string
+								tmp_marker_val = StrRev(tmp_marker_val)
 							} else if(escaping == "|url") { // escape URL
 								tmp_marker_val = EscapeUrl(tmp_marker_val)
 							} else if(escaping == "|json") { // format as Json Data ; expects pure JSON !!!
@@ -4637,8 +4662,46 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string) st
 								tmp_marker_val = Bin2Hex(tmp_marker_val)
 							} else if(escaping == "|b64") { // Apply Base64 Encode
 								tmp_marker_val = Base64Encode(tmp_marker_val)
-							} else if(escaping == "|sha1") { // Apply SHA1 Encode
+							} else if(escaping == "|b64s") { // Apply Base64 Encode
+								tmp_marker_val = Base64sEncode(tmp_marker_val)
+							} else if(escaping == "|b32") { // Apply Base32 Encode
+								tmp_marker_val = base32.Encode([]byte(tmp_marker_val))
+							} else if(escaping == "|b36") { // Apply Base36 Encode
+								tmp_marker_val = base36.Encode([]byte(tmp_marker_val))
+							} else if(escaping == "|b58") { // Apply Base58 Encode
+								tmp_marker_val = base58.Encode([]byte(tmp_marker_val))
+							} else if(escaping == "|b62") { // Apply Base62 Encode
+								tmp_marker_val = base62.Encode([]byte(tmp_marker_val))
+							} else if(escaping == "|b85") { // Apply Base85 Encode
+								tmp_marker_val = base85.Encode([]byte(tmp_marker_val))
+							} else if(escaping == "|b92") { // Apply Base92 Encode
+								tmp_marker_val = base92.Encode([]byte(tmp_marker_val))
+							} else if(escaping == "|crc32") { // Create Crc32b Hash
+								tmp_marker_val = Crc32b(tmp_marker_val)
+							} else if(escaping == "|crc32e36") { // Create Crc32b Hash, Base36
+								tmp_marker_val = Crc32bB36(tmp_marker_val)
+							} else if(escaping == "|md5") { // Create MD5 Hash, Hex
+								tmp_marker_val = Md5(tmp_marker_val)
+							} else if(escaping == "|md5e64") { // Create MD5 Hash, Base64
+								tmp_marker_val = Md5B64(tmp_marker_val)
+							} else if(escaping == "|sha1") { // Create SHA1 Hash, Hex
 								tmp_marker_val = Sha1(tmp_marker_val)
+							} else if(escaping == "|sha1e64") { // Create SHA1 Hash, Base64
+								tmp_marker_val = Sha1B64(tmp_marker_val)
+							} else if(escaping == "|sha256") { // Create SHA256 Hash, Hex
+								tmp_marker_val = Sha256(tmp_marker_val)
+							} else if(escaping == "|sha256e64") { // Create SHA256 Hash, Base64
+								tmp_marker_val = Sha256B64(tmp_marker_val)
+							} else if(escaping == "|sha384") { // Create SHA384 Hash, Hex
+								tmp_marker_val = Sha384(tmp_marker_val)
+							} else if(escaping == "|sha384e64") { // Create SHA384 Hash, Base64
+								tmp_marker_val = Sha384B64(tmp_marker_val)
+							} else if(escaping == "|sha512") { // Create SHA512 Hash, Hex
+								tmp_marker_val = Sha512(tmp_marker_val)
+							} else if(escaping == "|sha512e64") { // Create SHA512 Hash, Base64
+								tmp_marker_val = Sha512B64(tmp_marker_val)
+							} else if(escaping == "|prettybytes") { // Display Pretty Bytes
+								tmp_marker_val = PrettyPrintBytes(ParseStrAsInt64(tmp_marker_val))
 							} else {
 								log.Println("[WARNING] " + CurrentFunctionName() + ": {### Invalid or Undefined Escaping " + escaping + " [" + ConvertIntToStr(j) + "]" + " for Marker `" + tmp_marker_key + "` " + "[" + ConvertIntToStr(i) + "]: " + " - detected in Replacement Key: " + tmp_marker_id + " ###}")
 							} //end if
@@ -4971,6 +5034,7 @@ func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, 
 
 //-----
 
+
 func PrettyPrintBytes(b int64) string {
 	//--
 	const unit int64 = 1024
@@ -4984,6 +5048,132 @@ func PrettyPrintBytes(b int64) string {
 	} //end for
 	//--
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HTMLCodeFixValidate(htmlCode string) (string, error) {
+	//--
+	var uuid string = StrToLower(uid.Uuid1013Str(13) + "-" + uid.Uuid1013Str(10) + "-fx." + ConvertUInt64ToStr(uid.UuidSessionSequence()))
+	var validHtml string = ""
+	//--
+	getBody := func(doc *xnethtml.Node) (*xnethtml.Node, error) {
+		var body *xnethtml.Node
+		var crawler func(*xnethtml.Node)
+		crawler = func(node *xnethtml.Node) {
+			if((node.Type == xnethtml.ElementNode) && (node.Data == "div")) {
+				for i:=0; i<len(node.Attr); i++ {
+					if((node.Attr[i].Key == "id") && (node.Attr[i].Val == "markdown-" + uuid)) {
+						body = node
+						return
+					} //end if
+				} //end for
+			} //end if
+			for child := node.FirstChild; child != nil; child = child.NextSibling {
+				crawler(child)
+			} //end for
+		} //end function
+		crawler(doc)
+		if(body == nil) {
+			return nil, errors.New("HTML Smart Fix / Validate: Body Tag is missing ...")
+		} //end if
+		return body, nil
+	} //end function
+	//--
+	renderNode := func(n *xnethtml.Node) string {
+		var buf bytes.Buffer
+		w := io.Writer(&buf)
+		xnethtml.Render(w, n)
+		return buf.String()
+	} //end if
+	//--
+	doc, err := xnethtml.Parse(strings.NewReader(`<!DOCTYPE html><html><head><meta charset="` + EscapeHtml(CHARSET) + `"></head><body><div id="markdown-` + EscapeHtml(uuid) + `" class="markdown">` + htmlCode + `</div></body></html>`))
+	if(err != nil) {
+		return "<!-- Html:err-fix.vd.1 -->", err
+	} //end if
+	//--
+	bn, err := getBody(doc)
+	if(err != nil) {
+		return "<!-- Html:err-fix.vd.2 -->", err
+	} //end if
+	validHtml = renderNode(bn)
+	validHtml = StrReplaceAll(validHtml, " />", ">") // fix html ending tags
+	validHtml = StrReplaceAll(validHtml, "/>", ">") // fix html ending tags
+	//--
+	return validHtml, nil
+	//--
+} //END FUNCTION
+
+
+func HTMLCodeFixSanitize(htmlCode string) (string, error) {
+	//--
+	defer PanicHandler() // just in case
+	//--
+	sanitizedHtml, errSanitizer := htmlsanitizer.SanitizeString(htmlCode)
+	//--
+	if(errSanitizer != nil) {
+		return "<!-- Html:err-fix.sn -->", errSanitizer
+	} //end if
+	//--
+	return sanitizedHtml, nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func MarkdownToHTMLRender(mkdwDoc string) (string, error) {
+	//--
+	defer PanicHandler() // just in case
+	//--
+	if(mkdwDoc == "") {
+		return "<!-- Markdown:empty -->", nil
+	} //end if
+	//--
+	var md []byte = []byte(mkdwDoc)
+	//--
+	extensions := mkparser.CommonExtensions | mkparser.HardLineBreak | mkparser.Attributes | mkparser.SuperSubscript // | mkparser.AutoHeadingIDs | mkparser.NoEmptyLineBeforeBlock // create markdown parser with extensions
+	p := mkparser.NewWithExtensions(extensions)
+	nodes := p.Parse(md)
+	//--
+	if(DEBUG == true) {
+		log.Println("[DEBUG] Markdown Render as HTML")
+		log.Println("[DATA] Markdown DOC: ========", mkdwDoc)
+		log.Println("[DATA] Markdown AST: ========", mkast.ToString(nodes))
+	} //end if
+	//--
+	htmlFlags := mkhtml.SkipHTML | mkhtml.LazyLoadImages // create HTML renderer with extensions
+	opts := mkhtml.RendererOptions{Flags: htmlFlags}
+	renderer := mkhtml.NewRenderer(opts)
+	//--
+	var htmlCode string = string(markdown.Render(nodes, renderer))
+	if(DEBUG == true) {
+		log.Println("[DATA] Markdown HTML: ========", htmlCode)
+	} //end if
+	//--
+	htmlCode, errHtmlSanitizer := HTMLCodeFixSanitize(htmlCode)
+	if(errHtmlSanitizer != nil) {
+		log.Println("[WARNING] Markdown HTML Sanitized:", errHtmlSanitizer)
+		return "<!-- Markdown:html.err-fix.sn -->", errHtmlSanitizer
+	} //end if
+	if(DEBUG == true) {
+		log.Println("[DATA] Markdown HTML Sanitized: ========", htmlCode)
+	} //end if
+	//--
+	htmlCode, errFixHtml := HTMLCodeFixValidate(htmlCode)
+	if(errFixHtml != nil) {
+		log.Println("[WARNING] Markdown HTML ValidateFixed:", errHtmlSanitizer)
+		return "<!-- Markdown:html.err-fix.vd -->", errHtmlSanitizer
+	} //end if
+	if(DEBUG == true) {
+		log.Println("[DATA] Markdown HTML Fixed (Sanitized + Validated): ========", htmlCode)
+	} //end if
+	//--
+	return htmlCode + "<!-- Markdown:html.safe -->", errHtmlSanitizer
 	//--
 } //END FUNCTION
 
