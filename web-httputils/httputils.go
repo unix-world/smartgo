@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230928.1807 :: STABLE
+// r.20231021.0510 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20230928.1807"
+	VERSION string = "r.20231021.0510"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -1882,7 +1882,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		(!smart.StrRegexMatchString(`^[a-z0-9\.]+$`, authUsername)) || // {{{SYNC-SF:REGEX_VALID_USER_NAME}}}
 		//--
 		(smart.StrTrimWhitespaces(authPassword) == "") ||
-		((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 255)) || // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
+		((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 88)) || // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
 		//--
 		(len(user) != len(authUsername)) ||
 		(len(pass) != len(authPassword)) ||
