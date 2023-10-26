@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231021.0510 :: STABLE
+// r.20231026.2358 :: STABLE
 
 // REQUIRE: go 1.17 or later
 package smartgo
@@ -21,6 +21,7 @@ import (
 
 	"time"
 	"math"
+	"math/big"
 	"math/rand"
 	"bytes"
 	"strings"
@@ -54,6 +55,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/cipher"
+	cryptorand "crypto/rand"
 	"golang.org/x/crypto/blowfish"
 	"golang.org/x/crypto/argon2"
 
@@ -83,7 +85,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20231021.0510"
+	VERSION string = "v.20231026.2358"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -712,13 +714,56 @@ func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
 //-----
 
 
+// GenerateRandomBytes returns securely generated random bytes.
+// It will return an error if the system's secure random
+// number generator fails to function correctly, in which
+// case the caller should not continue.
+func GenerateRandomBytes(n int) ([]byte, error) { // https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb
+	//--
+	b := make([]byte, n)
+	//--
+	_, err := cryptorand.Read(b) // Note that err == nil only if we read len(b) bytes.
+	if(err != nil) {
+		return nil, err
+	} //end if
+	//--
+	return b, nil
+	//--
+} //END FUNCTION
+
+
+// GenerateRandomString returns a securely generated random string.
+// It will return an error if the system's secure random
+// number generator fails to function correctly, in which
+// case the caller should not continue.
+func GenerateRandomString(n int) (string, error) { // https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb
+	//--
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
+	//--
+	ret := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(letters))))
+		if(err != nil) {
+			return "", err
+		} //end if
+		ret[i] = letters[num.Int64()]
+	} //end for
+	//--
+	return string(ret), nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
 	//--
 	// Create a safe checksum of data
 	// It will append the salt to the end of data to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
 	// Protected by SHA384 that has 128-bit resistance against the length extension attacks since the attacker needs to guess the 128-bit to perform the attack, due to the truncation
 	//--
-	defer PanicHandler() // req. by b64 decrypt panic handler with malformed data
+	defer PanicHandler() // req. by b64 decode panic handler with malformed data
 	//--
 	customSalt = StrTrimWhitespaces(customSalt)
 	if(customSalt == "") {
@@ -887,7 +932,7 @@ func SafePassHashArgon2id824(plainPass string, customSalt string, usePrefix bool
 
 func cryptoPacketCheckAndDecode(str string, fx string, ver uint8) string {
 	//--
-	defer PanicHandler() // req. by b64 decrypt panic handler with malformed data
+	defer PanicHandler() // req. by b64 decode panic handler with malformed data
 	//--
 	if((ver != 2) && (ver != 1)) {
 		log.Println("[NOTICE]", fx, "Invalid Version:", ver, CurrentFunctionName())
