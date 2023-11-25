@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231021.0510 :: STABLE
+// r.20231124.2232 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -26,7 +26,6 @@ import (
 	"net/http/httputil"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/subtle"
 
 	smart 		"github.com/unix-world/smartgo"
 	smartcache 	"github.com/unix-world/smartgo/simplecache"
@@ -38,7 +37,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20231021.0510"
+	VERSION string = "r.20231124.2232"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -73,12 +72,19 @@ const (
 	MIME_TYPE_DEFAULT string = "application/octet-stream"
 	//--
 	CACHE_CLEANUP_INTERVAL uint32 = 5 // 5 seconds
-	CACHE_EXPIRATION uint32 = 300 // 300 seconds = 5 mins
+	CACHE_EXPIRATION uint32 = 300 // 300 seconds = 5 mins ; cache unsuccessful logins for 5 mins
+	CACHE_FAILS_NUM uint32 = 7 // max fail attempts before lock 5 mins (300 sec)
 	CACHE_CONTROL_NOCACHE = "no-cache"
 	CACHE_CONTROL_PRIVATE = "private"
 	CACHE_CONTROL_PUBLIC = "public"
 	//--
 	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-]+$`
+	//--
+
+	//--
+	HTTP_AUTH_MODE_BASIC  uint8 = 0
+	HTTP_AUTH_MODE_BEARER uint8 = 1
+	HTTP_AUTH_MODE_COOKIE uint8 = 2
 	//--
 
 	//--
@@ -1794,10 +1800,30 @@ func HttpStatus504(w http.ResponseWriter, r *http.Request, messageText string, o
 
 //-----
 
+// modes: 0 = Basic Auth ; 1 = Bearer ; 2 = Cookie ; 3..255 unused at the moment ...
+type HttpAuthCheckFunc func(string, string, uint8) bool // (user, pass, authmode) : true if OK / false if NOT
 
 // if returns a non empty string there is an error ; if error it already outputs the 401 headers and content so there is nothing more to do ...
 // it handles 401 or 403 access by IP list
-func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, authUsername string, authPassword string, allowedIPs string, outputHtml bool) string { // check if HTTP(S) Basic Auth is OK
+func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, authUsername string, authPassword string, allowedIPs string, customAuthCheck HttpAuthCheckFunc, outputHtml bool) string { // check if HTTP(S) Basic Auth is OK
+	//--
+	var err string = ""
+	//--
+	if(
+		(smart.StrTrimWhitespaces(authUsername) == "") &&
+		(smart.StrTrimWhitespaces(authPassword) == "") &&
+		(customAuthCheck == nil)) {
+			err = "ERROR: Empty Auth Provider. Either must supply a fixed username/password, either an auth method."
+			HttpStatus500(w, r, err, outputHtml)
+			return err
+	}
+	if(
+		(customAuthCheck != nil) &&
+		((smart.StrTrimWhitespaces(authUsername) != "") || (smart.StrTrimWhitespaces(authPassword) != ""))) {
+			err = "ERROR: Auth Provider Mismatch. Either must supply a fixed username/password, either an auth method."
+			HttpStatus500(w, r, err, outputHtml)
+			return err
+	}
 	//--
 	authRealm = smart.StrTrimWhitespaces(smart.StrReplaceAll(authRealm, `"`, `'`))
 	authUsername = smart.StrTrimWhitespaces(authUsername)
@@ -1808,8 +1834,6 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FIX :: Invalid Realm `" + authRealm + "` ; The Realm was set to default: `" + DEFAULT_REALM + "`")
 		authRealm = DEFAULT_REALM
 	} //end if
-	//--
-	var err string = ""
 	//--
 	var rAddr string = r.RemoteAddr
 	ip, port := smart.GetSafeIpAndPortFromRequestRemoteAddr(r) // this is using r.RemoteAddr
@@ -1864,7 +1888,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	} //end if
 	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(cacheKeyCliIpAddr)
 	if(cacheExists == true) {
-		if((cachedObj.Id == cacheKeyCliIpAddr) && (len(cachedObj.Data) >= 10)) { // allow max 10 invalid attempts then lock for 5 mins ... for this cacheKeyCliIpAddr
+		if((cachedObj.Id == cacheKeyCliIpAddr) && (len(cachedObj.Data) >= int(CACHE_FAILS_NUM))) { // allow max 7 invalid attempts then lock for 5 mins ... for this cacheKeyCliIpAddr
 			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(CACHE_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
 			w.Header().Set(HTTP_HEADER_RETRY_AFTER, time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " UTC")
 			HttpStatus429(w, r, err, outputHtml)
@@ -1876,20 +1900,16 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	//--
 	if(!ok) {
 		err = "Authentication is Required"
-	} else if(
-		(smart.StrTrimWhitespaces(authUsername) == "") ||
-		((len(authUsername) < 5) || (len(authUsername) > 25)) || // {{{SYNC-GO-SMART-AUTH-USER-LEN}}}
-		(!smart.StrRegexMatchString(`^[a-z0-9\.]+$`, authUsername)) || // {{{SYNC-SF:REGEX_VALID_USER_NAME}}}
-		//--
-		(smart.StrTrimWhitespaces(authPassword) == "") ||
-		((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 88)) || // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
-		//--
-		(len(user) != len(authUsername)) ||
-		(len(pass) != len(authPassword)) ||
-		(subtle.ConstantTimeCompare([]byte(user), []byte(authUsername)) != 1) ||
-		(subtle.ConstantTimeCompare([]byte(pass), []byte(authPassword)) != 1) ||
-		(user != authUsername) || (pass != authPassword)) {
-		err = "Username and Password Check Failed: not match or invalid"
+	} else {
+		if(customAuthCheck != nil) { // custom auth provider check
+			if(customAuthCheck(user, pass, HTTP_AUTH_MODE_BASIC) != true) {
+				err = "Username and Password [AuthCheck] Failed: no match or invalid"
+			} //end if
+		} else { // default check: user, pass, requiredUsername, requiredPassword
+			if(smart.UserPassDefaultCheck(user, pass, authUsername, authPassword) != true) {
+				err = "Username and Password [Check] Failed: no match or invalid"
+			} //end if
+		} //end if else
 	} //end if else
 	//--
 	if(err != "") {

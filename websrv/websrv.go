@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231005.1352 :: STABLE
+// r.20231124.2232 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231005.1352"
+	VERSION string = "r.20231124.2232"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -104,7 +104,7 @@ var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content stri
 }
 
 
-func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string) bool {
+func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc) bool {
 
 	//-- settings
 
@@ -217,7 +217,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 			useAuth = false
 		} //end if
 		if((isAuthActive == true) && (useAuth == true)) { // this check must be before executing fx below
-			var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, true) // outputs: HTML
+			var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, true) // outputs: HTML
 			if(authErr != "") {
 				log.Println("[WARNING] Web Server: Authentication Failed:", authErr)
 				return

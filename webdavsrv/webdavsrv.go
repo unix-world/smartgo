@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231005.1352 :: STABLE
+// r.20231124.2232 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231005.1352"
+	VERSION string = "r.20231124.2232"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -40,7 +40,7 @@ const (
 )
 
 
-func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string) bool {
+func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc) bool {
 
 	//-- settings
 
@@ -52,22 +52,8 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 	//-- auth user / pass
 
 	authUser = smart.StrTrimWhitespaces(authUser)
-	if(authUser == "") {
-		log.Println("[ERROR] WebDAV Server: Empty Auth UserName")
-		return false
-	} //end if
-	if((len(authUser) < 5) || (len(authUser) > 25)) { // {{{SYNC-GO-SMART-AUTH-USER-LEN}}}
-		log.Println("[ERROR] WebDAV Server: Invalid Auth UserName Length: must be between 5 and 25 characters")
-		return false
-	} //end if
-
-	// do not trim authPass !
-	if(smart.StrTrimWhitespaces(authPass) == "") {
-		log.Println("[ERROR] WebDAV Server: Empty Auth Password")
-		return false
-	} //end if
-	if((len(smart.StrTrimWhitespaces(authPass)) < 7) || (len(authPass) > 88)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
-		log.Println("[ERROR] WebDAV Server: Invalid Auth UserName Length: must be between 7 and 255 characters")
+	if((authUser == "") && (smart.StrTrimWhitespaces(authPass) == "") && (customAuthCheck == nil)) { // do not trim authPass !
+		log.Println("[ERROR] WebDAV Server: Empty Auth Providers")
 		return false
 	} //end if
 
@@ -177,7 +163,7 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	// webdav handler : all webdav status codes ...
 	davHandler := func(w http.ResponseWriter, r *http.Request) {
-		var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, false) // outputs: TEXT
+		var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, false) // outputs: TEXT
 		if(authErr != "") {
 			log.Println("[WARNING] WebDAV Server / Storage Area :: Authentication Failed:", authErr)
 			return
