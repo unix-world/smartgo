@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231124.2232 :: STABLE
+// r.20231128.0236 :: STABLE
 // [ CORE ]
 
-// REQUIRE: go 1.17 or later
+// REQUIRE: go 1.18 or later (depends on Go generics)
 package smartgo
 
 import (
@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20231124.2232"
+	VERSION string = "v.20231128.0236"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -235,6 +235,28 @@ func Base64sDecode(data string) string {
 } //END FUNCTION
 
 
+func Base64ToBase64s(data string) string {
+	//--
+	data = StrReplaceAll(data, "+", "-")
+	data = StrReplaceAll(data, "/", "_")
+	data = StrReplaceAll(data, "=", ".")
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+func Base64sToBase64(data string) string {
+	//--
+	data = StrReplaceAll(data, ".", "=")
+	data = StrReplaceAll(data, "_", "/")
+	data = StrReplaceAll(data, "-", "+")
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
 //-----
 
 
@@ -255,6 +277,49 @@ func Explode(delimiter string, text string) []string {
 func Implode(glue string, pieces []string) string {
 	//--
 	return strings.Join(pieces, glue)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func InListArr[E comparable](v E, arr []E) bool { // depends on Go generics, Go 1.18 or later
+	//--
+	if(arr == nil) {
+		return false
+	} //end if
+	//--
+	for _, vv := range arr {
+		if(v == vv) {
+			return true
+		} //end if
+	} //end for
+	//--
+	return false
+	//--
+} //END FUNCTION
+
+
+func ArrMapKeyExists[E comparable](v E, arr map[E]E) bool { // depends on Go generics, Go 1.18 or later
+	//--
+	if(arr == nil) {
+		return false
+	} //end if
+	//--
+	/*
+	for kk, _ := range arr {
+		if(v == kk) {
+			return true
+		} //end if
+	} //end for
+	//--
+	return false
+	*/
+	//--
+	_, exists := arr[v]
+	//--
+	return exists
 	//--
 } //END FUNCTION
 
@@ -483,18 +548,72 @@ func StrNormalizeSpaces(s string) string {
 } //END FUNCTION
 
 
-// case sensitive replacer ; for case insensitive must use StrRegexReplaceAll()
-func StrReplaceAll(s string, part string, replacement string) string {
+// case sensitive replacer
+func StrReplaceWithLimit(s string, part string, replacement string, limit int) string {
 	//--
-	return strings.ReplaceAll(s, part, replacement)
+	return strings.Replace(s, part, replacement, limit) // if (limit == -1) will replace all
 	//--
 } //END FUNCTION
 
 
-// case sensitive replacer ; for case insensitive write your own function ;-)
-func StrReplaceWithLimit(s string, part string, replacement string, limit int) string {
+// case sensitive replacer
+func StrReplaceAll(s string, part string, replacement string) string {
 	//--
-	return strings.Replace(s, part, replacement, limit) // if (limit == -1) will replace all
+//	return strings.ReplaceAll(s, part, replacement)
+	return StrReplaceWithLimit(s, part, replacement, -1)
+	//--
+} //END FUNCTION
+
+
+// case insensitive replacer
+func StrIReplaceWithLimit(s, part, replacement string, limit int) string {
+	//--
+	if((part == replacement) || (part == "")) {
+		return s // avoid allocation
+	} //end if
+	//--
+	t := strings.ToLower(s)
+	o := strings.ToLower(part)
+	//-- compute number of replacements
+	n := strings.Count(t, o)
+	if((n == 0) || (limit == 0)) {
+		return s // avoid allocation
+	} //end if
+	if(limit < 0) {
+		limit = n
+	} //end if
+	//-- apply replacements to buffer
+	var b strings.Builder
+	b.Grow(len(s) + n * (len(replacement) - len(part)))
+	start := 0
+	for i := 0; i < n; i++ {
+		j := start
+		if(len(part) == 0) {
+			if(i > 0) {
+				_, wid := utf8.DecodeRuneInString(s[start:])
+				j += wid
+			} //end if
+		} else {
+			j += strings.Index(t[start:], o)
+		} //end if else
+		b.WriteString(s[start:j])
+		b.WriteString(replacement)
+		start = j + len(part)
+		if(i >= (limit - 1)) {
+			break
+		} //end if
+	} //end for
+	b.WriteString(s[start:])
+	//--
+	return b.String()
+	//--
+} //END FUNCTION
+
+
+// case insensitive replacer
+func StrIReplaceAll(s string, part string, replacement string) string {
+	//--
+	return StrIReplaceWithLimit(s, part, replacement, -1)
 	//--
 } //END FUNCTION
 
@@ -995,10 +1114,17 @@ func StrCreateJsVarName(s string) string {
 		return ""
 	} //end if
 	//--
-	s = StrRegexReplaceAll(`[^a-zA-Z0-9_]`, s, "")
+	s = StrRegexReplaceAll(`[^a-zA-Z0-9_\$]`, s, "")
 	s = StrTrimWhitespaces(s)
 	//--
 	return s
+	//--
+} //END FUNCTION
+
+
+func UInt64ToHex(num uint64) string {
+	//--
+	return fmt.Sprintf("%x", num)
 	//--
 } //END FUNCTION
 
