@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231124.2232 :: STABLE
+// r.20231128.2058 :: STABLE
 // [ ARCHIVERS ]
 
-// REQUIRE: go 1.17 or later
+// REQUIRE: go 1.19 or later
 package smartgo
 
 import (
@@ -22,16 +22,18 @@ import (
 const (
 	SEPARATOR_SFZ_CHECKSUM_V1 string 		= "#CHECKSUM-SHA1#" 							// v1
 	SEPARATOR_SFZ_CHECKSUM_V2 string 		= "#CKSUM256#" 									// v2
+	SEPARATOR_SFZ_CHECKSUM_V3 string 		= "#CKSUM384V3#" 								// v3
 
-	SIGNATURE_SFZ_DATA_ARCH_V1 string 		= "PHP.SF.151129/B64.ZLibRaw.HEX" 				// only to support v1 unarchive ; (for v1 no archive is available anymore)
-	SIGNATURE_SFZ_DATA_ARCH_V2 string 		= "SFZ.20210818/B64.ZLibRaw.hex" 				// current, v2 ; archive + unarchive
+	SIGNATURE_SFZ_DATA_ARCH_V1 string 		= "PHP.SF.151129/B64.ZLibRaw.HEX" 				// v1, support only unarchive
+	SIGNATURE_SFZ_DATA_ARCH_V2 string 		= "SFZ.20210818/B64.ZLibRaw.hex" 				// v2, support only unarchive
+	SIGNATURE_SFZ_DATA_ARCH_V3 string 		= "[SFZ.20231031/B64.ZLibRaw.hex]" 				// current, v3 ; archive + unarchive
 )
 
 
 //-----
 
 
-func DataArchive(str string) string {
+func DataArchive(str string) string { // v3 only
 	//--
 	defer PanicHandler() // req. by gz deflate panic handler with malformed data
 	//--
@@ -40,8 +42,8 @@ func DataArchive(str string) string {
 		return ""
 	} //end if
 	//--
-	var chksum string = Sha256(str)
-	var data string = StrTrimWhitespaces(Bin2Hex(str)) + SEPARATOR_SFZ_CHECKSUM_V2 + chksum
+	var chksum string = Sh3a384B64(str) // b64
+	var data string = StrTrimWhitespaces(Bin2Hex(str)) + SEPARATOR_SFZ_CHECKSUM_V3 + chksum // v3
 	str = ""
 	//--
 	var arch string = GzDeflate(data, -1)
@@ -63,20 +65,47 @@ func DataArchive(str string) string {
 	} //end if
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ": ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
-	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + SIGNATURE_SFZ_DATA_ARCH_V2
+	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + SIGNATURE_SFZ_DATA_ARCH_V3 // v3
+	arch += "\n" + "(" + dataArchCheckSign(arch) + ")" // v3+ signature
 	//--
-	var unarch_chksum string = Sha256(DataUnArchive(arch))
+	var unarch_chksum string = Sh3a384B64(DataUnArchive(arch))
 	if(unarch_chksum != chksum) {
 		log.Println("[ERROR] " + CurrentFunctionName() + ": Data Encode Check Failed")
 		return ""
 	} //end if
 	//--
 	return arch
-	//-- str
+	//--
 } //END FUNCTION
 
 
-func DataUnArchive(str string) string {
+func dataArchCheckSign(pak string) string { // v3 only
+	//--
+	defer PanicHandler() // req. by hex2bin panic handler with malformed data
+	//--
+	len := ConvertIntToStr(len(pak))
+	//--
+	crc32b  := Crc32bB36(pak) // b36
+	sh3a512 := Sh3a512B64(pak + "\v" + len) // b64
+	sh3a384 := Sh3a384B64(sh3a512 + NULL_BYTE + pak) // b64
+	sh3a256 := Sh3a256B64(pak + NULL_BYTE + sh3a384) // b64
+	sh3a224 := Sh3a224B64(sh3a512 + NULL_BYTE + pak + NULL_BYTE + crc32b + NULL_BYTE + sh3a256 + NULL_BYTE + sh3a384) // b64
+	//--
+	hmacSh3a224, err := HashHmac("SHA3-224", len + "\v" + pak, sh3a224, false) // hex
+	if(err != nil) {
+		return ""
+	} //end if
+	hmacSh3a224 = Hex2Bin(hmacSh3a224)
+	if(hmacSh3a224 == "") {
+		return ""
+	} //end if
+	//--
+	return BaseEncode([]byte(hmacSh3a224), "b62")
+	//--
+} //END FUNCTION
+
+
+func DataUnArchive(str string) string { // v3, v2, v1
 	//--
 	defer PanicHandler() // req. by gz / hex2bin panic handler with malformed data
 	//--
@@ -85,8 +114,8 @@ func DataUnArchive(str string) string {
 		return ""
 	} //end if
 	//--
-	arr := Explode("\n", str)
-	str = ""
+	arr := ExplodeWithLimit("\n", str, 4) // let it be 4 not 3 ; if there is some garbage on a new line after signature ; also v3 have an extra checksum ... just let it there ...
+	str = "" // free mem
 	var alen int = len(arr)
 	//--
 	arr[0] = StrTrimWhitespaces(arr[0])
@@ -100,15 +129,39 @@ func DataUnArchive(str string) string {
 		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Package Signature")
 		//arr = append(arr, "") // fix: add missing arr[1] to avoid panic below ; no more needed as will exit below if this err happen
 		return ""
-	} else {
-		arr[1] = StrTrimWhitespaces(arr[1])
-		if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V2) {
-			versionDetected = 2
-		} else if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V1) {
-			versionDetected = 1
-		} //end if else
-		if(versionDetected <= 0) {
-			log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Signature:", arr[1])
+	} //end if
+	//--
+	if(alen < 3) {
+		arr = append(arr, "") // fix
+	} //end if
+	arr[2] = StrTrimWhitespaces(arr[2])
+	lenSign := len(arr[2])
+	//--
+	arr[1] = StrTrimWhitespaces(arr[1])
+	if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V3) {
+		versionDetected = 3
+	} else if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V2) {
+		versionDetected = 2
+	} else if(arr[1] == SIGNATURE_SFZ_DATA_ARCH_V1) {
+		versionDetected = 1
+	} //end if else
+	if(versionDetected <= 0) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Signature:", arr[1])
+		return ""
+	} //end if
+	//-- verify package checksum (v3+ only)
+	if(versionDetected == 3) { // v3
+		if(
+			(lenSign < 2) ||
+			(arr[2] == "") ||
+			(StrPos(arr[2], "(") != 0) ||
+			(StrSubstr(arr[2], lenSign-1, lenSign) != ")")) {
+				log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Empty or Malformed Package CheckSign", arr[2])
+				return ""
+		} //end if
+		cksgn := "(" + dataArchCheckSign(arr[0] + "\n" + arr[1]) + ")"
+		if(cksgn != arr[2]) {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Invalid Package CheckSign, signature does not match, archived data is unsafe !")
 			return ""
 		} //end if
 	} //end if
@@ -127,11 +180,11 @@ func DataUnArchive(str string) string {
 	//--
 	const txtErrExpl string = "This can occur if decompression failed or an invalid packet has been assigned ..."
 	//--
-	var versionCksumSeparator string = ""
-	if(versionDetected == 1) {
-		versionCksumSeparator = SEPARATOR_SFZ_CHECKSUM_V1
-	} else { // v2
+	var versionCksumSeparator string = SEPARATOR_SFZ_CHECKSUM_V3
+	if(versionDetected == 2) { // v2
 		versionCksumSeparator = SEPARATOR_SFZ_CHECKSUM_V2
+	} else if(versionDetected == 1) { // v1
+		versionCksumSeparator = SEPARATOR_SFZ_CHECKSUM_V1
 	} //end if else
 	//--
 	if((versionCksumSeparator == "") || (!StrContains(arr[0], versionCksumSeparator))) {
@@ -169,11 +222,15 @@ func DataUnArchive(str string) string {
 	//--
 	var chkSignature bool = false
 	if(versionDetected == 1) {
-		if(Sha1(darr[0]) == darr[1]) {
+		if(Sha1(darr[0]) == darr[1]) { // v1
 			chkSignature = true
 		} //end if
-	} else { // v2
+	} else if(versionDetected == 2) { // v2
 		if(Sha256(darr[0]) == darr[1]) {
+			chkSignature = true
+		} //end if
+	} else { // v3
+		if(Sh3a384B64(darr[0]) == darr[1]) {
 			chkSignature = true
 		} //end if
 	} //end if else

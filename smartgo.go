@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231128.0236 :: STABLE
+// r.20231128.2358 :: STABLE
 // [ CORE ]
 
-// REQUIRE: go 1.18 or later (depends on Go generics)
+// REQUIRE: go 1.19 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
 package smartgo
 
 import (
@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20231128.0236"
+	VERSION string = "v.20231128.2358"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -57,7 +57,7 @@ const (
 
 	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
 
-	REGEX_SMART_SAFE_NUMBER_FLOAT string    = `^[0-9\-\.]+$` 					// SAFETY: SUPPORT ONLY THESE CHARACTERS IN SAFE FLOAT (ex: JSON)
+	REGEX_SMART_SAFE_NUMBER_FLOAT string = `^[0-9\-\.]+$` 						// SAFETY: SUPPORT ONLY THESE CHARACTERS IN SAFE FLOAT (ex: JSON)
 
 	REGEXP2_DEFAULT_MAX_RECURSION uint32 = 800000 								// Default REGEXP2 Recursion Limit: 800K
 	REGEXP2_DEFAULT_MAX_TIMEOUT uint8 = 1										// Default REGEXP2 Max Timeout 1 Second(s)
@@ -884,6 +884,10 @@ func StrUcWords(s string) string {
 
 func StrPad2LenLeft(s string, padStr string, overallLen int) string { // LeftPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
 	//--
+	if(len(s) >= overallLen) { // fix, as in PHP
+		return s
+	} //end if
+	//--
 	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
 	var retStr string = strings.Repeat(padStr, padCountInt) + s
 	//--
@@ -893,6 +897,10 @@ func StrPad2LenLeft(s string, padStr string, overallLen int) string { // LeftPad
 
 
 func StrPad2LenRight(s string, padStr string, overallLen int) string { // RightPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
+	//--
+	if(len(s) >= overallLen) { // fix, as in PHP
+		return s
+	} //end if
 	//--
 	var padCountInt int = 1 + ((overallLen - len(padStr)) / len(padStr))
 	var retStr string = s + strings.Repeat(padStr, padCountInt)

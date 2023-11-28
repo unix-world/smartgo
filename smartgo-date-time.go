@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231124.2232 :: STABLE
+// r.20231128.2058 :: STABLE
 // [ DATE / TIME ]
 
-// REQUIRE: go 1.17 or later
+// REQUIRE: go 1.19 or later
 package smartgo
 
 import (

@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231128.0236 :: STABLE
+// r.20231128.2058 :: STABLE
 // [ TPL (MARKERS-TPL) ]
 
-// REQUIRE: go 1.18 or later (depends on Go generics)
+// REQUIRE: go 1.19 or later
 package smartgo
 
 import (
@@ -13,13 +13,6 @@ import (
 	"regexp"
 	"strings"
 	"encoding/json"
-
-	"github.com/unix-world/smartgo/base32"
-	"github.com/unix-world/smartgo/base36"
-	"github.com/unix-world/smartgo/base58"
-	"github.com/unix-world/smartgo/base62"
-	"github.com/unix-world/smartgo/base85"
-	"github.com/unix-world/smartgo/base92"
 
 	"github.com/unix-world/smartgo/fastjson"
 )
@@ -704,27 +697,28 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							} else if(escaping == "|hex") { // Apply Bin2Hex Encode
 								tmp_marker_val = Bin2Hex(tmp_marker_val)
 							//--
-							} else if(escaping == "|b64") { // Apply Base64 Encode
-								tmp_marker_val = Base64Encode(tmp_marker_val)
-							} else if(escaping == "|b64s") { // Apply Base64 Encode
-								tmp_marker_val = Base64sEncode(tmp_marker_val)
 							} else if(escaping == "|b64tob64s") { // Convert from Base64 Encoding to Base64 Safe URL Encoding
 								tmp_marker_val = Base64ToBase64s(tmp_marker_val)
 							} else if(escaping == "|b64stob64") { // Convert from Base64 Safe URL Encoding to Base64 Encoding
 								tmp_marker_val = Base64sToBase64(tmp_marker_val)
 							//--
+							} else if(escaping == "|b64") { // Apply Base64 Encode
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b64")
+							} else if(escaping == "|b64s") { // Apply Base64 Encode
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b64s")
+							//--
 							} else if(escaping == "|b32") { // Apply Base32 Encode
-								tmp_marker_val = base32.Encode([]byte(tmp_marker_val))
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b32")
 							} else if(escaping == "|b36") { // Apply Base36 Encode
-								tmp_marker_val = base36.Encode([]byte(tmp_marker_val))
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b36")
 							} else if(escaping == "|b58") { // Apply Base58 Encode
-								tmp_marker_val = base58.Encode([]byte(tmp_marker_val))
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b58")
 							} else if(escaping == "|b62") { // Apply Base62 Encode
-								tmp_marker_val = base62.Encode([]byte(tmp_marker_val))
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b62")
 							} else if(escaping == "|b85") { // Apply Base85 Encode
-								tmp_marker_val = base85.Encode([]byte(tmp_marker_val))
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b85")
 							} else if(escaping == "|b92") { // Apply Base92 Encode
-								tmp_marker_val = base92.Encode([]byte(tmp_marker_val))
+								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b92")
 							//--
 							} else if(escaping == "|crc32b") { // Apply Crc32b/B16 (default) Hashing
 								tmp_marker_val = Crc32b(tmp_marker_val)
