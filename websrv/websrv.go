@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231124.2232 :: STABLE
+// r.20231129.0631 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231124.2232"
+	VERSION string = "r.20231129.0631"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -116,17 +116,21 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 	//-- auth user / pass
 
 	var isAuthActive bool = false
-
 	authUser = smart.StrTrimWhitespaces(authUser)
 	if(authUser != "") {
 		isAuthActive = true
-		if((len(authUser) < 5) || (len(authUser) > 25)) { // {{{SYNC-GO-SMART-AUTH-USER-LEN}}}
-			log.Println("[ERROR] Web Server: Invalid Auth UserName Length: must be between 5 and 25 characters")
+		if(smart.StrTrimWhitespaces(authPass) == "") {
+			log.Println("[ERROR] Web Server: Empty Auth Password when a UserName is Set")
 			return false
 		} //end if
-		// do not trim authPass !
-		if((len(smart.StrTrimWhitespaces(authPass)) < 7) || (len(authPass) > 88)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
-			log.Println("[ERROR] Web Server: Invalid Auth UserName Length: must be between 7 and 255 characters")
+		if(customAuthCheck != nil) {
+			log.Println("[ERROR] Web Server: Auth User / Pass is set but also a custom Auth Handler")
+			return false
+		} //end if
+	} else if(customAuthCheck != nil) {
+		isAuthActive = true
+		if((smart.StrTrimWhitespaces(authUser) != "") && (smart.StrTrimWhitespaces(authPass) != "")) {
+			log.Println("[ERROR] Web Server: Custom Auth Handler is Set but also Auth User / Pass")
 			return false
 		} //end if
 	} //end if

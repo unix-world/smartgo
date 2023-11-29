@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231124.2232 :: STABLE
+// r.20231129.0631 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231124.2232"
+	VERSION string = "r.20231129.0631"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -53,7 +53,7 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	authUser = smart.StrTrimWhitespaces(authUser)
 	if((authUser == "") && (smart.StrTrimWhitespaces(authPass) == "") && (customAuthCheck == nil)) { // do not trim authPass !
-		log.Println("[ERROR] WebDAV Server: Empty Auth Providers")
+		log.Println("[ERROR] WebDAV Server: Empty Auth Providers: Auth User / Pass or Auth Handler")
 		return false
 	} //end if
 
