@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231129.0631 :: STABLE
+// r.20231129.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -54,12 +54,14 @@ type versionStruct struct {
 	Version string `json:"version"`
 }
 
-// EXTEND THIS
-var UrlHandlersSkipAuth = map[string]bool{
-	"/": true,
+type HttpHandlerFunc func(r *http.Request, authData smart.AuthDataStruct) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string)
+
+// EXTEND THESE
+var UrlHandlersSkipAuth = map[string]bool{ // use a separate map for auth, not the handler itself to avoid use any other execution before successful auth if required
+	"/": false,
 }
-var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string){
-	"/": func(r *http.Request) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+var UrlHandlersMap = map[string]HttpHandlerFunc{
+	"/": func(r *http.Request, authData smart.AuthDataStruct) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
 		code = 208
 		var headHtml string = ""
 		var serverSignature bytes.Buffer = wSrvSignature()
@@ -74,7 +76,7 @@ var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content stri
 		headers["Z-Sample-Header"] = "Home Page"
 		return
 	},
-	"/status": func(r *http.Request) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+	"/status": func(r *http.Request, authData smart.AuthDataStruct) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
 		code = 202
 		var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 		var serverSignature bytes.Buffer = wSrvSignature()
@@ -88,7 +90,7 @@ var UrlHandlersMap = map[string]func(r *http.Request) (code uint16, content stri
 		headers = nil
 		return
 	},
-	"/version": func(r *http.Request) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+	"/version": func(r *http.Request, authData smart.AuthDataStruct) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
 		code = 203
 		ver := versionStruct{}
 		ver.Version = TheStrSignature
@@ -200,6 +202,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 
 	// http root handler : 202 | 404
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		//--
 		var theUrlPath string = smart.StrTrimWhitespaces(string(r.URL.Path))
 		theUrlPath = smart.StrTrimRight(theUrlPath, "/")
 		theUrlPath = smart.StrTrimWhitespaces(theUrlPath)
@@ -210,28 +213,37 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 			srvassets.WebAssetsHttpHandler(w, r, "", "cache:private") // use default mime disposition ; private cache mode
 			return
 		} //end if
+		//--
 		fx, okPath := UrlHandlersMap[theUrlPath]
 		if((okPath != true) || (fx == nil)) {
 			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + smart.EscapeHtml(r.URL.Path) + "`", true)
 			return
 		} //end if
+		//--
 		var useAuth bool = true
-		skipAuth, okAuth := UrlHandlersSkipAuth[theUrlPath]
-		if((okAuth == true) && (skipAuth == true)) {
-			useAuth = false
+		if(UrlHandlersSkipAuth != nil) {
+			skipAuth, okAuth := UrlHandlersSkipAuth[theUrlPath]
+			if((okAuth == true) && (skipAuth == true)) {
+				useAuth = false
+			} //end if
 		} //end if
+		var authErr error = nil
+		var authData smart.AuthDataStruct
 		if((isAuthActive == true) && (useAuth == true)) { // this check must be before executing fx below
-			var authErr string = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, true) // outputs: HTML
-			if(authErr != "") {
+			authErr, authData = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, true) // outputs: HTML
+			if(authErr != nil) {
 				log.Println("[WARNING] Web Server: Authentication Failed:", authErr)
 				return
 			} //end if
 		} //end if
+		//--
 		timerStart := time.Now()
-		code, content, contentFnameOrRedirUrl, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers := fx(r)
+		code, content, contentFnameOrRedirUrl, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers := fx(r, authData)
 		timerDuration := time.Since(timerStart)
+		//--
 		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
 		log.Printf("[OK] Web Server :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		//--
 		log.Println("Web Server: StatusCode:", code, "# Path: `" + theUrlPath + "`", "# ExecutionTime:", timerDuration)
 		switch(code) {
 			//-- ok status codes

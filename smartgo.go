@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231129.0631 :: STABLE
+// r.20231202.2358 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.19 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20231129.0631"
+	VERSION string = "v.20231202.2358"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -55,14 +55,22 @@ const (
 
 	CHARSET string = "UTF-8" // don't change !!
 
-	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
-
 	REGEX_SMART_SAFE_NUMBER_FLOAT string = `^[0-9\-\.]+$` 						// SAFETY: SUPPORT ONLY THESE CHARACTERS IN SAFE FLOAT (ex: JSON)
 
 	REGEXP2_DEFAULT_MAX_RECURSION uint32 = 800000 								// Default REGEXP2 Recursion Limit: 800K
 	REGEXP2_DEFAULT_MAX_TIMEOUT uint8 = 1										// Default REGEXP2 Max Timeout 1 Second(s)
 
-	NULL_BYTE string = "\000" 													// THE NULL BYTE
+	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 								// PHP COMPATIBILITY
+
+	NULL_BYTE string = "\x00" 													// THE NULL BYTE character \x00 or \000
+	BACK_SPACE string = "\b" 													// The Backspace Character \b
+	ASCII_BELL string = "\a" 													// The ASCII Bell Character \a
+	FORM_FEED string = "\f" 													// The Form Feed Character \f or \x0C
+	VERTICAL_TAB string = "\v" 													// The Vertical Tab character \v or \x0B
+
+	HORIZONTAL_TAB string = "\t" 												// The Horizontal Tab character \t
+	LINE_FEED string = "\n" 													// The Line Feed character \n
+	CARRIAGE_RETURN string = "\r" 												// The Carriage Return character \r
 
 	SIZE_BYTES_16M uint64 = 16777216 											// Reference Unit
 )
@@ -195,6 +203,11 @@ func Base64Encode(data string) string {
 func Base64Decode(data string) string {
 	//--
 	defer PanicHandler() // req. by base64 decode panic handler with malformed data
+	//--
+	data = StrTrimWhitespaces(data) // required, to remove extra space like characters, go b64dec is strict !
+	if(data == "") {
+		return ""
+	} //end if
 	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if(err != nil) {
@@ -535,13 +548,16 @@ func StrSubstr(s string, start int, stop int) string {
 
 func StrNormalizeSpaces(s string) string {
 	//--
-	s = StrReplaceAll(s, "\r\n", " ")
-	s = StrReplaceAll(s, "\r",   " ")
-	s = StrReplaceAll(s, "\n",   " ")
-	s = StrReplaceAll(s, "\t",   " ")
-	s = StrReplaceAll(s, "\x0B", " ")
-	s = StrReplaceAll(s, "\x00", " ")
-	s = StrReplaceAll(s, "\f",   " ")
+	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, " ")
+	s = StrReplaceAll(s, CARRIAGE_RETURN, " ")
+	s = StrReplaceAll(s, LINE_FEED, " ")
+	s = StrReplaceAll(s, HORIZONTAL_TAB, " ")
+	s = StrReplaceAll(s, VERTICAL_TAB, " ")
+	s = StrReplaceAll(s, NULL_BYTE, " ")
+	s = StrReplaceAll(s, FORM_FEED,   " ")
+	//--
+	s = StrReplaceAll(s, BACK_SPACE,   " ")
+	s = StrReplaceAll(s, ASCII_BELL,   " ")
 	//--
 	return s
 	//--
@@ -1151,6 +1167,11 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 	//--
 	defer PanicHandler() // req. by hex2bin panic handler with malformed data
 	//--
+	str = StrTrimWhitespaces(str) // required, to remove extra space like characters, go hex2bin is strict !
+	if(str == "") {
+		return ""
+	} //end if
+	//--
 	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
 		log.Println("[NOTICE] " + CurrentFunctionName() + " Failed:", err)
@@ -1167,8 +1188,9 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 
 func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, error) {
 	//-- no need any panic handler
-	buffer := &bytes.Buffer{}
-	encoder := json.NewEncoder(buffer)
+	out := bytes.Buffer{}
+	//--
+	encoder := json.NewEncoder(&out)
 	encoder.SetEscapeHTML(htmlsafe)
 	if(prettyprint == true) {
 		encoder.SetIndent("", "    ") // 4 spaces
@@ -1179,7 +1201,7 @@ func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, erro
 		return "", err
 	} //end if
 	//--
-	return StrTrimWhitespaces(buffer.String()), nil // must trim as will add a new line at the end ...
+	return StrTrimWhitespaces(out.String()), nil // must trim as will add a new line at the end ...
 	//--
 } //END FUNCTION
 
@@ -1315,13 +1337,13 @@ func AddCSlashes(s string, c string) string {
 
 func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 	//--
-	var out = &bytes.Buffer{}
+	out := bytes.Buffer{}
 	//--
 	for _, c := range s {
 		if((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57)) {
 			out.WriteRune(c) // a-zA-Z0-9
 		} else {
-			fmt.Fprintf(out, "\\%04X", c) // UTF-8
+			fmt.Fprintf(&out, "\\%04X", c) // UTF-8
 		} //end if else
 	} //end for
 	//--
@@ -1347,7 +1369,7 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 	// GO :  1234567890_ abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ:;\u0022\u0027~`!@#$%^\u0026*()+=[]{}|\\\u003C\u003E,.?\/\t\r\n
 	// PHP:  1234567890_ abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ:;\u0022\u0027~`!@#$%^\u0026*()+=[]{}|\\\u003C\u003E,.?\/\t\r\n
 	//--
-	var out = &bytes.Buffer{}
+	out := bytes.Buffer{}
 	//--
 	for _, c := range in {
 		// chars: ASCII 32..126, but not 127 [DELETE] ; exclude: 34 ["] ; 38 [&] ; 39 ['] ; 47 [SLASH/] ; 60 [<] ; 62 [>] ; 92 [BACKSLASH]
@@ -1369,7 +1391,7 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 			out.WriteRune(92)  // backslash
 			out.WriteRune(114) // r
 		} else {
-			fmt.Fprintf(out, "\\u%04X", c) // UTF-8
+			fmt.Fprintf(&out, "\\u%04X", c) // UTF-8
 		} //end if else
 	} //end for
 	//--
@@ -1409,9 +1431,9 @@ func StrNl2Br(s string) string {
 		return ""
 	} //end if
 	//--
-	s = StrReplaceAll(s, "\r\n", "<br>")
-	s = StrReplaceAll(s, "\r", "<br>")
-	s = StrReplaceAll(s, "\n", "<br>")
+	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, "<br>")
+	s = StrReplaceAll(s, CARRIAGE_RETURN, "<br>")
+	s = StrReplaceAll(s, LINE_FEED, "<br>")
 	//--
 	return s
 	//--

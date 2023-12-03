@@ -9,7 +9,7 @@
 // 	* CryptoHash: CRC32B, MD5, SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-224, SHA3-256, SHA3-384, SHA3-512, HMAC (Hex / B64) ; PBKDF2 (Hex / B92)
 // 	* DhKx: Srv/Cli :: Shad
 // 	* CipherCrypto: Twofish / Blowfish :: enc/dec :: CBC
-// r.20231121
+// r.20231202
 
 //==================================================================
 // The code is released under the BSD License.
@@ -3615,7 +3615,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20231117
+ * @version 20231202
  * @class smartJ$DhKx
  * @static
  * @frozen
@@ -3653,7 +3653,7 @@ const smartJ$DhKx = new class{constructor(){ // STATIC CLASS (ES6)
 
 	_C$.param_Size = (_Option$ && (typeof(_Option$.Size) == 'string') && _Option$.Size) ? _Utils$.stringTrim(_Option$.Size) : 'default';
 	_C$.param_Prix = (_Option$ && (typeof(_Option$.Prix) == 'string') && _Option$.Prix) ? _Utils$.stringTrim(_Option$.Prix) : 'default';
-	_C$.param_UseBigInt = (bigIntSupport && (_Option$ && (!!_Option$.UseBigInt))) ? true : false;
+	_C$.param_UseBigInt = (bigIntSupport && (_Option$ && (!_Option$.UseBigInt))) ? false : true;
 
 	_w$ = null;
 
@@ -4074,7 +4074,7 @@ const smartJ$DhKx = new class{constructor(){ // STATIC CLASS (ES6)
 				if(prix !== 'default') {
 					_p$.warn(_N$, 'prime: Invalid Prime Selection (Bigint), using defaults:', prix);
 				} //end if
-				px = primesBigint['h127'];
+				px = primesBigint['h061'];
 		} //end switch
 		//--
 		return String(px);
@@ -5569,7 +5569,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20231121
+ * @version 20231130
  * @class smartJ$CryptoCipherTwofish
  * @static
  * @frozen
@@ -5683,8 +5683,6 @@ smartJ$CipherCrypto = new class{constructor(){ // STATIC CLASS (ES6)
 
 	const tfKdIv = (k) => {
 		//--
-		const _m$ = 'tfKdIv';
-		//--
 		const kdiv = {
 			'err': '?',
 			'key': '',
@@ -5724,7 +5722,7 @@ smartJ$CipherCrypto = new class{constructor(){ // STATIC CLASS (ES6)
 			return kdiv;
 		} //end if
 		//--
-		const sK = '[' + nByte + pbkdf2PV + vByte + c32b(vByte + k + nByte, !0) + nByte + ']'; // s +B36
+		const sK = '[' + nByte + pbkdf2PV + vByte + c32b(vByte + k + nByte, !0) + nByte + ']'; // s + B36
 		const pbkdf2K = strm(kdf2(aK, pbkdf2PK, sK, nkSz, DERIVE_CENTITER_EK, false)); // hex
 		if(
 			(pbkdf2K == '')
@@ -5897,10 +5895,16 @@ smartJ$CipherCrypto = new class{constructor(){ // STATIC CLASS (ES6)
 		//--
 		const sk = String(nByte + (key || ''));
 		//--
-		const hk1 = String(c32b(key)        + nByte + hm5(key)        + nByte + hs1(key)        + nByte + hs256(key)        + nByte + hs512(key));
-		const hk2 = String(c32b(sk) + nByte + hm5(sk) + nByte + hs1(sk) + nByte + hs256(sk) + nByte + hs512(sk));
+		const hk1 = String(c32b(key) + nByte + hm5(key) + nByte + hs1(key) + nByte + hs256(key) + nByte + hs512(key));
+		const hk2 = String(c32b(sk)  + nByte + hm5(sk)  + nByte + hs1(sk)  + nByte + hs256(sk)  + nByte + hs512(sk));
+		//--
 		const ck = String(hk1 + nByte + hk2);
-		const dk = String(b92hxc(hs256(ck))) + "'" + String(b92hxc(hm5(ck)));
+		if((ck.length != 553) || (strm(ck) !== ck)) {
+			_p$.error(_N$, 'ERR:', 'Invalid Composed Key Length');
+			return '';
+		} //end if
+		//--
+		const dk = b92hxc(hs256(ck)) + "'" + b92hxc(hm5(ck));
 		const rk = strm(String(dk).substring(0, 448/8));
 		//--
 		return String(rk || '');
@@ -5908,8 +5912,6 @@ smartJ$CipherCrypto = new class{constructor(){ // STATIC CLASS (ES6)
 	};
 
 	const bfKdIv = (k) => {
-		//--
-		const _m$ = 'bfKdIv';
 		//--
 		const kdiv = {
 			'err': '?',
@@ -5929,6 +5931,15 @@ smartJ$CipherCrypto = new class{constructor(){ // STATIC CLASS (ES6)
 		//--
 		const b92k = safePreDerive(k);
 		const b36v = String(String(c32b(k, !0)).padStart(8, '0')).substring(0, 64/8);
+		//--
+		if(b92k.length != kSz) {
+			kdiv.err = 'Invalid Derived Key Length';
+			return kdiv;
+		} //end if
+		if(b36v.length != iSz) {
+			kdiv.err = 'Invalid Derived Iv Length';
+			return kdiv;
+		} //end if
 		//--
 		kdiv.err = ''; // reset
 		kdiv.key = String(b92k || '');

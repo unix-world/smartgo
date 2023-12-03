@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231128.2058 :: STABLE
+// r.20231202.2358 :: STABLE
 // [ ARCHIVERS ]
 
 // REQUIRE: go 1.19 or later
@@ -20,12 +20,12 @@ import (
 
 
 const (
-	SEPARATOR_SFZ_CHECKSUM_V1 string 		= "#CHECKSUM-SHA1#" 							// v1
-	SEPARATOR_SFZ_CHECKSUM_V2 string 		= "#CKSUM256#" 									// v2
-	SEPARATOR_SFZ_CHECKSUM_V3 string 		= "#CKSUM384V3#" 								// v3
+	SEPARATOR_SFZ_CHECKSUM_V1 string 		= "#CHECKSUM-SHA1#" 							// compatibility, v1
+	SEPARATOR_SFZ_CHECKSUM_V2 string 		= "#CKSUM256#" 									// compatibility, v2
+	SEPARATOR_SFZ_CHECKSUM_V3 string 		= "#CKSUM384V3#" 								// current, v3
 
-	SIGNATURE_SFZ_DATA_ARCH_V1 string 		= "PHP.SF.151129/B64.ZLibRaw.HEX" 				// v1, support only unarchive
-	SIGNATURE_SFZ_DATA_ARCH_V2 string 		= "SFZ.20210818/B64.ZLibRaw.hex" 				// v2, support only unarchive
+	SIGNATURE_SFZ_DATA_ARCH_V1 string 		= "PHP.SF.151129/B64.ZLibRaw.HEX" 				// compatibility, v1, unarchive only
+	SIGNATURE_SFZ_DATA_ARCH_V2 string 		= "SFZ.20210818/B64.ZLibRaw.hex" 				// compatibility, v2, unarchive only
 	SIGNATURE_SFZ_DATA_ARCH_V3 string 		= "[SFZ.20231031/B64.ZLibRaw.hex]" 				// current, v3 ; archive + unarchive
 )
 
@@ -65,8 +65,8 @@ func DataArchive(str string) string { // v3 only
 	} //end if
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ": ZLib Data Ratio is: ", ratio, " by division of: ", ulen, " with: (/) ", alen)
 	//--
-	arch = StrTrimWhitespaces(Base64Encode(arch)) + "\n" + SIGNATURE_SFZ_DATA_ARCH_V3 // v3
-	arch += "\n" + "(" + dataArchCheckSign(arch) + ")" // v3+ signature
+	arch = StrTrimWhitespaces(Base64Encode(arch)) + LINE_FEED + SIGNATURE_SFZ_DATA_ARCH_V3 // v3
+	arch += LINE_FEED + "(" + dataArchCheckSign(arch) + ")" // v3+ signature
 	//--
 	var unarch_chksum string = Sh3a384B64(DataUnArchive(arch))
 	if(unarch_chksum != chksum) {
@@ -86,12 +86,12 @@ func dataArchCheckSign(pak string) string { // v3 only
 	len := ConvertIntToStr(len(pak))
 	//--
 	crc32b  := Crc32bB36(pak) // b36
-	sh3a512 := Sh3a512B64(pak + "\v" + len) // b64
+	sh3a512 := Sh3a512B64(pak + VERTICAL_TAB + len) // b64
 	sh3a384 := Sh3a384B64(sh3a512 + NULL_BYTE + pak) // b64
 	sh3a256 := Sh3a256B64(pak + NULL_BYTE + sh3a384) // b64
 	sh3a224 := Sh3a224B64(sh3a512 + NULL_BYTE + pak + NULL_BYTE + crc32b + NULL_BYTE + sh3a256 + NULL_BYTE + sh3a384) // b64
 	//--
-	hmacSh3a224, err := HashHmac("SHA3-224", len + "\v" + pak, sh3a224, false) // hex
+	hmacSh3a224, err := HashHmac("SHA3-224", len + VERTICAL_TAB + pak, sh3a224, false) // hex
 	if(err != nil) {
 		return ""
 	} //end if
@@ -114,7 +114,7 @@ func DataUnArchive(str string) string { // v3, v2, v1
 		return ""
 	} //end if
 	//--
-	arr := ExplodeWithLimit("\n", str, 4) // let it be 4 not 3 ; if there is some garbage on a new line after signature ; also v3 have an extra checksum ... just let it there ...
+	arr := ExplodeWithLimit(LINE_FEED, str, 4) // let it be 4 not 3 ; if there is some garbage on a new line after signature ; also v3 have an extra checksum ... just let it there ...
 	str = "" // free mem
 	var alen int = len(arr)
 	//--
@@ -159,7 +159,7 @@ func DataUnArchive(str string) string { // v3, v2, v1
 				log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Empty or Malformed Package CheckSign", arr[2])
 				return ""
 		} //end if
-		cksgn := "(" + dataArchCheckSign(arr[0] + "\n" + arr[1]) + ")"
+		cksgn := "(" + dataArchCheckSign(arr[0] + LINE_FEED + arr[1]) + ")"
 		if(cksgn != arr[2]) {
 			log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Invalid Package CheckSign, signature does not match, archived data is unsafe !")
 			return ""

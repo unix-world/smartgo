@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231124.2232 :: STABLE
+// r.20231129.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sync"
 
+	"errors"
 	"log"
 	"fmt"
 	"time"
@@ -79,12 +80,6 @@ const (
 	CACHE_CONTROL_PUBLIC = "public"
 	//--
 	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-]+$`
-	//--
-
-	//--
-	HTTP_AUTH_MODE_BASIC  uint8 = 0
-	HTTP_AUTH_MODE_BEARER uint8 = 1
-	HTTP_AUTH_MODE_COOKIE uint8 = 2
 	//--
 
 	//--
@@ -245,7 +240,7 @@ type HttpClientRequest struct {
 //-----
 
 
-func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "HEAD"
 	var reqArr map[string][]string = nil
@@ -260,7 +255,7 @@ func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVer
 
 // IMPORTANT: will not rewrite the download file if exists ... must be previous deleted !
 // can handle: GET or POST
-func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var putLocalFilePath string = ""
 	//--
@@ -284,7 +279,7 @@ func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string,
 } //END FUNCTION
 
 
-func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "GET"
 	var reqArr map[string][]string = nil
@@ -296,7 +291,7 @@ func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVeri
 } //END FUNCTION
 
 
-func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "POST"
 	var putLocalFilePath string = ""
@@ -307,7 +302,7 @@ func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVer
 } //END FUNCTION
 
 
-func HttpClientDoRequestPUTFile(putLocalFilePath string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestPUTFile(putLocalFilePath string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PUT"
 	var reqArr map[string][]string = nil
@@ -319,7 +314,7 @@ func HttpClientDoRequestPUTFile(putLocalFilePath string, uri string, tlsServerPE
 } //END FUNCTION
 
 
-func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PUT"
 	var reqArr map[string][]string = map[string][]string{
@@ -335,7 +330,7 @@ func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tls
 } //END FUNCTION
 
 
-func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "MKCOL"
 	var reqArr map[string][]string = nil
@@ -348,7 +343,7 @@ func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVe
 } //END FUNCTION
 
 
-func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "DELETE"
 	var reqArr map[string][]string = nil
@@ -361,7 +356,7 @@ func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipV
 } //END FUNCTION
 
 
-func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "COPY"
 	var strOverwrite string = "F"
@@ -381,7 +376,7 @@ func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, 
 } //END FUNCTION
 
 
-func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "MOVE"
 	var strOverwrite string = "F"
@@ -401,7 +396,7 @@ func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, 
 } //END FUNCTION
 
 
-func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PROPFIND"
 	var reqArr map[string][]string = nil
@@ -414,7 +409,7 @@ func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSki
 } //END FUNCTION
 
 
-func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) *HttpClientRequest {
+func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "OPTIONS"
 	var reqArr map[string][]string = nil
@@ -430,18 +425,18 @@ func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkip
 //-----
 
 
-func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *bytes.Buffer, multipartType string) {
+func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData bytes.Buffer, multipartType string) {
 	//--
 	// This will create the form data or multi/part form data by reading all files in memory
 	//--
-	var emptyData *bytes.Buffer = &bytes.Buffer{}
-	var postData  *bytes.Buffer = &bytes.Buffer{}
+	emptyData := bytes.Buffer{}
+	postData  := bytes.Buffer{}
 	//--
 	if(reqArr == nil) {
 		return "", emptyData, ""
 	} //end if
 	//--
-	w := multipart.NewWriter(postData)
+	w := multipart.NewWriter(&postData)
 	defer w.Close()
 	//--
 	var validPostVarsOrFiles int = 0
@@ -539,9 +534,9 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *byt
 
 // If Auth User/Pass is set will dissalow redirects, by auto-setting maxRedirects=0 !
 // Min Read Limit is 10MB (set maxBytesRead=0 as default) ; Max Read Limit is 1GB (because is in memory !)
-func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, putLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult *HttpClientRequest) {
+func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, putLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult HttpClientRequest) {
 	//--
-	httpResult = &HttpClientRequest {
+	httpResult = HttpClientRequest {
 		Errors: "?",
 		UserAgent: httpHeaderSignatureUserAgent(),
 		ConnTimeout: timeoutSec,
@@ -577,7 +572,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		DownloadLocalFileName: "",
 	}
 	//--
-	transport := &http.Transport{
+	transport := http.Transport{
 		TLSClientConfig: TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM),
 		TLSHandshakeTimeout: time.Duration(HTTP_CLI_TLS_TIMEOUT) * time.Second, // fix for TLS handshake error ; default is 10 seconds
 		DisableKeepAlives: true, // fix ; {{{SYNC-GO-ERR-HTTP-CLI-TOO-MANY-OPEN-FILES}}} : this is a fix for too many open files # this is requires as well as resp.Body.Close() which is handled below
@@ -910,14 +905,14 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		return nil
 	} //end function
 	//--
-	client := &http.Client{
+	client := http.Client{
 		Timeout: time.Duration(timeoutSec) * time.Second,
-		Transport: transport,
+		Transport: &transport,
 		CheckRedirect: safeCheckRedirect,
 	}
 	//--
+	formData := bytes.Buffer{}
 	var errData string = ""
-	var formData *bytes.Buffer = &bytes.Buffer{}
 	var multipartType string = ""
 	var formDataLen int64 = 0
 	var putDataLen int64 = 0
@@ -939,7 +934,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
 		)
 		obar.RenderBlank()
-		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(formData))
+		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(&formData))
 		log.Println("[INFO] " + smart.CurrentFunctionName() + ": Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(formDataLen) + ")")
 	} else if(isPut == true) {
 		var ubar *pbar.ProgressBar
@@ -1148,7 +1143,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	)
 	dbar.RenderBlank()
 	//--
-	var bodyData *bytes.Buffer = &bytes.Buffer{}
+	bodyData := bytes.Buffer{}
 	var bytesCopied int64 = 0
 	var rdBodyErr error
 	//--
@@ -1267,8 +1262,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		//--
 		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
-		limitedReader := &io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
-		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(bodyData, dbar), limitedReader)
+		limitedReader := io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
+		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(&bodyData, dbar), &limitedReader)
 		if(rdBodyErr != nil) {
 			httpResult.Errors = "ERR: Failed to Read Response Body (" + smart.ConvertInt64ToStr(bytesCopied) + "bytes read): " + rdBodyErr.Error()
 			httpResult.HttpStatus = -109
@@ -1310,12 +1305,12 @@ func TlsConfigServer() *tls.Config {
 		MaxVersion: 		tls.VersionTLS13,
 		CurvePreferences: 	[]tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
 		CipherSuites: []uint16{
+			tls.TLS_AES_256_GCM_SHA384, // tls1.3
+			tls.TLS_CHACHA20_POLY1305_SHA256, // tls1.3
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, // tls1.2
 			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, // tls1.2
 			tls.TLS_RSA_WITH_AES_256_GCM_SHA384, // tls1.2
 			tls.TLS_RSA_WITH_AES_256_CBC_SHA, // tls1.2
-			tls.TLS_AES_256_GCM_SHA384, // tls1.3
-			tls.TLS_CHACHA20_POLY1305_SHA256, // tls1.3
 		},
 	}
 	//--
@@ -1800,13 +1795,14 @@ func HttpStatus504(w http.ResponseWriter, r *http.Request, messageText string, o
 
 //-----
 
-// modes: 0 = Basic Auth ; 1 = Bearer ; 2 = Cookie ; 3..255 unused at the moment ...
-type HttpAuthCheckFunc func(string, string, uint8) bool // (user, pass, authmode) : true if OK / false if NOT
+// modes: 1 = Basic Auth ; 2 = Bearer ; 3 = Cookie ; 4..255 unused at the moment ...
+type HttpAuthCheckFunc func(string, uint8, string, string, string, string) (bool, smart.AuthDataStruct) // (authRealm, authMode, realClientIp, user, pass, token) : true if OK / false if NOT
 
 // if returns a non empty string there is an error ; if error it already outputs the 401 headers and content so there is nothing more to do ...
 // it handles 401 or 403 access by IP list
-func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, authUsername string, authPassword string, allowedIPs string, customAuthCheck HttpAuthCheckFunc, outputHtml bool) string { // check if HTTP(S) Basic Auth is OK
+func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, authUsername string, authPassword string, allowedIPs string, customAuthCheck HttpAuthCheckFunc, outputHtml bool) (error, smart.AuthDataStruct) { // check if HTTP(S) Basic Auth is OK ; return: errMsg, authData
 	//--
+	aData := smart.AuthDataStruct{}
 	var err string = ""
 	//--
 	if(
@@ -1815,14 +1811,14 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		(customAuthCheck == nil)) {
 			err = "ERROR: Empty Auth Provider. Either must supply a fixed username/password, either an auth method."
 			HttpStatus500(w, r, err, outputHtml)
-			return err
+			return errors.New(err), aData
 	}
 	if(
 		(customAuthCheck != nil) &&
 		((smart.StrTrimWhitespaces(authUsername) != "") || (smart.StrTrimWhitespaces(authPassword) != ""))) {
 			err = "ERROR: Auth Provider Mismatch. Either must supply a fixed username/password, either an auth method."
 			HttpStatus500(w, r, err, outputHtml)
-			return err
+			return errors.New(err), aData
 	}
 	//--
 	authRealm = smart.StrTrimWhitespaces(smart.StrReplaceAll(authRealm, `"`, `'`))
@@ -1840,7 +1836,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	if(ip == "") {
 		err = "ERROR: Empty or Invalid Client Remote Address: `" + rAddr + "`"
 		HttpStatus500(w, r, err, outputHtml)
-		return err
+		return errors.New(err), aData
 	} //end if
 	//--
 	isOkClientRealIp, realClientIp, rawHdrRealIpVal, rawHdrRealIpKey := smart.GetSafeRealClientIpFromRequestHeaders(r) // this is using r.Header.Get() with value from
@@ -1860,7 +1856,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		if(err != "") {
 			log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 			HttpStatus403(w, r, err, outputHtml)
-			return err
+			return errors.New(err), aData
 		} //end if
 		log.Println("[OK] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
@@ -1892,23 +1888,56 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(CACHE_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
 			w.Header().Set(HTTP_HEADER_RETRY_AFTER, time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " UTC")
 			HttpStatus429(w, r, err, outputHtml)
-			return err
+			return errors.New(err), aData
 		} //end if
 	} //end if
 	//--
-	user, pass, ok := r.BasicAuth()
+	var httpAuthMode uint8 = smart.HTTP_AUTH_MODE_NONE
+	var authHeader string = ""
+	var token string = ""
+	var user string = ""
+	var pass string = ""
+	var ok bool = false
+	authHeader = smart.StrTrimWhitespaces(r.Header.Get("Authorization"))
+	if(authHeader != "") {
+		if(smart.StrIStartsWith(authHeader, "Basic ")) {
+			httpAuthMode = smart.HTTP_AUTH_MODE_BASIC
+			user, pass, ok = r.BasicAuth()
+		} else if(smart.StrIStartsWith(authHeader, "Bearer ")) {
+			httpAuthMode = smart.HTTP_AUTH_MODE_BEARER
+			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
+			if(token != "") {
+				ok = true
+			} //end if
+		} //end if else
+	} //end if
 	//--
 	if(!ok) {
 		err = "Authentication is Required"
 	} else {
 		if(customAuthCheck != nil) { // custom auth provider check
-			if(customAuthCheck(user, pass, HTTP_AUTH_MODE_BASIC) != true) {
-				err = "Username and Password [AuthCheck] Failed: no match or invalid"
+			var authCustomOk bool = false
+			authCustomOk, aData = customAuthCheck(authRealm, httpAuthMode, realClientIp, user, pass, token)
+			if(authCustomOk != true) {
+				aData.OK = false // make sure !
+				err = "Username and Password [AuthCheck:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 			} //end if
-		} else { // default check: user, pass, requiredUsername, requiredPassword
-			if(smart.UserPassDefaultCheck(user, pass, authUsername, authPassword) != true) {
-				err = "Username and Password [Check] Failed: no match or invalid"
+		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only
+			var authBasicOk bool = false
+			authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, httpAuthMode, user, pass, authUsername, authPassword)
+			if(authBasicOk != true) { // default check: user, pass, requiredUsername, requiredPassword
+				aData.OK = false // make sure !
+				err = "Username and Password [DefaultCheck.User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 			} //end if
+		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BEARER) { // bearer auth only
+			var authBearerOk bool = false
+			authBearerOk, aData = smart.AuthTokenDefaultCheck(authRealm, httpAuthMode, realClientIp, token, authUsername, authPassword)
+			if(authBearerOk != true) { // default check: clientIP, token, requiredUsername, requiredPassword
+				aData.OK = false // make sure !
+				err = "Username and Password [DefaultCheck.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+			} //end if
+		} else {
+			err = "Auth Mode NOT Implemented: [" + smart.ConvertUInt8ToStr(httpAuthMode) + "]"
 		} //end if else
 	} //end if else
 	//--
@@ -1942,7 +1971,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		//--
 		log.Printf("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 		//--
-		return err
+		return errors.New(err), aData
 		//--
 	} //end if
 	//--
@@ -1952,7 +1981,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	//--
 	log.Println("[OK] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.SUCCESS [" + authRealm + "] :: UserName: `" + user + "` # From RemoteAddress: `" + ip + "` on Port: `" + port + "`" + " # RealClientIP: `" + realClientIp + "` # Using Proxy Detected RealClientIP: [", isAuthMemKeyUsingProxyRealClientIp, "] # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 	//--
-	return ""
+	return nil, aData
 	//--
 } //END FUNCTION
 

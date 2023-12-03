@@ -1,7 +1,7 @@
 
 // Go Lang Base Conv
-// (c) 2021-2022 unix-world.org # inspired from github.com/akamensky/base58 # adapted to support any base
-// v.20220408.1556
+// (c) 2021-2023 unix-world.org # inspired from github.com/akamensky/base58 # adapted to support any base
+// v.20231129.2358
 // License: BSD
 
 package baseconv
@@ -27,13 +27,13 @@ type BaseConv struct {
 
 //--
 
-func NewBaseConv(name string, radix int64, encodeStd string) *BaseConv {
+func NewBaseConv(name string, radix int64, encodeStd string) BaseConv {
 	//--
 	if(int64(len(encodeStd)) != radix) {
 		log.Println("[ERROR] Invalid BaseConvert[" + name + "] radix:", radix, "for encodeStd: " + encodeStd)
 	} //end if
 	//--
-	bc := &BaseConv{
+	bc := BaseConv{
 		name: 			name,
 		radix: 			radix,
 		encodeStd: 		encodeStd,

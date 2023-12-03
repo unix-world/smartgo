@@ -1,3 +1,3 @@
-// JS-Script (UM): trailingspace.js @ 2023-11-25 11:00:37 +0000
+// JS-Script (UM): trailingspace.js @ 2023-12-03 00:04:02 +0000
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror"],e)}else{e(CodeMirror)}})(function(r){r.defineOption("showTrailingSpace",false,function(e,i,n){if(n==r.Init){n=false}if(n&&!i){e.removeOverlay("trailingspace")}else if(!n&&i){e.addOverlay({token:function(e){for(var i=e.string.length,n=i;n&&/\s/.test(e.string.charAt(n-1));--n){}if(n>e.pos){e.pos=n;return null}e.pos=i;return"trailingspace"},name:"trailingspace"})}})});
 // #END

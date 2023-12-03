@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231128.2058 :: STABLE
+// r.20231202.2358 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -23,13 +23,12 @@ import (
 	"io"
 	"bytes"
 
-//	"github.com/fatih/color"
 	color "github.com/unix-world/smartgo/colorstring"
 	"github.com/unix-world/smartgo/logutils"
 )
 
 const (
-	CMD_EXEC_ERR_SIGNATURE string = "[SmartGo:cmdExec:Exit:ERROR]" // INTERNAL FLAG FOR CMD EXIT ERROR
+	CMD_EXEC_HAMMER_SIGNATURE string = "[»»»»»»»[SmartGo:{!HAMMER!}:Abort:(Exit):KILL.SIGNAL]«««««««]" // INTERNAL FLAG FOR CMD FORCE EXIT HAMMER
 )
 
 
@@ -174,7 +173,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	//--
 	var theLogFile string = logFilePath + theLogPfx + "log" + "-" + dtObjUtc.Years + "-" + dtObjUtc.Months + "-" + dtObjUtc.Days + "-" + dtObjUtc.Hours + ".log"
 	//--
-	isSuccess, errMsg := SafePathFileWrite(theLogFile, "a", true, theFmtMsg + "\n")
+	isSuccess, errMsg := SafePathFileWrite(theLogFile, "a", true, theFmtMsg + LINE_FEED)
 	//--
 	if(errMsg != "") {
 		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") write Error `" + theLogFile + "` :: " + errMsg
@@ -316,7 +315,8 @@ func HandleAbortCtrlC(delay uint32) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		log.Println("[INFO] »»»»»»» CTRL+C Exit ... [ delay:", delay, "sec. ] «««««««")
+		fmt.Println(LINE_FEED + color.GreenString("»»»»»»»»"), color.MagentaString("[ CTRL+C (Hammer) ]"), color.BlueString("... KILL.SIGNAL: Abort ..."), color.BlackString("[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]"), color.GreenString("««««««««") + LINE_FEED)
+		log.Println("[INFO]", CMD_EXEC_HAMMER_SIGNATURE, "Exit Delay:", delay, "sec.")
 		time.Sleep(time.Duration(int(delay)) * time.Second)
 		os.Exit(1)
 	}()
@@ -327,6 +327,7 @@ func HandleAbortCtrlC(delay uint32) {
 //-----
 
 
+// set terminal theme Dark (bg:black ; fg:white) : print("\033[0;37;40m")
 func ClearPrintTerminal() {
 	//--
 	print("\033[H\033[2J") // try to clear the terminal (should work on *nix and windows) ; for *nix only it can be: fmt.Println("\033[2J")
@@ -395,7 +396,7 @@ func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, addit
 	//--
 	err := cmd.Run()
 	if(err != nil) { // [ALTERNATIVE] e, ok := err.(*exec.ExitError) // cast the error as *exec.ExitError and compare the result
-		return false, string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()) + "\n" + CMD_EXEC_ERR_SIGNATURE + " " + err.Error()
+		return false, string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()) + LINE_FEED + CMD_EXEC_HAMMER_SIGNATURE + ": [" + err.Error() + "]"
 	} //end if
 	//--
 	outStr, errStr := string(stdoutBuf.Bytes()), string(stderrBuf.Bytes())

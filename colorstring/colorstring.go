@@ -1,11 +1,11 @@
 
 // (c) 2014 Mitchell Hashimoto
-// (c) 2021 unix-world.org
+// (c) 2021-2023 unix-world.org
 
 // colorstring provides functions for colorizing strings for terminal output.
 
 // THIS IS A MODIFIED VERSION of github.com/mitchellh/colorstring to replace the github.com/fatih/color
-// v.20210328.2317
+// v.20231130.1712
 
 //==== NOTICE
 // GreyString is alias of fatih HiBlackString
@@ -21,18 +21,88 @@ import (
 
 //==
 
+func getSafeColor(color string) string {
+
+	switch(color) {
+		case "":
+			break
+		case "black":
+		case "red":
+		case "green":
+		case "yellow":
+		case "blue":
+		case "magenta":
+		case "cyan":
+		case "light_gray":
+		case "dark_gray":
+		case "light_red":
+		case "light_green":
+		case "light_yellow":
+		case "light_blue":
+		case "light_magenta":
+		case "light_cyan":
+		case "white":
+			break
+		default:
+			color = "default"
+	}
+
+	return color
+
+}
+
+func ColorString(str string, fgColor string, bgColor string, bold bool, dim bool, underline bool, blink, invert bool) string {
+
+	if(str == "") {
+		return ""
+	}
+
+	var clr string = ""
+
+	fgColor = getSafeColor(fgColor)
+	if(fgColor != "") {
+		clr += "[" + fgColor + "]"
+	}
+
+	bgColor = getSafeColor(bgColor)
+	if(bgColor != "") {
+		clr += "[_" + bgColor + "_]"
+	}
+
+	if(bold) {
+		clr += "[bold]"
+	}
+	if(dim) {
+		clr += "[dim]"
+	}
+	if(underline) {
+		clr += "[underline]"
+	}
+	if(blink) {
+		clr += "[blink_slow]" // on unix systems, blink_fast is the same ... skip !
+	}
+	if(invert) {
+		clr += "[invert]"
+	}
+
+	return def.color(clr, str)
+
+}
+
+//== dark color theme ...
+
 func BlackString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[black]", str)
+	return def.color("[black][_white_]", str)
 }
 
 func WhiteString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[white]", str)
+	return def.color("[white][_black_]", str)
 }
 
 //==
@@ -41,49 +111,49 @@ func GreyString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[dark_gray]", str)
+	return def.color("[dark_gray][_black_]", str)
 }
 
 func RedString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[red]", str)
+	return def.color("[red][_black_]", str)
 }
 
 func GreenString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[green]", str)
+	return def.color("[green][_black_]", str)
 }
 
 func YellowString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[yellow]", str)
+	return def.color("[yellow][_black_]", str)
 }
 
 func BlueString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[blue]", str)
+	return def.color("[blue][_white_]", str)
 }
 
 func MagentaString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[magenta]", str)
+	return def.color("[magenta][_black_]", str)
 }
 
 func CyanString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[cyan]", str)
+	return def.color("[cyan][_black_]", str)
 }
 
 //==
@@ -92,49 +162,49 @@ func HiGreyString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_gray]", str)
+	return def.color("[light_gray][_black_]", str)
 }
 
 func HiRedString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_red]", str)
+	return def.color("[light_red][_black_]", str)
 }
 
 func HiGreenString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_green]", str)
+	return def.color("[light_green][_black_]", str)
 }
 
 func HiYellowString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_yellow]", str)
+	return def.color("[light_yellow][_black_]", str)
 }
 
 func HiBlueString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_blue]", str)
+	return def.color("[light_blue][_black_]", str)
 }
 
 func HiMagentaString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_magenta]", str)
+	return def.color("[light_magenta][_black_]", str)
 }
 
 func HiCyanString(str string) string {
 	if(str == "") {
 		return ""
 	}
-	return def.color("[light_cyan]", str)
+	return def.color("[light_cyan][_black_]", str)
 }
 
 //=======
@@ -196,8 +266,7 @@ func (c *Colorize) color(clr string, str string) string {
 	result.WriteString(v[m[1]:])
 
 	if colored && c.Reset && !c.Disable {
-		// Write the clear byte at the end
-		result.WriteString("\033[0m")
+		result.WriteString("\033[0m") // Write the clear byte at the end
 	}
 
 	return result.String()

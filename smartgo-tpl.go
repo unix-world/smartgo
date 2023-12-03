@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231128.2058 :: STABLE
+// r.20231202.2358 :: STABLE
 // [ TPL (MARKERS-TPL) ]
 
 // REQUIRE: go 1.19 or later
@@ -20,6 +20,8 @@ import (
 //-----
 
 const (
+	SPECIAL_TRIM string = "\n\r\x00\x0B"
+
 	UNDEF_VAR_NAME string = "Undef____V_a_r"
 )
 
@@ -447,7 +449,7 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 						isConditionalBlockERR = "IF operation mismatch: `" + tmp_ifs_operation + "`"
 					} //end if else
 					//--
-					theConditionalResult = StrTrim(theConditionalResult, "\n\r\x00\x0B") // special trim
+					theConditionalResult = StrTrim(theConditionalResult, SPECIAL_TRIM) // special trim
 					//--
 					if(theConditionalResult != "") {
 						if(StrContains(theConditionalResult, "[%%%IF:") == true) {
@@ -940,11 +942,17 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	//	log.Println("[NOTICE]", "Processing SPECIALS Syntax")
 		template = StrReplaceAll(template, "[%%%|SB-L%%%]", "［")
 		template = StrReplaceAll(template, "[%%%|SB-R%%%]", "］")
-		template = StrReplaceAll(template, "[%%%|R%%%]",    "\r")
-		template = StrReplaceAll(template, "[%%%|N%%%]",    "\n")
-		template = StrReplaceAll(template, "[%%%|T%%%]",    "\t")
+		template = StrReplaceAll(template, "[%%%|R%%%]",    CARRIAGE_RETURN)
+		template = StrReplaceAll(template, "[%%%|N%%%]",    LINE_FEED)
+		template = StrReplaceAll(template, "[%%%|T%%%]",    HORIZONTAL_TAB)
 		template = StrReplaceAll(template, "[%%%|SPACE%%%]", " ")
 	} //end if
+	//--
+	template = StrReplaceAll(template, NULL_BYTE, " ")
+	template = StrReplaceAll(template, BACK_SPACE, " ")
+	template = StrReplaceAll(template, ASCII_BELL, " ")
+	template = StrReplaceAll(template, FORM_FEED, " ")
+	template = StrReplaceAll(template, VERTICAL_TAB, " ")
 	//--
 	if(escapeRemainingSyntax == true) {
 		//--

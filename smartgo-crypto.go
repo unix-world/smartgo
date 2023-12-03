@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231128.2358 :: STABLE
+// r.20231202.2358 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"encoding/base64"
 
-	"crypto/subtle"
 	"crypto/cipher"
 	cryptorand "crypto/rand"
 
@@ -32,9 +31,9 @@ import (
 	"crypto/sha512"
 	"crypto/hmac"
 
-	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/argon2"
-
+//	"golang.org/x/crypto/sha3"
+	"github.com/unix-world/smartgo/sha3" // this is a better version than above, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
 	"github.com/unix-world/smartgo/poly1305"
 	"github.com/unix-world/smartgo/pbkdf2"
 	"github.com/unix-world/smartgo/blowfish"
@@ -43,18 +42,22 @@ import (
 )
 
 const (
-	SEPARATOR_CRYPTO_CHECKSUM_V1 string 	= "#CHECKSUM-SHA1#" 							// only to support v1 unarchive or decrypt ; (for v1 no archive or encrypt is available anymore ; use v2 for Blowfish and v3 for Twofish / Threefish !)
-	SEPARATOR_CRYPTO_CHECKSUM_V2 string 	= "#CKSUM256#" 									// current, v2 ; archive + unarchive or encrypt + decrypt ; Blowfish only
-	SEPARATOR_CRYPTO_CHECKSUM_V3 string 	= "#CKSUM512V3#" 								// current, v3 ; archive + unarchive or encrypt + decrypt ; Twofish / Threefish only
+	SEPARATOR_CRYPTO_CHECKSUM_V1 string 	= "#CHECKSUM-SHA1#" 							// compatibility, v1 ; blowfish only
+	SEPARATOR_CRYPTO_CHECKSUM_V2 string 	= "#CKSUM256#" 									// compatibility, v2 ; blowfish only
+	SEPARATOR_CRYPTO_CHECKSUM_V3 string 	= "#CKSUM512V3#" 								// current, v3 ; threefish, twofish, blowfish
 
-	SIGNATURE_BFISH_V1 string 				= "bf384.v1!" 									// this was not implemented in the v1, if used must be prefixed before decrypt for compatibility ... (for v1 no encrypt is available anymore)
-	SIGNATURE_BFISH_V2 string 				= "bf448.v2!" 									// current, v2 ; encrypt + decrypt
+	SIGNATURE_BFISH_V1 string 				= "bf384.v1!" 									// compatibility, v1 ; decrypt only
+	SIGNATURE_BFISH_V2 string 				= "bf448.v2!" 									// compatibility, v2 ; decrypt only
+	SIGNATURE_BFISH_V3 string 				= "bf448.v3!" 									// current, v3 ; encrypt + decrypt
 
 	SIGNATURE_2FISH_V1_DEFAULT string 		= "2f256.v1!" 									// current, v1 (default)   ; encrypt + decrypt
-	SIGNATURE_2FISH_V1_BFISH   string 		= "2f88B.v1!" 									// current, v1 (+blowfish) ; encrypt + decrypt ; Blowfish 56 (448) + TwoFish 32 (256) = 88 (704)
+	SIGNATURE_2FISH_V1_BF_DEFAULT string 	= "2f88B.v1!" 									// current, v1 (default+blowfish) ; encrypt + decrypt ; Blowfish 56 (448) + TwoFish 32 (256) = 88 (704)
 
-	SIGNATURE_3FISH_V1_DEFAULT string  		= "3f1kD.v1!" 									// current, v1 (default)  ; encrypt + decrypt
-	SIGNATURE_3FISH_V1_ARGON2ID string 		= "3f1kA.v1!" 									// current, v1 (argon2id) ; encrypt + decrypt
+	SIGNATURE_3FISH_1K_V1_DEFAULT string  	= "3f1kD.v1!" 									// current, v1 1024 (default)  ; encrypt + decrypt
+	SIGNATURE_3FISH_1K_V1_ARGON2ID string 	= "3f1kA.v1!" 									// current, v1 1024 (argon2id) ; encrypt + decrypt
+
+	SIGNATURE_3FISH_1K_V1_2FBF_D string  	= "3ffb2kD.v1!" 								// current, v1 1024 (default+twofish/256+blowfish/448)  ; encrypt + decrypt
+	SIGNATURE_3FISH_1K_V1_2FBF_A string 	= "3ffb2kA.v1!" 								// current, v1 1024 (argon2id+twofish/256+blowfish/448) ; encrypt + decrypt
 
 	SALT_PREFIX string 						= "Smart Framework" 							// fixed salt prefix
 	SALT_SEPARATOR string 					= "#" 											// fixed salt separator
@@ -75,34 +78,6 @@ const (
 
 	REGEX_SAFE_HTTP_USER_NAME string 		= `^[a-z0-9\.]+$` 								// Safe UserName Regex
 )
-
-
-//-----
-
-
-func UserPassDefaultCheck(user string, pass string, requiredUsername string, requiredPassword string) bool {
-	//--
-	if( // {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
-		(StrTrimWhitespaces(user) == "") ||
-		((len(user) < 3) || (len(user) > 128)) || // {{{SYNC-GO-SMART-AUTH-USER-LEN}}} ; std max username length is 128 ; min 3, from Smart.Framework
-		(!StrRegexMatchString(REGEX_SAFE_HTTP_USER_NAME, user)) || // {{{SYNC-SF:REGEX_VALID_USER_NAME}}}
-		//--
-		(StrTrimWhitespaces(pass) == "") ||
-		((len(StrTrimWhitespaces(pass)) < 7) || (len(pass) > 2048)) || // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}} ; allow tokens, length can be up to 2048 (ex: JWT) ; min 7, from Smart.Framework (security)
-		//--
-		(len(user) != len(requiredUsername)) ||
-		(len(pass) != len(requiredPassword)) ||
-		(subtle.ConstantTimeCompare([]byte(user), []byte(requiredUsername)) != 1) ||
-		(subtle.ConstantTimeCompare([]byte(pass), []byte(requiredPassword)) != 1) ||
-		(user != requiredUsername) || (pass != requiredPassword)) {
-		//--
-		return false
-		//--
-	} //end if
-	//--
-	return true
-	//--
-} //END FUNCTION
 
 
 //-----
@@ -543,7 +518,7 @@ func Crc32bB36(str string) string {
 
 func Poly1305(key string, str string, b64 bool) (string, error) {
 	//--
-	defer PanicHandler() // req. by poly1305 ...
+	defer PanicHandler() // for: poly1305
 	//--
 	if(len(key) != 32) {
 		return "", errors.New(CurrentFunctionName() + " # " + "Key length is invalid, must be 32 bytes !")
@@ -618,7 +593,7 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 	// It will append the salt to the end of data to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
 	// Protected by SHA384 that has 128-bit resistance against the length extension attacks since the attacker needs to guess the 128-bit to perform the attack, due to the truncation
 	//--
-	defer PanicHandler() // req. by b64 decode panic handler with malformed data
+	defer PanicHandler() // for: b64Dec
 	//--
 	customSalt = StrTrimWhitespaces(customSalt)
 	if(customSalt == "") {
@@ -636,56 +611,9 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 //-----
 
 
-func safePassComposedKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}} [PHP]
-	//--
-	// This should be used as the basis for a derived key, will be 100% in theory and practice agains hash colissions (see the comments below)
-	// It implements a safe mechanism that in order that a key to produce a colission must collide at the same time in all hashing mechanisms: md5, sha1, ha256 and sha512 + crc32b control
-	// By enforcing the max key length to 4096 bytes actually will not have any chance to collide even in the lowest hashing such as md5 ...
-	// It will return a string of 553 bytes length as: (base:key)[8(crc32b) + 1(null) + 32(md5) + 1(null) + 40(sha1) + 1(null) + 64(sha256) + 1(null) + 128(sha512) = 276] + 1(null) + (base:saltedKeyWithNullBytePrefix)[8(crc32b) + 1(null) + 32(md5) + 1(null) + 40(sha1) + 1(null) + 64(sha256) + 1(null) + 128(sha512) = 276]
-	// More, it will return a fixed length (553 bytes) string with an ascii subset just of [ 01234567890abcdef + NullByte ] which already is colission free by using a max source string length of 4096 bytes and by combining many hashes as: md5, sha1, sha256, sha512 and the crc32b
-	//--
-	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
-	if(plainTextKey != key) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is invalid, must not contain trailing spaces !")
-		return ""
-	} //end if
-	//--
-	var klen int = len(key)
-	if(klen < 7) { // {{{SYNC-CRYPTO-KEY-MIN}}} ; minimum acceptable secure key is 7 characters long
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key Size is lower than 7 bytes (", klen, ") which is not safe against brute force attacks !")
-		return ""
-	} else if(klen > 4096) { // {{{SYNC-CRYPTO-KEY-MAX}}} ; max key size is enforced to allow ZERO theoretical colissions on any of: md5, sha1, sha256 or sha512
-		//-- as a precaution, use the lowest supported value which is 4096 (as the md5 supports) ; under this value all the hashes are safe against colissions (in theory)
-		// MD5     produces 128 bits which is 16 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 16*256 =  4096 bytes
-		// SHA-1   produces 160 bits which is 20 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 20*256 =  5120 bytes
-		// SHA-256 produces 256 bits which is 32 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 32*256 =  8192 bytes
-		// SHA-512 produces 512 bits which is 64 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 64*256 = 16384 bytes
-		//-- anyway, as a more precaution, combine all hashes thus a key should produce a colission at the same time in all: md5, sha1, sha256 and sha512 ... which in theory, event with bad implementations of the hashing functions this is excluded !
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key Size is higher than 4096 bytes (", klen, ") which is not safe against collisions !")
-		return ""
-	} //end if else
-	//--
-	// Security concept: be safe against collisions, the idea is to concatenate more algorithms on the exactly same input !!
-	// https://security.stackexchange.com/questions/169711/when-hashing-do-longer-messages-have-a-higher-chance-of-collisions
-	// just sensible salt + strong password = unbreakable ; using a minimal salt, prepended, the NULL byte ; a complex salt may be used later in combination with derived keys
-	// the best is to pre-pend the salt: http://stackoverflow.com/questions/4171859/password-salts-prepending-vs-appending
-	//--
-	var saltedKey string = NULL_BYTE + key
-	//-- use hex here, with fixed lengths to reduce the chance of collisions for the next step (with not so complex fixed length strings, chances of colissions are infinite lower) ; this will generate a predictible concatenated hash using multiple algorithms ; actually the chances to find a colission for a string between 1..1024 characters that will produce a colission of all 4 hashing algorithms at the same time is ZERO in theory and in practice ... and in the well known universe using well known mathematics !
-	var hkey1 string = Crc32b(key)       + NULL_BYTE + Md5(key)       + NULL_BYTE + Sha1(key)       + NULL_BYTE + Sha256(key)       + NULL_BYTE + Sha512(key)
-	var hkey2 string = Crc32b(saltedKey) + NULL_BYTE + Md5(saltedKey) + NULL_BYTE + Sha1(saltedKey) + NULL_BYTE + Sha256(saltedKey) + NULL_BYTE + Sha512(saltedKey)
-	//--
-	return hkey1 + NULL_BYTE + hkey2 // composedKey
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
 func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) string { // {{{SYNC-HASH-PASSWORD}}} [PHP]
-	//-- r.20231128 + Argon2Id
-	defer PanicHandler() // req. by Hex2Bin and Argon2Id
+	//-- r.20231202 + Argon2Id
+	defer PanicHandler() // for: Hex2Bin ; Argon2Id
 	//--
 	// V2 was a bit unsecure..., was deprecated a long time, now is no more supported !
 	// V3 is the current version: 20231028, using PBKDF2 + derivations, SHA3-512 and SHA3-384
@@ -745,7 +673,7 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 	var sSalt string = ""
 	var errSSalt error = nil
 	if(useArgon2id == true) {
-		sSalt = string(argon2.IDKey([]byte(key), []byte(pbkdf2Salt + "\v" + DataRot13(BaseEncode([]byte(pbkdf2Salt), "b32"))), uint32(math.Ceil((float64(DERIVE_CENTITER_PW) * 1.7) - 2)), 128*1024, 1, uint32(reqLen))) // Argon2id resources: 129 cycles, 128MB memory, 1 thread, 34 bytes = 272 bits
+		sSalt = string(argon2.IDKey([]byte(key), []byte(pbkdf2Salt + VERTICAL_TAB + DataRot13(BaseEncode([]byte(pbkdf2Salt), "b32"))), uint32(math.Floor((float64(DERIVE_CENTITER_PW) * 2.8) - 2)), 128*1024, 1, uint32(reqLen))) // Argon2id resources: 215 cycles, 128MB memory, 1 thread, 34 bytes = 272 bits
 		sSalt = StrSubstr(StrPad2LenRight(BaseEncode([]byte(sSalt), "b92"), "'", int(reqLen)), 0, int(reqLen))
 	} else {
 		sSalt, errSSalt = Pbkdf2DerivedKey("sha3-384", key, pbkdf2Salt, reqLen, DERIVE_CENTITER_PW, true) // B92
@@ -761,9 +689,9 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 	fSalt := StrSubstr(StrPad2LenLeft(sSalt, "'", 22), 0, 22) // fixed length sale: 22 chars (from ~ 21..22), with a more wider character set: B92
 	//--
 	chksPass := Crc32bB36(plainPass) // 7 chars
-	pddPass := StrPad2LenRight(plainPass, "\v", int(PASSWORD_PLAIN_MAX_LENGTH)) // fixed length: 55
+	pddPass := StrPad2LenRight(plainPass, VERTICAL_TAB, int(PASSWORD_PLAIN_MAX_LENGTH)) // fixed length: 55
 	chksPPass := Crc32bB36(pddPass) // 7 chars
-	hashData := fSalt + "\n" + pddPass + "\r" + "\t" + chksPass // MUST BE FIXED LEN ! It is 87 a PRIME Number ! To avoid colissions ; SHA3-512 collisions safe max string is 256 bit (32 bytes only) !!!
+	hashData := fSalt + LINE_FEED + pddPass + CARRIAGE_RETURN + HORIZONTAL_TAB + chksPass // MUST BE FIXED LEN ! It is 87 a PRIME Number ! To avoid colissions ; SHA3-512 collisions safe max string is 256 bit (32 bytes only) !!!
 	//--
 	hashHexPass := Sh3a512(hashData) // hex, 128
 	hashBinPass := Hex2Bin(hashHexPass)
@@ -810,7 +738,7 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 
 func Pbkdf2PreDerivedKey(key string) (string, error) {
 	//-- r.20231128
-	defer PanicHandler() // req. by Hex2Bin
+	defer PanicHandler() // for: Hex2Bin
 	//--
 	key = StrTrimWhitespaces(key)
 	klen := len(key)
@@ -822,7 +750,7 @@ func Pbkdf2PreDerivedKey(key string) (string, error) {
 	} //end if else
 	//--
 	b64 := Sh3a384B64(key) // 64 chars fixed length, B64
-	hex := Sh3a512(key + "\v" + Crc32bB36(key) + "\v" + DataRRot13(b64)) // 128 chars fixed length, HEX
+	hex := Sh3a512(key + VERTICAL_TAB + Crc32bB36(key) + VERTICAL_TAB + DataRRot13(b64)) // 128 chars fixed length, HEX
 	bin := Hex2Bin(hex)
 	if(bin == "") {
 		return "", errors.New(CurrentFunctionName() + " # Hash Hex2Bin Error")
@@ -845,7 +773,7 @@ func Pbkdf2PreDerivedKey(key string) (string, error) {
 
 func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterations uint16, b92 bool) (string, error) {
 	//-- r.20231128
-	defer PanicHandler() // may be req. by pbkdf2.Key
+	defer PanicHandler() // for: pbkdf2.Key
 	//--
 	algo = StrToLower(algo)
 	//--
@@ -980,50 +908,275 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 //-----
 
 
-func cipherEncryptDataCBC(ecipher cipher.Block, str string, iv string) (string, error) {
+// IMPORTANT: the input will be padded ; expects B64 data !
+func CipherEncryptCBC(algo string, str string, key string, iv string, tweak string) (string, error) {
+	//-- safety
+	defer PanicHandler() // for: hex2bin ; cipher encrypt may panic handler with wrong padded data
 	//-- init
 	var encrypted string = ""
-	//-- fix padding
+	var bcipher cipher.Block = nil
+	var errCipher error = nil
+	//-- checks
+	algo = StrToLower(StrTrimWhitespaces(algo))
+	switch(algo) {
+		case "threefish.1024":
+			if(len(key) != 128) {
+				return "", errors.New("Key Size must be 128 bytes for ThreeFish (1024) / algo: " + algo)
+			} //end if
+			if(len(iv) != 128) {
+				return "", errors.New("iV Size must be 128 bytes for ThreeFish (1024) algo: " + algo)
+			} //end if
+			if(len(tweak) != 16) {
+				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (1024) algo: " + algo)
+			} //end if
+			bcipher, errCipher = threefish.New1024([]byte(key), []byte(tweak))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "threefish.512":
+			if(len(key) != 64) {
+				return "", errors.New("Key Size must be 64 bytes for ThreeFish (512) / algo: " + algo)
+			} //end if
+			if(len(iv) != 64) {
+				return "", errors.New("iV Size must be 64 bytes for ThreeFish (512) algo: " + algo)
+			} //end if
+			if(len(tweak) != 16) {
+				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (512) algo: " + algo)
+			} //end if
+			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "threefish.256":
+			if(len(key) != 32) {
+				return "", errors.New("Key Size must be 32 bytes for ThreeFish (256) / algo: " + algo)
+			} //end if
+			if(len(iv) != 32) {
+				return "", errors.New("iV Size must be 32 bytes for ThreeFish (256) algo: " + algo)
+			} //end if
+			if(len(tweak) != 16) {
+				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (256) algo: " + algo)
+			} //end if
+			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "twofish.256":
+			if(len(key) != 32) {
+				return "", errors.New("Key Size must be 32 bytes for TwoFish (256) / algo: " + algo)
+			} //end if
+			if(len(iv) != 16) {
+				return "", errors.New("iV Size must be 16 bytes for TwoFish (256) / algo: " + algo)
+			} //end if
+			if(len(tweak) != 0) {
+				return "", errors.New("Tweak is not supported by TwoFish (256) / algo: " + algo)
+			} //end if
+			bcipher, errCipher = twofish.NewCipher([]byte(key))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "blowfish.448":
+			if(len(key) != 56) {
+				return "", errors.New("Key Size must be 56 bytes for BlowFish (448) / algo: " + algo)
+			} //end if
+			if(len(iv) != 8) {
+				return "", errors.New("iV Size must be 8 bytes for BlowFish (448) / algo: " + algo)
+			} //end if
+			if(len(tweak) != 0) {
+				return "", errors.New("Tweak is not supported by BlowFish (448) / algo: " + algo)
+			} //end if
+			bcipher, errCipher = blowfish.NewCipher([]byte(key))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+		case "blowfish.384":
+			if(len(key) != 48) {
+				return "", errors.New("Key Size must be 48 bytes for BlowFish (384) / algo: " + algo)
+			} //end if
+			if(len(iv) != 8) {
+				return "", errors.New("iV Size must be 8 bytes for BlowFish (384) / algo: " + algo)
+			} //end if
+			if(len(tweak) != 0) {
+				return "", errors.New("Tweak is not supported by BlowFish (384) / algo: " + algo)
+			} //end if
+			bcipher, errCipher = blowfish.NewCipher([]byte(key))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		default:
+			return "", errors.New("Invalid Cipher Algo: `" + algo + "`")
+	} //end switch
+	if(bcipher == nil) {
+		return "", errors.New("No Cipher Selected for Algo: `" + algo + "`")
+	} //end if
+	if(len(iv) != bcipher.BlockSize()) {
+		return "", errors.New("Invalid iV: Does not Match the Block Size")
+	} //end if
+	//-- check for empty data
+	if(str == "") {
+		return "", nil
+	} //end if
+	//-- fix: padding
 	var slen int = len(str)
-	var modulus int = slen % ecipher.BlockSize()
+	var modulus int = slen % bcipher.BlockSize()
 	if(modulus > 0) {
-		var padlen int = ecipher.BlockSize() - modulus
+		var padlen int = bcipher.BlockSize() - modulus
 		str = StrPad2LenRight(str, " ", slen + padlen) // pad with spaces
 		slen = slen + padlen
 	} //end if
 	//-- encrypt
-	ciphertext := make([]byte, ecipher.BlockSize()+slen) // make ciphertext big enough to store data
-	ecbc := cipher.NewCBCEncrypter(ecipher, []byte(iv)) // create the encrypter: CBC
-	ecbc.CryptBlocks(ciphertext[ecipher.BlockSize():], []byte(str)) // encrypt the blocks
+	ciphertext := make([]byte, bcipher.BlockSize()+slen) // make ciphertext big enough to store data
+	ecbc := cipher.NewCBCEncrypter(bcipher, []byte(iv)) // create the encrypter: CBC
+	ecbc.CryptBlocks(ciphertext[bcipher.BlockSize():], []byte(str)) // encrypt the blocks
 	str = "" // no more needed
 	encrypted = StrTrimWhitespaces(Bin2Hex(string(ciphertext))) // prepare output
 	ciphertext = nil
 	//-- clear first header block ; will use BlockSize*2 because is operating over HEX data ; there are BlockSize*2 trailing zeroes that represent the HEX of BlockSize null bytes ; remove them
-	if(StrSubstr(encrypted, 0, ecipher.BlockSize()*2) != strings.Repeat("0", ecipher.BlockSize()*2)) { // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
+	if(StrSubstr(encrypted, 0, bcipher.BlockSize()*2) != strings.Repeat("0", bcipher.BlockSize()*2)) { // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
 		return "", errors.New("Invalid Hex Header")
 	} //end if
-	encrypted = StrTrimWhitespaces(StrSubstr(encrypted, ecipher.BlockSize()*2, 0)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
+	encrypted = StrTrimWhitespaces(StrSubstr(encrypted, bcipher.BlockSize()*2, 0)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
 	if(encrypted == "") { // must be some data after the first null header bytes
 		return "", errors.New("Empty Hex Body")
 	} //end if
 	//--
-	return encrypted, nil
+	return Hex2Bin(encrypted), nil // raw crypto data
 	//--
 } //END FUNCTION
 
 
-func cipherDecryptDataCBC(dcipher cipher.Block, str string, iv string) (string, error) {
+// IMPORTANT: the output must be trimmed for the padding added when encrypted ; expects B64 data, so trim is OK !
+func CipherDecryptCBC(algo string, str string, key string, iv string, tweak string) (string, error) {
+	//-- safety
+	defer PanicHandler() // for: hex2bin ; cipher decrypt may panic handler with malformed data
 	//-- init
 	var decrypted []byte = nil
+	var bcipher cipher.Block = nil
+	var errCipher error = nil
+	//-- checks
+	algo = StrToLower(StrTrimWhitespaces(algo))
+	switch(algo) {
+		case "threefish.1024":
+			if(len(key) != 128) {
+				return "", errors.New("Key Size must be 128 bytes for ThreeFish (1024) / algo: " + algo)
+			} //end if
+			if(len(iv) != 128) {
+				return "", errors.New("iV Size must be 128 bytes for ThreeFish (1024) algo: " + algo)
+			} //end if
+			if(len(tweak) != 16) {
+				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (1024) algo: " + algo)
+			} //end if
+			bcipher, errCipher = threefish.New1024([]byte(key), []byte(tweak))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "threefish.512":
+			if(len(key) != 64) {
+				return "", errors.New("Key Size must be 64 bytes for ThreeFish (512) / algo: " + algo)
+			} //end if
+			if(len(iv) != 64) {
+				return "", errors.New("iV Size must be 64 bytes for ThreeFish (512) algo: " + algo)
+			} //end if
+			if(len(tweak) != 16) {
+				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (512) algo: " + algo)
+			} //end if
+			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "threefish.256":
+			if(len(key) != 32) {
+				return "", errors.New("Key Size must be 32 bytes for ThreeFish (256) / algo: " + algo)
+			} //end if
+			if(len(iv) != 32) {
+				return "", errors.New("iV Size must be 32 bytes for ThreeFish (256) algo: " + algo)
+			} //end if
+			if(len(tweak) != 16) {
+				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (256) algo: " + algo)
+			} //end if
+			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "twofish.256":
+			if(len(key) != 32) {
+				return "", errors.New("Key Size must be 32 bytes for TwoFish (256) / algo: " + algo)
+			} //end if
+			if(len(iv) != 16) {
+				return "", errors.New("iV Size must be 16 bytes for TwoFish (256) / algo: " + algo)
+			} //end if
+			if(len(tweak) != 0) {
+				return "", errors.New("Tweak is not supported by TwoFish (256) / algo: " + algo)
+			} //end if
+			bcipher, errCipher = twofish.NewCipher([]byte(key))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		case "blowfish.448":
+			if(len(key) != 56) {
+				return "", errors.New("Key Size must be 56 bytes for BlowFish (448) / algo: " + algo)
+			} //end if
+			if(len(iv) != 8) {
+				return "", errors.New("iV Size must be 8 bytes for BlowFish (448) / algo: " + algo)
+			} //end if
+			if(len(tweak) != 0) {
+				return "", errors.New("Tweak is not supported by BlowFish (448) / algo: " + algo)
+			} //end if
+			bcipher, errCipher = blowfish.NewCipher([]byte(key))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+		case "blowfish.384":
+			if(len(key) != 48) {
+				return "", errors.New("Key Size must be 48 bytes for BlowFish (384) / algo: " + algo)
+			} //end if
+			if(len(iv) != 8) {
+				return "", errors.New("iV Size must be 8 bytes for BlowFish (384) / algo: " + algo)
+			} //end if
+			if(len(tweak) != 0) {
+				return "", errors.New("Tweak is not supported by BlowFish (384) / algo: " + algo)
+			} //end if
+			bcipher, errCipher = blowfish.NewCipher([]byte(key))
+			if(errCipher != nil) {
+				return "", errCipher
+			} //end if
+			break
+		default:
+			return "", errors.New("Invalid Cipher Algo: `" + algo + "`")
+	} //end switch
+	if(bcipher == nil) {
+		return "", errors.New("No Cipher Selected for Algo: `" + algo + "`")
+	} //end if
+	if(len(iv) != bcipher.BlockSize()) {
+		return "", errors.New("Invalid iV: Does not Match the Block Size")
+	} //end if
+	//-- check for empty data
+	if(str == "") {
+		return "", nil
+	} //end if
+	//-- fix: restore header block ; use blocksize * 2 (is hex ...)
+	str = Hex2Bin(strings.Repeat("0", bcipher.BlockSize()*2) + Bin2Hex(str)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
+	if(str == "") {
+		return "", errors.New("Hex Header Restore Failed")
+	} //end if
 	//-- decrypt
 	et := []byte(str)
 	str = ""
-	decrypted = et[dcipher.BlockSize():]
+	decrypted = et[bcipher.BlockSize():]
 	et = nil
-	if(len(decrypted) % dcipher.BlockSize() != 0) { // check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
-		return "", errors.New("Decrypted Data is not a multiple of cipher BlockSize: [" + ConvertIntToStr(dcipher.BlockSize()) + "]")
+	if(len(decrypted) % bcipher.BlockSize() != 0) { // check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
+		return "", errors.New("Decrypted Data is not a multiple of cipher BlockSize: [" + ConvertIntToStr(bcipher.BlockSize()) + "]")
 	} //end if
-	dcbc := cipher.NewCBCDecrypter(dcipher, []byte(iv))
+	dcbc := cipher.NewCBCDecrypter(bcipher, []byte(iv))
 	dcbc.CryptBlocks(decrypted, decrypted)
 	//--
 	return string(decrypted), nil
@@ -1031,9 +1184,12 @@ func cipherDecryptDataCBC(dcipher cipher.Block, str string, iv string) (string, 
 } //END FUNCTION
 
 
+//-----
+
+
 func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 	//--
-	defer PanicHandler() // req. by b64 decode panic handler with malformed data
+	defer PanicHandler() // for: b64Dec
 	//--
 	algo = StrToLower(StrTrimWhitespaces(algo))
 	//--
@@ -1061,10 +1217,12 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 		} //end if
 		separator = SEPARATOR_CRYPTO_CHECKSUM_V3
 	} else if(algo == "blowfish") {
-		if(ver == 1) {
-			separator = SEPARATOR_CRYPTO_CHECKSUM_V1
+		if(ver == 3) {
+			separator = SEPARATOR_CRYPTO_CHECKSUM_V3
 		} else if(ver == 2) {
 			separator = SEPARATOR_CRYPTO_CHECKSUM_V2
+		} else if(ver == 1) {
+			separator = SEPARATOR_CRYPTO_CHECKSUM_V1
 		} else {
 			return "", errors.New("Invalid BlowFish Version, v: " + ConvertUInt8ToStr(ver))
 		} //end if else
@@ -1098,24 +1256,30 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 	} //end if
 	//--
 	switch(algo) {
-		case "blowfish": // v1 or v2
+		case "blowfish": // v3, v2, v1
 			if(ver == 1) { // v1
 				if(Sha1(darr[0]) != darr[1]) {
 					return "", errors.New("Invalid Blowfish Data Packet (v1), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 				} //end if
-			} else { // v2
+			} else if(ver == 2) { // v2
 				if(Sha256B64(darr[0]) != darr[1]) {
 					return "", errors.New("Invalid Blowfish Data Packet (v2), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 				} //end if
+			} else if(ver == 3) { // v3
+				if(BaseEncode([]byte(Base64Decode(Sh3a512B64(darr[0]))), "b62") != darr[1]) {
+					return "", errors.New("Invalid Blowfish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
+				} //end if
+			} else {
+				return "", errors.New("Invalid Blowfish Data Packet (v" + ConvertUInt8ToStr(ver) + "), Checksum Check SKIP :: A checksum was found but don't know how to handle: `" + darr[1] + "`")
 			} //end if else
 			break
 		case "twofish": // v3 only
-			if(Sh3a384B64(darr[0]) != darr[1]) {
+			if(BaseEncode([]byte(Base64Decode(Sh3a512B64(darr[0]))), "b62") != darr[1]) {
 				return "", errors.New("Invalid Twofish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 			} //end if
 			break
 		case "threefish": // v3 only
-			if(Sh3a384B64(darr[0]) != darr[1]) {
+			if(BaseEncode([]byte(Base64Decode(Sh3a512B64(darr[0]))), "b62") != darr[1]) {
 				return "", errors.New("Invalid Threefish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 			} //end if
 			break
@@ -1132,14 +1296,20 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 
 
 func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
-	//--
+	//-- r.20231202 + Argon2Id
 	// B92 ; (128 bytes)
 	//--
-	defer PanicHandler() // req. by Argon2Id
+	defer PanicHandler() // for: Argon2Id
 	//--
-	salt, errSalt := Pbkdf2PreDerivedKey(plainTextKey)
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty or Invalid !")
+		return ""
+	} //end if
+	//--
+	salt, errSalt := Pbkdf2PreDerivedKey(key)
 	if((errSalt != nil) || (len(salt) != int(DERIVE_PREKEY_LEN))) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Salt is Invalid !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Key Salt is Invalid !")
 		return ""
 	} //end if
 	//--
@@ -1147,16 +1317,16 @@ func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC
 	var safeKey string = ""
 	var errSafeKey error = nil
 	if(useArgon2id == true) {
-		safeKey = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(DERIVE_CENTITER_EK), 256*1024, 1, uint32(klen))) // Argon2id resources: 87 cycles, 256MB memory, 1 thread, 128 bytes = 1024 bits
+		safeKey = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(DERIVE_CENTITER_EK), 96*1024, 1, uint32(klen))) // Argon2id resources: 87 cycles, 80MB memory, 1 thread, 128 bytes = 1024 bits
 		safeKey = BaseEncode([]byte(safeKey), "b92") // b92
 	} else {
 		safeKey, errSafeKey = Pbkdf2DerivedKey("sha3-512", plainTextKey, salt, klen, DERIVE_CENTITER_EK, true) // b92
 		if(errSafeKey != nil) {
-			safeKey = ""
+			log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key is Empty !")
+			return ""
 		} //end if else
 	} //end if else
-	safeKey = StrSubstr(safeKey, 0, int(klen))
-	safeKey = StrTrimWhitespaces(safeKey)
+	safeKey = StrTrimWhitespaces(StrSubstr(safeKey, 0, int(klen)))
 	var kslen int = len(safeKey)
 	if((errSafeKey != nil) || (kslen != int(klen)) || (kslen != 128)) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Key is invalid !")
@@ -1169,14 +1339,20 @@ func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC
 
 
 func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-CRYPTO-IV-DERIVE}}}
+	//-- r.20231202 + Argon2Id
+	// B85 ; (128 bytes)
 	//--
-	// B92 ; (128 bytes)
+	defer PanicHandler() // for: Argon2Id
 	//--
-	defer PanicHandler() // req. by Argon2Id
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Iv is Empty or Invalid !")
+		return ""
+	} //end if
 	//--
-	salt, errSalt := Pbkdf2PreDerivedKey(DataRRot13(Base64sEncode(plainTextKey)))
+	salt, errSalt := Pbkdf2PreDerivedKey(DataRRot13(Base64sEncode(key)))
 	if((errSalt != nil) || (len(salt) != int(DERIVE_PREKEY_LEN))) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Salt is Invalid !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Iv Salt is Invalid !")
 		return ""
 	} //end if
 	//--
@@ -1184,16 +1360,22 @@ func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-
 	var safeIv string = ""
 	var errSafeIv error = nil
 	if(useArgon2id == true) {
-		safeIv = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(DERIVE_CENTITER_EV), 192*1024, 1, uint32(ivlen))) // Argon2id resources: 78 cycles, 192MB memory, 1 thread, 128 bytes = 1024 bits
-		safeIv = BaseEncode([]byte(safeIv), "b92") // b92
+		safeIv = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(DERIVE_CENTITER_EV), 64*1024, 1, uint32(ivlen))) // Argon2id resources: 78 cycles, 64MB memory, 1 thread, 128 bytes = 1024 bits
+		safeIv = BaseEncode([]byte(safeIv), "b85") // b85
 	} else {
-		safeIv, errSafeIv = Pbkdf2DerivedKey("sha3-384", plainTextKey, salt, ivlen, DERIVE_CENTITER_EV, true) // b92
+		safeIv, errSafeIv = Pbkdf2DerivedKey("sha3-384", plainTextKey, salt, ivlen * 2, DERIVE_CENTITER_EV, false) // hex
 		if(errSafeIv != nil) {
-			safeIv = ""
+			log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Iv is Empty !")
+			return ""
 		} //end if else
+		safeIv = Hex2Bin(safeIv)
+		if(safeIv == "") {
+			log.Println("[WARNING] " + CurrentFunctionName() + ":", "Post Derived Iv is Empty !")
+			return ""
+		} //end if
+		safeIv = BaseEncode([]byte(safeIv), "b85") // b85
 	} //end if else
-	safeIv = StrSubstr(safeIv, 0, int(ivlen))
-	safeIv = StrTrimWhitespaces(safeIv)
+	safeIv = StrTrimWhitespaces(StrSubstr(safeIv, 0, int(ivlen)))
 	var ivslen int = len(safeIv)
 	if((errSafeIv != nil) || (ivslen != int(ivlen)) || (ivslen != 128)) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Iv is invalid !")
@@ -1206,16 +1388,18 @@ func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-
 
 
 func threefishSafeTweak(plainTextKey string) string {
+	//-- r.20231202
+	// B92 ; (16 bytes)
 	//--
-	// B85 ; (16 bytes)
-	//--
-	defer PanicHandler() // req. by cipher encrypt panic handler with wrong padded data
+	defer PanicHandler() // for: Hex2Bin
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
-	if(key == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Tweak is Empty or Invalid !")
 		return ""
 	} //end if
+	//--
+	const twklen uint16 = 16
 	//--
 	var ckSumCrc32bKeyHex string = Crc32b(key)
 	var ckSumCrc32bDKeyHex string = Crc32b(key)
@@ -1224,23 +1408,31 @@ func threefishSafeTweak(plainTextKey string) string {
 	var ckSumCrc32bKeyEnc string = BaseEncode([]byte(ckSumCrc32bKeyRaw + ckSumCrc32bDKeyRaw), "b62")
 	var ckSumCrc32bDKeyEnc string = BaseEncode([]byte(ckSumCrc32bDKeyRaw + ckSumCrc32bKeyRaw), "b58")
 	var ckSumHash string = Sh3a512B64(key + NULL_BYTE + SALT_PREFIX + " " + SALT_SEPARATOR + " " + SALT_SUFFIX + NULL_BYTE + ckSumCrc32bKeyEnc + NULL_BYTE + ckSumCrc32bDKeyEnc)
+	//--
 	poly1305Sum, polyErr := Poly1305(Md5(ckSumHash), key, true)
 	if((StrTrimWhitespaces(poly1305Sum) == "") || (len(poly1305Sum) < 20) || (polyErr != nil)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Failed to get a valid Poly1305 Sum !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Post Derived Tweak (step1) is Empty !")
 		return ""
 	} //end if
 	poly1305Sum = Base64Decode(poly1305Sum) // do not trim, is binary data
 	if(poly1305Sum == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Failed to process a valid Poly1305 Sum !")
-		return ""
-	} //end if
-	var b85Tweak = StrTrimWhitespaces(BaseEncode([]byte(poly1305Sum), "b85"))
-	if((b85Tweak == "") || (len(b85Tweak) < 12)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Failed to get a valid Tweak B85 !")
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Post Derived Tweak (step2) is Empty !")
 		return ""
 	} //end if
 	//--
-	var safeTweak string = StrPad2LenRight(StrSubstr(b85Tweak, 0, 16), "`", 16) // 128/8 ; pas with ` as it is only base 85
+	var b92Tweak = StrTrimWhitespaces(BaseEncode([]byte(poly1305Sum), "b92"))
+	if((b92Tweak == "") || (len(b92Tweak) < 15)) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Post Derived Tweak (step3) is Empty !")
+		return ""
+	} //end if
+	//--
+	var safeTweak string = StrPad2LenRight(StrSubstr(b92Tweak, 0, 16), "`", 16) // 128/8 ; pas with ` as it is only base 92
+	var twkslen int = len(safeTweak)
+	if((twkslen != int(twklen)) || (twkslen != 16)) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Tweak is invalid !")
+		return ""
+	} //end if
+
 	//--
 	return safeTweak
 	//--
@@ -1248,63 +1440,49 @@ func threefishSafeTweak(plainTextKey string) string {
 
 
 func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
-	//--
-	defer PanicHandler() // req. by hex2bin and cipher encrypt panic handler with wrong padded data
+	//-- safety
+	defer PanicHandler() // for: encrypt
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
 	//-- prepare string
+	var oStr string = str
 	str = Base64Encode(str)
-	cksum := Sh3a384B64(str)
+	cksum := BaseEncode([]byte(Base64Decode(Sh3a512B64(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
-	//log.Println("[DEBUG] " + CurrentFunctionName() + ": " + str)
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
 	//-- signature
 	var theSignature string = ""
 	if(useArgon2id == true) {
-		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
+		theSignature = SIGNATURE_3FISH_1K_V1_ARGON2ID
 	} else {
-		theSignature = SIGNATURE_3FISH_V1_DEFAULT
+		theSignature = SIGNATURE_3FISH_1K_V1_DEFAULT
 	} //end if else
-	//-- derived key
-	var derivedKey string = threefishSafeKey(key, useArgon2id) // b92, (128 bytes)
-	if(len(derivedKey) != 128) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 128 bytes, and it is:", len(derivedKey))
-		return ""
-	} //end if
-	//-- derived iv
+	//-- derived key, iv, tweak
+	var dKey string = threefishSafeKey(key, useArgon2id) // b92, (128 bytes)
 	var iv string = threefishSafeIv(key, useArgon2id) // b92 (128 bytes)
-	if(len(iv) != 128) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
-		return ""
-	} //end if
-	//-- tweak
 	var tweak string = threefishSafeTweak(key) // b85 (16 bytes)
-	if(len(tweak) != 16) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Tweak Size must be 16 bytes")
-		return ""
-	} //end if
-	//-- create the cipher
-	ecipher, err := threefish.New1024([]byte(derivedKey), []byte(tweak))
-	if(err != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
-		return ""
-	} //end if
 	//-- encrypt: CBC
-	encStr, encErr := cipherEncryptDataCBC(ecipher, str, iv)
+	encStr, encErr := CipherEncryptCBC("ThreeFish.1024", str, dKey, iv, tweak)
+	str = ""
 	if(encErr != nil) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Encrypt Error:", encErr)
 		return ""
 	} //end if
+	encStr = Base64sEncode(encStr) // b64s
 	//--
-	return theSignature + DataRRot13(Base64sEncode(Hex2Bin(encStr))) // signature
+	var ckSum string = BaseEncode([]byte(Hex2Bin(Sh3a224(encStr + NULL_BYTE + oStr))), "b62")
+	oStr = ""
+	//--
+	return theSignature + DataRRot13(encStr + ";" + ckSum) // signature
 	//--
 } //END FUNCTION
 
 
 func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
-	//--
-	defer PanicHandler() // req. by hex2bin and crypto decrypt panic handler with malformed data
+	//-- safety
+	defer PanicHandler() // for: b64Dec
 	//-- check
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
@@ -1313,77 +1491,82 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 	//-- signature
 	var theSignature string = ""
 	if(useArgon2id == true) {
-		theSignature = SIGNATURE_3FISH_V1_ARGON2ID
+		theSignature = SIGNATURE_3FISH_1K_V1_ARGON2ID
 	} else {
-		theSignature = SIGNATURE_3FISH_V1_DEFAULT
+		theSignature = SIGNATURE_3FISH_1K_V1_DEFAULT
 	} //end if else
 	if(StrTrimWhitespaces(theSignature) == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Empty Signature provided")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Signature provided")
 		return ""
 	} //end if
 	if(!StrContains(str, theSignature)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Signature was not found")
-		return ""
-	} //end if
-	//-- derived key
-	var derivedKey string = threefishSafeKey(key, useArgon2id) // b92, (128 bytes)
-	if(len(derivedKey) != 128) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 128 bytes, and it is:", len(derivedKey))
-		return ""
-	} //end if
-	//-- derived iv
-	var iv string = threefishSafeIv(key, useArgon2id) // b92 (128 bytes)
-	if(len(iv) != 128) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
-		return ""
-	} //end if
-	//-- tweak
-	var tweak string = threefishSafeTweak(key) // b85 (16 bytes)
-	if(len(tweak) != 16) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Tweak Size must be 16 bytes")
-		return ""
-	} //end if
-	//-- create the cipher
-	dcipher, err := threefish.New1024([]byte(derivedKey), []byte(tweak))
-	if(err != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Signature was not found")
 		return ""
 	} //end if
 	//-- extract data after signature
 	sgnArr := ExplodeWithLimit("!", str, 3)
 	if(len(sgnArr) != 2) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Invalid Signature Separator")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Signature Separator")
 		return ""
 	} //end if
-	str = StrTrimWhitespaces(sgnArr[1])
+	str = StrTrimWhitespaces(DataRRot13(sgnArr[1]))
 	sgnArr = nil
 	if(str == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": B64s Part not found")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Part not found")
 		return ""
 	} //end if
-	//-- decode and restore back first empty header block
-	str = Base64sDecode(DataRRot13(str))
+	//-- separe data from checksum + decode
+	cksArr := ExplodeWithLimit(";", str, 3)
+	if(len(cksArr) != 2) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Checksum Separator")
+		return ""
+	} //end if
+	str = StrTrimWhitespaces(cksArr[0])
+	cksum := StrTrimWhitespaces(cksArr[1])
+	cksArr = nil
 	if(str == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": B64s Decode Failed")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data Part not found")
 		return ""
 	} //end if
-	str = Hex2Bin(strings.Repeat("0", dcipher.BlockSize()*2) + Bin2Hex(str)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
-	if(str == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Hex Header Restore and Decode Failed")
+	if(cksum == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Checksum Part not found")
 		return ""
 	} //end if
-	//-- decrypt
+	var pak string = str
+	str = Base64sDecode(str)
+	if(str == "") { // do not trim, it is raw crypto data
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Decode Failed")
+		return ""
+	} //end if
+	//-- derived key, iv, tweak
+	var dKey string = threefishSafeKey(key, useArgon2id) // b92, (128 bytes)
+	var iv string = threefishSafeIv(key, useArgon2id) // b92 (128 bytes)
+	var tweak string = threefishSafeTweak(key) // b85 (16 bytes)
+	//-- decrypt: CBC
 	var decrypted string = ""
 	var errDecrypted error = nil
-	decrypted, errDecrypted = cipherDecryptDataCBC(dcipher, str, iv)
+	decrypted, errDecrypted = CipherDecryptCBC("ThreeFish.1024", str, dKey, iv, tweak)
 	if(errDecrypted != nil) {
 		log.Println("[NOTICE] " + CurrentFunctionName() + ": Decrypt Failed:", errDecrypted)
 		return ""
 	} //end if
-	//--
+	//-- unpack
 	decrypted, errDecrypted = cryptoContainerUnpack("ThreeFish", 3, decrypted)
 	if(errDecrypted != nil) {
 		log.Println("[NOTICE] " + CurrentFunctionName() + ": Unpack Failed:", errDecrypted)
+		return ""
+	} //end if
+	//-- check package checksum
+	if(StrTrimWhitespaces(cksum) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data/Package Checksum is N/A, Cannot Verify")
+		return ""
+	} //end if
+	if(StrTrimWhitespaces(pak) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data/Package is N/A, Cannot Verify")
+		return ""
+	} //end if
+	if(cksum != BaseEncode([]byte(Hex2Bin(Sh3a224(pak + NULL_BYTE + decrypted))), "b62")) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data Checksum Failed")
 		return ""
 	} //end if
 	//--
@@ -1395,63 +1578,202 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 //-----
 
 
-func twofishSafeKey(plainTextKey string) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
+func twofishSafeKeyIv(plainTextKey string) (string, string) { // {{{SYNC-CRYPTO-KEY-DERIVE}}} [PHP] ; v3
 	//--
-	// B92 (32 bytes)
-	//-- TODO ...
-	return Md5(plainTextKey)
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty or Invalid !")
+		return "", ""
+	} //end if
 	//--
-} //END FUNCTION
-
-
-func twofishSafeIv(plainTextKey string) string {
+	var kSz uint16 = 32
+	var iSz uint16 = 16
 	//--
-	// B92 (16 bytes)
-	//-- TODO ...
-	return StrSubstr(Md5(plainTextKey), 0, 16)
+	var nkSz uint16 = kSz * 2 // ensure double size
+	var niSz uint16 = iSz * 2 // ensure double size
+	//--
+	pbkdf2PK, errPK := Pbkdf2PreDerivedKey(key)
+	if(errPK != nil) {
+		log.Println("[WARNING] Pre-Derived Key Error:", errPK)
+		return "", ""
+	} //end if
+	pbkdf2PK = StrTrimWhitespaces(pbkdf2PK)
+	if((pbkdf2PK == "") || (len(pbkdf2PK) != int(DERIVE_PREKEY_LEN))) {
+		log.Println("[WARNING] Invalid Pre-Derived Key Length:", len(pbkdf2PK))
+		return "", ""
+	} //end if
+	//--
+	pbkdf2PV, errPV := Pbkdf2PreDerivedKey(DataRRot13(Base64sEncode(key)) + NULL_BYTE + pbkdf2PK)
+	if(errPV != nil) {
+		log.Println("[WARNING] Pre-Derived Iv Error:", errPV)
+		return "", ""
+	} //end if
+	pbkdf2PV = StrTrimWhitespaces(pbkdf2PV)
+	if((pbkdf2PV == "") || (len(pbkdf2PV) != int(DERIVE_PREKEY_LEN))) {
+		log.Println("[WARNING] Invalid Pre-Derived Iv Length:", len(pbkdf2PV))
+		return "", ""
+	} //end if
+	//--
+	var sK string = "[" + NULL_BYTE + pbkdf2PV + VERTICAL_TAB + Crc32bB36(VERTICAL_TAB + key + NULL_BYTE) + NULL_BYTE + "]" // s + B36
+	pbkdf2K, errK := Pbkdf2DerivedKey("sha3-512", pbkdf2PK, sK, nkSz, DERIVE_CENTITER_EK, false) // hex
+	if(errK != nil) {
+		log.Println("[WARNING] Derived Key Error:", errK)
+		return "", ""
+	} //end if
+	pbkdf2K = StrTrimWhitespaces(pbkdf2K) // hex
+	if((pbkdf2K == "") || (len(pbkdf2K) != int(nkSz))) {
+		log.Println("[WARNING] Invalid Derived Key Hex Length:", len(pbkdf2K))
+		return "", ""
+	} //end if
+	pbkdf2K = Hex2Bin(pbkdf2K) // bin
+	if((pbkdf2K == "") || (len(pbkdf2K) != int(kSz))) {
+		log.Println("[WARNING] Invalid Derived Key Length:", len(pbkdf2K))
+		return "", ""
+	} //end if
+	pbkdf2K = StrTrimWhitespaces(DataRRot13(StrSubstr(BaseEncode([]byte(pbkdf2K), "b92"), 0, int(kSz)))) // b92
+	//--
+	var sV string = "(" + NULL_BYTE + pbkdf2PK + VERTICAL_TAB + Crc32b(VERTICAL_TAB + key + NULL_BYTE) + NULL_BYTE + ")" // s + Hex
+	pbkdf2V, errV := Pbkdf2DerivedKey("sha3-256", pbkdf2PV, sV, niSz, DERIVE_CENTITER_EV, false) // hex
+	if(errV != nil) {
+		log.Println("[WARNING] Derived Key Error:", errV)
+		return "", ""
+	} //end if
+	pbkdf2V = StrTrimWhitespaces(pbkdf2V) // hex
+	if((pbkdf2V == "") || (len(pbkdf2V) != int(niSz))) {
+		log.Println("[WARNING] Invalid Derived Key Hex Length:", len(pbkdf2V))
+		return "", ""
+	} //end if
+	pbkdf2V = Hex2Bin(pbkdf2V) // bin
+	if((pbkdf2V == "") || (len(pbkdf2V) != int(iSz))) {
+		log.Println("[WARNING] Invalid Derived Key Length:", len(pbkdf2V))
+		return "", ""
+	} //end if
+	pbkdf2V = StrTrimWhitespaces(DataRRot13(StrSubstr(BaseEncode([]byte(pbkdf2V), "b85"), 0, int(iSz)))) // b85
+	//--
+	//log.Println("[DATA] " + CurrentFunctionName() + ":", "\n", pbkdf2PK, "\n", pbkdf2PV, "\n", pbkdf2K, "\n", pbkdf2V)
+	return pbkdf2K, pbkdf2V
 	//--
 } //END FUNCTION
 
 
 func TwofishEncryptCBC(str string, key string) string {
-	//--
-	defer PanicHandler() // req. by hex2bin and cipher encrypt panic handler with wrong padded data
+	//-- safety
+	defer PanicHandler() // for: hex2bin ; encrypt
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
 	//-- prepare string
+	var oStr string = str
 	str = Base64Encode(str)
-//	cksum := Sh3a384B64(str)
-//	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
-	//log.Println("[DEBUG] " + CurrentFunctionName() + ": " + str)
-	//--
-//	var theSignature string = SIGNATURE_2FISH_V1_DEFAULT
-	var derivedKey string = twofishSafeKey(key) // b92, (32 bytes)
-	if(len(derivedKey) != 32) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 32 bytes")
-		return ""
-	} //end if
-	var iv string = twofishSafeIv(key) // b85 + b92 (16 bytes)
-	if(len(iv) != 16) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 16 bytes")
-		return ""
-	} //end if
-	//-- create the cipher
-	ecipher, err := twofish.NewCipher([]byte(derivedKey)) // 32 bytes (256 bit)
-	if(err != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
-		return ""
-	} //end if
+	cksum := BaseEncode([]byte(Base64Decode(Sh3a512B64(str))), "b62")
+	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
+	//-- signature
+	var theSignature string = SIGNATURE_2FISH_V1_DEFAULT
+	//-- derived key, iv
+	dKey, iv := twofishSafeKeyIv(key) // key b92, (32 bytes) ; iv b85 + b92 (16 bytes)
 	//-- encrypt: CBC
-	encStr, encErr := cipherEncryptDataCBC(ecipher, str, iv)
+	encStr, encErr := CipherEncryptCBC("TwoFish.256", str, dKey, iv, "")
+	str = ""
 	if(encErr != nil) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Encrypt Error:", encErr)
 		return ""
 	} //end if
+	encStr = Base64sEncode(encStr) // b64s
 	//--
-//	return theSignature + Base64sEncode(Hex2Bin(encStr)) // signature
-	return Base64Encode(Hex2Bin(encStr)) // signature
+	var ckSum string = BaseEncode([]byte(Hex2Bin(Sh3a224(encStr + NULL_BYTE + oStr))), "b62")
+	oStr = ""
+	//--
+	return theSignature + DataRRot13(encStr + ";" + ckSum) // signature
+	//--
+} //END FUNCTION
+
+
+func TwofishDecryptCBC(str string, key string) string {
+	//-- safety
+	defer PanicHandler() // for: b64Dec
+	//-- check
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
+	//-- signature
+	var theSignature string = SIGNATURE_2FISH_V1_DEFAULT
+	if(StrTrimWhitespaces(theSignature) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Signature provided")
+		return ""
+	} //end if
+	if(!StrContains(str, theSignature)) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Signature was not found")
+		return ""
+	} //end if
+	//-- extract data after signature
+	sgnArr := ExplodeWithLimit("!", str, 3)
+	if(len(sgnArr) != 2) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Signature Separator")
+		return ""
+	} //end if
+	str = StrTrimWhitespaces(DataRRot13(sgnArr[1]))
+	sgnArr = nil
+	if(str == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Part not found")
+		return ""
+	} //end if
+	//-- separe data from checksum + decode
+	cksArr := ExplodeWithLimit(";", str, 3)
+	if(len(cksArr) != 2) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Checksum Separator")
+		return ""
+	} //end if
+	str = StrTrimWhitespaces(cksArr[0])
+	cksum := StrTrimWhitespaces(cksArr[1])
+	cksArr = nil
+	if(str == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data Part not found")
+		return ""
+	} //end if
+	if(cksum == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Checksum Part not found")
+		return ""
+	} //end if
+	var pak string = str
+	str = Base64sDecode(str)
+	if(str == "") { // do not trim, it is raw crypto data
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Decode Failed")
+		return ""
+	} //end if
+	//-- derived key, iv
+	dKey, iv := twofishSafeKeyIv(key) // key b92, (32 bytes) ; iv b85 + b92 (16 bytes)
+	//-- decrypt: CBC
+	var decrypted string = ""
+	var errDecrypted error = nil
+	decrypted, errDecrypted = CipherDecryptCBC("TwoFish.256", str, dKey, iv, "")
+	if(errDecrypted != nil) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Decrypt Failed:", errDecrypted)
+		return ""
+	} //end if
+	//-- unpack
+	decrypted, errDecrypted = cryptoContainerUnpack("TwoFish", 3, decrypted)
+	if(errDecrypted != nil) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Unpack Failed:", errDecrypted)
+		return ""
+	} //end if
+	//-- check package checksum
+	if(StrTrimWhitespaces(cksum) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data/Package Checksum is N/A, Cannot Verify")
+		return ""
+	} //end if
+	if(StrTrimWhitespaces(pak) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data/Package is N/A, Cannot Verify")
+		return ""
+	} //end if
+	if(cksum != BaseEncode([]byte(Hex2Bin(Sh3a224(pak + NULL_BYTE + decrypted))), "b62")) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Data Checksum Failed")
+		return ""
+	} //end if
+	//--
+	return decrypted
 	//--
 } //END FUNCTION
 
@@ -1459,12 +1781,11 @@ func TwofishEncryptCBC(str string, key string) string {
 //-----
 
 
-// PRIVATE : Blowfish key @ v1 # ONLY FOR COMPATIBILITY : DECRYPT SUPPORT ONLY
-func blowfishV1SafeKey(plainTextKey string) string {
+func blowfishV1SafeKey(plainTextKey string) string { // v1
 	//--
-	var key string = StrTrimWhitespaces(plainTextKey)
-	if(key == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty or Invalid !")
 		return ""
 	} //end if
 	//--
@@ -1476,12 +1797,11 @@ func blowfishV1SafeKey(plainTextKey string) string {
 } //END FUNCTION
 
 
-// PRIVATE : Blowfish iv @ v1 # ONLY FOR COMPATIBILITY : DECRYPT SUPPORT ONLY
-func blowfishV1SafeIv(plainTextKey string) string {
+func blowfishV1SafeIv(plainTextKey string) string { // v1
 	//--
-	var key string = StrTrimWhitespaces(plainTextKey)
-	if(key == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty or Invalid !")
 		return ""
 	} //end if
 	//--
@@ -1494,12 +1814,64 @@ func blowfishV1SafeIv(plainTextKey string) string {
 } //END FUNCTION
 
 
-// PRIVATE : Blowfish key {{{SYNC-BLOWFISH-KEY}}}
-func blowfishSafeKey(plainTextKey string) string {
+func blowfishComposeKey(plainTextKey string) string { // v2, v3 ; {{{SYNC-CRYPTO-KEY-DERIVE}}} [PHP]
 	//--
-	defer PanicHandler() // req. by hex2bin panic handler with malformed data
+	// This should be used as the basis for a derived key, will be 100% in theory and practice agains hash colissions (see the comments below)
+	// It implements a safe mechanism that in order that a key to produce a colission must collide at the same time in all hashing mechanisms: md5, sha1, ha256 and sha512 + crc32b control
+	// By enforcing the max key length to 4096 bytes actually will not have any chance to collide even in the lowest hashing such as md5 ...
+	// It will return a string of 553 bytes length as: (base:key)[8(crc32b) + 1(null) + 32(md5) + 1(null) + 40(sha1) + 1(null) + 64(sha256) + 1(null) + 128(sha512) = 276] + 1(null) + (base:saltedKeyWithNullBytePrefix)[8(crc32b) + 1(null) + 32(md5) + 1(null) + 40(sha1) + 1(null) + 64(sha256) + 1(null) + 128(sha512) = 276]
+	// More, it will return a fixed length (553 bytes) string with an ascii subset just of [ 01234567890abcdef + NullByte ] which already is colission free by using a max source string length of 4096 bytes and by combining many hashes as: md5, sha1, sha256, sha512 and the crc32b
 	//--
-	var composedKey string = safePassComposedKey(plainTextKey)
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if(key == "") {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
+		return ""
+	} //end if
+	//--
+	var klen int = len(key)
+	if(klen < int(DERIVE_MIN_KLEN)) { // {{{SYNC-CRYPTO-KEY-MIN}}} ; minimum acceptable secure key is 7 characters long
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key Size is too short")
+		return ""
+	} else if(klen > int(DERIVE_MAX_KLEN)) { // {{{SYNC-CRYPTO-KEY-MAX}}} ; max key size is enforced to allow ZERO theoretical colissions on any of: md5, sha1, sha256 or sha512
+		//-- as a precaution, use the lowest supported value which is 4096 (as the md5 supports) ; under this value all the hashes are safe against colissions (in theory)
+		// MD5     produces 128 bits which is 16 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 16*256 =  4096 bytes
+		// SHA-1   produces 160 bits which is 20 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 20*256 =  5120 bytes
+		// SHA-256 produces 256 bits which is 32 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 32*256 =  8192 bytes
+		// SHA-512 produces 512 bits which is 64 bytes, not characters, each byte has 256 possible values ; theoretical safe max colission free is: 64*256 = 16384 bytes
+		//-- anyway, as a more precaution, combine all hashes thus a key should produce a colission at the same time in all: md5, sha1, sha256 and sha512 ... which in theory, event with bad implementations of the hashing functions this is excluded !
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key Size is too long")
+		return ""
+	} //end if else
+	//--
+	// Security concept: be safe against collisions, the idea is to concatenate more algorithms on the exactly same input !!
+	// https://security.stackexchange.com/questions/169711/when-hashing-do-longer-messages-have-a-higher-chance-of-collisions
+	// just sensible salt + strong password = unbreakable ; using a minimal salt, prepended, the NULL byte ; a complex salt may be used later in combination with derived keys
+	// the best is to pre-pend the salt: http://stackoverflow.com/questions/4171859/password-salts-prepending-vs-appending
+	//--
+	var saltedKey string = NULL_BYTE + key
+	//--
+	// https://stackoverflow.com/questions/1323013/what-are-the-chances-that-two-messages-have-the-same-md5-digest-and-the-same-sha
+	// use just hex here and the null byte, with fixed lengths to reduce the chance of collisions for the next step (with not so complex fixed length strings, chances of colissions are infinite lower) ; this will generate a predictible concatenated hash using multiple algorithms ; actually the chances to find a colission for a string between 1..1024 characters that will produce a colission of all 4 hashing algorithms at the same time is ZERO in theory and in practice ... and in the well known universe using well known mathematics !
+	//--
+	var hkey1 string = Crc32b(key)       + NULL_BYTE + Md5(key)       + NULL_BYTE + Sha1(key)       + NULL_BYTE + Sha256(key)       + NULL_BYTE + Sha512(key)
+	var hkey2 string = Crc32b(saltedKey) + NULL_BYTE + Md5(saltedKey) + NULL_BYTE + Sha1(saltedKey) + NULL_BYTE + Sha256(saltedKey) + NULL_BYTE + Sha512(saltedKey)
+	//--
+	return hkey1 + NULL_BYTE + hkey2 // composedKey
+	//--
+} //END FUNCTION
+
+
+func blowfishSafeKey(plainTextKey string) string { // v2, v3
+	//--
+	defer PanicHandler() // for: hex2bin
+	//--
+	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty or Invalid !")
+		return ""
+	} //end if
+	//--
+	var composedKey string = blowfishComposeKey(key)
 	var len_composedKey int = len(composedKey)
 	var len_trimmed_composedKey int = len(StrTrimWhitespaces(composedKey))
 	if((len_composedKey != 553) || (len_trimmed_composedKey != 553)) {
@@ -1515,12 +1887,11 @@ func blowfishSafeKey(plainTextKey string) string {
 } //END FUNCTION
 
 
-// PRIVATE : Blowfish iv {{{SYNC-BLOWFISH-IV}}}
-func blowfishSafeIv(plainTextKey string) string {
+func blowfishSafeIv(plainTextKey string) string { // v2, v3
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
-	if(key == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty !")
+	if((key == "") || (len(key) < int(DERIVE_MIN_KLEN)) || (len(key) > int(DERIVE_MAX_KLEN))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Key is Empty or Invalid !")
 		return ""
 	} //end if
 	//--
@@ -1533,50 +1904,44 @@ func blowfishSafeIv(plainTextKey string) string {
 } //END FUNCTION
 
 
-func BlowfishEncryptCBC(str string, key string) string {
-	//--
-	defer PanicHandler() // req. by hex2bin and blowfish encrypt panic handler with wrong padded data
+func BlowfishEncryptCBC(str string, key string) string { // v3 only
+	//-- safety
+	defer PanicHandler() // for: hex2bin ; encrypt
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
 	//-- prepare string
+	var oStr string = str
 	str = Base64Encode(str)
-	cksum := Sha256B64(str)
-	str = str + SEPARATOR_CRYPTO_CHECKSUM_V2 + cksum
-	//log.Println("[DEBUG] " + CurrentFunctionName() + ": " + str)
-	//--
-	var derivedKey string = blowfishSafeKey(key) // 56 bytes
-	if(len(derivedKey) != 56) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Size must be 56 bytes")
-		return ""
-	} //end if
-	var iv string = blowfishSafeIv(key) // 8 bytes
-	if(len(iv) != 8) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
-		return ""
-	} //end if
-	//-- create the cipher
-	ecipher, err := blowfish.NewCipher([]byte(derivedKey))
-	if(err != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
-		return ""
-	} //end if
+	cksum := BaseEncode([]byte(Base64Decode(Sh3a512B64(str))), "b62")
+	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
+	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
+	//-- signature
+	var theSignature string = SIGNATURE_BFISH_V3
+	//-- derived key, iv
+	var dKey string = blowfishSafeKey(key) // key b92 (56 bytes)
+	var iv string = blowfishSafeIv(key) // iv b36 (8 bytes)
 	//-- encrypt: CBC
-	encStr, encErr := cipherEncryptDataCBC(ecipher, str, iv)
+	encStr, encErr := CipherEncryptCBC("BlowFish.448", str, dKey, iv, "")
+	str = ""
 	if(encErr != nil) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Encrypt Error:", encErr)
 		return ""
 	} //end if
+	encStr = Base64sEncode(encStr) // b64s
 	//--
-	return SIGNATURE_BFISH_V2 + Base64sEncode(Hex2Bin(encStr))
+	var ckSum string = BaseEncode([]byte(Hex2Bin(Sh3a224(encStr + NULL_BYTE + oStr))), "b62")
+	oStr = ""
+	//--
+	return theSignature + DataRRot13(encStr + ";" + ckSum) // signature
 	//--
 } //END FUNCTION
 
 
-func BlowfishDecryptCBC(str string, key string) string {
-	//--
-	defer PanicHandler() // req. by hex2bin and blowfish decrypt panic handler with malformed data
+func BlowfishDecryptCBC(str string, key string) string { // v1, v2, v3
+	//-- safety
+	defer PanicHandler() // for: hex2bin ; b64Dec ; decrypt
 	//-- check
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
@@ -1585,7 +1950,10 @@ func BlowfishDecryptCBC(str string, key string) string {
 	//-- signature
 	var theSignature string = ""
 	var versionDetected uint8 = 0
-	if(StrPos(str, SIGNATURE_BFISH_V2) == 0) {
+	if(StrPos(str, SIGNATURE_BFISH_V3) == 0) {
+		versionDetected = 3
+		theSignature = SIGNATURE_BFISH_V3
+	} else if(StrPos(str, SIGNATURE_BFISH_V2) == 0) {
 		versionDetected = 2
 		theSignature = SIGNATURE_BFISH_V2
 	} else if(StrPos(str, SIGNATURE_BFISH_V1) == 0) {
@@ -1596,79 +1964,127 @@ func BlowfishDecryptCBC(str string, key string) string {
 //		theSignature = SIGNATURE_BFISH_V1
 //		str = SIGNATURE_BFISH_V1 + str // if no signature found consider it is v1 and try to dercypt
 	} //end if
+	if((versionDetected < 1) || (versionDetected > 3)) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Version Detected:", versionDetected)
+		return ""
+	} //end if
 	if(StrTrimWhitespaces(theSignature) == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Empty or Invalid Signature")
-		return ""
-	} //end if
-	//-- derived key
-	var derivedKey string = ""
-	if(versionDetected == 1) { // v1
-		derivedKey = blowfishV1SafeKey(key) // 48 bytes
-		if(len(derivedKey) != 48) {
-			log.Println("[WARNING] " + CurrentFunctionName() + " (v1):", "Derived Key Size must be 48 bytes")
-			return ""
-		} //end if
-	} else { // v2
-		derivedKey = blowfishSafeKey(key) // 56 bytes
-		if(len(derivedKey) != 56) {
-			log.Println("[WARNING] " + CurrentFunctionName() + " (v2):", "Derived Key Size must be 56 bytes")
-			return ""
-		} //end if
-	} //end if else
-	//-- derived iv
-	var iv string = ""
-	if(versionDetected == 1) { // v1
-		iv = blowfishV1SafeIv(key) // 8 bytes
-	} else { // v2
-		iv = blowfishSafeIv(key) // 8 bytes
-	} //end if else
-	if(len(iv) != 8) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "iV Size must be 128 bytes")
-		return ""
-	} //end if
-	//-- create the cipher
-	dcipher, err := blowfish.NewCipher([]byte(derivedKey))
-	if(err != nil) {
-		//-- fix this. its okay for this tester program, but...
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", err)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty or Invalid Signature ; Version:", versionDetected)
 		return ""
 	} //end if
 	//-- extract data after signature
 	sgnArr := ExplodeWithLimit("!", str, 3)
 	if(len(sgnArr) != 2) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Invalid Signature Separator")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Signature Separator ; Version:", versionDetected)
 		return ""
 	} //end if
 	str = StrTrimWhitespaces(sgnArr[1])
 	sgnArr = nil
 	if(str == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": B64s Part not found")
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Part not found ; Version:", versionDetected)
 		return ""
 	} //end if
-	//-- decode and restore back first empty header block
-	if(versionDetected == 1) {
-		str = Hex2Bin(strings.Repeat("0", dcipher.BlockSize()*2) + StrToLower(str)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
-	} else { // v2
+	//-- separe data from checksum + decode
+	var pak string = ""
+	var cksum string = ""
+	if(versionDetected == 1) { // v1
+		str = Hex2Bin(StrToLower(str))
+		if(str == "") { // do not trim, it is raw crypto data
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Hex Decode Failed ; Version:", versionDetected)
+			return ""
+		} //end if
+	} else if(versionDetected == 2) { // v2
 		str = Base64sDecode(str)
-		str = Hex2Bin(strings.Repeat("0", dcipher.BlockSize()*2) + Bin2Hex(str)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
+		if(str == "") { // do not trim, it is raw crypto data
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Decode Failed ; Version:", versionDetected)
+			return ""
+		} //end if
+	} else { // v3
+		cksArr := ExplodeWithLimit(";", DataRRot13(str), 3)
+		if(len(cksArr) != 2) {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Checksum Separator ; Version:", versionDetected)
+			return ""
+		} //end if
+		str = StrTrimWhitespaces(cksArr[0])
+		cksum = StrTrimWhitespaces(cksArr[1])
+		cksArr = nil
+		if(str == "") {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Data Part not found ; Version:", versionDetected)
+			return ""
+		} //end if
+		if(cksum == "") {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Checksum Part not found ; Version:", versionDetected)
+			return ""
+		} //end if
+		pak = str
+		str = Base64sDecode(str)
+		if(str == "") { // do not trim, it is raw crypto data
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": B64s Decode Failed ; Version:", versionDetected)
+			return ""
+		} //end if
 	} //end if else
-	if(str == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Hex Header Restore and Decode Failed")
+	//-- derived key, iv (by version)
+	var dKey string = ""
+	var iv string = ""
+	if(versionDetected == 1) { // v1
+		dKey = blowfishV1SafeKey(key) // 48 bytes
+	} else { // v2, v3
+		dKey = blowfishSafeKey(key) // 56 bytes
+	} //end if else
+	if(StrTrimWhitespaces(dKey) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Derived Key is NOT Set ; Version:", versionDetected)
 		return ""
 	} //end if
-	//-- decrypt
+	if(versionDetected == 1) { // v1
+		iv = blowfishV1SafeIv(key) // 8 bytes
+	} else { // v2, v3
+		iv = blowfishSafeIv(key) // 8 bytes
+	} //end if else
+	if(StrTrimWhitespaces(iv) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Derived Iv is NOT Set ; Version:", versionDetected)
+		return ""
+	} //end if
+	//-- set algo (by version)
+	var algoMode string = ""
+	if(versionDetected == 1) {
+		algoMode = "384"
+	} else { // v2, v3
+		algoMode = "448"
+	} //end if else
+	if(StrTrimWhitespaces(algoMode) == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Algo Mode is NOT Set ; Version:", versionDetected)
+		return ""
+	} //end if
+	//-- decrypt: CBC
 	var decrypted string = ""
 	var errDecrypted error = nil
-	decrypted, errDecrypted = cipherDecryptDataCBC(dcipher, str, iv)
+	decrypted, errDecrypted = CipherDecryptCBC("BlowFish." + algoMode, str, dKey, iv, "")
 	if(errDecrypted != nil) {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ": Decrypt Failed:", errDecrypted)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Decrypt Failed ; Version:", versionDetected, "; ErrMsg:", errDecrypted)
 		return ""
 	} //end if
-	//--
+	//-- unpack
 	decrypted, errDecrypted = cryptoContainerUnpack("BlowFish", versionDetected, decrypted)
 	if(errDecrypted != nil) {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ": Unpack Failed:", errDecrypted)
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Unpack Failed ; Version:", versionDetected, "; ErrMsg:", errDecrypted)
 		return ""
+	} //end if
+	//-- check package checksum ; v3 only
+	if(versionDetected > 2) {
+		//--
+		if(StrTrimWhitespaces(cksum) == "") {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Data/Package Checksum is N/A, Cannot Verify ; Version:", versionDetected)
+			return ""
+		} //end if
+		if(StrTrimWhitespaces(pak) == "") {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Data/Package is N/A, Cannot Verify ; Version:", versionDetected)
+			return ""
+		} //end if
+		if(cksum != BaseEncode([]byte(Hex2Bin(Sh3a224(pak + NULL_BYTE + decrypted))), "b62")) {
+			log.Println("[NOTICE] " + CurrentFunctionName() + ": Data Checksum Failed ; Version:", versionDetected)
+			return ""
+		} //end if
+		//--
 	} //end if
 	//--
 	return decrypted

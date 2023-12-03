@@ -1,8 +1,8 @@
 
 // Go Lang Base36
-// (c) 2021-2022 unix-world.org
+// (c) 2021-2023 unix-world.org
 // License: BSD
-// v.20220408.1556
+// v.20231129.2358
 
 package base36
 
@@ -18,7 +18,7 @@ const encodeStd string = "0123456789abcdefghijklmnopqrstuvwxyz" // base36 charse
 
 //--
 
-var bConv *bconv.BaseConv = bconv.NewBaseConv(name, radix, encodeStd)
+var bConv bconv.BaseConv = bconv.NewBaseConv(name, radix, encodeStd)
 
 //--
 
