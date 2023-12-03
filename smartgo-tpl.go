@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231202.2358 :: STABLE
+// r.20231203.2358 :: STABLE
 // [ TPL (MARKERS-TPL) ]
 
 // REQUIRE: go 1.19 or later

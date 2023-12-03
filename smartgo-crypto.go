@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231202.2358 :: STABLE
+// r.20231203.2358 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -1296,7 +1296,7 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 
 
 func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
-	//-- r.20231202 + Argon2Id
+	//-- r.20231203 + Argon2Id
 	// B92 ; (128 bytes)
 	//--
 	defer PanicHandler() // for: Argon2Id
@@ -1339,7 +1339,7 @@ func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC
 
 
 func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-CRYPTO-IV-DERIVE}}}
-	//-- r.20231202 + Argon2Id
+	//-- r.20231203 + Argon2Id
 	// B85 ; (128 bytes)
 	//--
 	defer PanicHandler() // for: Argon2Id
@@ -1388,7 +1388,7 @@ func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-
 
 
 func threefishSafeTweak(plainTextKey string) string {
-	//-- r.20231202
+	//-- r.20231203
 	// B92 ; (16 bytes)
 	//--
 	defer PanicHandler() // for: Hex2Bin
@@ -1402,7 +1402,7 @@ func threefishSafeTweak(plainTextKey string) string {
 	const twklen uint16 = 16
 	//--
 	var ckSumCrc32bKeyHex string = Crc32b(key)
-	var ckSumCrc32bDKeyHex string = Crc32b(key)
+	var ckSumCrc32bDKeyHex string = Crc32b(Base64Encode(key))
 	var ckSumCrc32bKeyRaw string = Hex2Bin(ckSumCrc32bKeyHex)
 	var ckSumCrc32bDKeyRaw string = Hex2Bin(ckSumCrc32bDKeyHex)
 	var ckSumCrc32bKeyEnc string = BaseEncode([]byte(ckSumCrc32bKeyRaw + ckSumCrc32bDKeyRaw), "b62")
