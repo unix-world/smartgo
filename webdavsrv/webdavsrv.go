@@ -1,20 +1,19 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231129.2358 :: STABLE
+// r.20231205.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
 
 import (
 	"log"
-
 	"fmt"
-	"strconv"
-	"bytes"
 
 	"context"
+	"bytes"
 	"net/http"
+
 	"golang.org/x/net/webdav"
 
 	smart "github.com/unix-world/smartgo"
@@ -23,7 +22,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231129.0631"
+	VERSION string = "r.20231205.2358"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -130,11 +129,12 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 		FileSystem: webdav.Dir(STORAGE_DIR),
 		LockSystem: webdav.NewMemLS(),
 		Logger: func(r *http.Request, err error) {
-			_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
+			remoteAddr, remotePort := smart.GetHttpRemoteAddrIpAndPortFromRequest(r)
+			_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
 			if(err != nil) {
-				log.Printf("[WARNING] WebDAV Server :: WEBDAV.ERROR: %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", err, "*", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+				log.Printf("[WARNING] WebDAV Server :: WEBDAV.ERROR: %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", err, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
 			} else {
-				log.Printf("[OK] WebDAV Server :: WEBDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "*", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+				log.Printf("[OK] WebDAV Server :: WEBDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
 			} //end if else
 		},
 	}
@@ -147,8 +147,8 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 			smarthttputils.HttpStatus404(w, r, "WebDAV Resource Not Found: `" + r.URL.Path + "`", false)
 			return
 		} //end if
-		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
-		log.Printf("[OK] WebDAV Server :: DEFAULT :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
+		log.Printf("[OK] WebDAV Server :: DEFAULT :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 		var bodyHtml string = `<div class="status"><img alt="Status: Up and Running ..." title="Status: Up and Running ..." width="64" height="64" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(serverSignature.String()) + "</pre>" + "\n" + "</div>"
 		smarthttputils.HttpStatus202(w, r, assets.HtmlStandaloneTemplate(theStrSignature, headHtml, bodyHtml), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
@@ -156,8 +156,8 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	// http version handler : 203
 	mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
-		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
-		log.Printf("[OK] WebDAV Server :: VERSION :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
+		log.Printf("[OK] WebDAV Server :: VERSION :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		smarthttputils.HttpStatus203(w, r, theStrSignature + "\n", "version.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
 	})
 

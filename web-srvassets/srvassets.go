@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20230928.1807 :: STABLE
+// r.20231204.1852 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package assetsserver
@@ -19,10 +19,57 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20230928.1807"
+	VERSION string = "r.20231204.1852"
 
 	DEBUG bool = false
 )
+
+//-----
+
+
+type uxmAjaxFormReply struct {
+	Completed 			string 		`json:"completed"`
+	Status 				string 		`json:"status"`
+	Action 				string 		`json:"action"`
+	Title  				string 		`json:"title"`
+	Message 			string 		`json:"message"`
+	JsEvalCode 			string 		`json:"js_evcode"`
+	RedirectUrl 		string 		`json:"redirect"`
+	ReplaceDiv 			string 		`json:"replace_div"`
+	ReplaceHtml 		string 		`json:"replace_html"`
+	HideFormOnSuccess	string 		`json:"hide_form_on_success"`
+}
+
+
+func JsonAjaxFormReply(status string, action string, title string, message string, isHtmlMessage bool, js_evcode string, redirect string, replace_div string, replace_html string, hide_form_on_success bool) string {
+	//--
+	title = smart.EscapeHtml(title)
+	if(!isHtmlMessage) {
+		message = smart.StrNl2Br(smart.EscapeHtml(message))
+	} //end if
+	//--
+	var hideFormOnSuccess string = ""
+	if(hide_form_on_success) {
+		hideFormOnSuccess = "hide"
+	} //end if
+	//--
+	data := uxmAjaxFormReply{}
+	//--
+	data.Completed 			= "DONE"
+	data.Status 			= smart.StrTrimWhitespaces(status)
+	data.Action 			= smart.StrTrimWhitespaces(action)
+	data.Title 				= smart.StrTrimWhitespaces(title)
+	data.Message 			= smart.StrTrimWhitespaces(message)
+	data.JsEvalCode 		= smart.StrTrimWhitespaces(js_evcode)
+	data.RedirectUrl 		= smart.StrTrimWhitespaces(redirect)
+	data.ReplaceDiv 		= smart.StrTrimWhitespaces(replace_div)
+	data.ReplaceHtml 		= smart.StrTrimWhitespaces(replace_html)
+	data.HideFormOnSuccess 	= smart.StrTrimWhitespaces(hideFormOnSuccess)
+	//--
+	return smart.JsonNoErrChkEncode(data, false, true)
+	//--
+} //END FUNCTION
+
 
 //-----
 

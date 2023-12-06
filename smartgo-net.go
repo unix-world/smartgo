@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231203.2358 :: STABLE
+// r.20231205.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -23,10 +23,114 @@ const (
 	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
 )
 
+var (
+	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP string = "" // by default is empty (no proxy) ; if a proxy is used it can be set as: "X-FORWARDED-CLIENT-IP" or "X-REAL-IP" or "X-FORWARDED-FOR" or ... but only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
+)
 
 //-----
 
-var requestProxyRealIpHeaderKey string = "" // by default is empty (no proxy) ; if a proxy is used it can be set as "X-REAL-IP" or "X-FORWARDED-FOR" or ... but only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
+
+func SetSafeRealClientIpHeaderKey(hdrKey string) bool {
+	//--
+	hdrKey = StrToUpper(StrTrimWhitespaces(hdrKey))
+	//--
+	if(hdrKey == "") {
+		log.Println("[ERROR] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, empty")
+		return false
+	} //end if
+	if(!StrRegexMatchString(REGEX_SMART_SAFE_HTTP_HEADER_KEY, hdrKey)) {
+		log.Println("[ERROR] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, invalid:", hdrKey)
+		return false
+	} //end if
+	if(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP != "") {
+		log.Println("[ERROR] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, already set as:", ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP)
+		return false
+	} //end if
+	//--
+	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP = hdrKey
+	//--
+	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Http Real Client IP Proxy Header Key Set to `" + ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP + "`: Success")
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func GetSafeRealClientIpHeaderKey() string {
+	//--
+	return StrToUpper(StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP))
+	//--
+} //END FUNCTION
+
+
+func GetHttpRealClientIpFromRequestHeaders(r *http.Request) (isOk bool, clientRealIp string, rawVal string, headerKey string) {
+	//--
+	// This is intended to look at the Request Proxy Headers such as: X-FORWARDED-CLIENT-IP, X-REAL-IP, X-FORWARDED-FOR
+	//--
+	var ip string = ""
+	var ipList string = ""
+	//--
+	var hdrKey string = StrToUpper(StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP))
+	if(hdrKey == "") {
+		//--
+		ip, _ = GetHttpRemoteAddrIpAndPortFromRequest(r)
+		ipList = ip
+		hdrKey = "[REMOTE_ADDR]" // this is a special value, not in the headers, with underscore
+		//--
+	} else {
+		//--
+		ipList = StrTrimWhitespaces(r.Header.Get(hdrKey))
+		if(ipList == "") {
+			log.Println("[WARNING]", CurrentFunctionName(), "Failed to get a valid IP Address from custom Header Key: `" + ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP + "`")
+			return false, DEFAULT_FAKE_IP_CLIENT, "", hdrKey
+		} //end if
+		//--
+		splitIps := strings.Split(ipList, ",")
+		for _, tmpIp := range splitIps { // get last from list, as this is considered to be last added by trusted proxy
+			tmpIp = StrToLower(StrTrimWhitespaces(tmpIp))
+			if((tmpIp != "") && IsNetValidIpAddr(tmpIp)) {
+				ip = tmpIp
+			} //end if
+		} //end for
+		//--
+	} //end if
+	//--
+	if((StrTrimWhitespaces(ip) == "") || (!IsNetValidIpAddr(ip))) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Failed to get a valid IP Address ; custom Header Key: `" + ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP + "`")
+		return false, DEFAULT_FAKE_IP_CLIENT, ipList, hdrKey
+	} //end if
+	//--
+	return true, ip, ipList, hdrKey
+	//--
+} //END FUNCTION
+
+
+func GetHttpRemoteAddrIpAndPortFromRequest(r *http.Request) (ipAddr string, portNum string) {
+	//--
+	var remoteAddr string = StrTrimWhitespaces(r.RemoteAddr)
+	if(remoteAddr == "") {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, empty")
+		return "", "0"
+	} //end if
+	ip, port, err := net.SplitHostPort(remoteAddr) // expects: remoteAddr = 127.0.0.1:1234
+	if(err != nil) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid format")
+		return "", "0"
+	} //end if
+	//--
+	ip = StrToLower(StrTrimWhitespaces(ip))
+	if(!IsNetValidIpAddr(ip)) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid IP:", ip)
+		ip = ""
+	} //end if
+	if(!IsNetValidPortStr(port)) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid Port", port)
+		port = "0"
+	} //end if
+	return ip, port // returns strtolower + trim of IP
+	//--
+} //END FUNCTION
+
 
 //-----
 
@@ -81,90 +185,6 @@ func IsNetValidIpAddr(s string) bool { // can be IPV4 or IPV6 but non-empty or z
 	} //end if
 	//--
 	return true
-	//--
-} //END FUNCTION
-
-
-func GetSafeIpAndPortFromRequestRemoteAddr(r *http.Request) (ipAddr string, portNum string) {
-	//--
-	var remoteAddr string = StrTrimWhitespaces(r.RemoteAddr)
-	if(remoteAddr == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, empty")
-		return "", "0"
-	} //end if
-	ip, port, err := net.SplitHostPort(remoteAddr) // expects: remoteAddr = 127.0.0.1:1234
-	if(err != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid format")
-		return "", "0"
-	} //end if
-	//--
-	ip = StrToLower(StrTrimWhitespaces(ip))
-	if(!IsNetValidIpAddr(ip)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid IP:", ip)
-		ip = ""
-	} //end if
-	if(!IsNetValidPortStr(port)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Get Safe IP and Port from RemoteAddress Failed, invalid Port", port)
-		port = "0"
-	} //end if
-	return ip, port // returns strtolower + trim of IP
-	//--
-} //END FUNCTION
-
-
-func SetSafeRealClientIpHeaderKey(hdrKey string) bool {
-	//--
-	hdrKey = StrToUpper(StrTrimWhitespaces(hdrKey))
-	//--
-	if(hdrKey == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, empty")
-		return false
-	} //end if
-	if(!StrRegexMatchString(REGEX_SMART_SAFE_HTTP_HEADER_KEY, hdrKey)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, invalid:", hdrKey)
-		return false
-	} //end if
-	if(requestProxyRealIpHeaderKey != "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, already set as:", requestProxyRealIpHeaderKey)
-		return false
-	} //end if
-	//--
-	requestProxyRealIpHeaderKey = hdrKey
-	if(DEBUG == true) {
-		log.Println("[DEBUG] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key, successful as:", requestProxyRealIpHeaderKey)
-	} //end if
-	return true
-	//--
-} //END FUNCTION
-
-
-func GetSafeRealClientIpFromRequestHeaders(r *http.Request) (isOk bool, clientRealIp string, rawVal string, headerKey string) {
-	//--
-	// This is intended to look at the Request Proxy Headers such as: X-REAL-IP, X-FORWARDED-FOR
-	//--
-	var hdrKey string = StrToUpper(StrTrimWhitespaces(requestProxyRealIpHeaderKey))
-	if(hdrKey == "") {
-		return false, DEFAULT_FAKE_IP_CLIENT, "", ""
-	} //end if
-	var ipList string = StrTrimWhitespaces(r.Header.Get(hdrKey))
-	if(ipList == "") {
-		return false, DEFAULT_FAKE_IP_CLIENT, "", hdrKey
-	} //end if
-	//--
-	splitIps := strings.Split(ipList, ",")
-	var ip string = ""
-	for _, ip = range splitIps { // get last from list, as this is considered to be last added by trusted proxy
-		tmpIp := StrToLower(StrTrimWhitespaces(ip))
-		if((tmpIp != "") && IsNetValidIpAddr(tmpIp)) {
-			ip = tmpIp
-		} //end if
-	} //end for
-	//--
-	if((StrTrimWhitespaces(ip) == "") || (!IsNetValidIpAddr(ip))) {
-		return false, DEFAULT_FAKE_IP_CLIENT, ipList, hdrKey
-	} //end if
-	//--
-	return true, ip, ipList, hdrKey
 	//--
 } //END FUNCTION
 

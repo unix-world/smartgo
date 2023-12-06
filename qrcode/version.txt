@@ -1,0 +1,5 @@
+github.com/skip2/go-qrcode # v.20231205
+go 1.13
+
+[modified by unixman] github.com/wamuir/svg-qr-code # v.20231205
+go 1.16

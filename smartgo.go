@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231203.2358 :: STABLE
+// r.20231206.2316 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.19 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -47,14 +47,13 @@ import (
 )
 
 const (
-	VERSION string = "v.20231203.2358"
+	VERSION string = "v.20231205.2358"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
-	DEBUG bool = false
-
 	CHARSET string = "UTF-8" // don't change !!
 
+	REGEX_SAFE_APP_NAMESPACE string = `^[_a-z0-9\-\.]+$` 						// Safe App Namespace Regex
 	REGEX_SMART_SAFE_NUMBER_FLOAT string = `^[0-9\-\.]+$` 						// SAFETY: SUPPORT ONLY THESE CHARACTERS IN SAFE FLOAT (ex: JSON)
 
 	REGEXP2_DEFAULT_MAX_RECURSION uint32 = 800000 								// Default REGEXP2 Recursion Limit: 800K
@@ -74,6 +73,56 @@ const (
 
 	SIZE_BYTES_16M uint64 = 16777216 											// Reference Unit
 )
+
+
+//-----
+
+var (
+	DEBUG bool = false
+
+	ini_SMART_SOFTWARE_NAMESPACE string = "smart-framework.go" // set via AppSetNamespace
+)
+
+//-----
+
+
+func AppSetNamespace(ns string) bool {
+	//--
+	ns = StrTrimWhitespaces(ns)
+	var nLen int = len(ns)
+	if((nLen < 4) || (nLen > 63)) {
+		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo App Namespace must be between 16 and 255 caracters long ...")
+		return false
+	} //end if
+	if(!StrRegexMatchString(REGEX_SAFE_APP_NAMESPACE, ns)) {
+		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo App Namespace contains invalid characters ...")
+		return false
+	} //end if
+	//--
+	ini_SMART_SOFTWARE_NAMESPACE = ns
+	//--
+	log.Println("[INFO]", CurrentFunctionName(), "SmartGo App Namespace was Set to `" + ini_SMART_SOFTWARE_NAMESPACE + "`: Success")
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func AppGetNamespace() (string, error) {
+	//--
+	var ns string = StrTrimWhitespaces(ini_SMART_SOFTWARE_NAMESPACE)
+	//--
+	var nLen int = len(ns)
+	if((nLen < 4) || (nLen > 63)) {
+		return "", errors.New("SmartGo App Namespace must be between 16 and 255 caracters long")
+	} //end if
+	if(!StrRegexMatchString(REGEX_SAFE_APP_NAMESPACE, ns)) {
+		return "", errors.New("SmartGo App Namespace contains invalid characters")
+	} //end if
+	//--
+	return ns, nil
+	//--
+} //END FUNCTION
 
 
 //-----
@@ -333,6 +382,30 @@ func ArrMapKeyExists[E comparable](v E, arr map[E]E) bool { // depends on Go gen
 	_, exists := arr[v]
 	//--
 	return exists
+	//--
+} //END FUNCTION
+
+
+//-----
+
+func NullableStrFromStr(s string) *string {
+	//--
+	if(s == "") {
+		return nil
+	} //end if
+	//--
+	return &s
+	//--
+} //END FUNCTION
+
+
+func NullableStrToStr(s *string) string {
+	//--
+	if(s == nil) {
+		return ""
+	} //end if
+	//--
+	return *s
 	//--
 } //END FUNCTION
 
@@ -671,60 +744,21 @@ func ConvertJsonNumberToStr(data interface{}) string { // after convert to strin
 //----- IMPORTANT: never use string(number) ... it will lead to strange situations ... use the convert methods from below
 
 
-func ConvertIntToStr(i int) string {
+func ConvertFloat64ToStr(f float64) string {
 	//--
-	return strconv.Itoa(i)
-	//--
-} //END FUNCTION
-
-
-func ConvertUIntToStr(i uint) string {
-	//--
-	return strconv.Itoa(int(i))
+	return strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
 	//--
 } //END FUNCTION
 
 
-func ConvertInt8ToStr(i int8) string {
+func ConvertFloat32ToStr(f float32) string {
 	//--
-	return strconv.FormatInt(int64(i), 10)
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt8ToStr(i uint8) string {
-	//--
-	return strconv.FormatUint(uint64(i), 10)
+	return ConvertFloat64ToStr(float64(f)) // use precision 14 as in PHP
 	//--
 } //END FUNCTION
 
 
-func ConvertInt16ToStr(i int16) string {
-	//--
-	return strconv.FormatInt(int64(i), 10)
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt16ToStr(i uint16) string {
-	//--
-	return strconv.FormatUint(uint64(i), 10)
-	//--
-} //END FUNCTION
-
-
-func ConvertInt32ToStr(i int32) string {
-	//--
-	return strconv.FormatInt(int64(i), 10)
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt32ToStr(i uint32) string {
-	//--
-	return strconv.FormatUint(uint64(i), 10)
-	//--
-} //END FUNCTION
+//--
 
 
 func ConvertInt64ToStr(i int64) string {
@@ -741,16 +775,58 @@ func ConvertUInt64ToStr(i uint64) string {
 } //END FUNCTION
 
 
-func ConvertFloat32ToStr(f float32) string {
+func ConvertIntToStr(i int) string {
 	//--
-	return ConvertFloat64ToStr(float64(f)) // use precision 14 as in PHP
+	return ConvertInt64ToStr(int64(i))
 	//--
 } //END FUNCTION
 
 
-func ConvertFloat64ToStr(f float64) string {
+func ConvertUIntToStr(i uint) string {
 	//--
-	return strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt32ToStr(i int32) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt32ToStr(i uint32) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt16ToStr(i int16) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt16ToStr(i uint16) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt8ToStr(i int8) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt8ToStr(i uint8) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
 	//--
 } //END FUNCTION
 
@@ -826,12 +902,12 @@ func ParseStrAsFloat64StrFixedPrecision(s string) string {
 } //END FUNCTION
 
 
-func ParseStrAsUInt64(s string) uint64 {
+func ParseStrAsInt64(s string) int64 {
 	//--
 	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
 	//--
-	var num uint64 = 0
-	conv, err := strconv.ParseUint(s, 10, 64)
+	var num int64 = 0
+	conv, err := strconv.ParseInt(s, 10, 64)
 	if(err == nil) {
 		num = conv
 	} //end if else
@@ -841,12 +917,12 @@ func ParseStrAsUInt64(s string) uint64 {
 } //END FUNCTION
 
 
-func ParseStrAsInt64(s string) int64 {
+func ParseStrAsUInt64(s string) uint64 {
 	//--
 	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
 	//--
-	var num int64 = 0
-	conv, err := strconv.ParseInt(s, 10, 64)
+	var num uint64 = 0
+	conv, err := strconv.ParseUint(s, 10, 64)
 	if(err == nil) {
 		num = conv
 	} //end if else

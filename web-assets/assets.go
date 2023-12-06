@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231202.2358 :: STABLE
+// r.20231204.1852 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,7 +19,7 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20231202.2358"
+	VERSION string = "r.20231204.1852"
 
 	LAST_MODIFIED_DATE_TIME string = "2023-12-02 01:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
@@ -235,7 +235,7 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <br>
 <br>
 <hr>
-<div class="message">[###MESSAGE-TEXT|html###]</div>
+<div class="message">[###MESSAGE-TEXT|html|nl2br###]</div>
 <hr>
 <small id="server-signature"><b>Smart.Framework.Go</b> :: WebApp</small>
 <div align="right" title="` + smart.COPYRIGHT + `">[###FOOTER-HTML###]</div>

@@ -1,18 +1,16 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231129.2358 :: STABLE
+// r.20231205.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
 	"log"
-	"time"
-
 	"fmt"
-	"strconv"
 
+	"time"
 	"bytes"
 	"net/http"
 
@@ -23,7 +21,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231129.0631"
+	VERSION string = "r.20231205.2358"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -40,9 +38,9 @@ const (
 	REAL_IP_HEADER_KEY = "" // if used behind a proxy, can be set as: X-REAL-IP, X-FORWARDED-FOR, HTTP-X-CLIENT-IP, ... or any other trusted proxy header ; if no proxy is used, set as an empty string
 )
 
-var TheStrSignature string = "SmartGO Web Server " + VERSION
+const TheStrSignature string = "SmartGO Web Server " + VERSION
 
-func wSrvSignature() bytes.Buffer {
+func WSrvSignature() bytes.Buffer {
 	var serverSignature bytes.Buffer
 	serverSignature.WriteString(TheStrSignature + "\n")
 	serverSignature.WriteString(SIGNATURE + "\n")
@@ -62,10 +60,12 @@ var UrlHandlersSkipAuth = map[string]bool{ // use a separate map for auth, not t
 }
 var UrlHandlersMap = map[string]HttpHandlerFunc{
 	"/": func(r *http.Request, authData smart.AuthDataStruct) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+		remoteAddr, remotePort := smart.GetHttpRemoteAddrIpAndPortFromRequest(r)
+		_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
 		code = 208
 		var headHtml string = ""
-		var serverSignature bytes.Buffer = wSrvSignature()
-		var bodyHtml string = "<h1>" + "Sample Home Page ..." + "</h1>" + "<h3>" + smart.StrNl2Br(smart.EscapeHtml(serverSignature.String())) + "</h3>"
+		var serverSignature bytes.Buffer = WSrvSignature()
+		var bodyHtml string = "<h1>" + "Sample Home Page ..." + "</h1>" + "<h4>" + smart.StrNl2Br(smart.EscapeHtml(serverSignature.String())) + "</h4>" + "<hr>Your Real IP / Remote IP : Port # Address is: <b>`" + smart.EscapeHtml(realClientIp + "` / `" + remoteAddr + "`:`" + remotePort + "`") + "</b>"
 		content = srvassets.HtmlServerTemplate(TheStrSignature, headHtml, bodyHtml)
 		contentFnameOrRedirUrl = "index.html"
 		contentDisposition = ""
@@ -79,7 +79,7 @@ var UrlHandlersMap = map[string]HttpHandlerFunc{
 	"/status": func(r *http.Request, authData smart.AuthDataStruct) (code uint16, content string, contentFnameOrRedirUrl string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
 		code = 202
 		var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
-		var serverSignature bytes.Buffer = wSrvSignature()
+		var serverSignature bytes.Buffer = WSrvSignature()
 		var bodyHtml string = `<div class="status"><img alt="Status: Up and Running ..." title="Status: Up and Running ..." width="64" height="64" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(serverSignature.String()) + "</pre>" + "\n" + "</div>"
 		content = assets.HtmlStandaloneTemplate(TheStrSignature, headHtml, bodyHtml)
 		contentFnameOrRedirUrl = "status.html"
@@ -176,7 +176,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 
 	//-- for web
 
-	var serverSignature bytes.Buffer = wSrvSignature()
+	var serverSignature bytes.Buffer = WSrvSignature()
 
 	if(serveSecure == true) {
 		serverSignature.WriteString("<Secure URL> :: https://" + httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort) + "/" + "\n")
@@ -216,7 +216,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 		//--
 		fx, okPath := UrlHandlersMap[theUrlPath]
 		if((okPath != true) || (fx == nil)) {
-			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + smart.EscapeHtml(r.URL.Path) + "`", true)
+			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + r.URL.Path + "`", true)
 			return
 		} //end if
 		//--
@@ -241,8 +241,18 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 		code, content, contentFnameOrRedirUrl, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers := fx(r, authData)
 		timerDuration := time.Since(timerStart)
 		//--
-		_, realClientIp, _, _ := smart.GetSafeRealClientIpFromRequestHeaders(r)
-		log.Printf("[OK] Web Server :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", strconv.Itoa(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
+		log.Printf("[OK] Web Server :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		//--
+		var fExt string = ""
+		if((contentFnameOrRedirUrl != "") && (!smart.StrContains(contentFnameOrRedirUrl, "://"))) {
+			fExt = smart.StrTrimWhitespaces(smart.StrToLower(smart.PathBaseExtension(contentFnameOrRedirUrl)))
+		} //end if
+		//--
+		var isHtmlAnswer bool = false
+		if((fExt == "") || (fExt == "html") || (fExt == "htm")) {
+			isHtmlAnswer = true
+		} //end if
 		//--
 		log.Println("Web Server: StatusCode:", code, "# Path: `" + theUrlPath + "`", "# ExecutionTime:", timerDuration)
 		switch(code) {
@@ -261,50 +271,50 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 				break
 			//-- redirect 3xx statuses
 			case 301:
-				smarthttputils.HttpStatus301(w, r, content, true)
+				smarthttputils.HttpStatus301(w, r, content, true) // this must be HTML, is URL not File to get a valid extension (above)
 				break
 			case 302:
-				smarthttputils.HttpStatus302(w, r, content, true)
+				smarthttputils.HttpStatus302(w, r, content, true) // this must be HTML, is URL not File to get a valid extension (above)
 				break
 			//-- client errors
 			case 400:
-				smarthttputils.HttpStatus400(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus400(w, r, content, isHtmlAnswer)
 				break
 			case 401:
-				smarthttputils.HttpStatus401(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus401(w, r, content, isHtmlAnswer)
 				break
 			case 403:
-				smarthttputils.HttpStatus403(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus403(w, r, content, isHtmlAnswer)
 				break
 			case 404:
-				smarthttputils.HttpStatus404(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus404(w, r, content, isHtmlAnswer)
 				break
 			case 410:
-				smarthttputils.HttpStatus410(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus410(w, r, content, isHtmlAnswer)
 				break
 			case 429:
-				smarthttputils.HttpStatus429(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus429(w, r, content, isHtmlAnswer)
 				break
 			//-- server errors
 			case 500:
-				smarthttputils.HttpStatus500(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus500(w, r, content, isHtmlAnswer)
 				break
 			case 501:
-				smarthttputils.HttpStatus501(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus501(w, r, content, isHtmlAnswer)
 				break
 			case 502:
-				smarthttputils.HttpStatus502(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus502(w, r, content, isHtmlAnswer)
 				break
 			case 503:
-				smarthttputils.HttpStatus503(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus503(w, r, content, isHtmlAnswer)
 				break
 			case 504:
-				smarthttputils.HttpStatus504(w, r, smart.EscapeHtml(content), true)
+				smarthttputils.HttpStatus504(w, r, content, isHtmlAnswer)
 				break
 			//--
 			default: // fallback to 500
 				log.Println("[ERROR] Web Server: Invalid Application Level Status Code for the URL Path [" + theUrlPath + "]:", code)
-				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + strconv.Itoa(int(code)) + "` for the URL Path: `" + smart.EscapeHtml(r.URL.Path) + "`", true)
+				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + smart.ConvertIntToStr(int(code)) + "` for the URL Path: `" + r.URL.Path + "`", isHtmlAnswer)
 		} //end switch
 	})
 

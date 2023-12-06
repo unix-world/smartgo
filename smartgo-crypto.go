@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231203.2358 :: STABLE
+// r.20231205.2358 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -51,7 +51,7 @@ const (
 	SIGNATURE_BFISH_V3 string 				= "bf448.v3!" 									// current, v3 ; encrypt + decrypt
 
 	SIGNATURE_2FISH_V1_DEFAULT string 		= "2f256.v1!" 									// current, v1 (default)   ; encrypt + decrypt
-	SIGNATURE_2FISH_V1_BF_DEFAULT string 	= "2f88B.v1!" 									// current, v1 (default+blowfish) ; encrypt + decrypt ; Blowfish 56 (448) + TwoFish 32 (256) = 88 (704)
+	SIGNATURE_2FISH_V1_BF_DEFAULT string 	= "2fb88.v1!" 									// current, v1 (default+blowfish) ; encrypt + decrypt ; Blowfish 56 (448) + TwoFish 32 (256) = 88 (704)
 
 	SIGNATURE_3FISH_1K_V1_DEFAULT string  	= "3f1kD.v1!" 									// current, v1 1024 (default)  ; encrypt + decrypt
 	SIGNATURE_3FISH_1K_V1_ARGON2ID string 	= "3f1kA.v1!" 									// current, v1 1024 (argon2id) ; encrypt + decrypt
@@ -75,9 +75,45 @@ const (
 	PASSWORD_HASH_LENGTH uint8 				=  128 											// fixed length ; {{{SYNC-AUTHADM-PASS-LENGTH}}} ; if lower then padd to right with * ; {{{SYNC-AUTHADM-PASS-PADD}}}
 	PASSWORD_PREFIX_VERSION string 			= "$fPv3.7!" 									// {{{SYNC-AUTHADM-PASS-PREFIX}}}
 	PASSWORD_PREFIX_A2ID_VERSION string 	= "a2idP37!" 									// go lang only (no PHP), curent v3, argon2id password ; must be the same length as PASSWORD_PREFIX_VERSION
-
-	REGEX_SAFE_HTTP_USER_NAME string 		= `^[a-z0-9\.]+$` 								// Safe UserName Regex
 )
+
+var (
+	ini_SMART_FRAMEWORK_SECURITY_KEY string = "Private-Key#0987654321" // set via CryptoSetSecurityKey
+)
+
+//-----
+
+
+func CryptoSetSecurityKey(key string) bool {
+	//--
+	key = StrTrimWhitespaces(key)
+	var kLen int = len(key)
+	if((kLen < 16) || (kLen > 255)) {
+		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo Security Key must be between 16 and 255 caracters long ...")
+		return false
+	} //end if
+	//--
+	ini_SMART_FRAMEWORK_SECURITY_KEY = key
+	//--
+	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Security Key was Set (size is `" + ConvertIntToStr(len(ini_SMART_FRAMEWORK_SECURITY_KEY)) + "` bytes): Success")
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func CryptoGetSecurityKey() (string, error) {
+	//--
+	var key string = StrTrimWhitespaces(ini_SMART_FRAMEWORK_SECURITY_KEY)
+	//--
+	var kLen int = len(key)
+	if((kLen < 16) || (kLen > 255)) {
+		return "", errors.New("SmartGo Security Key must be between 16 and 255 caracters long")
+	} //end if
+	//--
+	return key, nil
+	//--
+} //END FUNCTION
 
 
 //-----
@@ -588,22 +624,64 @@ func GenerateRandomString(n int) (string, error) { // https://gist.github.com/do
 
 
 func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
-	//--
+	//-- r.20231204
 	// Create a safe checksum of data
 	// It will append the salt to the end of data to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
-	// Protected by SHA384 that has 128-bit resistance against the length extension attacks since the attacker needs to guess the 128-bit to perform the attack, due to the truncation
+	// Protected by SHA3-384 that has 128-bit resistance against the length extension attacks since the attacker needs to guess the 128-bit to perform the attack, due to the truncation
+	// Now includes also a Poly1305 custom derivation ... adds 10x more resistence against length extension attacks ; increases exponential chances for rainbow attacks
 	//--
-	defer PanicHandler() // for: b64Dec
+	// this have to be extremely fast, it is a checksum not a 2-way encryption or a password, thus not using PBKDF2 derivation
+	// more, it is secured against length attacks with a combination of SHA3-384 / SHA384 and a core of SHA3-512 as derivations ; double prefixed with high complexity strings: B64 prefix 88 chars ; B92 suffix, variable
+	// time execution ~ 0.07s .. 0.08s
+	//--
+	defer PanicHandler() // for: b64Dec ; Hex2Bin
 	//--
 	customSalt = StrTrimWhitespaces(customSalt)
 	if(customSalt == "") {
 		customSalt = SALT_PREFIX + " " + SALT_SEPARATOR + " " + SALT_SUFFIX // dissalow empty salt, fallback to have at least something
+		appNs, errAppNs := AppGetNamespace()
+		if(errAppNs != nil) {
+			log.Println("[WARNING]", CurrentFunctionName(), "App Namespace value Error:", errAppNs)
+			return ""
+		} //end if
+		customSalt += " " + appNs
+		secKey, errSecKey := CryptoGetSecurityKey()
+		if(errSecKey != nil) {
+			log.Println("[WARNING]", CurrentFunctionName(), "Security Key value Error:", errSecKey)
+			return ""
+		} //end if
+		customSalt += " " + secKey
 	} //end if
 	//--
-	var b64CkSum string = Sha384B64(plainTextData + "#" + customSalt) // sha384 is a better choice than sha256/sha512 because is more resistant to length attacks
-	var rawCkSum string = Base64Decode(b64CkSum)
+	var antiAtkLen string = Sha384(plainTextData + NULL_BYTE + customSalt) // Hex
+	var antiAtkB64Len string = Sha384B64(plainTextData + NULL_BYTE + customSalt) // B64
 	//--
-	return BaseEncode([]byte(rawCkSum), "b62")
+	var cSalt string = Crc32bB36(antiAtkLen) // B36
+	//--
+	oSalt, errOSalt := HashHmac("SHA3-384", customSalt, NULL_BYTE + plainTextData + NULL_BYTE + antiAtkLen, false) // Hex
+	if(errOSalt != nil) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Hmac Checksum Failed:", errOSalt)
+		return ""
+	} //end if
+	var pSalt string = DataRRot13(Base64sEncode(Hex2Bin(oSalt))) // B64s
+	var rSalt string = Sh3a256(cSalt + NULL_BYTE + Sh3a224B64(pSalt + NULL_BYTE + antiAtkB64Len) + NULL_BYTE + Sha512B64(plainTextData) + NULL_BYTE + Md5B64(plainTextData) + NULL_BYTE + Sha1B64(plainTextData) + NULL_BYTE + Sha224B64(plainTextData) + NULL_BYTE + Sha256B64(plainTextData) + NULL_BYTE + Sha384B64(plainTextData) + NULL_BYTE + StrRev(antiAtkLen)) // Hex
+	//--
+	var tSalt string = BaseEncode([]byte(Hex2Bin(antiAtkLen)), "b32") // B32
+	var vSalt string = BaseEncode([]byte(Hex2Bin(rSalt)), "b58") // B58
+	var wSalt string = BaseEncode([]byte(Hex2Bin(oSalt + antiAtkLen)), "b85") // B85
+	var xSalt string = BaseEncode([]byte(Hex2Bin(StrRev(oSalt) + antiAtkLen)), "b92") // B92
+	var ySalt string = Sh3a512B64(customSalt + NULL_BYTE + plainTextData + NULL_BYTE + tSalt + NULL_BYTE + xSalt) // B64 of B92
+	var polyKey string = StrRev(StrSubstr(xSalt, 17, 17+32)) // B64 (part)
+	var polyData string = customSalt + NULL_BYTE + plainTextData + NULL_BYTE + wSalt // ascii
+	zSalt, errZSalt := Poly1305(polyKey, polyData, true) // B64
+	if(errZSalt != nil) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Poly Checksum Failed:", errOSalt)
+		return ""
+	} //end if
+	//--
+	var b64CkSum string = Sh3a384B64(ySalt + VERTICAL_TAB + plainTextData + HORIZONTAL_TAB + vSalt + LINE_FEED + customSalt + CARRIAGE_RETURN + xSalt + NULL_BYTE + zSalt) // SHA3-384 B64 of B64 derived salt (88 characters) + data + B92 derived salt (variable length ~ 72 characters)
+	//--
+	return DataRRot13(BaseEncode([]byte(Base64Decode(b64CkSum)), "b62")) // B62
 	//--
 } //END FUNCTION
 
@@ -612,7 +690,7 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 
 
 func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) string { // {{{SYNC-HASH-PASSWORD}}} [PHP]
-	//-- r.20231202 + Argon2Id
+	//-- r.20231204 + Argon2Id
 	defer PanicHandler() // for: Hex2Bin ; Argon2Id
 	//--
 	// V2 was a bit unsecure..., was deprecated a long time, now is no more supported !
@@ -1426,7 +1504,7 @@ func threefishSafeTweak(plainTextKey string) string {
 		return ""
 	} //end if
 	//--
-	var safeTweak string = StrPad2LenRight(StrSubstr(b92Tweak, 0, 16), "`", 16) // 128/8 ; pas with ` as it is only base 92
+	var safeTweak string = StrPad2LenRight(StrSubstr(b92Tweak, 0, 16), "`", 16) // 128/8 ; pad with ` as it is only base 92
 	var twkslen int = len(safeTweak)
 	if((twkslen != int(twklen)) || (twkslen != 16)) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Safe Tweak is invalid !")

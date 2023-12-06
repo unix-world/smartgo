@@ -1,13 +1,14 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231203.2358 :: STABLE
+// r.20231205.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
 
 import (
+	"log"
 	"errors"
 
 	"time"
@@ -16,6 +17,7 @@ import (
 
 const (
 	//-- FIXED DATE CONSTANTS REFERENCE VALUES ... SYNCED WITH GO DATE STANDARDS !
+	DATE_TIME_DEFAULT_LOCAL_TIMEZONE  string = "UTC"
 	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH string = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
 	DATE_TIME_FMT_ISO_STD_GO_EPOCH    string = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
 	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  string = "2006-01-02 15:04:05 -0700" 		// GO EPOCH: WITH TIME, WITH TZ OFFSET
@@ -23,6 +25,9 @@ const (
 	//-- #
 )
 
+var (
+	ini_SMART_FRAMEWORK_TIMEZONE string = DATE_TIME_DEFAULT_LOCAL_TIMEZONE // set via DateTimeSetLocation
+)
 
 //-----
 
@@ -52,6 +57,36 @@ type uxmDateTimeStruct struct {
 	TzOffset      string  `json:"tzOffset"` 		// "+0000" / "+0300" / ... / "-0700" / ...
 	TzName        string  `json:"tzName"` 			// "UTC" | "LOCAL"
 }
+
+
+func DateTimeSetLocation(loc string) bool {
+	//--
+	loc = StrTrimWhitespaces(loc)
+	if(loc != "") {
+		ini_SMART_FRAMEWORK_TIMEZONE = loc
+	} //end if
+	//--
+	tzLocation, tzLocErr := time.LoadLocation(ini_SMART_FRAMEWORK_TIMEZONE)
+	if(tzLocErr != nil) {
+		ini_SMART_FRAMEWORK_TIMEZONE = DATE_TIME_DEFAULT_LOCAL_TIMEZONE // restore
+		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo Date/Time Location FAILED to be Set to: `" + ini_SMART_FRAMEWORK_TIMEZONE + "`")
+		return false
+	} //end if
+	//--
+	time.Local = tzLocation // set the global timezone
+	//--
+	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Date/Time Location was Set to `" + ini_SMART_FRAMEWORK_TIMEZONE + "`: Success")
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func DateTimeGetLocation() string {
+	//--
+	return ini_SMART_FRAMEWORK_TIMEZONE
+	//--
+} //END FUNCTION
 
 
 // PRIVATE

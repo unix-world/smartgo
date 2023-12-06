@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231203.2358 :: STABLE
+// r.20231205.2358 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -35,6 +35,24 @@ const (
 //-----
 
 
+//func FatalError(logMessages ...interface{}) {
+func FatalError(logMessages ...any) {
+	//--
+	log.Println("[ERROR] ! FATAL !", fmt.Sprint(logMessages...))
+	os.Exit(1)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+// PRIVATES
+var logFilePath string = ""
+var logFileFormat string = "plain" // can be: "plain" | "json"
+var logToFileAlsoOnConsole bool = false
+var logColoredOnConsole bool = false
+var logUseLocalTime bool = false // default, logs will use UTC
+
 // PRIVATES
 type logWriterWithColors struct {}
 func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
@@ -51,7 +69,7 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 			theMsg = color.HiBlueString(theMsg)
 		} else if(StrIPos(theMsg, "[DATA]") == 0) {
-			theMsg = color.YellowString(string(bytes)) // for data preserve the string how it is ! ; brown
+			theMsg = color.YellowString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
 		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
@@ -63,27 +81,36 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		} //end if else
 	} //end if
 	//--
-	if(logColoredOnConsole) {
-		return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + theMsg)
+	var dTime string = ""
+	if(logUseLocalTime) {
+		dTime = DateNowLocal()
 	} else {
-		return fmt.Println("LOG | " + DateNowUtc() + " | " + theMsg)
+		dTime = DateNowUtc()
+	} //end if else
+	//--
+	if(logColoredOnConsole) {
+		return fmt.Println(color.GreyString("LOG | " + dTime + " | ") + theMsg)
+	} else {
+		return fmt.Println("LOG | " + dTime + " | " + theMsg)
 	} //end if else
 	//--
 } //END FUNCTION
 
-
 // PRIVATES
-var logFilePath string = ""
-var logFileFormat string = "plain" // can be: "plain" | "json"
-var logToFileAlsoOnConsole bool = false
-var logColoredOnConsole bool = false
 type logWriterFile struct {}
 type logWriteJsonStruct struct {
-	Type    string `json:"type"`
-	DateUtc string `json:"dateUtc"`
-	Message string `json:"message"`
+	Type     string `json:"type"`
+	DateTime string `json:"dateTime"`
+	Message  string `json:"message"`
 }
 func (writer logWriterFile) Write(bytes []byte) (int, error) {
+	//--
+	var dTime string = ""
+	if(logUseLocalTime) {
+		dTime = DateNowLocal()
+	} else {
+		dTime = DateNowUtc()
+	} //end if else
 	//--
 	var theErr string = ""
 	var theMsg string = StrTrimWhitespaces(string(bytes))
@@ -148,9 +175,9 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	if(logFileFormat == "json") {
 		theLogPfx = "json"
 		jsonLogStruct := logWriteJsonStruct {
-			Type    : theType,
-			DateUtc : DateNowUtc(),
-			Message : theMsg, // not necessary to normalize spaces
+			Type     : theType,
+			DateTime : dTime,
+			Message  : theMsg, // not necessary to normalize spaces
 		}
 		theFmtMsg, theErrFmtMsg = JsonEncode(jsonLogStruct, false, false)
 		if(theErrFmtMsg != nil) {
@@ -197,9 +224,9 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	//--
 	if(logToFileAlsoOnConsole) {
 		if(logColoredOnConsole) {
-			return fmt.Println(color.GreyString("LOG | " + DateNowUtc() + " | ") + colorMsg)
+			return fmt.Println(color.GreyString("LOG | " + dTime + " | ") + colorMsg)
 		} else {
-			return fmt.Println("LOG | " + DateNowUtc() + " | " + colorMsg)
+			return fmt.Println("LOG | " + dTime + " | " + colorMsg)
 		} //end if else
 	} //end if
 	//--
@@ -249,6 +276,20 @@ func isLogPathSafeDir(pathForLogs string) bool {
 	} //end if
 	//--
 	return true
+	//--
+} //END FUNCTION
+
+
+func LogUseUtcTime() {
+	//--
+	logUseLocalTime = false // default
+	//--
+} //END FUNCTION
+
+
+func LogUseLocalTime() {
+	//--
+	logUseLocalTime = true
 	//--
 } //END FUNCTION
 
