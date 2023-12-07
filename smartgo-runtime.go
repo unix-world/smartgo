@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231206.2358 :: STABLE
+// r.20231207.0658 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -303,6 +303,10 @@ func LogToStdErr(level string) {
 
 func LogToConsole(level string, withColorsOnConsole bool) {
 	//--
+	if(ini_RUN_IN_BACKGROUND) {
+		withColorsOnConsole = false
+	} //end if
+	//--
 	logColoredOnConsole = withColorsOnConsole
 	//--
 	log.SetFlags(0) // custom log with colors, reset all flags
@@ -356,7 +360,11 @@ func HandleAbortCtrlC(delay uint32) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		fmt.Println(LINE_FEED + color.GreenString("»»»»»»»»"), color.MagentaString("[ CTRL+C (Hammer) ]"), color.BlueString("... KILL.SIGNAL: Abort ..."), color.BlackString("[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]"), color.GreenString("««««««««") + LINE_FEED)
+		if(ini_RUN_IN_BACKGROUND) { // no colors ; weird characters should not appear in logs ...
+			fmt.Println(LINE_FEED + "»»»»»»»»", "[ Hammer (Abort) ]", "... KILL.SIGNAL ...", "[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]", "««««««««" + LINE_FEED)
+		} else {
+			fmt.Println(LINE_FEED + color.GreenString("»»»»»»»»"), color.MagentaString("[ Hammer (Abort) ]"), color.BlueString("... KILL.SIGNAL ..."), color.BlackString("[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]"), color.GreenString("««««««««") + LINE_FEED)
+		} //end if else
 		log.Println("[INFO]", CMD_EXEC_HAMMER_SIGNATURE, "Exit Delay:", delay, "sec.")
 		time.Sleep(time.Duration(int(delay)) * time.Second)
 		os.Exit(1)
@@ -370,6 +378,10 @@ func HandleAbortCtrlC(delay uint32) {
 
 // set terminal theme Dark (bg:black ; fg:white) : print("\033[0;37;40m")
 func ClearPrintTerminal() {
+	//--
+	if(ini_RUN_IN_BACKGROUND) {
+		return // stop here, weird characters should not appear in logs ...
+	} //end if
 	//--
 	print("\033[H\033[2J") // try to clear the terminal (should work on *nix and windows) ; for *nix only it can be: fmt.Println("\033[2J")
 	//--
