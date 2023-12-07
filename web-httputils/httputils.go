@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231204.1852 :: STABLE
+// r.20231206.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -1704,9 +1704,10 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 	if(outputHtml == true) { // html
 		content = assets.HtmlStatusPage(title, messageText, displayAuthLogo)
 	} else { // text
-		content += title
 		if(messageText != "") {
-			content += "\n\n" + messageText
+			content = messageText
+		} else {
+			content = title // use title only if the messageText is empty ; otherwise may be json or xml, don't use ...
 		} //end if
 		content += "\n"
 	} //end if else
