@@ -1,0 +1,4 @@
+v.20231213
+Go 1.18 or later
+
+golang.org/x/time v0.5.0

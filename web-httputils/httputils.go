@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231207.0658 :: STABLE
+// r.20231215.1336 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -15,6 +15,8 @@ import (
 	"log"
 	"fmt"
 	"time"
+
+	"path/filepath"
 
 	"io"
 //	"io/ioutil"
@@ -38,7 +40,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20231207.0658"
+	VERSION string = "r.20231215.1336"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -260,6 +262,7 @@ func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string,
 	var putLocalFilePath string = ""
 	//--
 	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
+	downloadLocalDirPath = filepath.ToSlash(downloadLocalDirPath)
 	if(downloadLocalDirPath == "") {
 		downloadLocalDirPath = "./downloads/" // dissalow empty directory ; for downloads a directory is mandatory ; dissalow download in the same dir as executable is, there is a risk to rewrite the executable !!!
 	} //end if
@@ -535,6 +538,12 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData byte
 // If Auth User/Pass is set will dissalow redirects, by auto-setting maxRedirects=0 !
 // Min Read Limit is 10MB (set maxBytesRead=0 as default) ; Max Read Limit is 1GB (because is in memory !)
 func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, putLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult HttpClientRequest) {
+	//--
+	putLocalFilePath = smart.StrTrimWhitespaces(putLocalFilePath)
+	putLocalFilePath = filepath.ToSlash(putLocalFilePath)
+	//--
+	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
+	downloadLocalDirPath = filepath.ToSlash(downloadLocalDirPath)
 	//--
 	httpResult = HttpClientRequest {
 		Errors: "?",

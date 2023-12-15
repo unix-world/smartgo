@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231207.0658 :: STABLE
+// r.20231215.1336 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"path/filepath"
 
 	"errors"
 	"log"
@@ -318,6 +319,8 @@ func LogToConsole(level string, withColorsOnConsole bool) {
 func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole bool, withColorsOnConsole bool) {
 	//--
 	pathForLogs = StrTrimWhitespaces(pathForLogs) // must be (with trailing slash, dir must be existing): a/relative/path/to/log/ | /an/absolute/path/to/log/
+//	pathForLogs = filepath.ToSlash(pathForLogs)
+	pathForLogs = SafePathFixSeparator(pathForLogs) // this is better in this context, than ToSlash
 	//--
 	if(isLogPathSafeDir(pathForLogs) == true) {
 		//--
@@ -404,6 +407,7 @@ func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, addit
 	// inputStdin // The Input to Stdin if any ; DO NOT TRIM, must be passed exact how is get
 	//--
 	theExe = StrTrimWhitespaces(theExe)
+	theExe = filepath.ToSlash(theExe)
 	//--
 	var cmd *exec.Cmd = nil
 	if(stopTimeout > 0) { // timed command

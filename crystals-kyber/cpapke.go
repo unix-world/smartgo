@@ -3,7 +3,8 @@ package kyber
 import (
 	"crypto/rand"
 
-	"golang.org/x/crypto/sha3"
+//	"golang.org/x/crypto/sha3"
+	"github.com/unix-world/smartgo/sha3"
 )
 
 //PKEKeyGen creates a public and private key pair.

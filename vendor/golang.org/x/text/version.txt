@@ -1,4 +1,4 @@
-v.20230928
-Go 1.17 or later
+v.20231213
+Go 1.18 or later
 
-golang.org/x/text v0.13.0
+golang.org/x/text v0.14.0

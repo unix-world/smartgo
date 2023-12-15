@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231204.1852 :: STABLE
+// r.20231215.1336 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,7 +19,7 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20231204.1852"
+	VERSION string = "r.20231215.1336"
 
 	LAST_MODIFIED_DATE_TIME string = "2023-12-02 01:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
@@ -41,6 +41,7 @@ func ReadWebAsset(path string) string { // OK
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsafe backward path")
 		return ""
 	} //end if
+	path = smart.SafePathFixSeparator(path) // do always, not os context ToSlash !
 	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/"))
 	if(path == "") {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # empty path")

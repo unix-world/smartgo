@@ -1,0 +1,7 @@
+module github.com/mauricio/redis-client @head.20231213
+
+go 1.17
+
+modified by unixman:
+    * remove dependency on github.com/pkg/errors
+    * add extra error checks on method inputs

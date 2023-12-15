@@ -1,0 +1,4 @@
+github.com/tidwall/limiter @head.20231212
+
+go 1.18
+

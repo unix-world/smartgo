@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231207.0658 :: STABLE
+// r.20231215.1336 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.19 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -43,11 +43,14 @@ import (
 	"github.com/unix-world/smartgo/base92"
 
 	"github.com/unix-world/smartgo/regexp2"
+
 	"github.com/unix-world/smartgo/parseini"
+	"github.com/unix-world/smartgo/yaml"
+	"github.com/unix-world/smartgo/xml2json"
 )
 
 const (
-	VERSION string = "v.20231207.0658"
+	VERSION string = "v.20231215.1336"
 	DESCRIPTION string = "Smart.Framework.Go"
 	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
 
@@ -1580,7 +1583,7 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 	//--
 	iniData, errParseIni := parseini.Load(iniContent)
 	if(errParseIni != nil) {
-		return nil, "INI Settings # Parse Error: " + errParseIni.Error()
+		return nil, "INI # Parse Error: " + errParseIni.Error()
 	} //end if
 	//--
 	var settings map[string]string = map[string]string{}
@@ -1608,6 +1611,45 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 	} //end if else
 	//--
 	return settings, ""
+	//--
+} //END FUNCTION
+
+
+func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg string) {
+	//--
+	yamlData = StrTrimWhitespaces(yamlData)
+	if(yamlData == "") {
+		return
+	} //end if
+	yamlData = StrReplaceAll(yamlData, "\r\n", "\n")
+	yamlData = StrReplaceAll(yamlData, "\r", "\n")
+	yamlData = StrReplaceAll(yamlData, "\t", "    ")
+	//--
+	errYaml := yaml.Unmarshal([]byte(yamlData), &yamlMap)
+	if(errYaml != nil) {
+		yamlMap = nil
+		errMsg = "YAML # Parse Error: " + errYaml.Error()
+		return
+	} //end if
+	if(yamlMap == nil) {
+		errMsg = "YAML # Parse Error: Empty Structure"
+		return
+	} //end if
+	//--
+	return
+	//--
+} //END FUNCTION
+
+
+func XmlConvertToJson(xmlData string) (string, error) {
+	//--
+	xml := strings.NewReader(xmlData) // xml is an io.Reader
+	json, err := xml2json.Convert(xml)
+	if(err != nil) {
+		return "", err
+	} //end if
+	//--
+	return json.String(), nil
 	//--
 } //END FUNCTION
 

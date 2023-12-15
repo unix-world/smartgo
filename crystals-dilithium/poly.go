@@ -1,7 +1,8 @@
 package dilithium
 
 import (
-	"golang.org/x/crypto/sha3"
+//	"golang.org/x/crypto/sha3"
+	"github.com/unix-world/smartgo/sha3"
 )
 
 //Poly represents a polynomial of deg n with coefs in [0, Q)

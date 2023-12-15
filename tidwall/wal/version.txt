@@ -1,0 +1,8 @@
+module github.com/tidwall/wal @head.20231212
+
+go 1.13
+
+require:
+	tidwall/gjson
+	tidwall/tinylru
+

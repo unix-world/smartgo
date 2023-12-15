@@ -1,0 +1,9 @@
+github.com/emersion/go-webdav @head.20231213
+
+go 1.13
+
+require:
+	github.com/emersion/go-ical
+	github.com/emersion/go-vcard
+	github.com/teambition/rrule-go
+

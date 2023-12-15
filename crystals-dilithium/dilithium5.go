@@ -5,7 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 
-	"golang.org/x/crypto/sha3"
+//	"golang.org/x/crypto/sha3"
+	"github.com/unix-world/smartgo/sha3"
 )
 
 //KeyGen creates a public and private key pair.

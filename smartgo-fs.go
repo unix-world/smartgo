@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231207.0658 :: STABLE
+// r.20231215.1336 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -12,9 +12,10 @@ import (
 	"errors"
 	"log"
 
-	"io"
 	"path/filepath"
 	"embed"
+
+	"io"
 
 	"strings"
 	"encoding/hex"
@@ -41,7 +42,9 @@ func PathDirName(filePath string) string { // returns: `a/path/to` from `a/path/
 		return ""
 	} //end if
 	//--
-	return filepath.Dir(filePath)
+	filePath = filepath.ToSlash(filePath)
+	//--
+	return filepath.ToSlash(filepath.Dir(filePath))
 	//--
 } //END FUNCTION
 
@@ -52,12 +55,20 @@ func PathBaseName(filePath string) string { // returns: `file.extenstion` | `las
 		return ""
 	} //end if
 	//--
-	return filepath.Base(filePath)
+	filePath = filepath.ToSlash(filePath)
+	//--
+	return filepath.ToSlash(filepath.Base(filePath))
 	//--
 } //END FUNCTION
 
 
 func PathBaseNoExtName(filePath string) string { // returns: `file` (without extension) | `lastDirInPath` from `(/)a/path/to/lastDirInPath|file.extension`
+	//--
+	if(filePath == "") {
+		return ""
+	} //end if
+	//--
+	filePath = filepath.ToSlash(filePath)
 	//--
 	var fWithExt string = PathBaseName(filePath)
 	var fExt string = PathBaseExtension(fWithExt)
@@ -73,7 +84,9 @@ func PathBaseExtension(filePath string) string { // returns: file .extension (in
 		return ""
 	} //end if
 	//--
-	return filepath.Ext(filePath)
+	filePath = filepath.ToSlash(filePath)
+	//--
+	return filepath.ToSlash(filepath.Ext(filePath))
 	//--
 } //END FUNCTION
 
@@ -149,6 +162,8 @@ func PathIsEmptyOrRoot(filePath string) bool { // dissalow a path under 3 charac
 
 func PathIsAbsolute(filePath string) bool {
 	//--
+	filePath = SafePathFixSeparator(filePath) // always do, not os context ToSlash !
+	//--
 	if(
 		(StrSubstr(filePath, 0, 1) == "/") || // unix / linux
 		(StrSubstr(filePath, 0, 1) == ":") || // windows
@@ -162,6 +177,8 @@ func PathIsAbsolute(filePath string) bool {
 
 
 func PathIsBackwardUnsafe(filePath string) bool {
+	//--
+	filePath = SafePathFixSeparator(filePath) // always do, not os context ToSlash !
 	//--
 	if(
 		(len(filePath) > 1024) || // check max path length !
@@ -185,6 +202,8 @@ func PathIsDir(thePath string) bool {
 		return false
 	} //end if
 	//--
+	thePath = filepath.ToSlash(thePath)
+	//--
 	fd, err := os.Stat(thePath)
 	if(err != nil) {
 		if(os.IsNotExist(err)) {
@@ -204,6 +223,8 @@ func PathIsFile(thePath string) bool {
 	if(StrTrimWhitespaces(thePath) == "") {
 		return false
 	} //end if
+	//--
+	thePath = filepath.ToSlash(thePath)
 	//--
 	fd, err := os.Stat(thePath)
 	if(err != nil) {
@@ -225,6 +246,8 @@ func PathExists(thePath string) bool {
 		return false
 	} //end if
 	//--
+	thePath = filepath.ToSlash(thePath)
+	//--
 	_, err := os.Stat(thePath)
 	if(err != nil) {
 		if(os.IsNotExist(err)) {
@@ -240,10 +263,10 @@ func PathExists(thePath string) bool {
 func PathGetAbsoluteFromRelative(thePath string) string {
 	//--
 	absPath, err := filepath.Abs("./")
-	//--
 	if(err != nil) {
 		return "/tmp/err-absolute-path/invalid-path/"
 	} //end if
+	absPath = filepath.ToSlash(absPath)
 	//--
 	if((StrTrimWhitespaces(absPath) == "") || (absPath == "/") || (absPath == ".") || (absPath == "..")) {
 		return "/tmp/err-absolute-path/empty-or-root-path/"
@@ -287,6 +310,9 @@ func PathGetCurrentExecutableDir() string {
 func PathAddDirLastSlash(dirPath string) string {
 	//--
 	dirPath = StrTrimWhitespaces(dirPath)
+	//--
+	dirPath = filepath.ToSlash(dirPath)
+	//--
 	if((dirPath == "") || (dirPath == ".") || (dirPath == "..") || (dirPath == "/")) {
 		return "./"
 	} //end if
@@ -304,6 +330,7 @@ func PathAddDirLastSlash(dirPath string) string {
 //-----
 
 
+// this will always replace ; if only need OS context replace use: filepath.ToSlash(p)
 func SafePathFixSeparator(p string) string {
 	//--
 	if(p == "") {
@@ -323,6 +350,8 @@ func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bo
 	if(StrTrimWhitespaces(dirPath) == "") {
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
 	} //end if
+	//--
+	dirPath = filepath.ToSlash(dirPath)
 	//--
 	if(PathIsSafeValidPath(dirPath) != true) {
 		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error()
@@ -372,6 +401,8 @@ func SafePathDirDelete(dirPath string, allowAbsolutePath bool) (isSuccess bool, 
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
 	} //end if
 	//--
+	dirPath = filepath.ToSlash(dirPath)
+	//--
 	if(PathIsSafeValidPath(dirPath) != true) {
 		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error()
 	} //end if
@@ -412,6 +443,8 @@ func SafePathDirRename(dirPath string, dirNewPath string, allowAbsolutePath bool
 	if(StrTrimWhitespaces(dirPath) == "") {
 		return false, errors.New("WARNING: Dir Path is Empty").Error()
 	} //end if
+	//--
+	dirPath = filepath.ToSlash(dirPath)
 	//--
 	if(PathIsSafeValidPath(dirPath) != true) {
 		return false, errors.New("WARNING: Dir Path is Invalid Unsafe").Error()
@@ -486,6 +519,8 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 		return false, errors.New("WARNING: Dir Path is Empty").Error(), dirs, files
 	} //end if
 	//--
+	dirPath = filepath.ToSlash(dirPath)
+	//--
 	dirPath = PathAddDirLastSlash(dirPath)
 	//--
 	if(PathIsSafeValidPath(dirPath) != true) {
@@ -515,6 +550,7 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 	if(recursive) {
 		//--
 		err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+			path = filepath.ToSlash(path)
 			if((StrTrimWhitespaces(path) != "") && (StrTrim(path, "/ ") != "") && (path != ".") && (path != "..") && (path != "/") && (StrTrimRight(path, "/") != StrTrimRight(dirPath, "/"))) {
 				if(PathIsDir(path)) {
 					dirs = append(dirs, path)
@@ -534,6 +570,7 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 		if(derr != nil) {
 			return false, derr.Error(), dirs, files
 		} //end if
+		defer dir.Close()
 		paths, err := dir.Readdir(0)
 		if(err != nil) {
 			return false, err.Error(), dirs, files
@@ -563,7 +600,9 @@ func SafePathEmbedDirScan(efs *embed.FS, dirPath string, recursive bool) (isSucc
 	if(dirPath == "") {
 		return false, nil, nil, nil
 	} //end if
-	dirPath = SafePathFixSeparator(dirPath)
+	dirPath = StrTrimWhitespaces(dirPath)
+//	dirPath = SafePathFixSeparator(dirPath)
+	dirPath = filepath.ToSlash(dirPath) // this is better in this context, than SafePathFixSeparator
 	dirPath = StrTrimRight(dirPath, "/")
 	dirPath = StrTrimWhitespaces(dirPath)
 	if(dirPath == "") {
@@ -577,7 +616,7 @@ func SafePathEmbedDirScan(efs *embed.FS, dirPath string, recursive bool) (isSucc
 	//--
 	for _, entry := range entries {
 	//	fp := path.Join(dirPath, entry.Name()) // works better on windows but is unsafe
-		fp := filepath.Join(dirPath, entry.Name())
+		fp := filepath.Join(dirPath, filepath.ToSlash(entry.Name()))
 		if(entry.IsDir()) {
 			arrDirs = append(arrDirs, fp)
 			if(recursive) {
@@ -603,6 +642,8 @@ func SafePathEmbedDirScan(efs *embed.FS, dirPath string, recursive bool) (isSucc
 
 
 func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, errMsg string) {
+	//--
+	filePath = filepath.ToSlash(filePath)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return "", errors.New("WARNING: File Path is Empty").Error()
@@ -645,6 +686,8 @@ func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, e
 
 
 func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hashSum string, errMsg string) {
+	//--
+	filePath = filepath.ToSlash(filePath)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return "", errors.New("WARNING: File Path is Empty").Error()
@@ -702,20 +745,44 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 
 func SafePathIniFileReadAndParse(iniFilePath string, allowAbsolutePath bool, iniKeys []string) (iniMap map[string]string, errMsg string) {
 	//--
+	iniFilePath = filepath.ToSlash(iniFilePath)
+	//--
 	iniContent, iniFileErr := SafePathFileRead(iniFilePath, true)
 	if(iniFileErr != "") {
-		return nil, "INI Settings # Read Failed `" + iniFilePath + "`: " + iniFileErr
+		return nil, "INI File # Read Failed `" + iniFilePath + "`: " + iniFileErr
 	} //end if
 	if(StrTrimWhitespaces(iniContent) == "") {
-		return nil, "INI Settings # Content is Empty `" + iniFilePath + "`"
+		return nil, "INI File # Content is Empty `" + iniFilePath + "`"
 	} //end if
 	//--
-	settings, err := IniContentParse(iniContent, iniKeys)
+	dat, err := IniContentParse(iniContent, iniKeys)
 	if(err != "") {
-		return nil, err + " # `" + iniFilePath + "`"
+		return nil, "INI File # Parse ERR: " + err + " # `" + iniFilePath + "`"
 	} //end if
 	//--
-	return settings, ""
+	return dat, ""
+	//--
+} //END FUNCTION
+
+
+func SafePathYamlFileReadAndParse(yamlFilePath string, allowAbsolutePath bool) (yamlMap map[string]interface{}, errMsg string) {
+	//--
+	yamlFilePath = filepath.ToSlash(yamlFilePath)
+	//--
+	yamlData, errYaml := SafePathFileRead(yamlFilePath, true)
+	if(errYaml != "") {
+		return nil, "YAML File # Read Failed `" + yamlFilePath + "`: " + errYaml
+	} //end if
+	if(StrTrimWhitespaces(yamlData) == "") {
+		return nil, "YAML File # Content is Empty `" + yamlFilePath + "`"
+	} //end if
+	//--
+	yml, err := YamlDataParse(yamlData)
+	if(err != "") {
+		return nil, "YAML File # Parse ERR: " + err + " # `" + yamlFilePath + "`"
+	} //end if
+	//--
+	return yml, ""
 	//--
 } //END FUNCTION
 
@@ -724,6 +791,8 @@ func SafePathIniFileReadAndParse(iniFilePath string, allowAbsolutePath bool, ini
 
 
 func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent string, errMsg string) {
+	//--
+	filePath = filepath.ToSlash(filePath)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return "", errors.New("WARNING: File Path is Empty").Error()
@@ -760,6 +829,8 @@ func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent stri
 func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, fileContent string) (isSuccess bool, errMsg string) {
 	//--
 	// wrMode : "a" for append | "w" for write
+	//--
+	filePath = filepath.ToSlash(filePath)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return false, errors.New("WARNING: File Path is Empty").Error()
@@ -819,6 +890,8 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 
 func SafePathFileDelete(filePath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
 	//--
+	filePath = filepath.ToSlash(filePath)
+	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return false, errors.New("WARNING: File Path is Empty").Error()
 	} //end if
@@ -859,6 +932,9 @@ func SafePathFileDelete(filePath string, allowAbsolutePath bool) (isSuccess bool
 
 
 func SafePathFileRename(filePath string, fileNewPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	filePath = filepath.ToSlash(filePath)
+	fileNewPath = filepath.ToSlash(fileNewPath)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return false, errors.New("WARNING: File Path is Empty").Error()
@@ -929,6 +1005,9 @@ func SafePathFileRename(filePath string, fileNewPath string, allowAbsolutePath b
 
 
 func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath bool) (isSuccess bool, errMsg string) {
+	//--
+	filePath = filepath.ToSlash(filePath)
+	fileNewPath = filepath.ToSlash(fileNewPath)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return false, errors.New("WARNING: File Path is Empty").Error()
@@ -1047,6 +1126,8 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 
 func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int64, errMsg string) {
 	//--
+	filePath = filepath.ToSlash(filePath)
+	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return 0, errors.New("WARNING: File Path is Empty").Error()
 	} //end if
@@ -1086,6 +1167,8 @@ func SafePathFileGetSize(filePath string, allowAbsolutePath bool) (fileSize int6
 
 
 func SafePathGetMTime(thePath string, allowAbsolutePath bool) (mTime int64, errMsg string) {
+	//--
+	thePath = filepath.ToSlash(thePath)
 	//--
 	if(StrTrimWhitespaces(thePath) == "") {
 		return 0, errors.New("WARNING: The Path is Empty").Error()

@@ -1,0 +1,8 @@
+github.com/tidwall/redcon @head.20231212
+
+go 1.15
+
+require:
+	tidwall/btree
+	tidwall/match
+

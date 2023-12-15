@@ -5,8 +5,7 @@
 package cpu
 
 import (
-// "io/ioutil"
-	"os" // # fix by unixman
+	"os"
 )
 
 const (
@@ -40,8 +39,7 @@ func readHWCAP() error {
 		return nil
 	}
 
-//	buf, err := ioutil.ReadFile(procAuxv)
-	buf, err := os.ReadFile(procAuxv) // # fix by unixman
+	buf, err := os.ReadFile(procAuxv)
 	if err != nil {
 		// e.g. on android /proc/self/auxv is not accessible, so silently
 		// ignore the error and leave Initialized = false. On some

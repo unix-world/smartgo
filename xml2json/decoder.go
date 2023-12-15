@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	attrPrefix    = "-"
+//	attrPrefix    = "-"
+	attrPrefix    = "@" // fix by unixman
 	contentPrefix = "#"
 )
 

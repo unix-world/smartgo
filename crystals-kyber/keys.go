@@ -3,7 +3,8 @@ package kyber
 import (
 	"crypto/subtle"
 
-	"golang.org/x/crypto/sha3"
+//	"golang.org/x/crypto/sha3"
+	"github.com/unix-world/smartgo/sha3"
 )
 
 //PublicKey holds the pk strct

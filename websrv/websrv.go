@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231205.2358 :: STABLE
+// r.20231215.1336 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -12,6 +12,8 @@ import (
 
 	"time"
 	"bytes"
+
+	"path/filepath"
 	"net/http"
 
 	smart "github.com/unix-world/smartgo"
@@ -21,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231205.2358"
+	VERSION string = "r.20231215.1336"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -154,6 +156,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 
 	if(serveSecure == true) {
 		certifPath = smart.StrTrimWhitespaces(certifPath)
+		certifPath = filepath.ToSlash(certifPath)
 		if((certifPath == "") || (smart.PathIsBackwardUnsafe(certifPath) == true)) {
 			certifPath = CERTIFICATES_DEFAULT_PATH
 		} //end if
@@ -164,6 +167,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 	} //end if
 
 	webRootPath = smart.StrTrimWhitespaces(webRootPath)
+	webRootPath = filepath.ToSlash(webRootPath)
 	if((webRootPath == "") || (smart.PathIsBackwardUnsafe(webRootPath) == true)) {
 		webRootPath = WEBROOT_DIR
 	} //end if

@@ -1,6 +1,0 @@
-Go 1.17 or later
-
-Fixes by unixman v.20230928 for: x/sys/cpu v0.12.0:
-* fixed as in mainstream: use os instead of ioutil in: 		x/sys/cpu/hwcap_linux.go
-* fixed as in mainstream: cacheLineSize in: 				x/sys/cpu/cpu_riscv64.go
-

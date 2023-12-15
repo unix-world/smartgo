@@ -1,0 +1,8 @@
+github.com/tidwall/gjson @head.20231212
+
+go 1.12
+
+require:
+	tidwall/match
+	tidwall/pretty
+

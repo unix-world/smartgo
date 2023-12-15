@@ -1,0 +1,4 @@
+github.com/tidwall/x2j @head.20231212
+
+go 1.19
+

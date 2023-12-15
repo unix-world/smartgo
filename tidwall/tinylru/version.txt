@@ -1,0 +1,4 @@
+github.com/tidwall/tinylru @head.20231212
+
+go 1.18
+
