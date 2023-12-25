@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231215.1336 :: STABLE
+// r.20231224.0340 :: STABLE
 // [ TPL (MARKER-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -643,6 +643,10 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 								if(tmp_marker_val == "") {
 									tmp_marker_val = UNDEF_VAR_NAME
 								} //end if
+							} else if(escaping == "|normspaces") { // normalize spaces
+								tmp_marker_val = StrNormalizeSpaces(tmp_marker_val)
+							} else if(escaping == "|nospaces") { // no spaces
+								tmp_marker_val = StrTrimWhitespaces(StrReplaceAll(StrNormalizeSpaces(tmp_marker_val), " ", ""))
 							} else if(escaping == "|nobackslash") { // remove backslashes from a string
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\", "")
 							} else if(escaping == "|rxpattern") { // prepare a regex escaped pattern for a browser input ; the following characters need tot to be escaped in a browser pattern sequence, but in PHP they are, in a regex pattern

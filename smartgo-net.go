@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231215.1336 :: STABLE
+// r.20231224.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -18,13 +18,13 @@ import (
 
 const (
 	REGEX_SMART_SAFE_NET_HOSTNAME  string 	= `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
-	REGEX_SMART_SAFE_HTTP_HEADER_KEY string = `^[A-Z0-9\-]+$` 					// SAFETY: SUPPORT ONLY THESE CHARACTERS IN HEADER KEY VALUES
+	REGEX_SMART_SAFE_HTTP_HEADER_KEY string = `^[A-Za-z0-9\-]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN HEADER KEY VALUES
 
 	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
 )
 
 var (
-	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP string = "" // by default is empty (no proxy) ; if a proxy is used it can be set as: "X-FORWARDED-CLIENT-IP" or "X-REAL-IP" or "X-FORWARDED-FOR" or ... but only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
+	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP string = "" 							// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Client-Ip" or "X-Real-Ip" or "X-Forwarded-For" or ... but only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
 )
 
 //-----
@@ -32,7 +32,8 @@ var (
 
 func SetSafeRealClientIpHeaderKey(hdrKey string) bool {
 	//--
-	hdrKey = StrToUpper(StrTrimWhitespaces(hdrKey))
+//	hdrKey = StrToUpper(StrTrimWhitespaces(hdrKey))
+	hdrKey = StrTrimWhitespaces(hdrKey) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}} ; fix: any request header key goes into go http server will be converted into case-sensitive keys. The canonicalization converts the first letter and any letter following a hyphen to upper case; the rest are converted to lowercase. For example, the canonical key for "accept-encoding" is "Accept-Encoding"
 	//--
 	if(hdrKey == "") {
 		log.Println("[ERROR] " + CurrentFunctionName() + ": Set Real Client IP Proxy Header Key Failed, empty")
@@ -47,7 +48,7 @@ func SetSafeRealClientIpHeaderKey(hdrKey string) bool {
 		return false
 	} //end if
 	//--
-	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP = hdrKey
+	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP = http.CanonicalHeaderKey(hdrKey) // fix camelcase
 	//--
 	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Http Real Client IP Proxy Header Key Set to `" + ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP + "`: Success")
 	//--
@@ -58,7 +59,7 @@ func SetSafeRealClientIpHeaderKey(hdrKey string) bool {
 
 func GetSafeRealClientIpHeaderKey() string {
 	//--
-	return StrToUpper(StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP))
+	return StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
 	//--
 } //END FUNCTION
 
@@ -70,7 +71,7 @@ func GetHttpRealClientIpFromRequestHeaders(r *http.Request) (isOk bool, clientRe
 	var ip string = ""
 	var ipList string = ""
 	//--
-	var hdrKey string = StrToUpper(StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP))
+	var hdrKey string = StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
 	if(hdrKey == "") {
 		//--
 		ip, _ = GetHttpRemoteAddrIpAndPortFromRequest(r)
@@ -78,6 +79,10 @@ func GetHttpRealClientIpFromRequestHeaders(r *http.Request) (isOk bool, clientRe
 		hdrKey = "[REMOTE_ADDR]" // this is a special value, not in the headers, with underscore
 		//--
 	} else {
+		//--
+		if(DEBUG == true) {
+			log.Println("[DEBUG]", "Request Header Keys", r.Header)
+		} //end if
 		//--
 		ipList = StrTrimWhitespaces(r.Header.Get(hdrKey))
 		if(ipList == "") {

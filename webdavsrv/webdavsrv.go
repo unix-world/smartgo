@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2023 unix-world.org
-// r.20231215.1336 :: STABLE
+// r.20231224.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20231215.1336"
+	VERSION string = "r.20231224.2358"
 	SIGNATURE string = "(c) 2020-2023 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -45,7 +45,7 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	//-- settings
 
-	httpHeaderKeyRealIp = smart.StrToUpper(smart.StrTrimWhitespaces(httpHeaderKeyRealIp))
+	httpHeaderKeyRealIp = smart.StrTrimWhitespaces(httpHeaderKeyRealIp) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
 	if(httpHeaderKeyRealIp != "") { // if no proxy, don't set
 		smart.SetSafeRealClientIpHeaderKey(httpHeaderKeyRealIp)
 	} //end if
