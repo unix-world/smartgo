@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2023 unix-world.org
-// r.20231215.1336 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240102.2114 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -24,8 +24,8 @@ import (
 	"io"
 	"bytes"
 
-	color "github.com/unix-world/smartgo/colorstring"
-	"github.com/unix-world/smartgo/logutils"
+	color "github.com/unix-world/smartgo/ui/colorstring"
+	"github.com/unix-world/smartgo/utils/log-utils"
 )
 
 const (

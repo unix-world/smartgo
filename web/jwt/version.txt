@@ -1,0 +1,7 @@
+github.com/golang-jwt/jwt/v4 @v4.5.0
+
+go 1.16
+
+modified by unixman: r.20240102.2114
+	* added SHA-224
+	* added SHA-3: 224 / 256 / 384 / 512

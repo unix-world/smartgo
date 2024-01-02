@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2023 unix-world.org
-// r.20231215.1336 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240102.2114 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -95,7 +95,7 @@ func PathIsSafeValidFileName(fileName string) bool { // fileName must not contai
 	//--
 	fileName = StrNormalizeSpaces(fileName) // normalize all kind of spaces to detect below ; spaces of any kind or NULL byte are not allowed in filenames or paths ...
 	//--
-	if((StrTrimWhitespaces(fileName) == "") || StrContains(fileName, " ") || StrContains(fileName, "/") || StrContains(fileName, "\\") || StrContains(fileName, ":")) {
+	if((StrTrimWhitespaces(fileName) == "") || StrEndsWith(fileName, "/") || StrContains(fileName, " ") || StrContains(fileName, "/") || StrContains(fileName, "\\") || StrContains(fileName, ":")) {
 		return false
 	} //end if
 	//--
@@ -106,6 +106,32 @@ func PathIsSafeValidFileName(fileName string) bool { // fileName must not contai
 	} //end if
 	//--
 	return true
+	//--
+} //END FUNCTION
+
+
+func PathIsSafeValidSafeFileName(fileName string) bool {
+	//--
+	if(PathIsSafeValidFileName(fileName)) {
+		if(StrRegexMatchString(REGEX_SMART_SAFE_FILE_NAME, fileName)) {
+			return true
+		} //end if
+	} //end if
+	//--
+	return false
+	//--
+} //END FUNCTION
+
+
+func PathIsSafeValidSafePath(filePath string) bool {
+	//--
+	if(PathIsSafeValidPath(filePath)) {
+		if(StrRegexMatchString(REGEX_SMART_SAFE_PATH_NAME, filePath)) {
+			return true
+		} //end if
+	} //end if
+	//--
+	return false
 	//--
 } //END FUNCTION
 
@@ -143,7 +169,7 @@ func PathIsEmptyOrRoot(filePath string) bool { // dissalow a path under 3 charac
 	} //end if
 	//--
 	filePath = StrReplaceAll(filePath, "/", "")  // test for linux/unix file system
-	filePath = StrReplaceAll(filePath, "\\", "") // test for network shares
+	filePath = StrReplaceAll(filePath, "\\", "") // test for network shares or windows style path separator
 	filePath = StrReplaceAll(filePath, ":", "")  // test for windows file system
 	//--
 	filePath = StrTrimWhitespaces(filePath)

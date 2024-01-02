@@ -1,0 +1,4 @@
+module github.com/guptarohit/asciigraph @head.20240102
+
+go 1.11
+

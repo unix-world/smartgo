@@ -1,0 +1,9 @@
+module github.com/mauricio/redis-client @head.20231213
+
+go 1.17
+
+modified by unixman:
+	* package renamed from rediscli to redconcli
+	* remove dependency on github.com/pkg/errors
+	* add extra error checks on method inputs
+

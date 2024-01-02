@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2023 unix-world.org
-// r.20231215.1336 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240102.2114 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -20,9 +20,12 @@ import (
 
 	"encoding/hex"
 	"encoding/base64"
+	"encoding/pem"
 
+	"crypto"
 	"crypto/cipher"
 	cryptorand "crypto/rand"
+	"crypto/ed25519"
 
 	"hash/crc32"
 	"crypto/md5"
@@ -31,14 +34,15 @@ import (
 	"crypto/sha512"
 	"crypto/hmac"
 
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/argon2"
 //	"golang.org/x/crypto/sha3"
-	"github.com/unix-world/smartgo/sha3" // this is a better version than above, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
-	"github.com/unix-world/smartgo/poly1305"
-	"github.com/unix-world/smartgo/pbkdf2"
-	"github.com/unix-world/smartgo/blowfish"
-	"github.com/unix-world/smartgo/twofish"
-	"github.com/unix-world/smartgo/threefish"
+	"github.com/unix-world/smartgo/crypto/sha3" // this is a better version than above, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
+	"github.com/unix-world/smartgo/crypto/poly1305"
+	"github.com/unix-world/smartgo/crypto/pbkdf2"
+	"github.com/unix-world/smartgo/crypto/blowfish"
+	"github.com/unix-world/smartgo/crypto/twofish"
+	"github.com/unix-world/smartgo/crypto/threefish"
 )
 
 const (
@@ -2166,6 +2170,48 @@ func BlowfishDecryptCBC(str string, key string) string { // v1, v2, v3
 	} //end if
 	//--
 	return decrypted
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+// return: err, pubKeyPEM, privKeyPEM
+func GenerateSSHKeyPairEd25519(comment string, password string) (error, string, string) {
+	//-- info
+	// the comment is expected to be an email address or a slug
+	//-- trim, normalize spaces, replace spaces with -, and allow max 255 chars
+	comment = StrSubstr(StrReplaceAll(StrTrimWhitespaces(StrNormalizeSpaces(comment)), " ", "-"), 0, 255)
+	//-- do not trim, just ensure max allowed size
+	password = StrSubstr(password, 0, 72) // the PASSWORD_BCRYPT as the algorithm supports max length as 72 !
+	//--
+	pub, priv, errK := ed25519.GenerateKey(cryptorand.Reader)
+	if(errK != nil) {
+		return errK, "", ""
+	} //end if
+	//--
+	var p *pem.Block
+	var errM error
+	if(password != "") {
+		p, errM = ssh.MarshalPrivateKeyWithPassphrase(crypto.PrivateKey(priv), comment, []byte(password))
+	} else {
+		p, errM = ssh.MarshalPrivateKey(crypto.PrivateKey(priv), comment)
+	} //end if else
+	if(errM != nil) {
+		return errM, "", ""
+	} //end if
+	//--
+	publicKey, err := ssh.NewPublicKey(pub)
+	if(err != nil) {
+		return errM, "", ""
+	} //end if
+	privateKeyPem := pem.EncodeToMemory(p)
+	//--
+	pubPemK := "ssh-ed25519" + " " + base64.StdEncoding.EncodeToString(publicKey.Marshal()) + " " + comment
+	privPemK := string(privateKeyPem)
+	//--
+	return nil, StrTrimWhitespaces(pubPemK), StrTrimWhitespaces(privPemK)
 	//--
 } //END FUNCTION
 

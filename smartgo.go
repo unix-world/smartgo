@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2023 unix-world.org
-// r.20231224.2358 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240102.2114 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.19 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -30,29 +30,32 @@ import (
 
 	"mime"
 	"html"
-
+	"encoding/xml"
 	"encoding/json"
 	"encoding/hex"
 	"encoding/base64"
 
-	"github.com/unix-world/smartgo/base32"
-	"github.com/unix-world/smartgo/base36"
-	"github.com/unix-world/smartgo/base58"
-	"github.com/unix-world/smartgo/base62"
-	"github.com/unix-world/smartgo/base85"
-	"github.com/unix-world/smartgo/base92"
+	"github.com/unix-world/smartgo/baseconv/base32"
+	"github.com/unix-world/smartgo/baseconv/base36"
+	"github.com/unix-world/smartgo/baseconv/base58"
+	"github.com/unix-world/smartgo/baseconv/base62"
+	"github.com/unix-world/smartgo/baseconv/base85"
+	"github.com/unix-world/smartgo/baseconv/base92"
 
-	"github.com/unix-world/smartgo/regexp2"
+	"github.com/unix-world/smartgo/textproc/regexp2"
 
-	"github.com/unix-world/smartgo/parseini"
-	"github.com/unix-world/smartgo/yaml"
-	"github.com/unix-world/smartgo/xml2json"
+	"github.com/unix-world/smartgo/data-structs/parseini"
+	"github.com/unix-world/smartgo/data-structs/yaml"
+	"github.com/unix-world/smartgo/data-structs/xml2json"
+	"github.com/unix-world/smartgo/data-structs/tidwall/gjson"
 )
 
 const (
-	VERSION string = "v.20231224.2358"
+	VERSION string = "v.20240102.2114"
+	NAME string = "SmartGo"
+
 	DESCRIPTION string = "Smart.Framework.Go"
-	COPYRIGHT string = "(c) 2021-2023 unix-world.org"
+	COPYRIGHT string = "(c) 2021-2024 unix-world.org"
 
 	CHARSET string = "UTF-8" // don't change !!
 
@@ -93,6 +96,13 @@ var (
 func AppSetRunInBackground() bool {
 	//--
 	ini_RUN_IN_BACKGROUND = true
+	//--
+	return ini_RUN_IN_BACKGROUND
+	//--
+} //END FUNCTION
+
+
+func AppGetRunInBackground() bool {
 	//--
 	return ini_RUN_IN_BACKGROUND
 	//--
@@ -1401,6 +1411,18 @@ func JsonScalarDecodeToStr(data string) (string, error) { // can parse the follo
 } //END FUNCTION
 
 
+func JsonGetValueByKeyPath(json string, path string) gjson.Result {
+	//--
+	// path can be: "3" ; "a" ; "0.id" ; "a.b.c.7"
+	// will return type Result
+	// Result type can be converted to: .String() | .Bool() | .Int() as int64 | .Uint() as uint64 | .Float() as float64 | .Time() as time.Time | .Array() as []Result
+	// Result can be checked as: .IsObject(), .IsArray(), .IsBool()
+	//--
+	return gjson.Get(json, path)
+	//--
+} //END FUNCTION
+
+
 //-----
 
 
@@ -1424,19 +1446,19 @@ func AddCSlashes(s string, c string) string {
 } //END FUNCTION
 
 
-func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
+func EscapeXml(s string) string { // provides a Smart.Framework ~ EscapeXml
 	//--
-	out := bytes.Buffer{}
+	if(s == "") {
+		return ""
+	} //end if
 	//--
-	for _, c := range s {
-		if((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57)) {
-			out.WriteRune(c) // a-zA-Z0-9
-		} else {
-			fmt.Fprintf(&out, "\\%04X", c) // UTF-8
-		} //end if else
-	} //end for
+	buf := bytes.Buffer{}
+	err := xml.EscapeText(&buf, []byte(s)) // escapes all characters compliant with XML standard
+	if(err != nil) {
+		return ""
+	} //end if
 	//--
-	return out.String()
+	return buf.String()
 	//--
 } //END FUNCTION
 
@@ -1447,7 +1469,27 @@ func EscapeHtml(s string) string { // provides a Smart.Framework ~ EscapeHtml
 		return ""
 	} //end if
 	//--
-	return html.EscapeString(s) // escapes these five characters: < > & ' "
+//	return html.EscapeString(s) // escapes these five characters: < > & ' "
+	htmlEscaper := strings.NewReplacer( // do not use the above one, use this (a modified code of the above) because the above one replaces double quote as &#34; instead of &quot; and also single quote ...
+		`&`, "&amp;",
+	//	`'`, "&#39;", // "&apos;" is only for HTML5
+		`<`, "&lt;",
+		`>`, "&gt;",
+		`"`, "&quot;", // "&#34;"
+	)
+	return htmlEscaper.Replace(s)
+	//--
+} //END FUNCTION
+
+
+// works for HTML and XML too ...
+func UnEscapeHtml(s string) string { // provides a Smart.Framework ~ Decode HTML or XML Entities ; since golang this can be used also for XML
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	return html.UnescapeString(s)
 	//--
 } //END FUNCTION
 
@@ -1481,6 +1523,23 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 			out.WriteRune(114) // r
 		} else {
 			fmt.Fprintf(&out, "\\u%04X", c) // UTF-8
+		} //end if else
+	} //end for
+	//--
+	return out.String()
+	//--
+} //END FUNCTION
+
+
+func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
+	//--
+	out := bytes.Buffer{}
+	//--
+	for _, c := range s {
+		if((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57)) {
+			out.WriteRune(c) // a-zA-Z0-9
+		} else {
+			fmt.Fprintf(&out, "\\%04X", c) // UTF-8
 		} //end if else
 	} //end for
 	//--

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2023 unix-world.org
-// r.20231224.0340 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240102.2114 :: STABLE
 // [ TPL (MARKER-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -14,7 +14,7 @@ import (
 	"strings"
 	"encoding/json"
 
-	"github.com/unix-world/smartgo/fastjson"
+	"github.com/unix-world/smartgo/data-structs/fastjson"
 )
 
 //-----
@@ -129,7 +129,7 @@ func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
 
 
 func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded bool, revertSyntax bool) string {
-	//-- syntax: r.20231128
+	//-- syntax: r.20231228
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
 	} //end if
@@ -610,6 +610,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 								tmp_marker_val = EscapeJs(tmp_marker_val)
 							} else if(escaping == "|html") { // Escape HTML
 								tmp_marker_val = EscapeHtml(tmp_marker_val)
+							} else if(escaping == "|xml") { // Escape XML
+								tmp_marker_val = EscapeXml(tmp_marker_val)
 							} else if(escaping == "|css") { // Escape CSS
 								tmp_marker_val = EscapeCss(tmp_marker_val)
 							} else if(escaping == "|nl2br") { // Format NL2BR
@@ -913,7 +915,7 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 
 
 func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
-	//-- syntax: r.20231128
+	//-- syntax: r.20231228
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
 	} //end if

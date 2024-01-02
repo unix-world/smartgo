@@ -1,0 +1,7 @@
+github.com/lib/pq v.1.10.9
+
+go 1.13
+
+unixman:
+    DISABLED: github.com/lib/pq/auth/kerberos due a lot of extra dependencies ; this can be loaded separately if really needed
+

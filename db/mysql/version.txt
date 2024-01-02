@@ -1,0 +1,7 @@
+github.com/go-sql-driver/mysql v1.7.1
+
+go 1.13
+
+extended by unixman: # v.20231231.1148
+	* quote.go
+

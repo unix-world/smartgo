@@ -1,9 +1,0 @@
-v.head @ 20210705
-
-Go 1.16 or later
-
-github.com/kudelskisecurity/crystals-go/crystals-dilithium
-
-# refactored by unixman as:
-github.com/unix-world/smartgo/crystals-dilithium
-
