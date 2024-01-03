@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240103.1301 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -239,9 +239,9 @@ func DateTimeStructUtc(dateIsoStr string) uxmDateTimeStruct {
 } //END FUNCTION
 
 
-func DateNowUtc() string { // YYYY-MM-DD HH:II:SS +ZZZZ
+func DateTimeStructLocal(dateIsoStr string) uxmDateTimeStruct {
 	//--
-	return time.Now().UTC().Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+	return parseDateTimeAsStruct("LOCAL", dateIsoStr)
 	//--
 } //END FUNCTION
 
@@ -253,9 +253,16 @@ func DateNowIsoUtc() string { // YYYY-MM-DD HH:II:SS
 } //END FUNCTION
 
 
-func DateTimeStructLocal(dateIsoStr string) uxmDateTimeStruct {
+func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
 	//--
-	return parseDateTimeAsStruct("LOCAL", dateIsoStr)
+	return time.Now().Format(DATE_TIME_FMT_ISO_STD_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+func DateNowUtc() string { // YYYY-MM-DD HH:II:SS +ZZZZ
+	//--
+	return time.Now().UTC().Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
 	//--
 } //END FUNCTION
 
@@ -267,9 +274,19 @@ func DateNowLocal() string { // YYYY-MM-DD HH:II:SS +ZZZZ
 } //END FUNCTION
 
 
-func DateNowIsoLocal() string { // YYYY-MM-DD HH:II:SS
+//-----
+
+
+func TimeNowUtc() int64 { // unix timestamp UTC
 	//--
-	return time.Now().Format(DATE_TIME_FMT_ISO_STD_GO_EPOCH)
+	return time.Now().UTC().Unix()
+	//--
+} //END FUNCTION
+
+
+func TimeNowLocal() int64 { // unix timestamp UTC
+	//--
+	return time.Now().Unix()
 	//--
 } //END FUNCTION
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240103.1301 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -174,7 +174,7 @@ func DataRRot13(s string) string {
 
 func HashHmac(algo string, key string, str string, b64 bool) (string, error) {
 	//--
-	algo = StrToLower(algo)
+	algo = StrToLower(StrTrimWhitespaces(algo))
 	//--
 	var ok bool = false
 	var sum string = ""

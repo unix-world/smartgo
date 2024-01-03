@@ -18,6 +18,9 @@ golang.org/x/net/internal/socks
 golang.org/x/net/proxy
 golang.org/x/net/webdav
 golang.org/x/net/webdav/internal/xml
+# golang.org/x/sync v0.5.0
+## explicit; go 1.18
+golang.org/x/sync/syncmap
 # golang.org/x/sys v0.15.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
@@ -42,3 +45,6 @@ golang.org/x/text/runes
 golang.org/x/text/transform
 golang.org/x/text/unicode/cldr
 golang.org/x/text/unicode/norm
+# golang.org/x/time v0.5.0
+## explicit; go 1.18
+golang.org/x/time/rate

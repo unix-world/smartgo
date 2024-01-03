@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Simple Cache (in-Memory) :: Smart.Go.Framework
-// (c) 2020-2022 unix-world.org
-// r.20220416.2202 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240103.1301 :: STABLE
 
 // inspired from: forPelevin/go-cache/main/local.go # license: (golang, default) Apache
 
@@ -16,7 +16,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20220416.2202"
+	VERSION string = "r.20240103.1301"
 
 	LOG_INTERVAL_SEC uint16 = 60 // log every 60 seconds
 )
@@ -26,6 +26,7 @@ const (
 type CacheEntry struct {
 	Id    string `json:"id"`
 	Data  string `json:"data"`
+	Obj   interface{} // any ; this field cannot be exported to JSON, is intended for internal Go Objects
 }
 
 type cEntry struct {

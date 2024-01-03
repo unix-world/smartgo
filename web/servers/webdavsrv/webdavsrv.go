@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebDAV Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240103.1301 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package webdavsrv
@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20240102.2114"
+	VERSION string = "r.20240103.1301"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -41,7 +41,7 @@ const (
 )
 
 
-func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc) bool {
+func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) bool {
 
 	//-- settings
 
@@ -126,6 +126,13 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	mux, srv := smarthttputils.HttpMuxServer(httpAddr + fmt.Sprintf(":%d", httpPort), timeoutSeconds, true, "[WebDAV Server]") // force HTTP/1
 
+	//-- rate limit decision
+
+	var useRateLimit bool = ((rateLimit > 0) && (rateBurst > 0))
+	if(useRateLimit) { // RATE LIMIT
+		log.Println("[INFO]", "HTTP/S Rate Limiter", smart.CurrentFunctionName(), ":: Limit:", rateLimit, "Burst:", rateBurst)
+	} //end if
+
 	//-- webdav handler
 
 	wdav := &webdav.Handler{
@@ -147,32 +154,68 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 
 	// http root handler : 202 | 404
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		//-- rate limit interceptor (must be first)
+		if(useRateLimit) { // RATE LIMIT
+			var isRateLimited bool = smarthttputils.HttpServerIsIpRateLimited(r, rateLimit, rateBurst)
+			if(isRateLimited) { // if the current request/ip is rate limited
+				smarthttputils.HttpStatus429(w, r, "Rate Limit: Your IP Address have submitted too many requests in a short period of time and have exceeded the number of allowed requests. Try again in few minutes.", true)
+				return
+			} //end if
+		} //end if
+		//-- #end rate limit
 		if(r.URL.Path != "/") {
-			smarthttputils.HttpStatus404(w, r, "WebDAV Resource Not Found: `" + r.URL.Path + "`", false)
+			smarthttputils.HttpStatus404(w, r, "WebDAV Resource Not Found: `" + r.URL.Path + "`", true)
 			return
 		} //end if
+		//--
 		_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
 		log.Printf("[OK] WebDAV Server :: DEFAULT :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 		var bodyHtml string = `<div class="status"><img alt="Status: Up and Running ..." title="Status: Up and Running ..." width="64" height="64" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(serverSignature.String()) + "</pre>" + "\n" + "</div>"
 		smarthttputils.HttpStatus202(w, r, assets.HtmlStandaloneTemplate(theStrSignature, headHtml, bodyHtml), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
+		//--
 	})
 
 	// http version handler : 203
 	mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		//-- rate limit interceptor (must be first)
+		if(useRateLimit) { // RATE LIMIT
+			var isRateLimited bool = smarthttputils.HttpServerIsIpRateLimited(r, rateLimit, rateBurst)
+			if(isRateLimited) { // if the current request/ip is rate limited
+				smarthttputils.HttpStatus429(w, r, "Rate Limit: Your IP Address have submitted too many requests in a short period of time and have exceeded the number of allowed requests. Try again in few minutes.", false)
+				return
+			} //end if
+		} //end if
+		//-- #end rate limit
+		if(r.URL.Path != "/version") {
+			smarthttputils.HttpStatus404(w, r, "WebDAV Resource Not Found: `" + r.URL.Path + "`", false)
+			return
+		} //end if
+		//--
 		_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
 		log.Printf("[OK] WebDAV Server :: VERSION :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(202), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		smarthttputils.HttpStatus203(w, r, theStrSignature + "\n", "version.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
+		//--
 	})
 
 	// webdav handler : all webdav status codes ...
 	davHandler := func(w http.ResponseWriter, r *http.Request) {
+		//-- rate limit interceptor (must be first)
+		if(useRateLimit) { // RATE LIMIT
+			var isRateLimited bool = smarthttputils.HttpServerIsIpRateLimited(r, rateLimit, rateBurst)
+			if(isRateLimited) { // if the current request/ip is rate limited
+				smarthttputils.HttpStatus429(w, r, "Rate Limit: Your IP Address have submitted too many requests in a short period of time and have exceeded the number of allowed requests. Try again in few minutes.", false)
+				return
+			} //end if
+		} //end if
+		//-- #end rate limit
+		//-- auth check
 		authErr, _ := smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, false) // outputs: TEXT
 		if(authErr != nil) {
 			log.Println("[WARNING] WebDAV Server / Storage Area :: Authentication Failed:", authErr)
 			return
 		} //end if
-
+		//-- #end auth check
 		if(r.Method == http.MethodGet) {
 			var wdirPath string = smart.StrSubstr(r.URL.Path, len(DAV_PATH), 0)
 			if(smart.StrTrimWhitespaces(wdirPath) == "") {
@@ -186,9 +229,10 @@ func WebdavServerRun(httpHeaderKeyRealIp string, storagePath string, serveSecure
 				} //end if
 			} //end if
 		} //end if
-		log.Println("[DEBUG", "WebDAV Server", "Method:", r.Method, "Depth:", r.Header.Get("Depth"))
-
+		log.Println("[DEBUG]", "WebDAV Server", "Method:", r.Method, "Depth:", r.Header.Get("Depth"))
+		//--
 		wdav.ServeHTTP(w, r) // if all ok above (basic auth + credentials ok, serve ...)
+		//--
 	}
 	mux.HandleFunc(DAV_PATH, davHandler) // serve without "/" suffix # this is a fix to work also with gvfs
 	mux.HandleFunc(DAV_PATH + "/", davHandler) // serve classic, with "/" suffix

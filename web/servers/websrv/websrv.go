@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240103.1301 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20240102.2114"
+	VERSION string = "r.20240103.1301"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -108,7 +108,7 @@ var UrlHandlersMap = map[string]HttpHandlerFunc{
 }
 
 
-func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc) bool {
+func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) bool {
 
 	//-- settings
 
@@ -202,11 +202,26 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 
 	mux, srv := smarthttputils.HttpMuxServer(httpAddr + fmt.Sprintf(":%d", httpPort), timeoutSeconds, true, "[Web Server]") // force HTTP/1
 
+	//-- rate limit decision
+
+	var useRateLimit bool = ((rateLimit > 0) && (rateBurst > 0))
+	if(useRateLimit) { // RATE LIMIT
+		log.Println("[INFO]", "HTTP/S Rate Limiter", smart.CurrentFunctionName(), ":: Limit:", rateLimit, "Burst:", rateBurst)
+	} //end if
+
 	//-- handlers
 
-	// http root handler : 202 | 404
+	// http root handler
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		//--
+		//-- rate limit interceptor (must be first)
+		if(useRateLimit) { // RATE LIMIT
+			var isRateLimited bool = smarthttputils.HttpServerIsIpRateLimited(r, rateLimit, rateBurst)
+			if(isRateLimited) { // if the current request/ip is rate limited
+				smarthttputils.HttpStatus429(w, r, "Rate Limit: Your IP Address have submitted too many requests in a short period of time and have exceeded the number of allowed requests. Try again in few minutes.", true)
+				return
+			} //end if
+		} //end if
+		//-- #end rate limit
 		var theUrlPath string = smart.StrTrimWhitespaces(string(r.URL.Path))
 		theUrlPath = smart.StrTrimRight(theUrlPath, "/")
 		theUrlPath = smart.StrTrimWhitespaces(theUrlPath)
@@ -223,7 +238,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + r.URL.Path + "`", true)
 			return
 		} //end if
-		//--
+		//-- auth check (if set so)
 		var useAuth bool = true
 		if(UrlHandlersSkipAuth != nil) {
 			skipAuth, okAuth := UrlHandlersSkipAuth[theUrlPath]
@@ -240,7 +255,7 @@ func WebServerRun(httpHeaderKeyRealIp string, webRootPath string, serveSecure bo
 				return
 			} //end if
 		} //end if
-		//--
+		//-- #end auth check
 		timerStart := time.Now()
 		code, content, contentFnameOrRedirUrl, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers := fx(r, authData)
 		timerDuration := time.Since(timerStart)
