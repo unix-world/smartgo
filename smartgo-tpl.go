@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ TPL (MARKER-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -129,6 +129,8 @@ func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
 
 
 func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded bool, revertSyntax bool) string {
+	//--
+	defer PanicHandler() // url decode may panic
 	//-- syntax: r.20231228
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
@@ -157,6 +159,8 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 
 
 func markersTplProcessIfSyntax(template string, arrobj map[string]string) string {
+	//--
+	defer PanicHandler()
 	//-- process if (conditionals)
 	var rExp string = `(?s)\[%%%IF\:([a-zA-Z0-9_\-\.]+?)\:(@\=\=|@\!\=|@\<\=|@\<|@\>\=|@\>|\=\=|\!\=|\<\=|\<|\>\=|\>|\!%|%|\!\?|\?|\^~|\^\*|&~|&\*|\$~|\$\*)([^\[\]]*?);((\([0-9]+\))??)%%%\](.*?)??(\[%%%ELSE\:\1\4%%%\](.*?)??)??\[%%%\/IF\:\1\4%%%\]` // {{{SYNC-TPL-EXPR-IF}}} ; {{{SYNC-TPL-EXPR-IF-IN-LOOP}}}
 	re, matches := StrRegex2FindAllStringMatches("PERL", rExp, template, 0, 0)
@@ -479,6 +483,8 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 
 
 func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, context string) string {
+	//--
+	defer PanicHandler()
 	//-- trim context if any
 	context = StrTrimWhitespaces(context) // do not make context uppercase, leave as is, is case-sensitive ; this can affect level 1 ...
 	//-- process markers
@@ -809,6 +815,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 
 
 func markersTplProcessLoopSyntax(template string, arrobj map[string]string) string {
+	//--
+	defer PanicHandler()
 	//-- process loop (conditionals)
 	var rExp string = `(?s)\[%%%LOOP\:([a-zA-Z0-9_\-\.]+?)((\([0-9]+?\))??%)%%\](.*?)??\[%%%\/LOOP\:\1\2%%\]` // {{{SYNC-TPL-EXPR-LOOP}}}
 	re, matches := StrRegex2FindAllStringMatches("PERL", rExp, template, 0, 0)
@@ -916,6 +924,8 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 
 func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
 	//-- syntax: r.20231228
+	defer PanicHandler() // url decode may panic
+	//--
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
 	} //end if
@@ -992,6 +1002,8 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 
 func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
 	//--
+	defer PanicHandler()
+	//--
 	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
 	//--
 	template = PlaceholdersTplRender(template, arrpobj, false, false)
@@ -1002,6 +1014,8 @@ func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj
 
 
 func RenderMarkersTpl(template string, arrobj map[string]string) string {
+	//--
+	defer PanicHandler()
 	//--
 	return MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
 	//--

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.19 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -51,7 +51,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20240103.1301"
+	VERSION string = "v.20240111.1742"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -61,6 +61,7 @@ const (
 
 	REGEX_SAFE_APP_NAMESPACE string = `^[_a-z0-9\-\.]+$` 						// Safe App Namespace Regex
 	REGEX_SMART_SAFE_NUMBER_FLOAT string = `^[0-9\-\.]+$` 						// SAFETY: SUPPORT ONLY THESE CHARACTERS IN SAFE FLOAT (ex: JSON)
+	REGEX_SAFE_VAR_NAME string = `^[_a-zA-Z0-9]+$` 								// Safe VarName Regex
 
 	REGEXP2_DEFAULT_MAX_RECURSION uint32 = 800000 								// Default REGEXP2 Recursion Limit: 800K
 	REGEXP2_DEFAULT_MAX_TIMEOUT uint8 = 1										// Default REGEXP2 Max Timeout 1 Second(s)
@@ -114,7 +115,7 @@ func AppSetNamespace(ns string) bool {
 	ns = StrTrimWhitespaces(ns)
 	var nLen int = len(ns)
 	if((nLen < 4) || (nLen > 63)) {
-		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo App Namespace must be between 16 and 255 caracters long ...")
+		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo App Namespace must be between 4 and 63 caracters long ...")
 		return false
 	} //end if
 	if(!StrRegexMatchString(REGEX_SAFE_APP_NAMESPACE, ns)) {
@@ -137,10 +138,10 @@ func AppGetNamespace() (string, error) {
 	//--
 	var nLen int = len(ns)
 	if((nLen < 4) || (nLen > 63)) {
-		return "", errors.New("SmartGo App Namespace must be between 16 and 255 caracters long")
+		return "", NewError("SmartGo App Namespace must be between 16 and 255 caracters long")
 	} //end if
 	if(!StrRegexMatchString(REGEX_SAFE_APP_NAMESPACE, ns)) {
-		return "", errors.New("SmartGo App Namespace contains invalid characters")
+		return "", NewError("SmartGo App Namespace contains invalid characters")
 	} //end if
 	//--
 	return ns, nil
@@ -159,11 +160,13 @@ func CurrentFunctionName() string {
 		return "[Unknown]"
 	} //end if
 	//--
-	var name string = runtime.FuncForPC(counter).Name() // ex: github.com/unix-world/smartgo.CurrentFunctionName
+	var name string = runtime.FuncForPC(counter).Name() // ex: `main` or `github.com/unix-world/smartgo.CurrentFunctionName`
 	//--
-	if(DEBUG != true) { // if no debug get just the short method name instead of full method name
-		arr := Explode(".", name)
-		name = arr[len(arr)-1]
+	if(StrContains(name, "/")) { // if similar ~ with `github.com/unix-world/smartgo.CurrentFunctionName`
+		arr := Explode("/", name)
+		if(len(arr) > 0) {
+			name = arr[len(arr)-1] // get just the smartgo.CurrentFunctionName part
+		} //end if
 	} //end if
 	//--
 	return name
@@ -185,8 +188,10 @@ func PanicHandler() {
 
 //-----
 
-func CreateNewError(err string) error {
+func NewError(err string) error {
+	//--
 	return errors.New(err)
+	//--
 } //END FUNCTION
 
 
@@ -249,7 +254,7 @@ func BaseDecode(data string, fromBase string) []byte {
 	} else if((fromBase == "b16") || (fromBase == "hex")) { // hex (b16)
 		decoded = []byte(Hex2Bin(data))
 	} else {
-		err = errors.New("Invalid Decoding Base: `" + fromBase + "`")
+		err = NewError("Invalid Decoding Base: `" + fromBase + "`")
 	} //end if else
 	//--
 	if(err != nil) {
@@ -391,16 +396,6 @@ func ArrMapKeyExists[E comparable](v E, arr map[E]E) bool { // depends on Go gen
 	if(arr == nil) {
 		return false
 	} //end if
-	//--
-	/*
-	for kk, _ := range arr {
-		if(v == kk) {
-			return true
-		} //end if
-	} //end for
-	//--
-	return false
-	*/
 	//--
 	_, exists := arr[v]
 	//--
@@ -1638,11 +1633,11 @@ func MimeTypeByFilePath(path string) string {
 //-----
 
 
-func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]string, errMsg string) {
+func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]string, errMsg error) {
 	//--
 	iniData, errParseIni := parseini.Load(iniContent)
 	if(errParseIni != nil) {
-		return nil, "INI # Parse Error: " + errParseIni.Error()
+		return nil, NewError("INI # Parse Error: " + errParseIni.Error())
 	} //end if
 	//--
 	var settings map[string]string = map[string]string{}
@@ -1669,12 +1664,12 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 		} //end for
 	} //end if else
 	//--
-	return settings, ""
+	return settings, nil
 	//--
 } //END FUNCTION
 
 
-func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg string) {
+func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg error) {
 	//--
 	yamlData = StrTrimWhitespaces(yamlData)
 	if(yamlData == "") {
@@ -1686,13 +1681,10 @@ func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg stri
 	//--
 	errYaml := yaml.Unmarshal([]byte(yamlData), &yamlMap)
 	if(errYaml != nil) {
+		errMsg = NewError("YAML # Parse Error: " + errYaml.Error())
 		yamlMap = nil
-		errMsg = "YAML # Parse Error: " + errYaml.Error()
-		return
-	} //end if
-	if(yamlMap == nil) {
-		errMsg = "YAML # Parse Error: Empty Structure"
-		return
+	} else if(yamlMap == nil) {
+		errMsg = NewError("YAML # Parse Error: Empty Structure")
 	} //end if
 	//--
 	return

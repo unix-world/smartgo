@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	ALGO_PASS_SMART_SAFE_PASS uint8 = 0
-	ALGO_PASS_SMART_SAFE_ARGON_PASS uint8 = 1
+	ALGO_PASS_SMART_SAFE_PASS uint8 		= 0
+	ALGO_PASS_SMART_SAFE_ARGON_PASS uint8 	= 1
 	// 10..255 other pass algos ; 2..10 is reserved for internal use
 
 	HTTP_AUTH_MODE_NONE   uint8 = 0
@@ -23,6 +23,167 @@ const (
 
 	REGEX_SAFE_HTTP_USER_NAME string = `^[a-z0-9\.]+$` // Safe UserName Regex
 )
+
+var (
+	authBasicEnabled bool = true 		// default is TRUE,  does accept Auth Basic if HTTP Server ask for it ; to disable, set to FALSE
+	authBearerEnabled bool = false 		// default is FALSE, does not accept Auth Bearer ; to accept Auth Bearer, set to TRUE
+	authCookieName string = "" 			// [2..16 characters ; valid REGEX_SAFE_VAR_NAME] ; default is EMPTY, does not accept Auth by Cookies ; to accept Auth by Cookie, set to ~ "Sf_Auth"
+
+	auth2FACookieName string = "" 		// [2..16 characters ; valid REGEX_SAFE_VAR_NAME] ; default is EMPTY, to Enable 2FA (TOTP), set to ~ "Sf_2FA" ; this is intended to be used with Basic Auth, but for custom auth can be implemented also with Cookie or Bearer ...
+)
+
+//-----
+
+
+func AuthBasicIsEnabled() bool {
+	//--
+	return authBasicEnabled
+	//--
+} //END FUNCTION
+
+
+func AuthBasicModeSet(mode bool) bool {
+	//--
+	authBasicEnabled = mode
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func AuthBearerIsEnabled() bool {
+	//--
+	return authBearerEnabled
+	//--
+} //END FUNCTION
+
+
+func AuthBearerModeSet(mode bool) bool {
+	//--
+	authBearerEnabled = mode
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func AuthCookieIsEnabled() bool {
+	//--
+	if(AuthCookieNameGet() != "") {
+		return true
+	} //end if
+	//--
+	return false
+	//--
+} //END FUNCTION
+
+
+func AuthCookieNameGet() string {
+	//--
+	var cookieName string = StrTrimWhitespaces(authCookieName)
+	if(!ValidateCookieName(cookieName)) {
+		cookieName = "" // invalid, clear
+	} //end if
+	//--
+	if(cookieName != "") {
+		if((cookieName == auth2FACookieName) || (cookieName == sessionUUIDCookieName)) { // avoid collision with auth2FACookieName or sessionUUIDCookieName
+			cookieName = "" // invalid, clear
+		} //end if
+	} //end if
+	//--
+	return cookieName
+	//--
+} //END FUNCTION
+
+
+func AuthCookieNameSet(cookieName string) bool {
+	//--
+	var ok bool = true
+	//--
+	cookieName = StrTrimWhitespaces(cookieName)
+	if(cookieName != "") { // do not check below for empty cookie name, must be a way to be unset by passing empty string to this method
+		if(!ValidateCookieName(cookieName)) {
+			cookieName = "" // reset, invalid
+			ok = false // was non-empty, but invalid
+		} //end if
+	} //end if
+	//--
+	if(cookieName != "") {
+		if((cookieName == auth2FACookieName) || (cookieName == sessionUUIDCookieName)) { // avoid collision with auth2FACookieName or sessionUUIDCookieName
+			cookieName = "" // reset, invalid
+			ok = false // was non-empty, but invalid
+		} //end if
+	} //end if
+	//--
+	authCookieName = cookieName // set or unset
+	//--
+	return ok
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func Auth2FACookieIsEnabled() bool {
+	//--
+	if(Auth2FACookieNameGet() != "") {
+		return true
+	} //end if
+	//--
+	return false
+	//--
+} //END FUNCTION
+
+
+func Auth2FACookieNameGet() string {
+	//--
+	var cookieName string = StrTrimWhitespaces(auth2FACookieName)
+	if(!ValidateCookieName(cookieName)) {
+		cookieName = "" // invalid, clear
+	} //end if
+	//--
+	if(cookieName != "") {
+		if((cookieName == authCookieName) || (cookieName == sessionUUIDCookieName)) { // avoid collision with authCookieName or sessionUUIDCookieName
+			cookieName = "" // invalid, clear
+		} //end if
+	} //end if
+	//--
+	return cookieName
+	//--
+} //END FUNCTION
+
+
+func Auth2FACookieNameSet(cookieName string) bool {
+	//--
+	var ok bool = true
+	//--
+	cookieName = StrTrimWhitespaces(cookieName)
+	if(cookieName != "") { // do not check below for empty cookie name, must be a way to be unset by passing empty string to this method
+		if(!ValidateCookieName(cookieName)) {
+			cookieName = "" // reset, invalid
+			ok = false // was non-empty, but invalid
+		} //end if
+	} //end if
+	//--
+	if(cookieName != "") {
+		if((cookieName == authCookieName) || (cookieName == sessionUUIDCookieName)) { // avoid collision with authCookieName or sessionUUIDCookieName
+			cookieName = "" // reset, invalid
+			ok = false // was non-empty, but invalid
+		} //end if
+	} //end if
+	//--
+	auth2FACookieName = cookieName // set or unset
+	//--
+	return ok
+	//--
+} //END FUNCTION
 
 
 //-----
@@ -98,13 +259,23 @@ func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string
 } //END FUNCTION
 
 
-func AuthUserPassDefaultCheck(authRealm string, authMode uint8, user string, pass string, requiredUsername string, requiredPassword string) (bool, AuthDataStruct) {
+func AuthUserPassDefaultCheck(authRealm string, authMode uint8, user string, pass string, cookies map[string]string, requiredUsername string, requiredPassword string) (bool, AuthDataStruct) {
+	//--
+	// TODO: cookies will be used for 2FA (if enabled) in combination with Basic Auth
 	//--
 	authData := AuthDataStruct{
 		OK: false,
 		ErrMsg: "??",
+		Method: authMode,
 	}
 	//--
+	if(AuthBasicIsEnabled() != true) {
+		//--
+		authData.ErrMsg = "Auth Basic is Disabled"
+		//--
+		return false, authData
+		//--
+	} //end if
 	if( // {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
 		(StrTrimWhitespaces(user) == "") ||
 		((len(user) < 3) || (len(user) > 128)) || // {{{SYNC-GO-SMART-AUTH-USER-LEN}}} ; std max username length is 128 ; min 3, from Smart.Framework
@@ -132,15 +303,52 @@ func AuthUserPassDefaultCheck(authRealm string, authMode uint8, user string, pas
 } //END FUNCTION
 
 
-func AuthTokenDefaultCheck(authRealm string, authMode uint8, clientIP string, token string, requiredUsername string, requiredPassword string) (bool, AuthDataStruct) {
+func AuthTokenDefaultCheck(authRealm string, authMode uint8, clientIP string, token string, cookies map[string]string) (bool, AuthDataStruct) {
+	//--
+	// TODO: cookies will be used for 2FA (if enabled) in combination with Bearer Auth
 	//--
 	// TODO: ...
 	// 	* implement SWT
 	// 	* requiredPassword hash by using SafePassHashSmart() for SWT
 	//--
+	errMsg := "Auth by Token (Bearer) is Not (yet) Implemented ... TODO ..."
+	if(AuthBearerIsEnabled() != true) {
+		errMsg = "Auth by Token (Bearer) is Disabled"
+	} //end if
+	//--
 	authData := AuthDataStruct{
 		OK: false,
-		ErrMsg: "Not Implemented ...",
+		ErrMsg: errMsg,
+		Method: authMode,
+	}
+	//--
+	return false, authData
+	//--
+} //END FUNCTION
+
+
+func AuthCookieDefaultCheck(authRealm string, authMode uint8, clientIP string, cookies map[string]string) (bool, AuthDataStruct) {
+	//--
+	// TODO: ...
+	// 	* implement SWT
+	// 	* requiredPassword hash by using SafePassHashSmart() for SWT
+	//--
+	errMsg := "Auth by Cookie is Not (yet) Implemented ... TODO ..."
+	if(AuthCookieIsEnabled() != true) {
+		errMsg = "Auth by Cookie is Disabled"
+	} else {
+		var ckName string = AuthCookieNameGet()
+		if(ckName == "") {
+			errMsg += " # ERR: Empty Cookie Name"
+		} else {
+			errMsg += " # Cookie Name [" + ckName + "]"
+		} //end if
+	} //end if else
+	//--
+	authData := AuthDataStruct{
+		OK: false,
+		ErrMsg: errMsg,
+		Method: authMode,
 	}
 	//--
 	return false, authData

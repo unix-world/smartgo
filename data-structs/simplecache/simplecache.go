@@ -1,22 +1,24 @@
 
 // GO Lang :: SmartGo / Simple Cache (in-Memory) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240106.2368 :: STABLE
 
 // inspired from: forPelevin/go-cache/main/local.go # license: (golang, default) Apache
 
 package simplecache
 
 import (
+	"fmt"
+	"log"
+
 	"sync"
 	"time"
-	"log"
 )
 
 //-----
 
 const (
-	VERSION string = "r.20240103.1301"
+	VERSION string = "r.20240106.2368"
 
 	LOG_INTERVAL_SEC uint16 = 60 // log every 60 seconds
 )
@@ -86,7 +88,8 @@ func (lc *InMemCache) loopCleanExpired(interval time.Duration) {
 				return
 			case <-a.C:
 				now := time.Now().UTC()
-				log.Println("[NOTICE] ±±±±±±± InMemCache [" + lc.name + "] Objects ±±±±±±± #", len(lc.objects), "@ CleanUp Interval:", interval, now.Second())
+				_, minutes, seconds := now.Clock()
+				log.Println("[NOTICE] ±±±±±±± InMemCache [" + lc.name + "] Objects ±±±±±±± #", len(lc.objects), "@ CleanUp Interval:", interval, "# Log Frequency:", fmt.Sprintf("%ds", LOG_INTERVAL_SEC), "# mm:ss", fmt.Sprintf("%02d:%02d", minutes, seconds))
 			case <-t.C:
 				lc.mu.Lock() // keep above the IF as it reads ...
 				if(len(lc.objects) > 0) {

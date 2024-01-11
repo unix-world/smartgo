@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240111.1742 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20240102.2114"
+	VERSION string = "r.20240111.1742"
 
 	DEBUG bool = false
 )
@@ -42,6 +42,8 @@ type uxmAjaxFormReply struct {
 
 
 func JsonAjaxFormReply(status string, action string, title string, message string, isHtmlMessage bool, js_evcode string, redirect string, replace_div string, replace_html string, hide_form_on_success bool) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	title = smart.EscapeHtml(title)
 	if(!isHtmlMessage) {
@@ -74,14 +76,21 @@ func JsonAjaxFormReply(status string, action string, title string, message strin
 //-----
 
 
-func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposition string, cacheMode string) { // serves the assets for a HTTP(S) server under the path: `/lib/*`
+func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode string) uint16 { // serves the assets for a HTTP(S) server under the path: `/lib/*`
 	//--
-	var path string = r.URL.Path
-	path = smart.StrTrimWhitespaces(path)
+	defer smart.PanicHandler()
+	//--
+	var path string = smart.GetHttpPathFromRequest(r)
+	//--
+	if((r.Method != "GET") && (r.Method != "HEAD")) {
+		log.Println("StatusCode: 405 # Failed to Serve Asset: `" + path + "`", "# Invalid Method:", r.Method, "::", smart.CurrentFunctionName())
+		smarthttputils.HttpStatus405(w, r, "Invalid Request Method [" + r.Method + "] for Asset: `" + path + "`", true) // html
+		return 405
+	} //end if
 	//--
 	var assetContent string = ""
 	if(smart.StrStartsWith(path, "/lib/")) {
-		path = smart.StrTrim(path, "/")
+		path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/ ")) // remove `/` and space + all whitespaces
 		if(len(path) > 4) {
 			if(smart.StrStartsWith(path, "lib/")) {
 				assetContent = assets.ReadWebAsset(path)
@@ -92,21 +101,24 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposi
 	if(assetContent == "") {
 		log.Println("StatusCode: 404 # Failed to Serve Asset: `" + path + "`", "# Not Found", "::", smart.CurrentFunctionName())
 		smarthttputils.HttpStatus404(w, r, "Asset Not Found: `" + path + "`", true) // html
-		return
+		return 404
 	} //end if
 	//--
 	var cExp int = -1
 	var cMod string = ""
 	var cCtl string = smarthttputils.CACHE_CONTROL_NOCACHE
 	switch(cacheMode) {
+		case "cache:private": fallthrough
 		case "cache:public": fallthrough
-		case "cache:private":
+		case "cache:default":
 			cExp = int(assets.CACHED_EXP_TIME_SECONDS)
 			cMod = assets.LAST_MODIFIED_DATE_TIME
-			if(cacheMode == "cache:public") {
+			if(cacheMode == "cache:private") {
+				cCtl = smarthttputils.CACHE_CONTROL_PRIVATE
+			} else if(cacheMode == "cache:public") {
 				cCtl = smarthttputils.CACHE_CONTROL_PUBLIC
 			} else {
-				cCtl = smarthttputils.CACHE_CONTROL_PRIVATE
+				cCtl = smarthttputils.CACHE_CONTROL_DEFAULT
 			} //end if else
 			break
 		case "cache:no": fallthrough
@@ -115,11 +127,13 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, contentDisposi
 	} //end switch
 	//--
 	if(DEBUG == true) {
-		log.Println("[DATA] " + smart.CurrentFunctionName() + ": Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; contentDisposition: `" + contentDisposition + "` ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
+		log.Println("[DATA] " + smart.CurrentFunctionName() + ": Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
 	} //end if
 	log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Serving Asset: `" + path + "` ;", len(assetContent), "bytes")
 	//--
-	smarthttputils.HttpStatus200(w, r, assetContent, path, contentDisposition, cExp, cMod, cCtl, nil)
+	smarthttputils.HttpStatus200(w, r, assetContent, path, "", cExp, cMod, cCtl, nil)
+	//--
+	return 200
 	//--
 } //END FUNCTION
 
@@ -141,6 +155,8 @@ func HtmlServerFaviconTemplate(titleText string, headHtml string, bodyHtml strin
 
 
 func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	//--
@@ -166,38 +182,40 @@ func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string
 		theTpl = assets.HTML_TPL_FAVICON_DEF
 	}
 	//--
-	var headCssJs string = "<!-- Head: Css / Js -->"
+	var headCssJs string = TAG_COMMENT_HEAD_JS_CSS
+	headCssJs += TAG_BASE_HREF_START + smart.EscapeHtml(smart.GetHttpProxyBasePath()) + TAG_BASE_HREF_END // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use HTML BasePath as prefix (default is /), to work with advanced tail dirs routing
+	//--
 	var assetsAll []string
 	assetsAll = append(assetsAll, headCssJs)
 	//--
-	const cssStartTag = `<link rel="stylesheet" type="text/css" href="`
-	const cssEndTag = `">`
-	const jsStartTag = `<script src="`
-	const jsEndTag = `"></script>`
+	var cssStartTag string 	= TAG_CSS_START // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use ONLY relative paths, because Base Tag will fix them
+	var cssEndTag string 	= TAG_CSS_END
+	var jsStartTag string 	= TAG_JS_START // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use ONLY relative paths, because Base Tag will fix them
+	var jsEndTag string		= TAG_JS_END
 	//--
-	const cssAppGo = "lib/app-go.css"
+	const cssAppGo string = "lib/app-go.css"
 	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssAppGo) + cssEndTag)
 	//--
-	const jsJQueryBase = "lib/js/jquery/jquery.js"
+	const jsJQueryBase string = "lib/js/jquery/jquery.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryBase) + jsEndTag)
-	const jsJQuerySettings = "lib/js/jquery/settings-jquery.js"
+	const jsJQuerySettings string = "lib/js/jquery/settings-jquery.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySettings) + jsEndTag)
-	const jsJQuerySmartCompat = "lib/js/jquery/jquery.smart.compat.js"
+	const jsJQuerySmartCompat string = "lib/js/jquery/jquery.smart.compat.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySmartCompat) + jsEndTag)
 	//--
-	const cssJQueryGrowl = "lib/js/jquery/growl/jquery.toastr.css"
+	const cssJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.css"
 	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryGrowl) + cssEndTag)
-	const jsJQueryGrowl = "lib/js/jquery/growl/jquery.toastr.js"
+	const jsJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryGrowl) + jsEndTag)
 	//--
-	const cssJQueryAlertable = "lib/js/jquery/jquery.alertable.css"
+	const cssJQueryAlertable string = "lib/js/jquery/jquery.alertable.css"
 	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryAlertable) + cssEndTag)
-	const jsJQueryAlertable = "lib/js/jquery/jquery.alertable.js"
+	const jsJQueryAlertable string = "lib/js/jquery/jquery.alertable.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryAlertable) + jsEndTag)
 	//--
-	const jsSfSettings = "lib/js/framework/smart-framework-settings.js"
+	const jsSfSettings string = "lib/js/framework/smart-framework-settings.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfSettings) + jsEndTag)
-	const jsSfPak = "lib/js/framework/smart-framework.pak.js"
+	const jsSfPak string = "lib/js/framework/smart-framework.pak.js"
 	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfPak) + jsEndTag)
 	//--
 	if(len(assetsAll) > 0) {
@@ -212,6 +230,19 @@ func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string
 	//--
 } //END FUNCTION
 
+
+//-----
+
+
+const (
+	TAG_COMMENT_HEAD_JS_CSS string 	= "<!-- Head: Css / Js -->"
+	TAG_BASE_HREF_START string 		= `<base href="`
+	TAG_BASE_HREF_END string 		= `">`
+	TAG_CSS_START string 			= `<link rel="stylesheet" type="text/css" href="`
+	TAG_CSS_END string 				= `">`
+	TAG_JS_START string 			= `<script src="`
+	TAG_JS_END string 				= `"></script>`
+)
 
 //-----
 

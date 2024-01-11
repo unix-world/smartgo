@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240111.1742 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -9,7 +9,6 @@ package smartdb
 import (
 	"fmt"
 	"log"
-	"errors"
 	"strings"
 
 	"database/sql"
@@ -28,6 +27,8 @@ const (
 	DB_SQL_TYPE_SQLITE string = "sqlite3"
 	DB_SQL_TYPE_PGSQL  string = "postgres"
 	DB_SQL_TYPE_MYSQL  string = "mysql"
+
+	HARD_LIMIT_ROWS    uint64 = 1000000 // get max 1 million rows
 )
 
 const SQLITE_INIT_META_TABLE string = `
@@ -75,7 +76,7 @@ INSERT IGNORE INTO _smartframework_metadata VALUES('domain-realm-id',?5);
 //-----
 
 
-type dbSqlConnector struct {
+type DbSqlConnector struct {
 	dbType string
 	dbUrl  string
 	dbConn *sql.DB
@@ -90,7 +91,7 @@ type dbSqlConnector struct {
 // 		* RegisterFunc()
 // 		* support DSN: file:test.db?cache=shared&mode=memory ; file::memory: ; :memory:
 
-func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) {
+func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -103,29 +104,29 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) 
 	switch(dbType) {
 		case DB_SQL_TYPE_SQLITE: // showld allow absolute paths, ex: desktop apps with a path from config
 			if(dbUrl == "") {
-				return nil, errors.New("Empty DB Connection String. Must be as `dir/db.sqlite` (relative path) or as `/dir/db.sqlite` (absolute path)")
+				return nil, smart.NewError("Empty DB Connection String. Must be as `dir/db.sqlite` (relative path) or as `/dir/db.sqlite` (absolute path)")
 			} //end if
 			if(smart.StrStartsWith(dbUrl, ".")) {
-				return nil, errors.New("Invalid DB Connection URL Path Prefix (Must NOT start with a dot): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Path Prefix (Must NOT start with a dot): " + dbUrl)
 			} //end if
 			if(smart.StrContains(dbUrl, "://")) {
-				return nil, errors.New("Invalid DB Connection URL Path Prefix (Must NOT start with ://): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Path Prefix (Must NOT start with ://): " + dbUrl)
 			} //end if
 			if(len(dbUrl) > 255) {
-				return nil, errors.New("Invalid DB Connection URL Suffix (Must have max 255 characters): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Suffix (Must have max 255 characters): " + dbUrl)
 			} //end if
 			testPath := strings.NewReplacer("/", "", "\\", "", ":", "")
 			if(len(smart.StrTrimWhitespaces(testPath.Replace(dbUrl))) < 10) { // {{{SYNC-DB-SQLITE-FNAME-MIN-LEN}}} ; expected: extension + 3 letters prefix
-				return nil, errors.New("Invalid DB Connection URL Path (Must have at least 8 characters, ex: `abc.sqlite`): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Path (Must have at least 8 characters, ex: `abc.sqlite`): " + dbUrl)
 			} //end if
 			if(smart.PathIsEmptyOrRoot(dbUrl)) {
-				return nil, errors.New("Invalid DB Connection URL Path (Empty or Root): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Path (Empty or Root): " + dbUrl)
 			} //end if
 			if(smart.PathIsBackwardUnsafe(dbUrl)) {
-				return nil, errors.New("Invalid DB Connection URL Path (Backward Unsafe): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Path (Backward Unsafe): " + dbUrl)
 			} //end if
 			if(!smart.PathIsSafeValidSafePath(dbUrl)) {
-				return nil, errors.New("Invalid DB Connection URL Path (Must contain only SafePath/Restricted Characters): " + dbUrl)
+				return nil, smart.NewError("Invalid DB Connection URL Path (Must contain only SafePath/Restricted Characters): " + dbUrl)
 			} //end if
 			dir  := smart.StrTrimWhitespaces(smart.PathDirName(dbUrl))
 			file := smart.StrTrimLeft(smart.StrTrimWhitespaces(smart.PathBaseName(dbUrl)), ".")
@@ -134,10 +135,10 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) 
 				smart.PathIsEmptyOrRoot(dir) ||
 				smart.PathIsBackwardUnsafe(dir) ||
 				(!smart.PathIsSafeValidSafePath(dir))) {
-					return nil, errors.New("Invalid DB Connection URL Path Dir: " + dir)
+					return nil, smart.NewError("Invalid DB Connection URL Path Dir: " + dir)
 			} //end if
 			if(smart.PathIsFile(dir)) {
-				return nil, errors.New("Invalid DB Connection URL Path: It points to an existing File: " + dir)
+				return nil, smart.NewError("Invalid DB Connection URL Path: It points to an existing File: " + dir)
 			} //end if
 			dir = smart.PathAddDirLastSlash(dir)
 			if(
@@ -145,32 +146,32 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) 
 				smart.PathIsEmptyOrRoot(dir) ||
 				smart.PathIsBackwardUnsafe(dir) ||
 				(!smart.PathIsSafeValidSafePath(dir))) {
-					return nil, errors.New("Invalid DB Connection URL Path with Trailing Slash: " + dir)
+					return nil, smart.NewError("Invalid DB Connection URL Path with Trailing Slash: " + dir)
 			} //end if
 			if(len(file) < 10) { // {{{SYNC-DB-SQLITE-FNAME-MIN-LEN}}}
-				return nil, errors.New("Invalid DB Connection URL File Name Length (must be at least 10 characters): " + file)
+				return nil, smart.NewError("Invalid DB Connection URL File Name Length (must be at least 10 characters): " + file)
 			} //end if
 			if(smart.StrStartsWith(file, ".")) {
-				return nil, errors.New("Invalid DB Connection URL File Name Prefix (Must NOT start with a dot): " + file)
+				return nil, smart.NewError("Invalid DB Connection URL File Name Prefix (Must NOT start with a dot): " + file)
 			} //end if
 			if(!smart.StrEndsWith(file, ".sqlite")) {
-				return nil, errors.New("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
+				return nil, smart.NewError("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
 			} //end if
 			if(!smart.PathIsSafeValidSafeFileName(file)) {
-				return nil, errors.New("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
+				return nil, smart.NewError("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
 			} //end if
 			safePath := dir + file
 			if(!smart.PathIsSafeValidSafePath(safePath)) {
-				return nil, errors.New("Invalid DB Connection URL Canonicalized Path: " + safePath)
+				return nil, smart.NewError("Invalid DB Connection URL Canonicalized Path: " + safePath)
 			} //end if
 			if(smart.PathIsDir(safePath)) {
-				return nil, errors.New("Invalid DB Connection URL Path: It points to an existing Directory: " + safePath)
+				return nil, smart.NewError("Invalid DB Connection URL Path: It points to an existing Directory: " + safePath)
 			} //end if
 			if(!smart.PathExists(dir)) {
 				log.Println("[NOTICE]", NAME, smart.CurrentFunctionName(), "DB Dir does not exists, will try to create it:", dir)
 				okDir, errDir := smart.SafePathDirCreate(dir, true, true) // recursive, allow absolute
-				if((okDir != true) || (errDir != "")) {
-					return nil, errors.New("Failed to Create the DB Directory: " + dir)
+				if((okDir != true) || (errDir != nil)) {
+					return nil, smart.NewError("Failed to Create the DB Directory: " + dir)
 				} //end if
 				if(smart.PathExists(dir)) {
 					log.Println("[INFO]", NAME, smart.CurrentFunctionName(), "DB Dir created:", dir)
@@ -179,11 +180,11 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) 
 				} //end if
 			} //end if
 			if(!smart.PathExists(dir)) {
-				return nil, errors.New("The DB Directory cannot be found: " + dir)
+				return nil, smart.NewError("The DB Directory cannot be found: " + dir)
 			} //end if
 			dbUrl = safePath
 			if(smart.PathIsDir(dbUrl)) {
-				return nil, errors.New("The DB Safe File points to an existing Directory: " + dbUrl)
+				return nil, smart.NewError("The DB Safe File points to an existing Directory: " + dbUrl)
 			} //end if
 			if(!smart.PathExists(dbUrl)) {
 				log.Println("[NOTICE]", NAME, smart.CurrentFunctionName(), "DB File does not exists, will be initialized on first connection:", dbUrl)
@@ -192,19 +193,19 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) 
 			break
 		case DB_SQL_TYPE_PGSQL:
 			if((dbUrl == "") || (!smart.StrStartsWith(dbUrl, "postgres://"))) {
-				return nil, errors.New("PostgreSQL Connection String is empty or invalid, must be such as (example): `postgres://user:pass@host:port/db_name?sslmode=disable` and is: `" + dbUrl + "")
+				return nil, smart.NewError("PostgreSQL Connection String is empty or invalid, must be such as (example): `postgres://user:pass@host:port/db_name?sslmode=disable` and is: `" + dbUrl + "")
 			} //end if
 			break
 		case DB_SQL_TYPE_MYSQL:
 			if((dbUrl == "") || (!smart.StrContains(dbUrl, "multiStatements=true"))) {
-				return nil, errors.New("MySQL Connection String is empty or invalid, must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
+				return nil, smart.NewError("MySQL Connection String is empty or invalid, must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
 			} //end if
 			break
 		default:
-			return nil, errors.New("Invalid DB Type: `" + dbType + "`")
+			return nil, smart.NewError("Invalid DB Type: `" + dbType + "`")
 	} //end switch
 	//--
-	conn := &dbSqlConnector{
+	conn := &DbSqlConnector{
 		dbType: dbType,
 		dbUrl:  dbUrl,
 		dbConn: nil,
@@ -220,14 +221,19 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*dbSqlConnector, error) 
 //-----
 
 
-func (conn *dbSqlConnector) GetConnectionInfo() string {
+func (conn *DbSqlConnector) GetConnectionInfo() string {
 	//--
-	return "@ Connection: [" + conn.dbType + ":`" + conn.dbUrl + "`]"
+	safeConnUrl := conn.dbUrl
+	if(conn.dbType != DB_SQL_TYPE_SQLITE) {
+		safeConnUrl = smart.StrRegexReplaceAll(`\:(.*)@`, safeConnUrl, `:*******@`) // mask password
+	} //end if
+	//--
+	return "@ Connection: [" + conn.dbType + ":`" + safeConnUrl + "`]"
 	//--
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) CheckConnection() bool {
+func (conn *DbSqlConnector) CheckConnection() bool {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -247,7 +253,7 @@ func (conn *dbSqlConnector) CheckConnection() bool {
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) OpenConnection() (*sql.DB, error) {
+func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -314,7 +320,7 @@ func (conn *dbSqlConnector) OpenConnection() (*sql.DB, error) {
 	} else {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "DB Initialization MetaData SQL is Empty", connDescr)
 		conn.dbConn = nil // reset
-		conn.dbErr = errors.New("DB Initialization MetaData Failed: `" + conn.dbUrl + "`")
+		conn.dbErr = smart.NewError("DB Initialization MetaData Failed: `" + conn.dbUrl + "`")
 		return nil, conn.dbErr
 	} //end if
 	//--
@@ -322,14 +328,14 @@ func (conn *dbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if((!smart.PathExists(conn.dbUrl)) || (!smart.PathIsFile(conn.dbUrl))) { // file must exists
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "DB File Creation Error", connDescr)
 			conn.dbConn = nil // reset
-			conn.dbErr = errors.New("DB File Creation Failed: `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("DB File Creation Failed: `" + conn.dbUrl + "`")
 			return nil, conn.dbErr
 		} //end if
 		fSize, fSzMsgErr := smart.SafePathFileGetSize(conn.dbUrl, true)
-		if((fSize <= 0) || (fSzMsgErr != "")) { // file size must be greater than zero
+		if((fSize <= 0) || (fSzMsgErr != nil)) { // file size must be greater than zero
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "DB File Creation Invalid Size (zero)", fSize, "Error:", fSzMsgErr, connDescr)
 			conn.dbConn = nil // reset
-			conn.dbErr = errors.New("DB File Creation Invalid Size (zero): `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("DB File Creation Invalid Size (zero): `" + conn.dbUrl + "`")
 			return nil, conn.dbErr
 		} //end if
 		libVersion, _, _ := sqlite3.Version()
@@ -361,7 +367,7 @@ func (conn *dbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(pgEncoding)) != ENCODING) {
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "PostgreSQL Server/Database Encoding is not `" + ENCODING + "` !", connDescr)
 			conn.dbConn = nil // reset
-			conn.dbErr = errors.New("PostgreSQL Server/Database Encoding must be `" + ENCODING + "` ! `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("PostgreSQL Server/Database Encoding must be `" + ENCODING + "` ! `" + conn.dbUrl + "`")
 			return nil, conn.dbErr
 		} //end if
 	} else if(conn.dbType == DB_SQL_TYPE_MYSQL) {
@@ -369,7 +375,7 @@ func (conn *dbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if(errSetCl != nil) {
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server Connection Collation to: `UTF8.MB4`", errSetCl)
 			conn.dbConn = nil // reset
-			conn.dbErr = errors.New("MySQL Server Connection Collation cannot be set to `UTF8.MB4` ! `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("MySQL Server Connection Collation cannot be set to `UTF8.MB4` ! `" + conn.dbUrl + "`")
 			return nil, conn.dbErr
 		} //end if
 		var myVersion string = ""
@@ -397,7 +403,7 @@ func (conn *dbSqlConnector) OpenConnection() (*sql.DB, error) {
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) CloseConnection() error {
+func (conn *DbSqlConnector) CloseConnection() error {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -430,7 +436,7 @@ func (conn *dbSqlConnector) CloseConnection() error {
 
 // In GoLang opposite to PHP, there is only one connection with possible asynchronous writes.
 // Because of this, should NEVER use direct SQL: BEGIN / TOLLBACK / COMMIT on the connection, they should always be isolated insite a TX transaction !
-func (conn *dbSqlConnector) TransactionStart() (*sql.Tx, error) {
+func (conn *DbSqlConnector) TransactionStart() (*sql.Tx, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -449,7 +455,7 @@ func (conn *dbSqlConnector) TransactionStart() (*sql.Tx, error) {
 	} //end if
 	if(conn.dbConn == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "No Connection", connDescr)
-		return nil, errors.New("No Connection")
+		return nil, smart.NewError("No Connection")
 	} //end if
 	//--
 	tx, err := conn.dbConn.Begin()
@@ -459,7 +465,7 @@ func (conn *dbSqlConnector) TransactionStart() (*sql.Tx, error) {
 	} //end if
 	if(tx == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Failed to Initiate Transaction", connDescr)
-		return nil, errors.New("Failed to Initiate Transaction")
+		return nil, smart.NewError("Failed to Initiate Transaction")
 	} //end if
 	//--
 	return tx, nil
@@ -467,7 +473,7 @@ func (conn *dbSqlConnector) TransactionStart() (*sql.Tx, error) {
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) TransactionRollback(tx *sql.Tx) error {
+func (conn *DbSqlConnector) TransactionRollback(tx *sql.Tx) error {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -482,7 +488,7 @@ func (conn *dbSqlConnector) TransactionRollback(tx *sql.Tx) error {
 	//--
 	if(tx == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Transaction is N/A", connDescr)
-		return errors.New("Transaction is N/A")
+		return smart.NewError("Transaction is N/A")
 	} //end if
 	//--
 	err := tx.Rollback()
@@ -495,7 +501,7 @@ func (conn *dbSqlConnector) TransactionRollback(tx *sql.Tx) error {
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) TransactionCommit(tx *sql.Tx) error {
+func (conn *DbSqlConnector) TransactionCommit(tx *sql.Tx) error {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -510,7 +516,7 @@ func (conn *dbSqlConnector) TransactionCommit(tx *sql.Tx) error {
 	//--
 	if(tx == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Transaction is N/A", connDescr)
-		return errors.New("Transaction is N/A")
+		return smart.NewError("Transaction is N/A")
 	} //end if
 	//--
 	err := tx.Commit()
@@ -526,7 +532,7 @@ func (conn *dbSqlConnector) TransactionCommit(tx *sql.Tx) error {
 //-----
 
 
-func (conn *dbSqlConnector) WriteData(query string, params ...any) (int64, error) {
+func (conn *DbSqlConnector) WriteData(query string, params ...any) (int64, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -535,13 +541,13 @@ func (conn *dbSqlConnector) WriteData(query string, params ...any) (int64, error
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) WriteTxData(tx *sql.Tx, query string, params ...any) (int64, error) {
+func (conn *DbSqlConnector) WriteTxData(tx *sql.Tx, query string, params ...any) (int64, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
 	if(tx == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Transaction cannot be NULL", conn.GetConnectionInfo())
-		return 0, errors.New("Transaction cannot be NULL")
+		return 0, smart.NewError("Transaction cannot be NULL")
 	} //end if
 	//--
 	return conn.writeExec(tx, query, params...)
@@ -549,7 +555,7 @@ func (conn *dbSqlConnector) WriteTxData(tx *sql.Tx, query string, params ...any)
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) writeExec(tx *sql.Tx, query string, params ...any) (int64, error) {
+func (conn *DbSqlConnector) writeExec(tx *sql.Tx, query string, params ...any) (int64, error) {
 	//--
 	// return: affectedRows, err ; lastID is unsupported on PostgreSQL ; on SQLite is not important, so don't handle
 	//--
@@ -561,7 +567,8 @@ func (conn *dbSqlConnector) writeExec(tx *sql.Tx, query string, params ...any) (
 	} //end if
 	//--
 	if(conn.debug) {
-		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query String:", query, ";", "Params:", params, connDescr)
+		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query Params:", params, connDescr)
+		log.Println("[DATA]",  NAME, smart.CurrentFunctionName(), "Query String:", "\n" + smart.StrTrimWhitespaces(query) + "\n", connDescr)
 	} //end if
 	//--
 	if(conn.CheckConnection() != true) {
@@ -573,7 +580,7 @@ func (conn *dbSqlConnector) writeExec(tx *sql.Tx, query string, params ...any) (
 	} //end if
 	if(conn.dbConn == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "No Connection", connDescr)
-		return 0, errors.New("No Connection")
+		return 0, smart.NewError("No Connection")
 	} //end if
 	//--
 	var result sql.Result
@@ -606,7 +613,7 @@ func (conn *dbSqlConnector) writeExec(tx *sql.Tx, query string, params ...any) (
 //-----
 
 
-func (conn *dbSqlConnector) CountData(query string, params ...any) (int64, error) {
+func (conn *DbSqlConnector) CountData(query string, params ...any) (int64, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -615,13 +622,13 @@ func (conn *dbSqlConnector) CountData(query string, params ...any) (int64, error
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) CountTxData(tx *sql.Tx, query string, params ...any) (int64, error) {
+func (conn *DbSqlConnector) CountTxData(tx *sql.Tx, query string, params ...any) (int64, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
 	if(tx == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Transaction cannot be NULL", conn.GetConnectionInfo())
-		return 0, errors.New("Transaction cannot be NULL")
+		return 0, smart.NewError("Transaction cannot be NULL")
 	} //end if
 	//--
 	return conn.countQueryRow(tx, query, params...)
@@ -629,7 +636,7 @@ func (conn *dbSqlConnector) CountTxData(tx *sql.Tx, query string, params ...any)
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) countQueryRow(tx *sql.Tx, query string, params ...any) (int64, error) {
+func (conn *DbSqlConnector) countQueryRow(tx *sql.Tx, query string, params ...any) (int64, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -639,7 +646,8 @@ func (conn *dbSqlConnector) countQueryRow(tx *sql.Tx, query string, params ...an
 	} //end if
 	//--
 	if(conn.debug) {
-		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query String:", query, ";", "Params:", params, connDescr)
+		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query Params:", params, connDescr)
+		log.Println("[DATA]",  NAME, smart.CurrentFunctionName(), "Query String:", "\n" + smart.StrTrimWhitespaces(query) + "\n", connDescr)
 	} //end if
 	//--
 	if(conn.CheckConnection() != true) {
@@ -651,7 +659,7 @@ func (conn *dbSqlConnector) countQueryRow(tx *sql.Tx, query string, params ...an
 	} //end if
 	if(conn.dbConn == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "No Connection", connDescr)
-		return 0, errors.New("No Connection")
+		return 0, smart.NewError("No Connection")
 	} //end if
 	//--
 	var count int64
@@ -674,7 +682,7 @@ func (conn *dbSqlConnector) countQueryRow(tx *sql.Tx, query string, params ...an
 //-----
 
 
-func (conn *dbSqlConnector) ReadData(query string, params ...any) ([]map[string]string, error) {
+func (conn *DbSqlConnector) ReadData(query string, params ...any) ([]map[string]string, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -683,13 +691,13 @@ func (conn *dbSqlConnector) ReadData(query string, params ...any) ([]map[string]
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) ReadTxData(tx *sql.Tx, query string, params ...any) ([]map[string]string, error) {
+func (conn *DbSqlConnector) ReadTxData(tx *sql.Tx, query string, params ...any) ([]map[string]string, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
 	if(tx == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Transaction cannot be NULL", conn.GetConnectionInfo())
-		return []map[string]string{}, errors.New("Transaction cannot be NULL")
+		return []map[string]string{}, smart.NewError("Transaction cannot be NULL")
 	} //end if
 	//--
 	return conn.readQuery(tx, query, params...)
@@ -697,7 +705,7 @@ func (conn *dbSqlConnector) ReadTxData(tx *sql.Tx, query string, params ...any) 
 } //END FUNCTION
 
 
-func (conn *dbSqlConnector) readQuery(tx *sql.Tx, query string, params ...any) ([]map[string]string, error) {
+func (conn *DbSqlConnector) readQuery(tx *sql.Tx, query string, params ...any) ([]map[string]string, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -709,7 +717,8 @@ func (conn *dbSqlConnector) readQuery(tx *sql.Tx, query string, params ...any) (
 	emptyArr := []map[string]string{} // instead of return nil, return this as default
 	//--
 	if(conn.debug) {
-		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query String:", query, ";", "Params:", params, connDescr)
+		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query Params:", params, connDescr)
+		log.Println("[DATA]",  NAME, smart.CurrentFunctionName(), "Query String:", "\n" + smart.StrTrimWhitespaces(query) + "\n", connDescr)
 	} //end if
 	//--
 	if(conn.CheckConnection() != true) {
@@ -721,7 +730,7 @@ func (conn *dbSqlConnector) readQuery(tx *sql.Tx, query string, params ...any) (
 	} //end if
 	if(conn.dbConn == nil) {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "No Connection", connDescr)
-		return emptyArr, errors.New("No Connection")
+		return emptyArr, smart.NewError("No Connection")
 	} //end if
 	//--
 	var rows *sql.Rows
@@ -737,7 +746,7 @@ func (conn *dbSqlConnector) readQuery(tx *sql.Tx, query string, params ...any) (
 	} //end if
 	defer rows.Close()
 	//--
-	arr, errA := GetArrFromSQLRows(rows)
+	arr, errA := getArrDataFromSQLRows(rows, HARD_LIMIT_ROWS)
 	if(errA != nil) { // no need to log again here, the above method will log
 		return emptyArr, errA
 	} //end if
@@ -753,7 +762,103 @@ func (conn *dbSqlConnector) readQuery(tx *sql.Tx, query string, params ...any) (
 //-----
 
 
+func (conn *DbSqlConnector) ReadOneData(query string, params ...any) (map[string]string, error) {
+	//--
+	// this method query should always use: LIMIT 1 ; if more than 1 rows returned will hit error
+	//--
+	defer smart.PanicHandler()
+	//--
+	return conn.readOneQuery(nil, query, params...)
+	//--
+} //END FUNCTION
+
+
+func (conn *DbSqlConnector) ReadTxOneData(tx *sql.Tx, query string, params ...any) (map[string]string, error) {
+	//--
+	// this method query should always use: LIMIT 1 ; if more than 1 rows returned will hit error
+	//--
+	defer smart.PanicHandler()
+	//--
+	if(tx == nil) {
+		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Transaction cannot be NULL", conn.GetConnectionInfo())
+		return map[string]string{}, smart.NewError("Transaction cannot be NULL")
+	} //end if
+	//--
+	return conn.readOneQuery(tx, query, params...)
+	//--
+} //END FUNCTION
+
+
+func (conn *DbSqlConnector) readOneQuery(tx *sql.Tx, query string, params ...any) (map[string]string, error) {
+	//--
+	// this method query should always use: LIMIT 1 ; if more than 1 rows returned will hit error
+	//--
+	defer smart.PanicHandler()
+	//--
+	connDescr := conn.GetConnectionInfo()
+	if(tx != nil) {
+		connDescr += " # {Tx}"
+	} //end if
+	//--
+	emptyArr := map[string]string{} // instead of return nil, return this as default
+	//--
+	if(conn.debug) {
+		log.Println("[DEBUG]", NAME, smart.CurrentFunctionName(), "Query Params:", params, connDescr)
+		log.Println("[DATA]",  NAME, smart.CurrentFunctionName(), "Query String:", "\n" + smart.StrTrimWhitespaces(query) + "\n", connDescr)
+	} //end if
+	//--
+	if(conn.CheckConnection() != true) {
+		_, errC := conn.OpenConnection()
+		if(errC != nil) {
+			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Connection Error", errC, connDescr)
+			return emptyArr, errC
+		} //end if
+	} //end if
+	if(conn.dbConn == nil) {
+		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "No Connection", connDescr)
+		return emptyArr, smart.NewError("No Connection")
+	} //end if
+	//--
+	var rows *sql.Rows
+	var errQ error
+	if(tx != nil) {
+		rows, errQ = tx.Query(query, params...)
+	} else {
+		rows, errQ = conn.dbConn.Query(query, params...)
+	} //end if else
+	if(errQ != nil) {
+		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Query", errQ, connDescr, "::", query, params)
+		return emptyArr, errQ
+	} //end if
+	defer rows.Close()
+	//--
+	arr, errA := getArrDataFromSQLRows(rows, 1)
+	if(errA != nil) { // no need to log again here, the above method will log
+		return emptyArr, errA
+	} //end if
+	oneArr := map[string]string{}
+	if(arr != nil) {
+		if(len(arr) == 1) {
+			oneArr = arr[0]
+		} //end if
+	} //end if
+	//--
+	return oneArr, nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func GetArrFromSQLRows(rows *sql.Rows) (arr []map[string]string, err error) {
+	//--
+	return getArrDataFromSQLRows(rows, HARD_LIMIT_ROWS)
+	//--
+} //END FUNCTION
+
+
+func getArrDataFromSQLRows(rows *sql.Rows, hLimit uint64) (arr []map[string]string, err error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -779,6 +884,11 @@ func GetArrFromSQLRows(rows *sql.Rows) (arr []map[string]string, err error) {
 	var rNum uint64 = 0
 	for rows.Next() {
 		rNum++
+		if(rNum > hLimit) {
+			err = smart.NewError("Hard Limit: Current Query returned more rows than the Allowed Limit")
+			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Scan Row #", rNum, "@", "Allowed Limit", hLimit, "::", err)
+			return
+		} //end if
 		columns := make([]string, len(cols))
 		columnPointers := make([]interface{}, len(cols))
 		for i, _ := range columns {

@@ -1,22 +1,19 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
 
 import (
+	"fmt"
+	"log"
+	"time"
+
 	"os"
 	"runtime"
 	"sync"
-
-	"errors"
-	"log"
-	"fmt"
-	"time"
-
-	"path/filepath"
 
 	"io"
 //	"io/ioutil"
@@ -42,7 +39,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240103.1301"
+	VERSION string = "r.20240111.1742"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -72,16 +69,22 @@ const (
 	//--
 	DEFAULT_REALM string = "SmartGO Web Server" // must be min 7 chars
 	//--
-	DISP_TYPE_INLINE string = "inline"
-	DISP_TYPE_ATTACHMENT string = "attachment"
-	MIME_TYPE_DEFAULT string = "application/octet-stream"
+	HTTP_SRV_IDLE_TIMEOUT uint32 = 60 // standard, as Apache
 	//--
-	CACHE_CLEANUP_INTERVAL uint32 = 5 // 5 seconds
-	CACHE_EXPIRATION uint32 = 300 // 300 seconds = 5 mins ; cache unsuccessful logins for 5 mins
-	CACHE_FAILS_NUM uint32 = 7 // max fail attempts before lock 5 mins (300 sec)
-	CACHE_CONTROL_NOCACHE = "no-cache"
-	CACHE_CONTROL_PRIVATE = "private"
-	CACHE_CONTROL_PUBLIC = "public"
+	DISP_TYPE_INLINE string 	= "inline"
+	DISP_TYPE_ATTACHMENT string = "attachment"
+	MIME_TYPE_DEFAULT string 	= "application/octet-stream"
+	//--
+	ICACHEM_CLEANUP_INTERVAL uint32 = 5 // 5 seconds
+	ICACHEM_EXPIRATION uint32 = 300 // 300 seconds = 5 mins ; cache unsuccessful logins for 5 mins
+	ICACHEM_FAILS_NUM uint32 = 7 // max fail attempts before lock 5 mins (300 sec)
+	//--
+	CACHE_CONTROL_NOCACHE string = "no-cache"
+	CACHE_CONTROL_PRIVATE string = "private"
+	CACHE_CONTROL_PUBLIC  string = "public"
+	CACHE_CONTROL_DEFAULT string = "default"
+	//--
+	MAX_SIZE_ETAG int64 = 1048576 // 1MB 1048576 bytes ; 100% of assets match this criteria ; for the rest (ex: public files), Weak ETag is not worth ...
 	//--
 	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-]+$`
 	//--
@@ -99,6 +102,7 @@ const (
 	HTTP_STATUS_401 string = "401 Unauthorized"
 	HTTP_STATUS_403 string = "403 Forbidden"
 	HTTP_STATUS_404 string = "404 Not Found"
+	HTTP_STATUS_405 string = "405 Method Not Allowed"
 	HTTP_STATUS_410 string = "410 Gone"
 	HTTP_STATUS_429 string = "429 Too Many Requests"
 	//--
@@ -161,17 +165,9 @@ type visitor struct {
 //-----
 
 
-func httpHeaderSignatureUserAgent() string {
-	//--
-	return DEFAULT_CLIENT_UA + " (" + smart.DESCRIPTION + " " + smart.VERSION + " " + VERSION + "; " + runtime.GOOS + "/" + runtime.GOARCH + "; " + "GoLang/" + runtime.Version() + ")"
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
 func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
+	//--
+	defer smart.PanicHandler()
 	//--
 	cfg := &tls.Config{
 		InsecureSkipVerify: insecureSkipVerify,
@@ -197,16 +193,6 @@ func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
 	} //end if
 	//--
 	return cfg
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.Header {
-	//--
-	return http.Header{HTTP_HEADER_AUTH_AUTHORIZATION: {HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + " " + smart.Base64Encode(authUsername + ":" + authPassword)}}
 	//--
 } //END FUNCTION
 
@@ -274,7 +260,7 @@ func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string,
 	var upldLocalFilePath string = ""
 	//--
 	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
-	downloadLocalDirPath = filepath.ToSlash(downloadLocalDirPath)
+	downloadLocalDirPath = smart.SafePathFixSeparator(downloadLocalDirPath)
 	if(downloadLocalDirPath == "") {
 		downloadLocalDirPath = "./downloads/" // dissalow empty directory ; for downloads a directory is mandatory ; dissalow download in the same dir as executable is, there is a risk to rewrite the executable !!!
 	} //end if
@@ -458,6 +444,8 @@ func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkip
 
 func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData bytes.Buffer, multipartType string) {
 	//--
+	defer smart.PanicHandler()
+	//--
 	// This will create the form data or multi/part form data by reading all files in memory
 	//--
 	emptyData := bytes.Buffer{}
@@ -567,15 +555,19 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData byte
 // Min Read Limit is 10MB (set maxBytesRead=0 as default) ; Max Read Limit is 1GB (because is in memory !)
 func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, upldLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult HttpClientRequest) {
 	//--
+	defer smart.PanicHandler()
+	//--
 	upldLocalFilePath = smart.StrTrimWhitespaces(upldLocalFilePath)
-	upldLocalFilePath = filepath.ToSlash(upldLocalFilePath)
+	upldLocalFilePath = smart.SafePathFixSeparator(upldLocalFilePath)
 	//--
 	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
-	downloadLocalDirPath = filepath.ToSlash(downloadLocalDirPath)
+	downloadLocalDirPath = smart.SafePathFixSeparator(downloadLocalDirPath)
+	//--
+	var uaSignature string = DEFAULT_CLIENT_UA + " (" + smart.DESCRIPTION + " " + smart.VERSION + " " + VERSION + "; " + runtime.GOOS + "/" + runtime.GOARCH + "; " + "GoLang/" + runtime.Version() + ")"
 	//--
 	httpResult = HttpClientRequest {
 		Errors: "?",
-		UserAgent: httpHeaderSignatureUserAgent(),
+		UserAgent: uaSignature,
 		ConnTimeout: timeoutSec,
 		MaxDownloadSize: maxBytesRead,
 		HttpMethod: method,
@@ -698,8 +690,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 					return
 				} //end if
 				putFSize, putFSizeErr := smart.SafePathFileGetSize(upldLocalFilePath, false) // {{{SYNC-HTTPCLI-UPLOAD-PATH-ALLOW-ABSOLUTE}}}
-				if(putFSizeErr != "") {
-					httpResult.Errors = "ERR: FAILED to determine a valid File Size from the PUT File Path: `" + upldLocalFilePath + "` # " + putFSizeErr
+				if(putFSizeErr != nil) {
+					httpResult.Errors = "ERR: FAILED to determine a valid File Size from the PUT File Path: `" + upldLocalFilePath + "` # " + putFSizeErr.Error()
 					httpResult.HttpStatus = -709
 					return
 				} //end if
@@ -958,7 +950,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		var crrRedirNum int = len(numReqs) - 1 // substract the last req. which is always served even if is redirect !
 		if(crrRedirNum >= int(maxRedirects)) {
 			httpResult.RedirectLocation = req.URL.String()
-			return smart.CreateNewError("Redirect Policy Limit: Stop after: " + smart.ConvertUInt8ToStr(maxRedirects) + " times")
+			return smart.NewError("Redirect Policy Limit: Stop after: " + smart.ConvertUInt8ToStr(maxRedirects) + " times")
 		} //end if
 		httpResult.LastUri = req.URL.String()
 		httpResult.NumRedirects++
@@ -1149,7 +1141,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		} //end if
 	} //end if
 	//--
-	req.Header.Set(HTTP_HEADER_USER_AGENT, httpHeaderSignatureUserAgent())
+	// TODO: allow a custom UA Signature to be set
+	req.Header.Set(HTTP_HEADER_USER_AGENT, uaSignature)
 	//--
 	resp, errResp := client.Do(req)
 	if(errResp != nil) {
@@ -1345,7 +1338,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
 		//--
 		dwFSize, dwFSizErr := smart.SafePathFileGetSize(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
-		if(dwFSizErr != "") {
+		if(dwFSizErr != nil) {
 			dwFSize = 0
 		} //end if
 		//--
@@ -1398,6 +1391,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 
 func TlsConfigServer() *tls.Config {
 	//--
+	defer smart.PanicHandler()
+	//--
 	cfg := &tls.Config{
 		MinVersion: 		tls.VersionTLS12,
 		MaxVersion: 		tls.VersionTLS13,
@@ -1422,6 +1417,8 @@ func TlsConfigServer() *tls.Config {
 
 func TLSProtoHttpV1Server() map[string]func(*http.Server, *tls.Conn, http.Handler) {
 	//--
+	defer smart.PanicHandler()
+	//--
 	return make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0) // disable HTTP/2 on TLS (on non-TLS is always HTTP/1.1)
 	//--
 } //END FUNCTION
@@ -1430,11 +1427,13 @@ func TLSProtoHttpV1Server() map[string]func(*http.Server, *tls.Conn, http.Handle
 //-----
 
 
-func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, description string) (*http.ServeMux, *http.Server) {
+func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableGeneralOptionsHandler bool, description string) (*http.ServeMux, *http.Server) {
+	//--
+	defer smart.PanicHandler()
 	//--
 	memRateLimitMutex.Lock()
 	if(memRateLimitCache == nil) { // start cache just on 1st auth ... otherwise all scripts using this library will run the cache in background, but is needed only by this method !
-		memRateLimitCache = smartcache.NewCache("smart.httputils.rateLimit.inMemCache", time.Duration(CACHE_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
+		memRateLimitCache = smartcache.NewCache("smart.httputils.rateLimit.inMemCache", time.Duration(ICACHEM_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
 	} //end if
 	memRateLimitMutex.Unlock()
 	//--
@@ -1445,13 +1444,14 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, descript
 	mux := http.NewServeMux()
 	//--
 	srv := &http.Server{
-		Addr: 				srvAddr,
-		Handler: 			mux,
-		TLSConfig: 			TlsConfigServer(),
-		ReadTimeout: 		time.Duration(timeoutSec) * time.Second,
-		ReadHeaderTimeout: 	0, // if set to zero, the value of ReadTimeout is used
-		IdleTimeout:        0, // if set to zero, the value of ReadTimeout is used
-		WriteTimeout: 		time.Duration(timeoutSec) * time.Second,
+		Addr: 							srvAddr,
+		Handler: 						mux,
+		TLSConfig: 						TlsConfigServer(),
+		ReadTimeout: 					time.Duration(timeoutSec) * time.Second,
+		ReadHeaderTimeout: 				0, // if set to zero, the value of ReadTimeout is used
+		IdleTimeout: 					time.Duration(HTTP_SRV_IDLE_TIMEOUT) * time.Second, // standard
+		WriteTimeout: 					time.Duration(timeoutSec) * time.Second,
+		DisableGeneralOptionsHandler:	disableGeneralOptionsHandler,
 	}
 	//--
 	if(forceHttpV1 == true) {
@@ -1468,6 +1468,8 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, descript
 
 
 func HttpServerIsIpRateLimited(r *http.Request, theLimit int, theBurst int) bool {
+	//--
+	defer smart.PanicHandler()
 	//--
 	// ex: set theLimit=1, theBurst=3 to allow one request at 3 seconds for a single IP
 	// if the rate limit will overflow, returns TRUE ; if not rate limited returns FALSE
@@ -1545,9 +1547,11 @@ func memRateLimitGetVisitor(ip string, theLimit rate.Limit, theBurst int) *rate.
 //-----
 
 
-func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration int, modified string, control string) (isCachedContent bool) {
+func HttpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration int, modified string, control string) (isCachedContent bool) {
 	//--
-	const TZ_UTC = "UTC"
+	defer smart.PanicHandler()
+	//--
+	const TZ_UTC string = "UTC"
 	//--
 	modified = smart.StrTrimWhitespaces(modified)
 	//--
@@ -1564,8 +1568,10 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 		} //end if
 		expdate := now.Add(time.Duration(expiration) * time.Second)
 		//--
-		if(control != CACHE_CONTROL_PUBLIC) {
-			control = CACHE_CONTROL_PRIVATE
+		if((control == CACHE_CONTROL_PUBLIC) || (control == CACHE_CONTROL_PRIVATE)) {
+			control = control + ", "
+		} else {
+			control = "" // must be empty for CACHE_CONTROL_DEFAULT
 		} //end if
 		//--
 		dtObjUtc := smart.DateTimeStructUtc(modified)
@@ -1582,7 +1588,7 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 		w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0
 		w.Header().Set(HTTP_HEADER_CACHE_PGMA, "cache") // HTTP 1.0 cache
 		w.Header().Set(HTTP_HEADER_CACHE_LMOD, modified + " " + TZ_UTC)
-		w.Header().Set(HTTP_HEADER_CACHE_CTRL, control + ", max-age=" + smart.ConvertIntToStr(expiration)) // HTTP 1.1 HTTP 1.1 (private will dissalow proxies to cache the content)
+		w.Header().Set(HTTP_HEADER_CACHE_CTRL, control + "max-age=" + smart.ConvertIntToStr(expiration) + ", must-revalidate") // HTTP 1.1 HTTP 1.1 (private will dissalow proxies to cache the content)
 		//--
 		return true
 		//--
@@ -1592,7 +1598,7 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 	//--
 	control = CACHE_CONTROL_NOCACHE
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-	w.Header().Set(HTTP_HEADER_CACHE_CTRL, control + ", must-revalidate") // HTTP 1.1 no-cache, not use their stale copy
+	w.Header().Set(HTTP_HEADER_CACHE_CTRL, control + ", max-age=0, must-revalidate") // HTTP 1.1 no-cache, not use their stale copy
 	w.Header().Set(HTTP_HEADER_CACHE_PGMA, control) // HTTP 1.0 no-cache
 	w.Header().Set(HTTP_HEADER_CACHE_EXPS, expdate.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC) // HTTP 1.0 no-cache expires
 	w.Header().Set(HTTP_HEADER_CACHE_LMOD, now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC)
@@ -1608,9 +1614,11 @@ func httpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 // valid code: 200 ; 202 ; 203 ; 208
 // contentFnameOrPath: file.html (will get extension .html and serve mime type by this extension) ; default, fallback to .txt
 // for no cache: 		cacheExpiration = -1 ; cacheLastModified = "" ; cacheControl = "no-cache"
-// for using cache: 	cacheExpiration = 3600 (1h) ; cacheLastModified = "2021-03-16 23:57:58" ; cacheControl = "private" | "public"
+// for using cache: 	cacheExpiration = 3600 (1h) ; cacheLastModified = "2021-03-16 23:57:58" ; cacheControl = "default" | "public" | "private"
 // headers:
 func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content string, contentFnameOrPath string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+	//--
+	defer smart.PanicHandler()
 	//--
 	switch(code) {
 		case 200:
@@ -1652,14 +1660,14 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 		contentType += "; charset=" + smart.CHARSET
 	} //end if
 	//--
-	isCachedContent := httpHeadersCacheControl(w, r, cacheExpiration, cacheLastModified, cacheControl)
-	if(isCachedContent == true) { // do not manage eTag if not cached
+	isCachedContent := HttpHeadersCacheControl(w, r, cacheExpiration, cacheLastModified, cacheControl)
+	if(isCachedContent == true) {
 		var eTag string = ""
-		if(len(content) <= 4194304) { // {{{SYNC-SIZE-16Mb}}} / 4 = 4MB ; do not manage eTag for content size > 4MB
-			eTag = smart.Md5(content)
+		if(int64(len(content)) <= MAX_SIZE_ETAG) { // {{{SYNC-SIZE-MAX-ETAG}}} ; manage eTag only for content size <= 4MB
+			eTag = smart.Md5(content) // do not enclose here in double quotes, needs pure value for below check, 304 (if match)
 		} //end if
 		if(eTag != "") {
-			w.Header().Set(HTTP_HEADER_ETAG_SUM, eTag)
+			w.Header().Set(HTTP_HEADER_ETAG_SUM, `"`+eTag+`"`) // trick: use a Weak ETag as (W/"") or by enclosing ETag in double quotes to allow GZip compression ...
 			var match string = smart.StrTrimWhitespaces(r.Header.Get(HTTP_HEADER_ETAG_IFNM))
 			if(DEBUG == true) {
 				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": If None Match (Header):", match)
@@ -1688,7 +1696,7 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 				break
 			case HTTP_HEADER_CONTENT_LEN:
 				break
-			//-- these headers are managed by httpHeadersCacheControl()
+			//-- these headers are managed by HttpHeadersCacheControl()
 			case HTTP_HEADER_CACHE_CTRL:
 				break
 			case HTTP_HEADER_CACHE_PGMA:
@@ -1718,6 +1726,11 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	} //end for
 	//--
 	w.WriteHeader(int(code)) // status code must be after set headers
+	//--
+	if(r.Method == "HEAD") { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body
+		return
+	} //end if
+	//--
 	w.Write([]byte(content))
 	//--
 } //END FUNCTION
@@ -1763,6 +1776,8 @@ func HttpStatus208(w http.ResponseWriter, r *http.Request, content string, conte
 
 func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirectUrl string, outputHtml bool) {
 	//--
+	defer smart.PanicHandler()
+	//--
 	var title string = ""
 	switch(code) {
 		case 301:
@@ -1802,7 +1817,9 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 		content += "\n"
 	} //end if else
 	//--
-	httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
+	time.Sleep(250 * time.Millisecond) // fix for TLS bad handshake, is redirecting too quick
+	//--
+	HttpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 	w.Header().Set(HTTP_HEADER_REDIRECT_LOCATION, redirectUrl)
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
@@ -1833,6 +1850,8 @@ func HttpStatus302(w http.ResponseWriter, r *http.Request, redirectUrl string, o
 
 func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageText string, outputHtml bool) {
 	//--
+	defer smart.PanicHandler()
+	//--
 	var title string = ""
 	var displayAuthLogo bool = false
 	switch(code) {
@@ -1849,6 +1868,9 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			break
 		case 404:
 			title = HTTP_STATUS_404
+			break
+		case 405:
+			title = HTTP_STATUS_405
 			break
 		case 410:
 			title = HTTP_STATUS_410
@@ -1898,13 +1920,25 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 		content += "\n"
 	} //end if else
 	//--
-	httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
+	HttpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
 	w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
 	w.WriteHeader(int(code)) // status code must be after set headers
 	w.Write([]byte(content))
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpHeaderAuthBasic(w http.ResponseWriter, authRealm string) {
+	//--
+	defer smart.PanicHandler()
+	//--
+	w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + smart.StrReplaceAll(authRealm, `"`, `'`) + `"`) // the safety of characters in authRealm should normally checked before calling this method ...
 	//--
 } //END FUNCTION
 
@@ -1933,6 +1967,12 @@ func HttpStatus403(w http.ResponseWriter, r *http.Request, messageText string, o
 func HttpStatus404(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 404, messageText, outputHtml)
+	//--
+} //END FUNCTION
+
+func HttpStatus405(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 405, messageText, outputHtml)
 	//--
 } //END FUNCTION
 
@@ -1982,12 +2022,254 @@ func HttpStatus504(w http.ResponseWriter, r *http.Request, messageText string, o
 
 //-----
 
+
+type CookieSameSiteType uint8
+const(
+	CookieSameSiteDefault CookieSameSiteType = iota
+	CookieSameSiteEmpty
+	CookieSameSiteNone
+	CookieSameSiteLax
+	CookieSameSiteStrict
+)
+
+
+func HttpRequestSetCookieWithDefaults(w http.ResponseWriter, r *http.Request, name string, value string, expires int64) error {
+	//--
+	defer smart.PanicHandler()
+	//--
+	return HttpRequestSetCookie(w, r, name, value, expires, "/", "@", CookieSameSiteDefault, false, false)
+	//--
+} //END FUNCTION
+
+
+func HttpRequestSetCookie(w http.ResponseWriter, r *http.Request, name string, value string, expires int64, path string, domain string, samesite CookieSameSiteType, secure bool, httpOnly bool) error {
+	//--
+	defer smart.PanicHandler()
+	//--
+	name = smart.StrTrimWhitespaces(name)
+	if(name == "") {
+		return smart.NewError("Name is Empty")
+	} //end if
+	if(smart.ValidateCookieName(name) != true) {
+		return smart.NewError("Name is Invalid")
+	} //end if
+	//--
+	if(smart.StrTrimWhitespaces(value) == "") { // do not trim value
+		expires = -1 // as in PHP
+	} //end if
+	//--
+	ck := http.Cookie{
+		Name: name,
+		Value: value,
+	}
+	//-- if expires is zero, do not set, it is session
+	if(expires > 0) {
+		ck.Expires = time.Now().Add(time.Second * time.Duration(expires)) // now + seconds
+	} else if(expires < 0) {
+		ck.Expires = time.Now().Add(time.Second * time.Duration(-1 * ((3600 * 24) - expires))) // minus one day - seconds
+	} //end if
+	//--
+	path = smart.StrTrimWhitespaces(path)
+	if(path != "") {
+		ck.Path = path
+	} //end if
+	//--
+	domain = smart.StrTrimWhitespaces(domain) // if is empty means only current domain (excludding current sub-domains)
+	if(domain == "@") {
+		domain = smart.GetCookieDefaultDomain() // can return "" or "*" or "dom.ext" ; if "*" must detect and use current base domain as this means current base domain plus all it's sub-domains ...
+	} //end if
+	if(domain == "*") { // the DEFAULT Cookie Domain (retrieved below) can return also "*", so DO NOT use this conditional in ELSE !!
+		var dom string = ""
+		var err error = nil
+		dom, _, err = smart.GetHttpDomainAndPortFromRequest(r)
+		if(err != nil) {
+			domain = "" // reset
+		} else {
+			dom, err = smart.GetBaseDomainFromDomain(dom)
+			if(err != nil) {
+				domain = "" // reset
+			} else {
+				domain = smart.StrTrimWhitespaces(dom)
+			} //end if
+		} //end if
+	} //end if
+	if(domain != "") {
+		if(!smart.IsNetValidHostName(domain)) { // if IPv4 or IPv6 don't set cookie domain !
+			domain = "" // reset
+		} //end if
+	} //end if
+	if(domain != "") {
+		ck.Domain = domain
+	} //end if
+	//--
+	switch(samesite) {
+		case CookieSameSiteEmpty:
+			// skip
+			break
+		case CookieSameSiteNone:
+			ck.SameSite = http.SameSiteNoneMode
+			break
+		case CookieSameSiteLax:
+			ck.SameSite = http.SameSiteLaxMode
+			break
+		case CookieSameSiteStrict:
+			ck.SameSite = http.SameSiteStrictMode
+			break
+		case CookieSameSiteDefault: fallthrough
+		default: // use default cookie policy
+			policy := smart.GetCookieDefaultSameSitePolicy()
+			switch(policy) {
+				case "None":
+					ck.SameSite = http.SameSiteNoneMode
+					if(smart.GetHttpProtocolFromRequest(r) == smart.HTTP_PROTO_PREFIX_HTTPS) { // fix: try to not set COOKIE SECURE except if over HTTPS ; some new browsers, ex: Chromium will not accept None policy cookies over plain HTTP but only over HTTPS ; but if on HTTP and not HTTPS with Chromium a None policy cookie is useless even with COOKIE SECURE set ON if already on HTTP plain ...
+						secure = true; // {{{SYNC-COOKIE-POLICY-NONE}}} ; new browsers (ex: Chromium) require this if SameSite cookie policy is set explicit to None ; but anyway, if not already on a secure protocol try to not set this, will still work in Firefox
+					} //end if
+					break
+				case "Lax":
+					ck.SameSite = http.SameSiteLaxMode
+					break
+				case "Strict":
+					ck.SameSite = http.SameSiteStrictMode
+					break
+				case "Empty": fallthrough
+				default:
+					// skip
+			} //end switch
+	} //end switch
+	//--
+	if(secure == true) {
+		ck.Secure = true
+	} //end if
+	//--
+	if(httpOnly == true) {
+		ck.HttpOnly = true
+	} //end if
+	//--
+	http.SetCookie(w, &ck)
+	//--
+	return nil
+	//--
+} //END FUNCTION
+
+
+func HttpRequestGetCookies(r *http.Request) map[string]string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	var cookies map[string]string = map[string]string{}
+	//--
+	reqCookies := r.Cookies()
+	if((reqCookies != nil) && (len(reqCookies) > 0)) {
+		for _, reqCookie := range reqCookies {
+			if(smart.StrTrimWhitespaces(reqCookie.Name) != "") { // do not trim, must match exactly
+				cookies[reqCookie.Name] = reqCookie.Value // do not trim ; include empty cookies ; register all cookies and pass back ; by example when using Basic Auth + 2FA (custom mode only, because it needs a custom UI) cookies may be needed
+			} //end if
+		} //end for
+	} //end if
+	//--
+	return cookies
+	//--
+} //END FUNCTION
+
+
+func HttpRequestGetCookie(r *http.Request, name string) string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	name = smart.StrTrimWhitespaces(name)
+	if((name == "") || (!smart.ValidateCookieName(name))) {
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "Empty or Invalid Cookie Name: `" + name + "`")
+		return ""
+	} //end if
+	//--
+	cookie, err := r.Cookie(name)
+	if(err != nil) {
+		return "" // avoid panic
+	} //end if
+	//--
+	return cookie.Value
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpRequestGetHeaderStr(r *http.Request, hdrKey string) string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	if((r.Header == nil) || (len(r.Header) <= 0)) {
+		return ""
+	} //end if
+	//--
+	return r.Header.Get(hdrKey) // return header values as list, separed by comma if there are multiple headers
+	//--
+} //END FUNCTION
+
+
+func HttpRequestGetHeaderArr(r *http.Request, hdrKey string) []string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	if((r.Header == nil) || (len(r.Header) <= 0)) {
+		return []string{}
+	} //end if
+	//--
+	hdrVals := HttpRequestGetHeaders(r)
+	if((hdrVals == nil) || (len(hdrVals) <= 0)) {
+		return []string{}
+	} //end if
+	//--
+	val, ok := hdrVals[hdrKey]
+	if((!ok) || (val == nil)) {
+		return []string{}
+	} //end if
+	//--
+	return val
+	//--
+} //END FUNCTION
+
+
+func HttpRequestGetHeaders(r *http.Request) map[string][]string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	var headers map[string][]string = map[string][]string{}
+	//--
+	if((r.Header != nil) && (len(r.Header) > 0)) {
+		for key, values := range r.Header {
+			headers[key] = values
+		} //end for
+	} //end if
+	//--
+	return headers
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.Header {
+	//--
+	defer smart.PanicHandler()
+	//--
+	return http.Header{HTTP_HEADER_AUTH_AUTHORIZATION: {HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + " " + smart.Base64Encode(authUsername + ":" + authPassword)}}
+	//--
+} //END FUNCTION
+
+
+//-----
+
 // modes: 1 = Basic Auth ; 2 = Bearer ; 3 = Cookie ; 4..255 unused at the moment ...
-type HttpAuthCheckFunc func(string, uint8, string, string, string, string) (bool, smart.AuthDataStruct) // (authRealm, authMode, realClientIp, user, pass, token) : true if OK / false if NOT
+type HttpAuthCheckFunc func(string, uint8, string, map[string]string, string, string, string) (bool, smart.AuthDataStruct) // (authRealm, authMode, realClientIp, arrCookies, user, pass, token) : true if OK / false if NOT
 
 // if returns a non empty string there is an error ; if error it already outputs the 401 headers and content so there is nothing more to do ...
 // it handles 401 or 403 access by IP list
 func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, authUsername string, authPassword string, allowedIPs string, customAuthCheck HttpAuthCheckFunc, outputHtml bool) (error, smart.AuthDataStruct) { // check if HTTP(S) Basic Auth is OK ; return: errMsg, authData
+	//--
+	defer smart.PanicHandler()
 	//--
 	aData := smart.AuthDataStruct{}
 	var err string = ""
@@ -1998,14 +2280,14 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		(customAuthCheck == nil)) {
 			err = "ERROR: Empty Auth Provider. Either must supply a fixed username/password, either an auth method."
 			HttpStatus500(w, r, err, outputHtml)
-			return errors.New(err), aData
+			return smart.NewError(err), aData
 	}
 	if(
 		(customAuthCheck != nil) &&
 		((smart.StrTrimWhitespaces(authUsername) != "") || (smart.StrTrimWhitespaces(authPassword) != ""))) {
 			err = "ERROR: Auth Provider Mismatch. Either must supply a fixed username/password, either an auth method."
 			HttpStatus500(w, r, err, outputHtml)
-			return errors.New(err), aData
+			return smart.NewError(err), aData
 	}
 	//--
 	authRealm = smart.StrTrimWhitespaces(smart.StrReplaceAll(authRealm, `"`, `'`))
@@ -2023,7 +2305,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	if(ip == "") {
 		err = "ERROR: Empty or Invalid Client Remote Address: `" + rAddr + "`"
 		HttpStatus500(w, r, err, outputHtml)
-		return errors.New(err), aData
+		return smart.NewError(err), aData
 	} //end if
 	//--
 	isOkClientRealIp, realClientIp, rawHdrRealIpVal, rawHdrRealIpKey := smart.GetHttpRealClientIpFromRequestHeaders(r) // this is using r.Header.Get() with value from
@@ -2043,7 +2325,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		if(err != "") {
 			log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 			HttpStatus403(w, r, err, outputHtml)
-			return errors.New(err), aData
+			return smart.NewError(err), aData
 		} //end if
 		log.Println("[OK] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
@@ -2062,7 +2344,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	//--
 	memAuthMutex.Lock()
 	if(memAuthCache == nil) { // start cache just on 1st auth ... otherwise all scripts using this library will run the cache in background, but is needed only by this method !
-		memAuthCache = smartcache.NewCache("smart.httputils.auth.inMemCache", time.Duration(CACHE_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
+		memAuthCache = smartcache.NewCache("smart.httputils.auth.inMemCache", time.Duration(ICACHEM_CLEANUP_INTERVAL) * time.Second, DEBUG_CACHE)
 	} //end if
 	memAuthMutex.Unlock()
 	//--
@@ -2072,57 +2354,103 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	//--
 	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(cacheKeyCliIpAddr)
 	if(cacheExists == true) {
-		if((cachedObj.Id == cacheKeyCliIpAddr) && (len(cachedObj.Data) >= int(CACHE_FAILS_NUM))) { // allow max 7 invalid attempts then lock for 5 mins ... for this cacheKeyCliIpAddr
-			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(CACHE_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+		if((cachedObj.Id == cacheKeyCliIpAddr) && (len(cachedObj.Data) >= int(ICACHEM_FAILS_NUM))) { // allow max 7 invalid attempts then lock for 5 mins ... for this cacheKeyCliIpAddr
+			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(ICACHEM_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
 			w.Header().Set(HTTP_HEADER_RETRY_AFTER, time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " UTC")
 			HttpStatus429(w, r, err, outputHtml)
-			return errors.New(err), aData
+			return smart.NewError(err), aData
 		} //end if
 	} //end if
 	//--
+	var authCookieIsSet bool = false
+	var authCookieName string = ""
+	if(smart.AuthCookieIsEnabled() == true) {
+		authCookieName = smart.AuthCookieNameGet()
+	} //end if
+	var cookies map[string]string = HttpRequestGetCookies(r)
+	if((cookies != nil) && (len(cookies) > 0)) {
+		if((smart.AuthCookieIsEnabled() == true) && (authCookieName != "")) {
+			for cookieName, cookieVal := range cookies {
+				if(smart.StrTrimWhitespaces(cookieName) != "") { // do not trim, must match exactly
+					if(smart.StrTrimWhitespaces(cookieVal) != "") {
+						if(cookieName == authCookieName) {
+							authCookieIsSet = true
+						} //end if
+					} //end if
+				} //end if
+			} //end for
+		} //end if
+	} //end if
+	//-- cookies
 	var httpAuthMode uint8 = smart.HTTP_AUTH_MODE_NONE
 	var authHeader string = ""
 	var token string = ""
 	var user string = ""
 	var pass string = ""
 	var ok bool = false
-	authHeader = smart.StrTrimWhitespaces(r.Header.Get("Authorization"))
-	if(authHeader != "") {
-		if(smart.StrIStartsWith(authHeader, "Basic ")) {
+	if((smart.AuthBasicIsEnabled() == true) || (smart.AuthBearerIsEnabled() == true)) {
+		authHeader = smart.StrTrimWhitespaces(r.Header.Get("Authorization")) // prefer authorization first
+	} //end if
+	//-- order to check: Basic, Bearer, Cookie
+	if(smart.StrTrimWhitespaces(authHeader) != "") {
+		if((smart.AuthBasicIsEnabled() == true) && (smart.StrIStartsWith(authHeader, "Basic "))) { // must be checked first if enabled, because if enabled the Auth Basic Prompt (Header) will be enabled by default
 			httpAuthMode = smart.HTTP_AUTH_MODE_BASIC
-			user, pass, ok = r.BasicAuth()
-		} else if(smart.StrIStartsWith(authHeader, "Bearer ")) {
+			user, pass, ok = r.BasicAuth() // do not trim password
+			user = smart.StrTrimWhitespaces(user)
+			if(smart.StrTrimWhitespaces(pass) == "") {
+				ok = false
+			} //end if
+			// DO NOT MANUALLY SET ok TO TRUE, must be preserved as is above comming from r.BasicAuth()
+		} else if((smart.AuthBearerIsEnabled() == true) && (smart.StrIStartsWith(authHeader, "Bearer "))) {
 			httpAuthMode = smart.HTTP_AUTH_MODE_BEARER
 			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
 			if(token != "") {
 				ok = true
 			} //end if
 		} //end if else
+	} else if(
+		(authCookieIsSet == true) && // mandatory check first
+		(smart.AuthCookieIsEnabled() == true) && (smart.AuthCookieNameGet() != "") &&
+		(cookies != nil) && (len(cookies) > 0)) { // if no authorization header (prefered) fallback to cookie ; pass back all cookies, not just the auth one ; by example when using 2FA cookies may be needed
+			httpAuthMode = smart.HTTP_AUTH_MODE_COOKIE
+			ok = true
 	} //end if
 	//--
 	if(!ok) {
-		err = "Authentication is Required"
+		if((smart.AuthBasicIsEnabled() == false) && (smart.AuthBearerIsEnabled() == false) && (smart.AuthCookieIsEnabled() == false)) {
+			err = "All Authentication Modes (Basic, Bearer, Cookie) are Disabled"
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ":", err)
+		} else {
+			err = "Authentication is Required"
+		} //end if
 	} else {
 		if(customAuthCheck != nil) { // custom auth provider check
 			var authCustomOk bool = false
-			authCustomOk, aData = customAuthCheck(authRealm, httpAuthMode, realClientIp, user, pass, token)
+			authCustomOk, aData = customAuthCheck(authRealm, httpAuthMode, realClientIp, cookies, user, pass, token)
 			if(authCustomOk != true) {
 				aData.OK = false // make sure !
-				err = "Username and Password [AuthCheck:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+				err = "Auth.Custom [AuthCheck:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 			} //end if
 		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only
 			var authBasicOk bool = false
-			authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, httpAuthMode, user, pass, authUsername, authPassword)
+			authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, httpAuthMode, user, pass, cookies, authUsername, authPassword)
 			if(authBasicOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 				aData.OK = false // make sure !
-				err = "Username and Password [DefaultCheck.User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+				err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 			} //end if
 		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BEARER) { // bearer auth only
 			var authBearerOk bool = false
-			authBearerOk, aData = smart.AuthTokenDefaultCheck(authRealm, httpAuthMode, realClientIp, token, authUsername, authPassword)
-			if(authBearerOk != true) { // default check: clientIP, token, requiredUsername, requiredPassword
+			authBearerOk, aData = smart.AuthTokenDefaultCheck(authRealm, httpAuthMode, realClientIp, token, cookies)
+			if(authBearerOk != true) { // default check: clientIP, token
 				aData.OK = false // make sure !
-				err = "Username and Password [DefaultCheck.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+				err = "Auth.Default: [Bearer:Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+			} //end if
+		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_COOKIE) { // cookie auth only
+			var authCookieOk bool = false
+			authCookieOk, aData = smart.AuthCookieDefaultCheck(authRealm, httpAuthMode, realClientIp, cookies)
+			if(authCookieOk != true) { // default check: clientIP, token
+				aData.OK = false // make sure !
+				err = "Auth.Default: [Cookies:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 			} //end if
 		} else {
 			err = "Auth Mode NOT Implemented: [" + smart.ConvertUInt8ToStr(httpAuthMode) + "]"
@@ -2137,29 +2465,17 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		} else {
 			cachedObj.Data += "."
 		} //end if
-		memAuthCache.Set(cachedObj, uint64(CACHE_EXPIRATION))
+		memAuthCache.Set(cachedObj, uint64(ICACHEM_EXPIRATION))
 		log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Set-In-Cache: AUTH.FAILED [" + authRealm + "] for Client: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
-		//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-		httpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
-		w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + authRealm + `"`) // the safety of characters in authRealm was checked above !
 		//--
-		if(outputHtml == true) {
-			w.Header().Set(HTTP_HEADER_CONTENT_TYPE, assets.HTML_CONTENT_HEADER) // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-		} else {
-			w.Header().Set(HTTP_HEADER_CONTENT_TYPE, assets.TEXT_CONTENT_HEADER) // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
+		if(smart.AuthBasicIsEnabled() == true) { // show Auth Basic Prompt (Header) ONLY if Auth Basic is Enabled, otherwise does not make sense ...
+			HttpHeaderAuthBasic(w , authRealm)
 		} //end if
-		//--
-		w.WriteHeader(401) // status code must be after set headers
-		//--
-		if(outputHtml == true) {
-			w.Write([]byte(assets.HtmlStatusPage(HTTP_STATUS_401, "Access to this area requires Authentication", true)))
-		} else {
-			w.Write([]byte(HTTP_STATUS_401 + "\n"))
-		} //end if else
+		HttpStatus401(w, r, "Access to this area requires Authentication", outputHtml)
 		//--
 		log.Printf("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
 		//--
-		return errors.New(err), aData
+		return smart.NewError(err), aData
 		//--
 	} //end if
 	//--
@@ -2200,6 +2516,8 @@ func MimeDispositionConformParam(mimeDisposition string) string {
 
 
 func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimDisposition string) {
+	//--
+	defer smart.PanicHandler()
 	//--
 	var mimeType string = ""
 	var mimeUseCharset bool = false
@@ -2264,6 +2582,10 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 			mimeType = "image/webp"
 			mimeDisposition = DISP_TYPE_INLINE
 			break
+		case "ico":
+			mimeType = "image/vnd.microsoft.icon"
+			mimeDisposition = DISP_TYPE_INLINE
+			break
 		//-------------- fonts
 		case "woff2":
 			mimeType = "application/x-font-woff2"
@@ -2299,7 +2621,8 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 		case "php":
 			mimeType = "application/x-php"
 			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
+		//	mimeDisposition = DISP_TYPE_ATTACHMENT
+			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- plain text and development
 		case "log": fallthrough // log file
@@ -2308,18 +2631,21 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 		case "bash": fallthrough // bash (shell) script
 		case "diff": fallthrough // Diff File
 		case "patch": fallthrough // Diff Patch
+		case "go": fallthrough // Go Lang
 		case "tcl": fallthrough // TCL
 		case "tk": fallthrough // Tk
 		case "lua": fallthrough // Lua
 		case "gjs": fallthrough // gnome js
 		case "toml": fallthrough // Tom's Obvious, Minimal Language (used with Cargo / Rust definitions)
-		case "rs": fallthrough // Rust Language
-		case "go": fallthrough // Go Lang
 		case "pl": fallthrough // perl
 		case "py": fallthrough // python
 		case "phps": fallthrough // php source, assign text/plain !
-		case "swift": fallthrough // apple swift language
+		case "rs": fallthrough // Rust Language
+		case "c": fallthrough // C Language
+		case "h": fallthrough // C/C++ Defs
+		case "cpp": fallthrough // C++ Language
 		case "vala": fallthrough // vala language
+		case "swift": fallthrough // apple swift language
 		case "java": fallthrough // java source code
 		case "pas": fallthrough // Delphi / Pascal
 		case "inc": fallthrough // include file
@@ -2336,6 +2662,11 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 			mimeType = "text/plain"
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		//-------------- portable documents
+		case "pdf":
+			mimeType = "application/pdf"
+			mimeDisposition = DISP_TYPE_INLINE // DISP_TYPE_ATTACHMENT
 			break
 		//-------------- email / calendar / addressbook
 		case "eml":
@@ -2364,11 +2695,6 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 			mimeType = "text/csv"
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- portable documents
-		case "pdf":
-			mimeType = "application/pdf"
-			mimeDisposition = DISP_TYPE_INLINE // DISP_TYPE_ATTACHMENT
 			break
 		//-------------- specials
 		case "asc": fallthrough

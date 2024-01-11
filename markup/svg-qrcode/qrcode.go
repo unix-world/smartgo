@@ -404,9 +404,9 @@ func (q *QRCode) encode() {
 		var err error
 
 		s, err = buildRegularSymbol(q.version, mask, encoded, !q.DisableBorder)
-
 		if err != nil {
-			log.Panic(err.Error())
+			log.Println("[ERROR]", "QR Encode:", err)
+			return
 		}
 
 		numEmptyModules := s.numEmptyModules()

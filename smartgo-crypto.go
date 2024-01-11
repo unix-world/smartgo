@@ -1,14 +1,13 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
 
 import (
-	"errors"
 	"log"
 
 	"strings"
@@ -112,7 +111,7 @@ func CryptoGetSecurityKey() (string, error) {
 	//--
 	var kLen int = len(key)
 	if((kLen < 16) || (kLen > 255)) {
-		return "", errors.New("SmartGo Security Key must be between 16 and 255 caracters long")
+		return "", NewError("SmartGo Security Key must be between 16 and 255 caracters long")
 	} //end if
 	//--
 	return key, nil
@@ -288,11 +287,11 @@ func HashHmac(algo string, key string, str string, b64 bool) (string, error) {
 	} //end witch
 	//--
 	if(ok != true) {
-		return "", errors.New(CurrentFunctionName() + " # " + "Invalid Algo: `" + algo + "`")
+		return "", NewError(CurrentFunctionName() + " # " + "Invalid Algo: `" + algo + "`")
 	} //end if
 	//--
 	if(StrTrimWhitespaces(sum) == "") {
-		return "", errors.New(CurrentFunctionName() + " # Failed to create a HMac Sum for Algo: `" + algo + "`")
+		return "", NewError(CurrentFunctionName() + " # Failed to create a HMac Sum for Algo: `" + algo + "`")
 	} //end if
 	//--
 	if(b64 != true) {
@@ -561,7 +560,7 @@ func Poly1305(key string, str string, b64 bool) (string, error) {
 	defer PanicHandler() // for: poly1305
 	//--
 	if(len(key) != 32) {
-		return "", errors.New(CurrentFunctionName() + " # " + "Key length is invalid, must be 32 bytes !")
+		return "", NewError(CurrentFunctionName() + " # " + "Key length is invalid, must be 32 bytes !")
 	} //end if
 	//--
 	var pKey [32]byte
@@ -826,16 +825,16 @@ func Pbkdf2PreDerivedKey(key string) (string, error) {
 	klen := len(key)
 	//--
 	if(klen < int(DERIVE_MIN_KLEN)) {
-		return "", errors.New(CurrentFunctionName() + " # The Key is too short: " + ConvertIntToStr(klen))
+		return "", NewError(CurrentFunctionName() + " # The Key is too short: " + ConvertIntToStr(klen))
 	} else if(klen > int(DERIVE_MAX_KLEN)) {
-		return "", errors.New(CurrentFunctionName() + " # The Key is too long: " + ConvertIntToStr(klen))
+		return "", NewError(CurrentFunctionName() + " # The Key is too long: " + ConvertIntToStr(klen))
 	} //end if else
 	//--
 	b64 := Sh3a384B64(key) // 64 chars fixed length, B64
 	hex := Sh3a512(key + VERTICAL_TAB + Crc32bB36(key) + VERTICAL_TAB + DataRRot13(b64)) // 128 chars fixed length, HEX
 	bin := Hex2Bin(hex)
 	if(bin == "") {
-		return "", errors.New(CurrentFunctionName() + " # Hash Hex2Bin Error")
+		return "", NewError(CurrentFunctionName() + " # Hash Hex2Bin Error")
 	} //end if
 	b92 := BaseEncode([]byte(bin), "b92")
 	//--
@@ -845,7 +844,7 @@ func Pbkdf2PreDerivedKey(key string) (string, error) {
 		(StrTrimWhitespaces(preKey) == "") || // avoid being empty
 		(StrTrim(preKey, "'") == "") || // avoid being all '
 		(len(preKey) != int(DERIVE_PREKEY_LEN))) {
-			return "", errors.New(CurrentFunctionName() + " # The B92 PBKDF2 Pre-Derived Key is empty or does not match the expected size ; required size is: " + ConvertUInt16ToStr(DERIVE_PREKEY_LEN) + " bytes ; but the actual size is: " + ConvertIntToStr(len(preKey)) + " bytes")
+			return "", NewError(CurrentFunctionName() + " # The B92 PBKDF2 Pre-Derived Key is empty or does not match the expected size ; required size is: " + ConvertUInt16ToStr(DERIVE_PREKEY_LEN) + " bytes ; but the actual size is: " + ConvertIntToStr(len(preKey)) + " bytes")
 	} //end if
 	//--
 	return preKey, nil
@@ -865,19 +864,19 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 	var ls = len(salt)
 	//--
 	if(lk < int(DERIVE_MIN_KLEN)) {
-		return "", errors.New(CurrentFunctionName() + " # The Key is too short: " + ConvertIntToStr(lk))
+		return "", NewError(CurrentFunctionName() + " # The Key is too short: " + ConvertIntToStr(lk))
 	} else if(lk > int(DERIVE_MAX_KLEN)) {
-		return "", errors.New(CurrentFunctionName() + " # The Key is too long: " + ConvertIntToStr(lk))
+		return "", NewError(CurrentFunctionName() + " # The Key is too long: " + ConvertIntToStr(lk))
 	} //end if else
 	if(ls < int(DERIVE_MIN_KLEN)) {
-		return "", errors.New(CurrentFunctionName() + " # The Salt is too short: " + ConvertIntToStr(ls))
+		return "", NewError(CurrentFunctionName() + " # The Salt is too short: " + ConvertIntToStr(ls))
 	} else if(ls > int(DERIVE_MAX_KLEN)) {
-		return "", errors.New(CurrentFunctionName() + " # The Salt is too long: " + ConvertIntToStr(ls))
+		return "", NewError(CurrentFunctionName() + " # The Salt is too long: " + ConvertIntToStr(ls))
 	} //end if else
 	//--
 	var keyLen int = int(klen) // below values may be adjusted, avoid out of range of uint16
 	if(klen <= 0) {
-		return "", errors.New(CurrentFunctionName() + " # The length parameter is zero or negative")
+		return "", NewError(CurrentFunctionName() + " # The length parameter is zero or negative")
 	} //end if
 	if(b92 == true) {
 		keyLen = 2 * keyLen // ensure double size ; {{{SYNC-PBKDF2-HEX-TO-B92-LENGTH-ADJUST}}} ; should have enough length to ensure the same size because Base92 length shrinks after conversion from HEX (Base16)
@@ -886,10 +885,10 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 	var iterCycles int = int(iterations) // below values may be adjusted, avoid out of range of uint16
 	if(iterCycles < 1) {
 		iterCycles = 1
-		err = errors.New(CurrentFunctionName() + " # The Number of iterations is too low: " + ConvertUInt16ToStr(iterations))
+		err = NewError(CurrentFunctionName() + " # The Number of iterations is too low: " + ConvertUInt16ToStr(iterations))
 	} else if(iterCycles > 50000) { // in go let 5000 * 10 as in PHP
 		iterCycles = 50000
-		err = errors.New(CurrentFunctionName() + " # The Number of iterations is too high: " + ConvertUInt16ToStr(iterations))
+		err = NewError(CurrentFunctionName() + " # The Number of iterations is too high: " + ConvertUInt16ToStr(iterations))
 	} //end if
 	//--
 	var ok bool = false
@@ -944,19 +943,19 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 	} //end witch
 	//--
 	if(ok != true) {
-		return "", errors.New(CurrentFunctionName() + " # " + "Invalid Algo: `" + algo + "`")
+		return "", NewError(CurrentFunctionName() + " # " + "Invalid Algo: `" + algo + "`")
 	} //end if
 	//--
 	if(StrTrimWhitespaces(dk) == "") {
-		return "", errors.New(CurrentFunctionName() + " # Failed to create a PBKDF2 Derived Key for Algo: `" + algo + "`")
+		return "", NewError(CurrentFunctionName() + " # Failed to create a PBKDF2 Derived Key for Algo: `" + algo + "`")
 	} //end if
 	//--
 	if(len(dk) != keyLen) {
-		return "", errors.New(CurrentFunctionName() + " # The PBKDF2 Derived Key have an invalid length for Algo: `" + algo + "`")
+		return "", NewError(CurrentFunctionName() + " # The PBKDF2 Derived Key have an invalid length for Algo: `" + algo + "`")
 	} //end if
 	//--
 	if(len(dk) < int(klen)) { // before converting to hex, is RAW, just ensure is enough size
-		return "", errors.New(CurrentFunctionName() + " # The PBKDF2 Derived Raw Key length is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
+		return "", NewError(CurrentFunctionName() + " # The PBKDF2 Derived Raw Key length is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
 	} //end if
 	//--
 	if(b92 == true) { // B92
@@ -965,19 +964,19 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 		dk = BaseEncode([]byte(dk), "b92")
 		dk = StrSubstr(StrPad2LenRight(dk, "'", int(klen)), 0, int(klen)) // both: HEX or B92 must do this in Go
 		if(len(dk) != int(klen)) {
-			return "", errors.New(CurrentFunctionName() + " # The PBKDF2 Derived Key length is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
+			return "", NewError(CurrentFunctionName() + " # The PBKDF2 Derived Key length is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
 		} //end if
 		//--
 	} else { // Hex
 		//--
 		dk = StrToLower(Bin2Hex(dk))
 		if(len(dk) < (int(klen) * 2)) { // after converting to hex, doubles the size
-			return "", errors.New(CurrentFunctionName() + " # The PBKDF2 Derived Hex Key length is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
+			return "", NewError(CurrentFunctionName() + " # The PBKDF2 Derived Hex Key length is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
 		} //end if
 		//--
 		dk = StrSubstr(dk, 0, int(klen)) // extract required size
 		if(len(dk) != int(klen)) {
-			return "", errors.New(CurrentFunctionName() + " # The PBKDF2 Derived Hex Key length after fix is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
+			return "", NewError(CurrentFunctionName() + " # The PBKDF2 Derived Hex Key length after fix is invalid for Algo: `" + algo + "` as: " + ConvertIntToStr(len(dk)))
 		} //end if
 		//--
 	} //end if
@@ -1003,13 +1002,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 	switch(algo) {
 		case "threefish.1024":
 			if(len(key) != 128) {
-				return "", errors.New("Key Size must be 128 bytes for ThreeFish (1024) / algo: " + algo)
+				return "", NewError("Key Size must be 128 bytes for ThreeFish (1024) / algo: " + algo)
 			} //end if
 			if(len(iv) != 128) {
-				return "", errors.New("iV Size must be 128 bytes for ThreeFish (1024) algo: " + algo)
+				return "", NewError("iV Size must be 128 bytes for ThreeFish (1024) algo: " + algo)
 			} //end if
 			if(len(tweak) != 16) {
-				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (1024) algo: " + algo)
+				return "", NewError("Tweak Size must be 16 bytes for ThreeFish (1024) algo: " + algo)
 			} //end if
 			bcipher, errCipher = threefish.New1024([]byte(key), []byte(tweak))
 			if(errCipher != nil) {
@@ -1018,13 +1017,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "threefish.512":
 			if(len(key) != 64) {
-				return "", errors.New("Key Size must be 64 bytes for ThreeFish (512) / algo: " + algo)
+				return "", NewError("Key Size must be 64 bytes for ThreeFish (512) / algo: " + algo)
 			} //end if
 			if(len(iv) != 64) {
-				return "", errors.New("iV Size must be 64 bytes for ThreeFish (512) algo: " + algo)
+				return "", NewError("iV Size must be 64 bytes for ThreeFish (512) algo: " + algo)
 			} //end if
 			if(len(tweak) != 16) {
-				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (512) algo: " + algo)
+				return "", NewError("Tweak Size must be 16 bytes for ThreeFish (512) algo: " + algo)
 			} //end if
 			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
 			if(errCipher != nil) {
@@ -1033,13 +1032,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "threefish.256":
 			if(len(key) != 32) {
-				return "", errors.New("Key Size must be 32 bytes for ThreeFish (256) / algo: " + algo)
+				return "", NewError("Key Size must be 32 bytes for ThreeFish (256) / algo: " + algo)
 			} //end if
 			if(len(iv) != 32) {
-				return "", errors.New("iV Size must be 32 bytes for ThreeFish (256) algo: " + algo)
+				return "", NewError("iV Size must be 32 bytes for ThreeFish (256) algo: " + algo)
 			} //end if
 			if(len(tweak) != 16) {
-				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (256) algo: " + algo)
+				return "", NewError("Tweak Size must be 16 bytes for ThreeFish (256) algo: " + algo)
 			} //end if
 			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
 			if(errCipher != nil) {
@@ -1048,13 +1047,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "twofish.256":
 			if(len(key) != 32) {
-				return "", errors.New("Key Size must be 32 bytes for TwoFish (256) / algo: " + algo)
+				return "", NewError("Key Size must be 32 bytes for TwoFish (256) / algo: " + algo)
 			} //end if
 			if(len(iv) != 16) {
-				return "", errors.New("iV Size must be 16 bytes for TwoFish (256) / algo: " + algo)
+				return "", NewError("iV Size must be 16 bytes for TwoFish (256) / algo: " + algo)
 			} //end if
 			if(len(tweak) != 0) {
-				return "", errors.New("Tweak is not supported by TwoFish (256) / algo: " + algo)
+				return "", NewError("Tweak is not supported by TwoFish (256) / algo: " + algo)
 			} //end if
 			bcipher, errCipher = twofish.NewCipher([]byte(key))
 			if(errCipher != nil) {
@@ -1063,13 +1062,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "blowfish.448":
 			if(len(key) != 56) {
-				return "", errors.New("Key Size must be 56 bytes for BlowFish (448) / algo: " + algo)
+				return "", NewError("Key Size must be 56 bytes for BlowFish (448) / algo: " + algo)
 			} //end if
 			if(len(iv) != 8) {
-				return "", errors.New("iV Size must be 8 bytes for BlowFish (448) / algo: " + algo)
+				return "", NewError("iV Size must be 8 bytes for BlowFish (448) / algo: " + algo)
 			} //end if
 			if(len(tweak) != 0) {
-				return "", errors.New("Tweak is not supported by BlowFish (448) / algo: " + algo)
+				return "", NewError("Tweak is not supported by BlowFish (448) / algo: " + algo)
 			} //end if
 			bcipher, errCipher = blowfish.NewCipher([]byte(key))
 			if(errCipher != nil) {
@@ -1077,13 +1076,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 			} //end if
 		case "blowfish.384":
 			if(len(key) != 48) {
-				return "", errors.New("Key Size must be 48 bytes for BlowFish (384) / algo: " + algo)
+				return "", NewError("Key Size must be 48 bytes for BlowFish (384) / algo: " + algo)
 			} //end if
 			if(len(iv) != 8) {
-				return "", errors.New("iV Size must be 8 bytes for BlowFish (384) / algo: " + algo)
+				return "", NewError("iV Size must be 8 bytes for BlowFish (384) / algo: " + algo)
 			} //end if
 			if(len(tweak) != 0) {
-				return "", errors.New("Tweak is not supported by BlowFish (384) / algo: " + algo)
+				return "", NewError("Tweak is not supported by BlowFish (384) / algo: " + algo)
 			} //end if
 			bcipher, errCipher = blowfish.NewCipher([]byte(key))
 			if(errCipher != nil) {
@@ -1091,13 +1090,13 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 			} //end if
 			break
 		default:
-			return "", errors.New("Invalid Cipher Algo: `" + algo + "`")
+			return "", NewError("Invalid Cipher Algo: `" + algo + "`")
 	} //end switch
 	if(bcipher == nil) {
-		return "", errors.New("No Cipher Selected for Algo: `" + algo + "`")
+		return "", NewError("No Cipher Selected for Algo: `" + algo + "`")
 	} //end if
 	if(len(iv) != bcipher.BlockSize()) {
-		return "", errors.New("Invalid iV: Does not Match the Block Size")
+		return "", NewError("Invalid iV: Does not Match the Block Size")
 	} //end if
 	//-- check for empty data
 	if(str == "") {
@@ -1120,11 +1119,11 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 	ciphertext = nil
 	//-- clear first header block ; will use BlockSize*2 because is operating over HEX data ; there are BlockSize*2 trailing zeroes that represent the HEX of BlockSize null bytes ; remove them
 	if(StrSubstr(encrypted, 0, bcipher.BlockSize()*2) != strings.Repeat("0", bcipher.BlockSize()*2)) { // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
-		return "", errors.New("Invalid Hex Header")
+		return "", NewError("Invalid Hex Header")
 	} //end if
 	encrypted = StrTrimWhitespaces(StrSubstr(encrypted, bcipher.BlockSize()*2, 0)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
 	if(encrypted == "") { // must be some data after the first null header bytes
-		return "", errors.New("Empty Hex Body")
+		return "", NewError("Empty Hex Body")
 	} //end if
 	//--
 	return Hex2Bin(encrypted), nil // raw crypto data
@@ -1145,13 +1144,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 	switch(algo) {
 		case "threefish.1024":
 			if(len(key) != 128) {
-				return "", errors.New("Key Size must be 128 bytes for ThreeFish (1024) / algo: " + algo)
+				return "", NewError("Key Size must be 128 bytes for ThreeFish (1024) / algo: " + algo)
 			} //end if
 			if(len(iv) != 128) {
-				return "", errors.New("iV Size must be 128 bytes for ThreeFish (1024) algo: " + algo)
+				return "", NewError("iV Size must be 128 bytes for ThreeFish (1024) algo: " + algo)
 			} //end if
 			if(len(tweak) != 16) {
-				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (1024) algo: " + algo)
+				return "", NewError("Tweak Size must be 16 bytes for ThreeFish (1024) algo: " + algo)
 			} //end if
 			bcipher, errCipher = threefish.New1024([]byte(key), []byte(tweak))
 			if(errCipher != nil) {
@@ -1160,13 +1159,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "threefish.512":
 			if(len(key) != 64) {
-				return "", errors.New("Key Size must be 64 bytes for ThreeFish (512) / algo: " + algo)
+				return "", NewError("Key Size must be 64 bytes for ThreeFish (512) / algo: " + algo)
 			} //end if
 			if(len(iv) != 64) {
-				return "", errors.New("iV Size must be 64 bytes for ThreeFish (512) algo: " + algo)
+				return "", NewError("iV Size must be 64 bytes for ThreeFish (512) algo: " + algo)
 			} //end if
 			if(len(tweak) != 16) {
-				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (512) algo: " + algo)
+				return "", NewError("Tweak Size must be 16 bytes for ThreeFish (512) algo: " + algo)
 			} //end if
 			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
 			if(errCipher != nil) {
@@ -1175,13 +1174,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "threefish.256":
 			if(len(key) != 32) {
-				return "", errors.New("Key Size must be 32 bytes for ThreeFish (256) / algo: " + algo)
+				return "", NewError("Key Size must be 32 bytes for ThreeFish (256) / algo: " + algo)
 			} //end if
 			if(len(iv) != 32) {
-				return "", errors.New("iV Size must be 32 bytes for ThreeFish (256) algo: " + algo)
+				return "", NewError("iV Size must be 32 bytes for ThreeFish (256) algo: " + algo)
 			} //end if
 			if(len(tweak) != 16) {
-				return "", errors.New("Tweak Size must be 16 bytes for ThreeFish (256) algo: " + algo)
+				return "", NewError("Tweak Size must be 16 bytes for ThreeFish (256) algo: " + algo)
 			} //end if
 			bcipher, errCipher = threefish.New512([]byte(key), []byte(tweak))
 			if(errCipher != nil) {
@@ -1190,13 +1189,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "twofish.256":
 			if(len(key) != 32) {
-				return "", errors.New("Key Size must be 32 bytes for TwoFish (256) / algo: " + algo)
+				return "", NewError("Key Size must be 32 bytes for TwoFish (256) / algo: " + algo)
 			} //end if
 			if(len(iv) != 16) {
-				return "", errors.New("iV Size must be 16 bytes for TwoFish (256) / algo: " + algo)
+				return "", NewError("iV Size must be 16 bytes for TwoFish (256) / algo: " + algo)
 			} //end if
 			if(len(tweak) != 0) {
-				return "", errors.New("Tweak is not supported by TwoFish (256) / algo: " + algo)
+				return "", NewError("Tweak is not supported by TwoFish (256) / algo: " + algo)
 			} //end if
 			bcipher, errCipher = twofish.NewCipher([]byte(key))
 			if(errCipher != nil) {
@@ -1205,13 +1204,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 			break
 		case "blowfish.448":
 			if(len(key) != 56) {
-				return "", errors.New("Key Size must be 56 bytes for BlowFish (448) / algo: " + algo)
+				return "", NewError("Key Size must be 56 bytes for BlowFish (448) / algo: " + algo)
 			} //end if
 			if(len(iv) != 8) {
-				return "", errors.New("iV Size must be 8 bytes for BlowFish (448) / algo: " + algo)
+				return "", NewError("iV Size must be 8 bytes for BlowFish (448) / algo: " + algo)
 			} //end if
 			if(len(tweak) != 0) {
-				return "", errors.New("Tweak is not supported by BlowFish (448) / algo: " + algo)
+				return "", NewError("Tweak is not supported by BlowFish (448) / algo: " + algo)
 			} //end if
 			bcipher, errCipher = blowfish.NewCipher([]byte(key))
 			if(errCipher != nil) {
@@ -1219,13 +1218,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 			} //end if
 		case "blowfish.384":
 			if(len(key) != 48) {
-				return "", errors.New("Key Size must be 48 bytes for BlowFish (384) / algo: " + algo)
+				return "", NewError("Key Size must be 48 bytes for BlowFish (384) / algo: " + algo)
 			} //end if
 			if(len(iv) != 8) {
-				return "", errors.New("iV Size must be 8 bytes for BlowFish (384) / algo: " + algo)
+				return "", NewError("iV Size must be 8 bytes for BlowFish (384) / algo: " + algo)
 			} //end if
 			if(len(tweak) != 0) {
-				return "", errors.New("Tweak is not supported by BlowFish (384) / algo: " + algo)
+				return "", NewError("Tweak is not supported by BlowFish (384) / algo: " + algo)
 			} //end if
 			bcipher, errCipher = blowfish.NewCipher([]byte(key))
 			if(errCipher != nil) {
@@ -1233,13 +1232,13 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 			} //end if
 			break
 		default:
-			return "", errors.New("Invalid Cipher Algo: `" + algo + "`")
+			return "", NewError("Invalid Cipher Algo: `" + algo + "`")
 	} //end switch
 	if(bcipher == nil) {
-		return "", errors.New("No Cipher Selected for Algo: `" + algo + "`")
+		return "", NewError("No Cipher Selected for Algo: `" + algo + "`")
 	} //end if
 	if(len(iv) != bcipher.BlockSize()) {
-		return "", errors.New("Invalid iV: Does not Match the Block Size")
+		return "", NewError("Invalid iV: Does not Match the Block Size")
 	} //end if
 	//-- check for empty data
 	if(str == "") {
@@ -1248,7 +1247,7 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 	//-- fix: restore header block ; use blocksize * 2 (is hex ...)
 	str = Hex2Bin(strings.Repeat("0", bcipher.BlockSize()*2) + Bin2Hex(str)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
 	if(str == "") {
-		return "", errors.New("Hex Header Restore Failed")
+		return "", NewError("Hex Header Restore Failed")
 	} //end if
 	//-- decrypt
 	et := []byte(str)
@@ -1256,7 +1255,7 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 	decrypted = et[bcipher.BlockSize():]
 	et = nil
 	if(len(decrypted) % bcipher.BlockSize() != 0) { // check last slice of encrypted text, if it's not a modulus of cipher block size, it's a problem
-		return "", errors.New("Decrypted Data is not a multiple of cipher BlockSize: [" + ConvertIntToStr(bcipher.BlockSize()) + "]")
+		return "", NewError("Decrypted Data is not a multiple of cipher BlockSize: [" + ConvertIntToStr(bcipher.BlockSize()) + "]")
 	} //end if
 	dcbc := cipher.NewCBCDecrypter(bcipher, []byte(iv))
 	dcbc.CryptBlocks(decrypted, decrypted)
@@ -1276,26 +1275,26 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 	algo = StrToLower(StrTrimWhitespaces(algo))
 	//--
 	if((ver != 3) && (ver != 2) && (ver != 1)) {
-		return "", errors.New("Invalid Version: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Version: " + ConvertUInt8ToStr(ver))
 	} //end if
 	//--
 	if(str == "") {
-		return "", errors.New("Empty Data Packet, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Empty Data Packet, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
-		return "", errors.New("Invalid Data Packet, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Data Packet, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	//--
 	var separator string = ""
 	if(algo == "threefish") {
 		if(ver != 3) {
-			return "", errors.New("Invalid Threefish Version, v: " + ConvertUInt8ToStr(ver))
+			return "", NewError("Invalid Threefish Version, v: " + ConvertUInt8ToStr(ver))
 		} //end if
 		separator = SEPARATOR_CRYPTO_CHECKSUM_V3
 	} else if(algo == "twofish") {
 		if(ver != 3) {
-			return "", errors.New("Invalid Twofish Version, v: " + ConvertUInt8ToStr(ver))
+			return "", NewError("Invalid Twofish Version, v: " + ConvertUInt8ToStr(ver))
 		} //end if
 		separator = SEPARATOR_CRYPTO_CHECKSUM_V3
 	} else if(algo == "blowfish") {
@@ -1306,67 +1305,67 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 		} else if(ver == 1) {
 			separator = SEPARATOR_CRYPTO_CHECKSUM_V1
 		} else {
-			return "", errors.New("Invalid BlowFish Version, v: " + ConvertUInt8ToStr(ver))
+			return "", NewError("Invalid BlowFish Version, v: " + ConvertUInt8ToStr(ver))
 		} //end if else
 	} else {
-		return "", errors.New("Invalid Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
 	} //end if else
 	if(separator == "") {
-		return "", errors.New("Empty Data Packet Checksum Separator, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Empty Data Packet Checksum Separator, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	//--
 	if(!StrContains(str, separator)) {
-		return "", errors.New("Invalid Data Packet, NO Checksum, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Data Packet, NO Checksum, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	darr := ExplodeWithLimit(separator, str, 3)
 	if(len(darr) != 2) {
-		return "", errors.New("Invalid Data Packet Segments, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Data Packet Segments, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	//--
 	str = "" // clear
 	var dlen int = len(darr)
 	if(dlen < 2) {
-		return "", errors.New("Invalid Data Packet, Checksum NOT Found, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Data Packet, Checksum NOT Found, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	darr[0] = StrTrimWhitespaces(darr[0])
 	darr[1] = StrTrimWhitespaces(darr[1])
 	if(darr[1] == "") {
-		return "", errors.New("Invalid Data Packet, Checksum is Empty, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Data Packet, Checksum is Empty, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	if(darr[0] == "") {
-		return "", errors.New("Invalid Data Packet, Packed Data NOT Found, v: " + ConvertUInt8ToStr(ver))
+		return "", NewError("Invalid Data Packet, Packed Data NOT Found, v: " + ConvertUInt8ToStr(ver))
 	} //end if
 	//--
 	switch(algo) {
 		case "blowfish": // v3, v2, v1
 			if(ver == 1) { // v1
 				if(Sha1(darr[0]) != darr[1]) {
-					return "", errors.New("Invalid Blowfish Data Packet (v1), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
+					return "", NewError("Invalid Blowfish Data Packet (v1), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 				} //end if
 			} else if(ver == 2) { // v2
 				if(Sha256B64(darr[0]) != darr[1]) {
-					return "", errors.New("Invalid Blowfish Data Packet (v2), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
+					return "", NewError("Invalid Blowfish Data Packet (v2), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 				} //end if
 			} else if(ver == 3) { // v3
 				if(BaseEncode([]byte(Base64Decode(Sh3a512B64(darr[0]))), "b62") != darr[1]) {
-					return "", errors.New("Invalid Blowfish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
+					return "", NewError("Invalid Blowfish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 				} //end if
 			} else {
-				return "", errors.New("Invalid Blowfish Data Packet (v" + ConvertUInt8ToStr(ver) + "), Checksum Check SKIP :: A checksum was found but don't know how to handle: `" + darr[1] + "`")
+				return "", NewError("Invalid Blowfish Data Packet (v" + ConvertUInt8ToStr(ver) + "), Checksum Check SKIP :: A checksum was found but don't know how to handle: `" + darr[1] + "`")
 			} //end if else
 			break
 		case "twofish": // v3 only
 			if(BaseEncode([]byte(Base64Decode(Sh3a512B64(darr[0]))), "b62") != darr[1]) {
-				return "", errors.New("Invalid Twofish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
+				return "", NewError("Invalid Twofish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 			} //end if
 			break
 		case "threefish": // v3 only
 			if(BaseEncode([]byte(Base64Decode(Sh3a512B64(darr[0]))), "b62") != darr[1]) {
-				return "", errors.New("Invalid Threefish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
+				return "", NewError("Invalid Threefish Data Packet (v3), Checksum FAILED :: A checksum was found but is invalid: `" + darr[1] + "`")
 			} //end if
 			break
 		default:
-			return "", errors.New("Invalid Data Packet, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+			return "", NewError("Invalid Data Packet, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
 	} //end switch
 	//--
 	return Base64Decode(darr[0]), nil

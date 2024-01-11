@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240111.1742 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,11 +19,11 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20240102.2114"
+	VERSION string = "r.20240111.1742"
 
-	LAST_MODIFIED_DATE_TIME string = "2023-12-02 01:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2024-01-08 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
-	CACHED_EXP_TIME_SECONDS uint32 = 3600 // (int) cache time of assets
+	CACHED_EXP_TIME_SECONDS uint32 = 8 * 3600 // (int) cache time of assets ; 8h
 
 	DEBUG bool = false
 )
@@ -32,6 +32,8 @@ const(
 
 
 func ReadWebAsset(path string) string { // OK
+	//--
+	defer smart.PanicHandler()
 	//--
 	if(DEBUG == true) {
 		log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Trying to Read the Asset: `" + path + "` ...")
@@ -42,7 +44,7 @@ func ReadWebAsset(path string) string { // OK
 		return ""
 	} //end if
 	path = smart.SafePathFixSeparator(path) // do always, not os context ToSlash !
-	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/"))
+	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/ ")) // remove `/` and space + all whitespaces
 	if(path == "") {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # empty path")
 		return ""
@@ -51,13 +53,17 @@ func ReadWebAsset(path string) string { // OK
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # path must start with `lib/`")
 		return ""
 	} //end if
-	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/"))
+	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/ ")) // remove `/` and space + all whitespaces
 	if((path == "") || (path == ".") || (path == "..") || (path == "/")) {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsupported path")
 		return ""
 	} //end if
 	if(smart.PathIsAbsolute(path) == true) {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # not a relative path")
+		return ""
+	} //end if
+	if(smart.PathIsSafeValidSafePath(path) != true) {
+		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsafe path")
 		return ""
 	} //end if
 	//--
@@ -80,6 +86,8 @@ func ReadWebAsset(path string) string { // OK
 
 
 func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	messageText = smart.StrTrimWhitespaces(messageText)
@@ -128,6 +136,8 @@ func HtmlStandaloneFaviconTemplate(titleText string, headHtml string, bodyHtml s
 
 
 func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	titleText = smart.StrTrimWhitespaces(titleText)
 	//--
@@ -204,6 +214,7 @@ func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml st
 
 //-----
 
+
 const (
 	TEXT_CONTENT_HEADER string = "text/plain; charset=" + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
 	HTML_CONTENT_HEADER string = "text/html; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
@@ -212,10 +223,10 @@ const (
 	HTML_META_VIEWPORT  string = `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
 	HTML_META_CHAREQUIV string = `<meta charset="` + smart.CHARSET + `"><meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">`
 
-	TAG_CSS_START = `<link rel="stylesheet" type="text/css" href="data:text/css,`
-	TAG_CSS_END = `">`
-	TAG_JS_START = `<script src="data:application/javascript,`
-	TAG_JS_END = `"></script>`
+	TAG_CSS_START string = `<link rel="stylesheet" type="text/css" href="data:text/css,`
+	TAG_CSS_END string = `">`
+	TAG_JS_START string = `<script src="data:application/javascript,`
+	TAG_JS_END string = `"></script>`
 
 	HTML_TPL_STATUS string = `<!DOCTYPE html>
 <!-- TPL.SmartGo.STATUS -->
@@ -282,6 +293,7 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <!-- #end TPL -->
 `
 )
+
 
 //-----
 

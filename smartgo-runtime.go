@@ -1,22 +1,20 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
 
 import (
+	"fmt"
+	"log"
+
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
-	"path/filepath"
-
-	"errors"
-	"log"
-	"fmt"
 
 	"time"
 	"context"
@@ -167,7 +165,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		} else {
 			fmt.Println(theErr + " : " + theMsg)
 		} //end if
-		return 0, errors.New(theErr)
+		return 0, NewError(theErr)
 	} //end if
 	//--
 	var theErrFmtMsg error = nil
@@ -184,7 +182,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		if(theErrFmtMsg != nil) {
 			theFmtMsg = ""
 			fmt.Println(color.RedString("[ERROR] SmartGo Log JSON Encoding") + " : " + theErrFmtMsg.Error())
-		}
+		} //end if
 	} else if(logFileFormat == "plain") {
 		theFmtMsg = StrNormalizeSpaces(theMsg)
 	} else {
@@ -194,7 +192,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		} else {
 			fmt.Println(theErr + " : " + theMsg)
 		} //end if else
-		return 0, errors.New(theErr)
+		return 0, NewError(theErr)
 	} //end if else
 	//--
 	dtObjUtc := DateTimeStructUtc("")
@@ -203,14 +201,14 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	//--
 	isSuccess, errMsg := SafePathFileWrite(theLogFile, "a", true, theFmtMsg + LINE_FEED)
 	//--
-	if(errMsg != "") {
-		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") write Error `" + theLogFile + "` :: " + errMsg
+	if(errMsg != nil) {
+		theErr = "[ERROR] SmartGo LogFile (" + logFileFormat + ") write Error `" + theLogFile + "` :: " + errMsg.Error()
 		if(logColoredOnConsole) {
 			fmt.Println(color.RedString(theErr) + " : " + colorMsg)
 		} else {
 			fmt.Println(theErr + " : " + theMsg)
 		} //end if else
-		return 0, errors.New(theErr)
+		return 0, NewError(theErr)
 	} //end if
 	//--
 	if(isSuccess != true) {
@@ -220,7 +218,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		} else {
 			fmt.Println(theErr + " : " + theMsg)
 		} //end if else
-		return 0, errors.New(theErr)
+		return 0, NewError(theErr)
 	} //end if
 	//--
 	if(logToFileAlsoOnConsole) {
@@ -319,8 +317,7 @@ func LogToConsole(level string, withColorsOnConsole bool) {
 func LogToFile(level string, pathForLogs string, theFormat string, alsoOnConsole bool, withColorsOnConsole bool) {
 	//--
 	pathForLogs = StrTrimWhitespaces(pathForLogs) // must be (with trailing slash, dir must be existing): a/relative/path/to/log/ | /an/absolute/path/to/log/
-//	pathForLogs = filepath.ToSlash(pathForLogs)
-	pathForLogs = SafePathFixSeparator(pathForLogs) // this is better in this context, than ToSlash
+	pathForLogs = SafePathFixSeparator(pathForLogs)
 	//--
 	if(isLogPathSafeDir(pathForLogs) == true) {
 		//--
@@ -407,7 +404,23 @@ func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, addit
 	// inputStdin // The Input to Stdin if any ; DO NOT TRIM, must be passed exact how is get
 	//--
 	theExe = StrTrimWhitespaces(theExe)
-	theExe = filepath.ToSlash(theExe)
+	if(theExe == "") {
+		return false, "", "ERR: EXECUTABLE Name/Path is Empty"
+	} //end if
+	//--
+	theExe = SafePathFixClean(theExe)
+	//--
+	if(PathIsEmptyOrRoot(theExe) == true) {
+		return false, "", "ERR: EXECUTABLE Name/Path is Empty/Root"
+	} //end if
+	if(PathIsSafeValidPath(theExe) != true) {
+		return false, "", "ERR: EXECUTABLE Name/Path is Invalid Unsafe"
+	} //end if
+	if(PathIsBackwardUnsafe(theExe) == true) {
+		return false, "", "ERR: EXECUTABLE Name/Path is Backward Unsafe"
+	} //end if
+	//--
+	// do not check if path exists, can be a simple executable name as `ping` only !
 	//--
 	var cmd *exec.Cmd = nil
 	if(stopTimeout > 0) { // timed command

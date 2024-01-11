@@ -19,7 +19,7 @@
  * @author unix-world.org
  * @license BSD
  * @file core_utils.js
- * @version 20231121
+ * @version 20231205
  * @class smartJ$Utils
  * @static
  * @frozen
@@ -1463,7 +1463,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 		//--
 		let utftext = '';
 		try {
-			utftext = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+			utftext = encodeURIComponent(str).replace(/%([0-9A-Fa-f]{2})/g,
 				(match, p1) => { return String.fromCharCode('0x' + p1); }
 			);
 		} catch(err) {

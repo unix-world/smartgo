@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -9,7 +9,6 @@ package smartgo
 
 import (
 	"log"
-	"errors"
 
 	"time"
 	mrand "math/rand"
@@ -120,7 +119,7 @@ func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { /
 				currentTime = parseTime
 			} //end if
 		} else { // error
-			theError = errors.New(`Invalid Format for the Input Date/Time: "` + dateIsoStr + `" # Using Now()`)
+			theError = NewError(`Invalid Format for the Input Date/Time: "` + dateIsoStr + `" # Using Now()`)
 		} //end if else
 	} //end if else
 	//--
@@ -130,7 +129,7 @@ func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { /
 		// leave as is
 	} else {
 		if(theError == nil) { // avoid overwrite if previous error registered
-			theError = errors.New("Invalid Parsing Mode `" + mode + "` for Date/Time ... Using `LOCAL`")
+			theError = NewError("Invalid Parsing Mode `" + mode + "` for Date/Time ... Using `LOCAL`")
 		} //end if
 	} //end if else
 	//--

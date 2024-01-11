@@ -1,14 +1,13 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240103.1301 :: STABLE
+// r.20240111.1742 :: STABLE
 // [ MARKUP ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
 
 import (
-	"errors"
 	"log"
 
 	"strings"
@@ -33,6 +32,8 @@ import (
 
 func HTMLCodeFixValidate(htmlCode string) (string, error) {
 	//--
+	defer PanicHandler()
+	//--
 	var uuid string = StrToLower(uid.Uuid13Str() + "-" + uid.Uuid10Num() + "-fx." + ConvertUInt64ToStr(uid.UuidSessionSequence()))
 	var validHtml string = ""
 	//--
@@ -54,7 +55,7 @@ func HTMLCodeFixValidate(htmlCode string) (string, error) {
 		} //end function
 		crawler(doc)
 		if(body == nil) {
-			return nil, errors.New("HTML Smart Fix / Validate: Body Tag is missing ...")
+			return nil, NewError("HTML Smart Fix / Validate: Body Tag is missing ...")
 		} //end if
 		return body, nil
 	} //end function

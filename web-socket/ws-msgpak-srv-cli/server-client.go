@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server / Client :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240108.1756 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"net/http"
-	"path/filepath"
 
 	fifolist 		"container/list"
 
@@ -37,7 +36,7 @@ import (
 
 
 const (
-	VERSION string = "r.20240102.2114"
+	VERSION string = "r.20240108.1756"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -104,7 +103,7 @@ func connWriteCloseMsgToSocket(conn *websocket.Conn, msg []byte) error {
 	defer websockWriteMutex.Unlock()
 	//--
 	if(conn == nil) {
-		return smart.CreateNewError("WARNING: Cannot write CloseMsg to Empty Connection")
+		return smart.NewError("WARNING: Cannot write CloseMsg to Empty Connection")
 	} //end if
 	//--
 	conn.SetWriteDeadline(time.Now().Add(time.Duration(WAIT_CLOSE_LIMIT_SECONDS) * time.Second))
@@ -121,7 +120,7 @@ func connWriteTxtMsgToSocket(conn *websocket.Conn, msg []byte, maxLimitSeconds u
 	defer websockWriteMutex.Unlock()
 	//--
 	if(conn == nil) {
-		return smart.CreateNewError("WARNING: Cannot write TxtMsg to Empty Connection")
+		return smart.NewError("WARNING: Cannot write TxtMsg to Empty Connection")
 	} //end if
 	//--
 	if(maxLimitSeconds < LIMIT_INTERVAL_SECONDS_MIN) { // {{{SYNC-MSGPAK-INTERVAL-LIMITS}}}
@@ -141,7 +140,7 @@ func connReadFromSocket(conn *websocket.Conn, maxLimitSeconds uint32) (msgType i
 	defer smart.PanicHandler()
 	//--
 	if(conn == nil) {
-		return -1, nil, smart.CreateNewError("WARNING: Cannot read Msg from Empty Connection")
+		return -1, nil, smart.NewError("WARNING: Cannot read Msg from Empty Connection")
 	} //end if
 	//--
 	if(maxLimitSeconds < LIMIT_INTERVAL_SECONDS_MIN) { // {{{SYNC-MSGPAK-INTERVAL-LIMITS}}}
@@ -229,8 +228,10 @@ func msgPakParseMessage(msg string, sharedPrivateKey string, sharedSecret string
 	} //end if
 	//--
 	D, DErr := smart.JsonObjDecode(msg)
-	if((DErr != nil) || (D == nil)) {
-		return sMsg, "MsgPak: Message JSON Decoding Failed: " + DErr.Error()
+	if(DErr != nil) {
+		return sMsg, "MsgPak: Message JSON Decoding Error: " + DErr.Error()
+	} else if(D == nil) {
+		return sMsg, "MsgPak: Message JSON Decoding Failed"
 	} //end if
 	//--
 	sMsg = messagePack{
@@ -301,6 +302,8 @@ func msgPakWriteMessage(conn *websocket.Conn, maxLimitSeconds uint32, cmd string
 
 func dhkxCliHandler(remoteId string, isServer bool, cmd string, data string) (answerMsg string, answerData string, extraData string) {
 	//--
+	defer smart.PanicHandler()
+	//--
 	if(isServer == true) {
 		return "<ERR:DHKX:CLI>", "Invalid Server Command: " + cmd, ""
 	} //end if
@@ -309,6 +312,8 @@ func dhkxCliHandler(remoteId string, isServer bool, cmd string, data string) (an
 	} //end if
 	//--
 	var clientRecvDhKxFromServer dhkx.HandleDhkxCliRecvFunc = func() (string, []byte, int) {
+		//--
+		defer smart.PanicHandler()
 		//--
 		arr := smart.Explode(":", smart.StrTrimWhitespaces(data))
 		if(len(arr) != 2) {
@@ -527,6 +532,10 @@ func msgPakGenerateMessageHash(msg []byte) string {
 func MsgPakSetServerTaskCmd(cmd string, data string, timeoutSec uint32, tlsMode string, certifPath string, httpAddr string, httpPort uint16, authUsername string, authPassword string) string {
 
 	//--
+	defer smart.PanicHandler()
+	//--
+
+	//--
 	certifPath = smart.StrTrimWhitespaces(certifPath)
 	if((certifPath == "") || (smart.PathIsBackwardUnsafe(certifPath) == true)) {
 		certifPath = CERTIFICATES_DEFAULT_PATH
@@ -543,12 +552,12 @@ func MsgPakSetServerTaskCmd(cmd string, data string, timeoutSec uint32, tlsMode 
 		uri += "s"
 		uri += "://"
 		crt, errCrt := smart.SafePathFileRead(certifPath + CERTIFICATE_PEM_CRT, true)
-		if(errCrt != "") {
-			return "Failed to read root certificate CRT: " + errCrt
+		if(errCrt != nil) {
+			return "Failed to read root certificate CRT: " + errCrt.Error()
 		} //end if
 		key, errKey := smart.SafePathFileRead(certifPath + CERTIFICATE_PEM_KEY, true)
-		if(errKey != "") {
-			return "Failed to read root certificate KEY: " + errKey
+		if(errKey != nil) {
+			return "Failed to read root certificate KEY: " + errKey.Error()
 		} //end if
 		tlsServerCerts = smart.StrTrimWhitespaces(string(crt)) + "\n" + smart.StrTrimWhitespaces(string(key))
 	} else if(tlsMode == "tls:noverify") {
@@ -592,8 +601,8 @@ func MsgPakSetServerTaskCmd(cmd string, data string, timeoutSec uint32, tlsMode 
 func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr string, httpPort uint16, allowedIPs string, authUsername string, authPassword string, sharedEncPrivKey string, intervalMsgSeconds uint32, handleMessagesFunc HandleMessagesFunc, allowedHttpCustomCmds map[string]bool, cronMsgTasks []CronMsgTask) bool {
 
 	//--
-
 	defer smart.PanicHandler()
+	//--
 
 	//-- checks
 
@@ -612,7 +621,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 	} //end if
 
 	certifPath = smart.StrTrimWhitespaces(certifPath)
-	certifPath = filepath.ToSlash(certifPath)
+	certifPath = smart.SafePathFixSeparator(certifPath)
 	if((certifPath == "") || (smart.PathIsBackwardUnsafe(certifPath) == true)) {
 		certifPath = CERTIFICATES_DEFAULT_PATH
 	} //end if
@@ -623,6 +632,9 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 	if((!smart.IsNetValidIpAddr(httpAddr)) && (!smart.IsNetValidHostName(httpAddr))) {
 		log.Println("[ERROR] MsgPak Server: Empty or Invalid Bind Address")
 		return false
+	} //end if
+	if(smart.StrContains(httpAddr, ":")) {
+		httpAddr = "[" + httpAddr + "]" // {{{SYNC-SMART-SERVER-DOMAIN-IPV6-BRACKETS}}}
 	} //end if
 
 	if(!smart.IsNetValidPortNum(int64(httpPort))) {
@@ -994,6 +1006,8 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		//--
 		var serverSendDhKxToClient dhkx.HandleDhkxSrvSendFunc = func(srvPubKey []byte, grpID int) string {
 			//--
+			defer smart.PanicHandler()
+			//--
 			msg, errCompose := msgPakComposeMessage("<DHKX:CLI>", smart.ConvertIntToStr(grpID) + ":" + smart.BaseEncode(srvPubKey, "b62"), sharedEncPrivKey, "")
 			if(errCompose != "") {
 				return "Send (to Client) ERR (1): " + errCompose
@@ -1012,6 +1026,8 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			return
 		} //end if
 		var serverRecvDhKxFromClient dhkx.HandleDhkxSrvRecvFunc = func(srvPubKey []byte) (string, []byte, []byte) {
+			//--
+			defer smart.PanicHandler()
 			//--
 			msgType, message, err := connReadFromSocket(conn, WAIT_DHKX_LIMIT_SECONDS)
 			if(err != nil) {
@@ -1234,18 +1250,18 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		} //end if
 		//--
 		headers := map[string]string{"refresh":"10"}
-		smarthttputils.HttpStatus200(w, r, assets.HtmlStandaloneTemplate("MsgPak Server: HTTP(S)/WsMux", "", `<div class="operation_display">MsgPak Server: HTTP(S)/WsMux # ` + smart.EscapeHtml(VERSION) + `</div>` + `<div class="operation_info"><img width="48" height="48" src="lib/framework/img/loading-spin.svg"></div>` + `<hr>` + `<small>` + smart.EscapeHtml(smart.COPYRIGHT) + `</small>`), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, headers)
+		smarthttputils.HttpStatus200(w, r, assets.HtmlStandaloneTemplate("MsgPak Server: HTTP(S)/WsMux", "", `<div class="operation_display">MsgPak Server: HTTP(S)/WsMux # ` + smart.EscapeHtml(VERSION) + `</div>` + `<div class="operation_info"><img width="48" height="48" src="/lib/framework/img/loading-spin.svg"></div>` + `<hr>` + `<small>` + smart.EscapeHtml(smart.COPYRIGHT) + `</small>`), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, headers)
 		//--
 	} //end function
 
 	webAssetsHttpHandler := func(w http.ResponseWriter, r *http.Request) {
 		//--
-		srvassets.WebAssetsHttpHandler(w, r, "", "cache:private") // use default mime disposition ; private cache mode
+		srvassets.WebAssetsHttpHandler(w, r, "cache:private") // private cache mode
 		//--
 	} //end function
 
 	var srvAddr string = httpAddr + fmt.Sprintf(":%d", httpPort)
-	mux, srv := smarthttputils.HttpMuxServer(srvAddr, intervalMsgSeconds, true, "[MsgPak Server]") // force HTTP/1
+	mux, srv := smarthttputils.HttpMuxServer(srvAddr, intervalMsgSeconds, true, false, "[MsgPak Server]") // force HTTP/1
 
 	mux.HandleFunc("/msgpak", srvHandlerMsgPack)
 	mux.HandleFunc("/msgsend", srvHandlerCustomMsg)
@@ -1280,6 +1296,8 @@ var mtxCliCustomMsgs sync.Mutex
 
 func MsgPakSetClientTaskCmd(cmd string, data string) string {
 	//--
+	defer smart.PanicHandler()
+	//--
 	cmd = smart.StrTrimWhitespaces(smart.StrTrim(smart.StrTrimWhitespaces(cmd), "<>"))
 	data = smart.StrTrimWhitespaces(data)
 	//--
@@ -1313,8 +1331,8 @@ func MsgPakSetClientTaskCmd(cmd string, data string) string {
 func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certifPath string, authUsername string, authPassword string, sharedEncPrivKey string, intervalMsgSeconds uint32, handleMessagesFunc HandleMessagesFunc) bool {
 
 	//--
-
 	defer smart.PanicHandler()
+	//--
 
 	//--
 
@@ -1337,7 +1355,7 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 	} //end if
 
 	certifPath = smart.StrTrimWhitespaces(certifPath)
-	certifPath = filepath.ToSlash(certifPath)
+	certifPath = smart.SafePathFixSeparator(certifPath)
 	if((certifPath == "") || (smart.PathIsBackwardUnsafe(certifPath) == true)) {
 		certifPath = CERTIFICATES_DEFAULT_PATH
 	} //end if
@@ -1513,12 +1531,12 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 		if(tlsMode == "tls:server") {
 			socketPrefix = "wss://"
 			crt, errCrt := smart.SafePathFileRead(certifPath + CERTIFICATE_PEM_CRT, true)
-			if(errCrt != "") {
-				log.Fatal("[ERROR] Failed to read root certificate CRT: " + errCrt)
+			if(errCrt != nil) {
+				log.Fatal("[ERROR] Failed to read root certificate CRT: " + errCrt.Error())
 			} //end if
 			key, errKey := smart.SafePathFileRead(certifPath + CERTIFICATE_PEM_KEY, true)
-			if(errKey != "") {
-				log.Fatal("[ERROR] Failed to read root certificate KEY: " + errKey)
+			if(errKey != nil) {
+				log.Fatal("[ERROR] Failed to read root certificate KEY: " + errKey.Error())
 			} //end if
 			log.Println("Initializing Client:", socketPrefix + addr + socketSuffix, "@", "HTTPS/WsMux/TLS:WithServerCertificate")
 			log.Println("[NOTICE] Server Certificates Path:", certifPath)
