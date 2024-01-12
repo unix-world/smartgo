@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -19,10 +19,11 @@ import (
 	assets 			"github.com/unix-world/smartgo/web/assets/web-assets"
 	srvassets 		"github.com/unix-world/smartgo/web/assets/srv-assets"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
+	webdav 			"github.com/unix-world/smartgo/web/webdav" // a modified version of [golang.org / x / net / webdav]: added extra path security checks
 )
 
 const (
-	VERSION string = "r.20240111.1742"
+	VERSION string = "r.20240112.1858"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -30,6 +31,9 @@ const (
 
 	WEB_PUBLIC_RELATIVE_ROOT_PATH string = "./web-public/"
 	DEFAULT_DIRECTORY_INDEX_HTML string = "index.html"
+
+	DAV_STORAGE_RELATIVE_ROOT_PATH  string = "./webdav" // do not add trailing slash
+	DAV_URL_PATH string = "webdav"
 
 	CACHED_EXP_TIME_SECONDS uint32 = assets.CACHED_EXP_TIME_SECONDS * 3  // 24h
 
@@ -70,9 +74,15 @@ var handlersWriteMutex sync.Mutex
 var handlersAreLocked bool = false // after server boot process no more handlers are allowed to be registered, by setting this flag to TRUE
 const msgErrHandlersLocked string = "Web Server Handlers are Locked after starting the server. Operation Disallowed."
 
+type WebdavRunOptions struct {
+	Enabled        bool
+	SharedMode     bool
+	SmartSafePaths bool
+}
+
 
 // IMPORTANT: If using Proxy with different PROXY_HTTP_BASE_PATH than "/" (ex: "/api/") the Proxy MUST strip back PROXY_HTTP_BASE_PATH to "/" for this backend
-func WebServerRun(servePublicPath bool, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
+func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
 
 	//--
 	// this method should return (error codes) just int16 positive values and zero if ok ; negative values are reserved for outsite managers
@@ -184,13 +194,46 @@ func WebServerRun(servePublicPath bool, serveSecure bool, certifPath string, htt
 
 	if(servePublicPath == true) {
 		if(webDirIsValid(WEB_PUBLIC_RELATIVE_ROOT_PATH) != true) {
-			log.Println("[ERROR]", "Web Server: WebRoot Path is Invalid:", WEB_PUBLIC_RELATIVE_ROOT_PATH)
+			log.Println("[ERROR]", "Web Server: WebPublic Root Path is Invalid:", WEB_PUBLIC_RELATIVE_ROOT_PATH)
 			return 1301
 		} //end if
 		if(webDirExists(WEB_PUBLIC_RELATIVE_ROOT_PATH) != true) {
-			log.Println("[ERROR]", "Web Server: WebRoot Path does not Exists or Is Not a Valid Directory:", WEB_PUBLIC_RELATIVE_ROOT_PATH)
+			log.Println("[ERROR]", "Web Server: WebPublic Path does not Exists or Is Not a Valid Directory:", WEB_PUBLIC_RELATIVE_ROOT_PATH)
 			return 1302
 		} //end if
+	} //end if
+
+	//-- webdav dir
+
+	if(webdavOptions == nil) {
+		webdavOptions = &WebdavRunOptions{Enabled:false, SharedMode:false, SmartSafePaths:false}
+	} //end if
+
+	var wdav *webdav.Handler = nil
+	if(webdavOptions.Enabled == true) {
+		if(isAuthActive == true) {
+			if(webdavOptions.SharedMode == true) {
+				log.Println("[WARNING]", "Web Server: WebDav Service will run as PRIVATE (authentication is Enabled), but using Shared Storage for all users, as set")
+			} //end if
+		} else {
+			log.Println("[WARNING]", "Web Server: WebDav Service will run as PUBLIC, NO AUTHENTICATION has been Set")
+			webdavOptions.SharedMode = true // this is the only possibility if no auth is enabled !
+		} //end if
+		if(webPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}} ; tesh with webPathIsValid() instead of webDirIsValid() because have no trailing slash
+			log.Println("[ERROR]", "Web Server: WebDav Root Path is Invalid:", DAV_STORAGE_RELATIVE_ROOT_PATH)
+			return 1401
+		} //end if
+		if(webDirExists(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) {
+			log.Println("[ERROR]", "Web Server: WebDav Root Path does not Exists or Is Not a Valid Directory:", DAV_STORAGE_RELATIVE_ROOT_PATH)
+			return 1402
+		} //end if
+		wdav = registerWebDavService()
+		if(wdav == nil) {
+			log.Println("[ERROR]", "Web Server: WebDav Service Failed to be Initialized")
+			return 1403
+		} //end if
+		log.Println("Web Server: WebDav Service is ENABLED ::", "SharedMode:", webdavOptions.SharedMode, ";", "SmartSafePaths:", webdavOptions.SmartSafePaths)
+		log.Println("[INFO]", "Web Server WebDAV Serving Path: `" + webDavUrlPath() + "` as: `" + smart.PathGetAbsoluteFromRelative(DAV_STORAGE_RELATIVE_ROOT_PATH) + "`")
 	} //end if
 
 	//-- signature: web
@@ -236,7 +279,8 @@ func WebServerRun(servePublicPath bool, serveSecure bool, certifPath string, htt
 		defer smart.PanicHandler() // safe recovery handler
 		//-- get real client IP
 		realClientIp := getVisitorRealIpAddr(r)
-		//-- rate limit interceptor (must be first)
+		//--
+		//== rate limit interceptor (must be first)
 		if(useRateLimit) { // RATE LIMIT
 			var isRateLimited bool = smarthttputils.HttpServerIsIpRateLimited(r, rateLimit, rateBurst)
 			if(isRateLimited) { // if the current request/ip is rate limited
@@ -245,13 +289,29 @@ func WebServerRun(servePublicPath bool, serveSecure bool, certifPath string, htt
 				return
 			} //end if
 		} //end if
-		//-- #end rate limit
-		manageSessUUIDCookie(w, r) // manage session UUID Cookie
-		//-- serving area (in order): assets (public) ; routes (depends how a route is set by urlHandlersSkipAuth) ; public files (public or n/a, depends if public files serving is enabled or not)
+		//== #end rate limit
+		//--
 		var urlPath string = smart.GetHttpPathFromRequest(r)
 		if(urlPath == "") {
 			urlPath = "/"
 		} //end if
+		//--
+		//== webDAV
+		if(webdavOptions.Enabled == true) {
+			if((urlPath == webDavUrlPath()) || (smart.StrStartsWith(urlPath, webDavUrlPath()+"/"))) { // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
+				if(wdav == nil) {
+					log.Printf("[SRV] Web Server: Failed to Serve WebDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "400", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+					smarthttputils.HttpStatus500(w, r, "WebDAV Service is N/A: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+					return
+				} //end if
+				webDavHttpHandler(w, r, wdav, webdavOptions.SharedMode, webdavOptions.SmartSafePaths, isAuthActive, allowedIPs, authUser, authPass, customAuthCheck)
+				return
+			} //end if
+		} //end if
+		//--
+		//== serving area (in order): assets (public) ; routes (depends how a route is set by urlHandlersSkipAuth) ; public files (public or n/a, depends if public files serving is enabled or not)
+		//-- uuid
+		manageSessUUIDCookie(w, r) // manage session UUID Cookie
 		//-- shiftPath
 		headPath, tailPaths := getUrlPathSegments(urlPath) // head path or tail paths must not contain slashes !!
 		//-- {{{SYNC-PATH-FROM-SLASH-REDIRECT}}} ; apache like fix but inversed: if path has / suffix remove and redirect ; this fix is needed because of tails implementation (shiftPath)
@@ -469,7 +529,7 @@ func WebServerRun(servePublicPath bool, serveSecure bool, certifPath string, htt
 		log.Println("[OK]", "Web Server is Ready for Serving HTTPS/TLS at", httpAddr, "on port", httpPort)
 		errServeTls := srv.ListenAndServeTLS(theTlsCertPath, theTlsKeyPath)
 		if(errServeTls != nil) {
-			log.Println("[ERROR]", "Web Server: Fatal Service Init Error:", errServeTls)
+			log.Println("[ERROR]", "Web Server (HTTPS/TLS): Fatal Service Init Error:", errServeTls)
 			return 3001
 		} //end if
 	} else { // serve HTTP

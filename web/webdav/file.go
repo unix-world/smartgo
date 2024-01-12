@@ -25,10 +25,17 @@ import (
 // slashClean is equivalent to but slightly more efficient than
 // path.Clean("/" + name).
 func slashClean(name string) string {
+	//-- unixman
+	name = smart.StrTrimWhitespaces(name)
+	name = smart.SafePathFixClean(name) // fix prior to below tests ; avoid use OS context dir separator, have them all unix style (safety) !
+	//-- #unixman
 	if name == "" || name[0] != '/' {
 		name = "/" + name
 	}
-	return path.Clean(name)
+	//-- unixman
+//	return path.Clean(name)
+	return name // no need to fix again, was fixed above
+	//-- #unixman
 }
 
 // A FileSystem implements access to a collection of named files. The elements
@@ -71,15 +78,15 @@ type Dir string
 
 func (d Dir) resolve(name string) string {
 	//-- unixman
-	if(name != "") {
+	if((name != "") && (name != "/")) {
 		if(useSmartSafeValidPaths) {
 			if(smart.PathIsSafeValidSafePath(name) != true) {
-				log.Println("[WARNING]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Smart Unsafe Path Name (Rejected): `" + name + "`")
+				log.Println("[NOTICE]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Unsafe SmartValid Path Name (Rejected): `" + name + "`")
 				return ""
 			} //end if
 		} else {
 			if(smart.PathIsSafeValidPath(name) != true) {
-				log.Println("[WARNING]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Unsafe Path Name (Rejected): `" + name + "`")
+				log.Println("[NOTICE]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Unsafe Valid Path Name (Rejected): `" + name + "`")
 				return ""
 			} //end if
 		} //end if

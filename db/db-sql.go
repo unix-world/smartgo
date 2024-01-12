@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -339,7 +339,7 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 			return nil, conn.dbErr
 		} //end if
 		libVersion, _, _ := sqlite3.Version()
-		log.Println("SQLite3 Version:", libVersion)
+		log.Println("SQLite3 Version:", libVersion, connDescr)
 	} else if(conn.dbType == DB_SQL_TYPE_PGSQL) {
 		var pgVersion string = ""
 		var pgEncoding string = ""
@@ -360,7 +360,7 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if(errTz != nil) {
 			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server TimeZone", errTz)
 		} //end if else
-		log.Println("PostgreSQL Server", "Version: " + pgVersion + " ; Encoding: " + pgEncoding + " ; TimeZone: " + pgTimeZone)
+		log.Println("PostgreSQL Server", "Version: " + pgVersion + " ; Encoding: " + pgEncoding + " ; TimeZone: " + pgTimeZone, connDescr)
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(pgTimeZone)) != smart.StrToUpper(smart.DateTimeGetLocation())) {
 			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set PostgreSQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", "Server=`" + pgTimeZone + "`", "Client=`" + smart.DateTimeGetLocation() + "`")
 		} //end if
@@ -392,7 +392,7 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if(errTz != nil) {
 			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server TimeZone", errTz)
 		} //end if else
-		log.Println("MySQL Server", "Version: " + myVersion + " ; Connection Collation: UTF8.MB4 ; TimeZone: " + myTimeZone)
+		log.Println("MySQL Server", "Version: " + myVersion + " ; Connection Collation: UTF8.MB4 ; TimeZone: " + myTimeZone, connDescr)
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(myTimeZone)) != smart.StrToUpper(smart.DateTimeGetLocation())) {
 			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", "Server=`" + myTimeZone + "`", "Client=`" + smart.DateTimeGetLocation() + "`")
 		} //end if

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20240111.1742"
+	VERSION string = "r.20240112.1858"
 
 	DEBUG bool = false
 )

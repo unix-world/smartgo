@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Web-Public :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -24,18 +24,18 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 	defer smart.PanicHandler() // safe recovery handler
 	//--
 	if((r.Method != "GET") && (r.Method != "HEAD")) {
-		log.Println("[ERROR]", "HTTP Status 405 :: Invalid Web Public Request Method: `" + r.Method + "`")
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 405 :: Invalid Web Public Request Method: `" + r.Method + "`")
 		smarthttputils.HttpStatus405(w, r, "Invalid WP Request Method", true)
 		return 405
 	} //end if
 	//--
 	if(!webDirIsValid(WEB_PUBLIC_RELATIVE_ROOT_PATH)) {
-		log.Println("[ERROR]", "HTTP Status 500 :: Invalid Web Public Root Path: `" + WEB_PUBLIC_RELATIVE_ROOT_PATH + "`")
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 500 :: Invalid Web Public Root Path: `" + WEB_PUBLIC_RELATIVE_ROOT_PATH + "`")
 		smarthttputils.HttpStatus500(w, r, "Invalid WP Root Path", true)
 		return 500
 	} //end if
 	if(!webDirExists(WEB_PUBLIC_RELATIVE_ROOT_PATH)) {
-		log.Println("[ERROR]", "HTTP Status 500 :: Missing Web Public Root Path: `" + WEB_PUBLIC_RELATIVE_ROOT_PATH + "`")
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 500 :: Missing Web Public Root Path: `" + WEB_PUBLIC_RELATIVE_ROOT_PATH + "`")
 		smarthttputils.HttpStatus500(w, r, "WP Root Path is Unavailable", true)
 		return 500
 	} //end if
@@ -45,7 +45,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		urlPath = "/" // required for validation
 	} //end if
 	if(!webUrlPathIsValid(urlPath)) {
-		log.Println("[WARNING]", "HTTP Status 400 :: Invalid Web Public URL Path: `" + urlPath + "`")
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 400 :: Invalid Web Public URL Path: `" + urlPath + "`")
 		smarthttputils.HttpStatus400(w, r, "Invalid WP Request URL Path", true)
 		return 400
 	} //end if
@@ -54,12 +54,12 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 	var path string = WEB_PUBLIC_RELATIVE_ROOT_PATH + urlPath
 	//--
 	if(!webPathIsValid(path)) {
-		log.Println("[WARNING]", "HTTP Status 400 :: Invalid Web Public Path: `" + path + "`")
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 400 :: Invalid Web Public Path: `" + path + "`")
 		smarthttputils.HttpStatus400(w, r, "Invalid WP Request Path", true)
 		return 400
 	} //end if
 	if(!webPathExists(path)) {
-		log.Println("[WARNING]", "HTTP Status 404 :: Web Public Path Not Found: `" + path + "`")
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 404 :: Web Public Path Not Found: `" + path + "`")
 		smarthttputils.HttpStatus404(w, r, "WP Request Path Not Found", true)
 		return 404
 	} //end if
@@ -67,13 +67,13 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		path = smart.PathAddDirLastSlash(path) + DEFAULT_DIRECTORY_INDEX_HTML
 	} //end if
 	if((webPathIsValid(path) != true) || (webFileExists(path) != true)) {
-		log.Println("[WARNING]", "HTTP Status 404 :: Web Public File Path Not Found Or Is Invalid: `" + path + "`")
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 404 :: Web Public File Path Not Found Or Is Invalid: `" + path + "`")
 		smarthttputils.HttpStatus404(w, r, "WP Request File Path N/A", true)
 		return 404
 	} //end if
 	//--
 	if(DEBUG) {
-		log.Println("[DEBUG]", "Trying to Serve Public File: `" + path + "`")
+		log.Println("[DEBUG]", smart.CurrentFunctionName(), "Trying to Serve Public File: `" + path + "`")
 	} //end if
 	//--
 	var fileSize int64 = -2
@@ -93,7 +93,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 	} //end if
 	//--
 	if(fileSize < 0) {
-		log.Println("[WARNING]", "HTTP Status 404 :: Web Public File is Not Accessible: `" + path + "`")
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 404 :: Web Public File is Not Accessible: `" + path + "`")
 		smarthttputils.HttpStatus404(w, r, "WP Request File is Not Accessible", true)
 		return 404
 	} //end if
@@ -135,7 +135,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 			fileContent, errRead = smart.SafePathFileRead(path, false)
 		} //end if
 		if(errRead != nil) {
-			log.Println("[ERROR]", "HTTP Status 410 :: Web Public Small File is Unavailable for Serving: `" + path + "` ; Error:", errRead)
+			log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 410 :: Web Public Small File is Unavailable for Serving: `" + path + "` ; Error:", errRead)
 			smarthttputils.HttpStatus410(w, r, "WP Request File is Unavailable for Serving", true)
 			return 410
 		} //end if
@@ -145,7 +145,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 	//--
 	streamBytes, errStream := os.Open(path)
 	if(errStream != nil) {
-		log.Println("[ERROR]", "HTTP Status 410 :: Web Public Stream File is Unavailable for Serving: `" + path + "` ; Error:", errStream)
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 410 :: Web Public Stream File is Unavailable for Serving: `" + path + "` ; Error:", errStream)
 		smarthttputils.HttpStatus410(w, r, "WP Request File is Unavailable for Serving", true)
 		return 410
 	} //end if

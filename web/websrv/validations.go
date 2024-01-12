@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Validations :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -88,7 +88,7 @@ func webPathIsValid(path string) bool { // must work for dir or file
 		return false
 	} //end if
 	//--
-	if((path == ".") || (path == "..") || smart.StrContains(path, "..") || smart.StrContains(path, " ") || smart.StrContains(path, "\\") || smart.StrContains(path, ":")) {
+	if((path == ".") || (path == "./") || (path == "..") || smart.StrContains(path, "..") || smart.StrContains(path, " ") || smart.StrContains(path, "\\") || smart.StrContains(path, ":")) {
 		return false
 	} //end if
 	//--
@@ -122,7 +122,7 @@ func webDirIsValid(path string) bool {
 	} //end if
 	//--
 	if(!webPathIsValid(path)) {
-		return false // aaaaaaaaaaaaaaaaaaaa
+		return false
 	} //end if
 	//--
 	if(smart.StrEndsWith(path, "/") != true) {

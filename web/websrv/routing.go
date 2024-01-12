@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -46,7 +46,13 @@ func UrlHandlerRegisterRoute(route string, skipAuth bool, methods []string, maxT
 			return false
 		} //end if
 	} //end if
-	if(route == "/lib") { // reserved for assets
+	//--
+	if((route == webDavUrlPath()) || (smart.StrStartsWith(route, webDavUrlPath()+"/"))) { // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Route: Disallowed (Reserved for WebDAV Service): `" + route + "`")
+		return false
+	} //end if
+	//--
+	if((route == "/lib") || smart.StrStartsWith(route, "/lib/")) { // reserved for assets
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Route: Disallowed (Reserved for Assets): `" + route + "`")
 		return false
 	} //end if

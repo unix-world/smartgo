@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -147,12 +147,12 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 			colorMsg = color.HiMagentaString(colorMsg)
 		} //end if
 	} else { // ALL OTHER CASES
-		theType = "message"
+		theType = ""
 		if(logColoredOnConsole) {
 			if(StrIPos(theMsg, "[OK]") == 0) {
 				theType = "ok"
 				colorMsg = color.HiGreenString(colorMsg)
-			} else { // message
+			} else { // no type
 				colorMsg = color.HiCyanString(colorMsg)
 			} //end if else
 		} //end if
@@ -265,7 +265,7 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 // PRIVATE
 func isLogPathSafeDir(pathForLogs string) bool {
 	//--
-	if((!PathIsSafeValidPath(pathForLogs)) ||
+	if((!PathIsSafeValidSafePath(pathForLogs)) ||
 		(PathIsEmptyOrRoot(pathForLogs)) ||
 		(PathIsBackwardUnsafe(pathForLogs)) ||
 		(!PathExists(pathForLogs)) ||

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -39,7 +39,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240111.1742"
+	VERSION string = "r.20240112.1858"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -77,7 +77,7 @@ const (
 	//--
 	ICACHEM_CLEANUP_INTERVAL uint32 = 5 // 5 seconds
 	ICACHEM_EXPIRATION uint32 = 300 // 300 seconds = 5 mins ; cache unsuccessful logins for 5 mins
-	ICACHEM_FAILS_NUM uint32 = 7 // max fail attempts before lock 5 mins (300 sec)
+	ICACHEM_FAILS_NUM uint32 = 8*2 // max fail attempts before lock 5 mins (300 sec) ; use x2 because most of the time in browsers each unauth request will generate double requests
 	//--
 	CACHE_CONTROL_NOCACHE string = "no-cache"
 	CACHE_CONTROL_PRIVATE string = "private"

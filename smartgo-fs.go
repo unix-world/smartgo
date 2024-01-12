@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240111.1742 :: STABLE
+// r.20240112.1858 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -390,6 +390,16 @@ func PathGetCurrentExecutableDir() string {
 	return PathDirName(currentExecutableAbsolutePath)
 	//--
 } //END FUNCTION
+
+
+func PathGetCurrentExecutablePathAndName() string {
+	//--
+	return PathAddDirLastSlash(PathGetCurrentExecutableDir()) + PathGetCurrentExecutableName()
+	//--
+} //END FUNCTION
+
+
+//-----
 
 
 func PathAddDirLastSlash(dirPath string) string {
