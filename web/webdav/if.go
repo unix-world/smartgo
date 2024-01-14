@@ -171,3 +171,5 @@ loop:
 	}
 	return tokenType, s[1:j], s[j+1:]
 }
+
+// #end

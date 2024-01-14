@@ -1,6 +1,6 @@
 
-// (c) 2021-2022 unix-world.org
-// r.20230928.2358
+// (c) 2021-2024 unix-world.org
+// r.20240112.1858
 
 //=======
 // This is an implementation of Diffie-Hellman Key Exchange algorithm for a Client/Server suite, based on: github.com/monnand/dhkx
@@ -152,10 +152,7 @@ func dhKxStep1(grpID int) (string, *DHGroup, *DHKey, []byte) {
 	//--
 
 	//-- Get a group. Use the default one would be enough.
-	g, errGrp := GetGroup(grpID)
-	if(errGrp != nil) {
-		return "Failed to Get Group: " + errGrp.Error(), nil, nil, nil
-	} //end if
+	g := GetGroup(grpID)
 	//--
 
 	//-- Generate a private key from the group. Use the default random number generator.
@@ -176,7 +173,7 @@ func dhKxStep1(grpID int) (string, *DHGroup, *DHKey, []byte) {
 	//--
 
 	//--
-	return "", g, priv, pub
+	return "", &g, priv, pub
 	//--
 
 } //END FUNCTION

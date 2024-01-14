@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -74,6 +74,8 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 		} else { // ALL OTHER CASES
 			if(StrIPos(theMsg, "[OK]") == 0) {
 				theMsg = color.HiGreenString(theMsg)
+			} else if(StrIPos(theMsg, "[PANIC]") == 0) {
+				theMsg = color.WhiteString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
 			} else { // message
 				theMsg = color.HiCyanString(theMsg)
 			} //end if else

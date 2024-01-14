@@ -15,7 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type Handler struct {
@@ -23,8 +22,6 @@ type Handler struct {
 	Prefix string
 	// FileSystem is the virtual file system.
 	FileSystem FileSystem
-	// LockSystem is the lock management system.
-	LockSystem LockSystem
 	// Logger is an optional error logger. If non-nil, it will be called
 	// for all HTTP requests.
 	Logger func(*http.Request, error)
@@ -40,6 +37,16 @@ func (h *Handler) stripPrefix(p string) (string, int, error) {
 	return p, http.StatusNotFound, errPrefixMismatch
 }
 
+//---- from: lock.go
+// Condition can match a WebDAV resource, based on a token or ETag.
+// Exactly one of Token and ETag should be non-empty.
+type Condition struct {
+	Not   bool
+	Token string
+	ETag  string
+}
+//----
+
 //-- unixman
 var useSmartSafeValidPaths bool = false
 //func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -49,8 +56,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, smartSafeVal
 	status, err := http.StatusBadRequest, errUnsupportedMethod
 	if h.FileSystem == nil {
 		status, err = http.StatusInternalServerError, errNoFileSystem
-	} else if h.LockSystem == nil {
-		status, err = http.StatusInternalServerError, errNoLockSystem
 	} else {
 		switch r.Method {
 		case "OPTIONS":
@@ -65,14 +70,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, smartSafeVal
 			status, err = h.handleMkcol(w, r)
 		case "COPY", "MOVE":
 			status, err = h.handleCopyMove(w, r)
-		case "LOCK":
-			status, err = h.handleLock(w, r)
-		case "UNLOCK":
-			status, err = h.handleUnlock(w, r)
 		case "PROPFIND":
 			status, err = h.handlePropfind(w, r)
 		case "PROPPATCH":
 			status, err = h.handleProppatch(w, r)
+		//-- unixman
+		case "LOCK":
+			status = http.StatusNotImplemented
+			err = errNoLockSystem
+		case "UNLOCK":
+			status = http.StatusNotImplemented
+			err = errNoLockSystem
+		//-- #unixman
 		}
 	}
 
@@ -87,92 +96,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, smartSafeVal
 	}
 }
 
-func (h *Handler) lock(now time.Time, root string) (token string, status int, err error) {
-	token, err = h.LockSystem.Create(now, LockDetails{
-		Root:      root,
-		Duration:  infiniteTimeout,
-		ZeroDepth: true,
-	})
-	if err != nil {
-		if err == ErrLocked {
-			return "", StatusLocked, err
-		}
-		return "", http.StatusInternalServerError, err
-	}
-	return token, 0, nil
-}
-
 func (h *Handler) confirmLocks(r *http.Request, src, dst string) (release func(), status int, err error) {
+	//--
 	hdr := r.Header.Get("If")
-	if hdr == "" {
-		// An empty If header means that the client hasn't previously created locks.
-		// Even if this client doesn't care about locks, we still need to check that
-		// the resources aren't locked by another client, so we create temporary
-		// locks that would conflict with another client's locks. These temporary
-		// locks are unlocked at the end of the HTTP request.
-		now, srcToken, dstToken := time.Now(), "", ""
-		if src != "" {
-			srcToken, status, err = h.lock(now, src)
-			if err != nil {
-				return nil, status, err
-			}
+	if(hdr != "") {
+		_, ok := parseIfHeader(hdr)
+		if(!ok) {
+			return nil, http.StatusBadRequest, errInvalidIfHeader
 		}
-		if dst != "" {
-			dstToken, status, err = h.lock(now, dst)
-			if err != nil {
-				if srcToken != "" {
-					h.LockSystem.Unlock(now, srcToken)
-				}
-				return nil, status, err
-			}
-		}
-
-		return func() {
-			if dstToken != "" {
-				h.LockSystem.Unlock(now, dstToken)
-			}
-			if srcToken != "" {
-				h.LockSystem.Unlock(now, srcToken)
-			}
-		}, 0, nil
 	}
-
-	ih, ok := parseIfHeader(hdr)
-	if !ok {
-		return nil, http.StatusBadRequest, errInvalidIfHeader
-	}
-	// ih is a disjunction (OR) of ifLists, so any ifList will do.
-	for _, l := range ih.lists {
-		lsrc := l.resourceTag
-		if lsrc == "" {
-			lsrc = src
-		} else {
-			u, err := url.Parse(lsrc)
-			if err != nil {
-				continue
-			}
-			if u.Host != r.Host {
-				continue
-			}
-			lsrc, status, err = h.stripPrefix(u.Path)
-			if err != nil {
-				return nil, status, err
-			}
-		}
-		release, err = h.LockSystem.Confirm(time.Now(), lsrc, dst, l.conditions...)
-		if err == ErrConfirmationFailed {
-			continue
-		}
-		if err != nil {
-			return nil, http.StatusInternalServerError, err
-		}
-		return release, 0, nil
-	}
-	// Section 10.4.1 says that "If this header is evaluated and all state lists
-	// fail, then the request must fail with a 412 (Precondition Failed) status."
-	// We follow the spec even though the cond_put_corrupt_token test case from
-	// the litmus test warns on seeing a 412 instead of a 423 (Locked).
-	return nil, http.StatusPreconditionFailed, ErrLocked
+	//-- unixman
+	return func(){}, 0, nil
+	//--
 }
 
 func (h *Handler) handleOptions(w http.ResponseWriter, r *http.Request) (status int, err error) {
@@ -181,14 +116,19 @@ func (h *Handler) handleOptions(w http.ResponseWriter, r *http.Request) (status 
 		return status, err
 	}
 	ctx := r.Context()
-	allow := "OPTIONS, LOCK, PUT, MKCOL"
+	//-- unixman
+//	allow := "OPTIONS, LOCK, PUT, MKCOL"
+	allow := "OPTIONS, PROPFIND" // unixman: default
 	if fi, err := h.FileSystem.Stat(ctx, reqPath); err == nil {
 		if fi.IsDir() {
-			allow = "OPTIONS, LOCK, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND"
+//			allow = "OPTIONS, LOCK, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND"
+			allow = "OPTIONS, DELETE, PROPPATCH, COPY, MOVE, PROPFIND, PUT, MKCOL" // unixman: Dir
 		} else {
-			allow = "OPTIONS, LOCK, GET, HEAD, POST, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND, PUT"
+//			allow = "OPTIONS, LOCK, GET, HEAD, POST, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND, PUT"
+			allow = "OPTIONS, DELETE, PROPPATCH, COPY, MOVE, PROPFIND, PUT, GET, HEAD, POST" // unixman: File
 		}
 	}
+	//-- #unixman
 	w.Header().Set("Allow", allow)
 	// http://www.webdav.org/specs/rfc4918.html#dav.compliance.classes
 	w.Header().Set("DAV", "1, 2")
@@ -216,7 +156,8 @@ func (h *Handler) handleGetHeadPost(w http.ResponseWriter, r *http.Request) (sta
 	if fi.IsDir() {
 		return http.StatusMethodNotAllowed, nil
 	}
-	etag, err := findETag(ctx, h.FileSystem, h.LockSystem, reqPath, fi)
+	lks := false // unixman
+	etag, err := findETag(ctx, h.FileSystem, lks, reqPath, fi)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
@@ -272,7 +213,10 @@ func (h *Handler) handlePut(w http.ResponseWriter, r *http.Request) (status int,
 
 	f, err := h.FileSystem.OpenFile(ctx, reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
-		return http.StatusNotFound, err
+		//-- unixman: TODO: create a temporary uuid file, then rename to this one, or have an absolute path like lock registry (better idea)
+	//	return http.StatusNotFound, err
+		return http.StatusUnsupportedMediaType, err
+		//--
 	}
 	_, copyErr := io.Copy(f, r.Body)
 	fi, statErr := f.Stat()
@@ -287,7 +231,8 @@ func (h *Handler) handlePut(w http.ResponseWriter, r *http.Request) (status int,
 	if closeErr != nil {
 		return http.StatusMethodNotAllowed, closeErr
 	}
-	etag, err := findETag(ctx, h.FileSystem, h.LockSystem, reqPath, fi)
+	lks := false // unixman
+	etag, err := findETag(ctx, h.FileSystem, lks, reqPath, fi)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
@@ -398,123 +343,6 @@ func (h *Handler) handleCopyMove(w http.ResponseWriter, r *http.Request) (status
 	return moveFiles(ctx, h.FileSystem, src, dst, r.Header.Get("Overwrite") == "T")
 }
 
-func (h *Handler) handleLock(w http.ResponseWriter, r *http.Request) (retStatus int, retErr error) {
-	duration, err := parseTimeout(r.Header.Get("Timeout"))
-	if err != nil {
-		return http.StatusBadRequest, err
-	}
-	li, status, err := readLockInfo(r.Body)
-	if err != nil {
-		return status, err
-	}
-
-	ctx := r.Context()
-	token, ld, now, created := "", LockDetails{}, time.Now(), false
-	if li == (lockInfo{}) {
-		// An empty lockInfo means to refresh the lock.
-		ih, ok := parseIfHeader(r.Header.Get("If"))
-		if !ok {
-			return http.StatusBadRequest, errInvalidIfHeader
-		}
-		if len(ih.lists) == 1 && len(ih.lists[0].conditions) == 1 {
-			token = ih.lists[0].conditions[0].Token
-		}
-		if token == "" {
-			return http.StatusBadRequest, errInvalidLockToken
-		}
-		ld, err = h.LockSystem.Refresh(now, token, duration)
-		if err != nil {
-			if err == ErrNoSuchLock {
-				return http.StatusPreconditionFailed, err
-			}
-			return http.StatusInternalServerError, err
-		}
-
-	} else {
-		// Section 9.10.3 says that "If no Depth header is submitted on a LOCK request,
-		// then the request MUST act as if a "Depth:infinity" had been submitted."
-		depth := infiniteDepth
-		if hdr := r.Header.Get("Depth"); hdr != "" {
-			depth = parseDepth(hdr)
-			if depth != 0 && depth != infiniteDepth {
-				// Section 9.10.3 says that "Values other than 0 or infinity must not be
-				// used with the Depth header on a LOCK method".
-				return http.StatusBadRequest, errInvalidDepth
-			}
-		}
-		reqPath, status, err := h.stripPrefix(r.URL.Path)
-		if err != nil {
-			return status, err
-		}
-		ld = LockDetails{
-			Root:      reqPath,
-			Duration:  duration,
-			OwnerXML:  li.Owner.InnerXML,
-			ZeroDepth: depth == 0,
-		}
-		token, err = h.LockSystem.Create(now, ld)
-		if err != nil {
-			if err == ErrLocked {
-				return StatusLocked, err
-			}
-			return http.StatusInternalServerError, err
-		}
-		defer func() {
-			if retErr != nil {
-				h.LockSystem.Unlock(now, token)
-			}
-		}()
-
-		// Create the resource if it didn't previously exist.
-		if _, err := h.FileSystem.Stat(ctx, reqPath); err != nil {
-			f, err := h.FileSystem.OpenFile(ctx, reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-			if err != nil {
-				// TODO: detect missing intermediate dirs and return http.StatusConflict?
-				return http.StatusInternalServerError, err
-			}
-			f.Close()
-			created = true
-		}
-
-		// http://www.webdav.org/specs/rfc4918.html#HEADER_Lock-Token says that the
-		// Lock-Token value is a Coded-URL. We add angle brackets.
-		w.Header().Set("Lock-Token", "<"+token+">")
-	}
-
-	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-	if created {
-		// This is "w.WriteHeader(http.StatusCreated)" and not "return
-		// http.StatusCreated, nil" because we write our own (XML) response to w
-		// and Handler.ServeHTTP would otherwise write "Created".
-		w.WriteHeader(http.StatusCreated)
-	}
-	writeLockInfo(w, token, ld)
-	return 0, nil
-}
-
-func (h *Handler) handleUnlock(w http.ResponseWriter, r *http.Request) (status int, err error) {
-	// http://www.webdav.org/specs/rfc4918.html#HEADER_Lock-Token says that the
-	// Lock-Token value is a Coded-URL. We strip its angle brackets.
-	t := r.Header.Get("Lock-Token")
-	if len(t) < 2 || t[0] != '<' || t[len(t)-1] != '>' {
-		return http.StatusBadRequest, errInvalidLockToken
-	}
-	t = t[1 : len(t)-1]
-
-	switch err = h.LockSystem.Unlock(time.Now(), t); err {
-	case nil:
-		return http.StatusNoContent, err
-	case ErrForbidden:
-		return http.StatusForbidden, err
-	case ErrLocked:
-		return StatusLocked, err
-	case ErrNoSuchLock:
-		return http.StatusConflict, err
-	default:
-		return http.StatusInternalServerError, err
-	}
-}
-
 func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status int, err error) {
 	reqPath, status, err := h.stripPrefix(r.URL.Path)
 	if err != nil {
@@ -548,8 +376,10 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status
 		}
 
 		var pstats []Propstat
+		lks := false // unixman
 		if pf.Propname != nil {
-			pnames, err := propnames(ctx, h.FileSystem, h.LockSystem, reqPath)
+			lks := false // unixman
+			pnames, err := propnames(ctx, h.FileSystem, lks, reqPath)
 			if err != nil {
 				return handlePropfindError(err, info)
 			}
@@ -559,9 +389,9 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status
 			}
 			pstats = append(pstats, pstat)
 		} else if pf.Allprop != nil {
-			pstats, err = allprop(ctx, h.FileSystem, h.LockSystem, reqPath, pf.Prop)
+			pstats, err = allprop(ctx, h.FileSystem, lks, reqPath, pf.Prop)
 		} else {
-			pstats, err = props(ctx, h.FileSystem, h.LockSystem, reqPath, pf.Prop)
+			pstats, err = props(ctx, h.FileSystem, lks, reqPath, pf.Prop)
 		}
 		if err != nil {
 			return handlePropfindError(err, info)
@@ -607,7 +437,8 @@ func (h *Handler) handleProppatch(w http.ResponseWriter, r *http.Request) (statu
 	if err != nil {
 		return status, err
 	}
-	pstats, err := patch(ctx, h.FileSystem, h.LockSystem, reqPath, patches)
+	lks := false // unixman
+	pstats, err := patch(ctx, h.FileSystem, lks, reqPath, patches)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}

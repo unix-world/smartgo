@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -1659,6 +1659,90 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 //-----
 
 
+func ThreefishEncryptTwofishBlowfishCBC(str string, key string, useArgon2id bool) string {
+	//-- safety
+	defer PanicHandler()
+	//-- check
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	sign3F := SIGNATURE_3FISH_1K_V1_DEFAULT
+	sign3xF := SIGNATURE_3FISH_1K_V1_2FBF_D
+	if(useArgon2id) {
+		sign3F = SIGNATURE_3FISH_1K_V1_ARGON2ID
+		sign3xF = SIGNATURE_3FISH_1K_V1_2FBF_A
+	} //end if
+	//--
+	str = StrTrimWhitespaces(TwofishEncryptBlowfishCBC(str, key))
+	if((str == "") || (!StrStartsWith(str, SIGNATURE_2FISH_V1_BF_DEFAULT)) || (len(str) <= len(SIGNATURE_2FISH_V1_BF_DEFAULT))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to BF Pre-Encrypt Data")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(StrSubstr(str, len(SIGNATURE_2FISH_V1_BF_DEFAULT), -1))
+	if(str == "") {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to Separe BF Encrypted Data")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(ThreefishEncryptCBC(DataRRot13(str), key, useArgon2id))
+	if((str == "") || (!StrStartsWith(str, sign3F)) || (len(str) <= len(sign3F))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to TF Encrypt Data")
+		return ""
+	} //end if
+	str = StrTrimWhitespaces(StrSubstr(str, len(sign3F), -1))
+	if(str == "") {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to Separe TF Encrypted Data")
+		return ""
+	} //end if
+	//--
+	return sign3xF + str
+	//--
+} //END FUNCTION
+
+
+func ThreefishDecryptTwofishBlowfishCBC(str string, key string, useArgon2id bool) string {
+	//-- safety
+	defer PanicHandler()
+	//-- check
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	sign3F := SIGNATURE_3FISH_1K_V1_DEFAULT
+	sign3xF := SIGNATURE_3FISH_1K_V1_2FBF_D
+	if(useArgon2id) {
+		sign3F = SIGNATURE_3FISH_1K_V1_ARGON2ID
+		sign3xF = SIGNATURE_3FISH_1K_V1_2FBF_A
+	} //end if
+	//--
+	if((!StrStartsWith(str, sign3xF)) || (len(str) <= len(sign3xF))) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Wrong Signature provided")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(StrSubstr(str, len(sign3xF), -1))
+	if(str == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Data After Signature")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(ThreefishDecryptCBC(sign3F + str, key, useArgon2id))
+	if(str == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Data After TF Decrypt")
+		return ""
+	} //end if
+	//--
+	return TwofishDecryptBlowfishCBC(SIGNATURE_2FISH_V1_BF_DEFAULT + DataRRot13(str), key)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func twofishSafeKeyIv(plainTextKey string) (string, string) { // {{{SYNC-CRYPTO-KEY-DERIVE}}} [PHP] ; v3
 	//--
 	var key string = StrTrimWhitespaces(plainTextKey) // {{{SYNC-CRYPTO-KEY-TRIM}}}
@@ -1855,6 +1939,76 @@ func TwofishDecryptCBC(str string, key string) string {
 	} //end if
 	//--
 	return decrypted
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func TwofishEncryptBlowfishCBC(str string, key string) string {
+	//-- safety
+	defer PanicHandler()
+	//-- check
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(BlowfishEncryptCBC(str, key))
+	if((str == "") || (!StrStartsWith(str, SIGNATURE_BFISH_V3)) || (len(str) <= len(SIGNATURE_BFISH_V3))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to BF Pre-Encrypt Data")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(StrSubstr(str, len(SIGNATURE_BFISH_V3), -1))
+	if(str == "") {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to Separe BF Encrypted Data")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(TwofishEncryptCBC(DataRRot13(str), key))
+	if((str == "") || (!StrStartsWith(str, SIGNATURE_2FISH_V1_DEFAULT)) || (len(str) <= len(SIGNATURE_2FISH_V1_DEFAULT))) {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to TF Encrypt Data")
+		return ""
+	} //end if
+	str = StrTrimWhitespaces(StrSubstr(str, len(SIGNATURE_2FISH_V1_DEFAULT), -1))
+	if(str == "") {
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to Separe TF Encrypted Data")
+		return ""
+	} //end if
+	//--
+	return SIGNATURE_2FISH_V1_BF_DEFAULT + str
+	//--
+} //END FUNCTION
+
+
+func TwofishDecryptBlowfishCBC(str string, key string) string {
+	//-- safety
+	defer PanicHandler()
+	//-- check
+	str = StrTrimWhitespaces(str)
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	if((!StrStartsWith(str, SIGNATURE_2FISH_V1_BF_DEFAULT)) || (len(str) <= len(SIGNATURE_2FISH_V1_BF_DEFAULT))) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Wrong Signature provided")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(StrSubstr(str, len(SIGNATURE_2FISH_V1_BF_DEFAULT), -1))
+	if(str == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Data After Signature")
+		return ""
+	} //end if
+	//--
+	str = StrTrimWhitespaces(TwofishDecryptCBC(SIGNATURE_2FISH_V1_DEFAULT + str, key))
+	if(str == "") {
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Empty Data After TF Decrypt")
+		return ""
+	} //end if
+	//--
+	return BlowfishDecryptCBC(SIGNATURE_BFISH_V3 + DataRRot13(str), key)
 	//--
 } //END FUNCTION
 

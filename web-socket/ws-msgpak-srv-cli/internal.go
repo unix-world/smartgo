@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Internal :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20240112.1858"
+	VERSION string = "r.20240114.2007"
 
 	CERTIFICATES_DEFAULT_PATH string = "./ssl"
 	CERTIFICATE_PEM_CRT string = "cert.crt"

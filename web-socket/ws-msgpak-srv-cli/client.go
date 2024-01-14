@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Client :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -285,6 +285,7 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 		//--
 		socketPrefix := "ws://"
 		socketSuffix := "/msgpak"
+		tlsCfgCli := smarthttputils.TlsConfigClient(false, "")
 		var theWebSocket websocket.Dialer
 		if(tlsMode == "tls:server") {
 			socketPrefix = "wss://"
@@ -298,23 +299,26 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 			} //end if
 			log.Println("Initializing Client:", socketPrefix + addr + socketSuffix, "@", "HTTPS/WsMux/TLS:WithServerCertificate")
 			log.Println("[NOTICE] Server Certificates Path:", certifPath)
+			tlsCfgCli = smarthttputils.TlsConfigClient(false, smart.StrTrimWhitespaces(string(crt)) + "\n" + smart.StrTrimWhitespaces(string(key)))
 			theWebSocket = websocket.Dialer{
 				HandshakeTimeout: time.Duration(HANDSHAKE_TIMEOUT_SECONDS) * time.Second,
-				TLSClientConfig: smarthttputils.TlsConfigClient(false, smart.StrTrimWhitespaces(string(crt)) + "\n" + smart.StrTrimWhitespaces(string(key))),
+				TLSClientConfig: &tlsCfgCli,
 			}
 		} else if(tlsMode == "tls:noverify") {
 			socketPrefix = "wss://"
 			log.Println("Initializing Client:", socketPrefix + addr + socketSuffix, "@", "HTTPS/WsMux/TLS:InsecureSkipVerify")
+			tlsCfgCli = smarthttputils.TlsConfigClient(true, "")
 			theWebSocket = websocket.Dialer{
 				HandshakeTimeout: time.Duration(HANDSHAKE_TIMEOUT_SECONDS) * time.Second,
-				TLSClientConfig: smarthttputils.TlsConfigClient(true, ""),
+				TLSClientConfig: &tlsCfgCli,
 			}
 		} else if(tlsMode == "tls") {
 			socketPrefix = "wss://"
 			log.Println("Initializing Client:", socketPrefix + addr + socketSuffix, "@", "HTTPS/WsMux/TLS")
+			tlsCfgCli = smarthttputils.TlsConfigClient(false, "")
 			theWebSocket = websocket.Dialer{
 				HandshakeTimeout: time.Duration(HANDSHAKE_TIMEOUT_SECONDS) * time.Second,
-				TLSClientConfig: smarthttputils.TlsConfigClient(false, ""),
+				TLSClientConfig: &tlsCfgCli,
 			}
 		} else { // insecure
 			log.Println("Initializing Client:", socketPrefix + addr + socketSuffix, "@", "HTTP/WsMux/Insecure")

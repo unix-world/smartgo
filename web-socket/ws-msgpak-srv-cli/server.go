@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -343,7 +343,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			//--
 			//===
 			//--
-			mtxSrvCustomMsgs.Lock() // use just lock for read and writes
+			mtxSrvCustomMsgs.Lock() // use just one lock for read and writes
 			//--
 			log.Println("[DEBUG] ≡≡≡≡≡≡≡ Task Commands Queue Length # Client(s):", len(srvCustomMsgs), "≡≡≡≡≡≡≡")
 			if(DEBUG == true) {
@@ -394,7 +394,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 				if(cacheExists != true) { // send
 					cachedObj.Id = rAddr + "|" + theCacheMsgHash // {{{SYNC-MSGPAK-CACHE-KEY}}}
 					cachedObj.Data = smart.DateNowIsoUtc()
-					memSrvMsgCache.Set(cachedObj, uint64(intervalMsgSeconds * 10)) // support up to 7 ( + 3 free loops) queued messages {{{SYNC-MAX-QUEUED-MSGPAK}}}
+					memSrvMsgCache.Set(cachedObj, int64(intervalMsgSeconds * 10)) // support up to 7 ( + 3 free loops) queued messages {{{SYNC-MAX-QUEUED-MSGPAK}}}
 					if(DEBUG == true) {
 						log.Println("[DEBUG] srvBroadcastMsg: Task Command Cached now (send) for Client `" + rAddr + "` ; Hash: `" + theCacheMsgHash + "`")
 					} //end if

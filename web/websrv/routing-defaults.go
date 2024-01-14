@@ -1,13 +1,12 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
-	"bytes"
 	"net/http"
 
 	smart 			"github.com/unix-world/smartgo"
@@ -35,8 +34,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	} //end if
 	code = 200
 	var headHtml string = ""
-	var serverSignature bytes.Buffer = WSrvSignature()
-	var bodyHtml string = "<h1>" + "Info Page" + "</h1>" + "<h4>" + smart.StrNl2Br(smart.EscapeHtml(serverSignature.String())) + "</h4>"
+	var bodyHtml string = "<h1>" + "Server Info" + "</h1>" + "<h4>" + smart.StrNl2Br(smart.EscapeHtml(TheStrSignature)) + "</h4>"
 	bodyHtml += "Visitor Real-IP [" + smart.EscapeHtml(proxyRealIpKey) + "] is: <b>`" + smart.EscapeHtml(realClientIp) + "`</b> ; Remote-IP (Host:Port) is: " + smart.EscapeHtml("`" + remoteAddr + "`:`" + remotePort + "`") + "<br>"
 	bodyHtml += "Visitor UserAgent: <i>`" + smart.EscapeHtml(smart.GetHttpUserAgentFromRequest(r)) + "`</i>" + "<br>"
 	bodyHtml += "Server Protocol: <b>`" + smart.EscapeHtml(smart.GetHttpProtocolFromRequest(r)) + "`</b>" + "<br>"
@@ -49,6 +47,8 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	bodyHtml += `<hr>`
 	bodyHtml += `<i class="sfi sfi-info sfi-3x"></i>`
 	bodyHtml += `<img src="lib/framework/img/golang-logo.svg" height="64" style="margin-top:-24px; margin-left:12px;">`
+	bodyHtml += "<hr>"
+	bodyHtml += `<div style="font-size:0.75rem; color:#CCCCDD; text-align:right;">&copy; 2023-` + smart.EscapeHtml(GetCurrentYear()) + ` unix-world.org</div>`
 	content = srvassets.HtmlServerTemplate(TheStrSignature, headHtml, bodyHtml)
 	contentFileName = "index.html"
 	//-- optionals
@@ -71,8 +71,7 @@ var RouteHandlerStatusPage HttpHandlerFunc = func(r *http.Request, headPath stri
 	defer smart.PanicHandler() // safe recovery handler
 	code = 202
 	var headHtml string = "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
-	var serverSignature bytes.Buffer = WSrvSignature()
-	var bodyHtml string = `<div class="status"><img alt="Status: Up and Running ..." title="Status: Up and Running ..." width="64" height="64" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(serverSignature.String()) + "</pre>" + "\n" + "</div>"
+	var bodyHtml string = `<div class="status"><img alt="status:svg" title="Service Status: Up and Running ..." width="48" height="48" src="data:image/svg+xml,` + smart.EscapeHtml(smart.EscapeUrl(assets.ReadWebAsset("lib/framework/img/loading-spin.svg"))) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + smart.EscapeHtml(TheStrSignature) + "</pre>" + "\n" + "</div>"
 	content = assets.HtmlStandaloneTemplate(TheStrSignature, headHtml, bodyHtml)
 	contentFileName = "status.html"
 	//-- optionals
@@ -93,8 +92,7 @@ var RouteHandlerVersionPage HttpHandlerFunc = func(r *http.Request, headPath str
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	code = 203
-	ver := versionStruct{}
-	ver.Version = TheStrSignature
+	ver := versionStruct{Version:TheStrSignature, Copyright:SIGNATURE}
 	content = smart.JsonNoErrChkEncode(ver, false, false)
 	contentFileName = "version.json"
 	//-- optionals

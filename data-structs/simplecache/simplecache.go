@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Simple Cache (in-Memory) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240106.2368 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // inspired from: forPelevin/go-cache/main/local.go # license: (golang, default) Apache
 
@@ -13,12 +13,14 @@ import (
 
 	"sync"
 	"time"
+
+	"strings"
 )
 
 //-----
 
 const (
-	VERSION string = "r.20240106.2368"
+	VERSION string = "r.20240114.2007"
 
 	LOG_INTERVAL_SEC uint16 = 60 // log every 60 seconds
 )
@@ -26,9 +28,9 @@ const (
 //-----
 
 type CacheEntry struct {
-	Id    string `json:"id"`
-	Data  string `json:"data"`
-	Obj   interface{} // any ; this field cannot be exported to JSON, is intended for internal Go Objects
+	Id    string      `json:"id"`
+	Data  string      `json:"data"`
+	Obj   interface{} `json:"-"` // any ; this field should not be exported to JSON, it is intended to store internal specific Go Objects
 }
 
 type cEntry struct {
@@ -155,6 +157,11 @@ func (lc *InMemCache) GetSize() int {
 
 func (lc *InMemCache) Unset(id string) bool {
 	//--
+	id = strings.TrimSpace(id)
+	if(id == "") {
+		return false
+	} //end if
+	//--
 	lc.mu.Lock()
 	defer lc.mu.Unlock()
 	//--
@@ -170,11 +177,16 @@ func (lc *InMemCache) Unset(id string) bool {
 
 //-----
 
-func (lc *InMemCache) Set(o CacheEntry, expirationInSecondsFromNow uint64) bool {
+func (lc *InMemCache) Set(o CacheEntry, expirationInSecondsFromNow int64) bool {
+	//--
+	o.Id = strings.TrimSpace(o.Id)
+	if(o.Id == "") {
+		return false
+	} //end if
 	//--
 	var expTime int64 = 0
 	if(expirationInSecondsFromNow > 0) {
-		expTime = time.Now().UTC().Unix() + int64(expirationInSecondsFromNow)
+		expTime = time.Now().UTC().Unix() + expirationInSecondsFromNow
 	} //end if
 	//--
 	lc.mu.Lock()
@@ -196,7 +208,54 @@ func (lc *InMemCache) Set(o CacheEntry, expirationInSecondsFromNow uint64) bool 
 
 //-----
 
+func (lc *InMemCache) SetExpiration(id string, expirationInSecondsFromNow int64) bool {
+	//--
+	id = strings.TrimSpace(id)
+	if(id == "") {
+		return false
+	} //end if
+	//--
+	if(expirationInSecondsFromNow < 0) {
+		if(lc.debug == true) {
+			log.Println("[DEBUG] InMemCache [" + lc.name + "] :: SetExpire: `" + id + "` Negative Expiration, FAIL:", expirationInSecondsFromNow)
+		} //end if
+		return false
+	} //end if
+	//--
+	lc.mu.Lock()
+	defer lc.mu.Unlock()
+	//--
+	cu, ok := lc.objects[id]
+	if(!ok) {
+		if(lc.debug == true) {
+			log.Println("[DEBUG] InMemCache [" + lc.name + "] :: SetExpire: `" + id + "` N/A")
+		} //end if
+		return false
+	} //end if
+	//--
+	var expTime int64 = 0
+	if(expirationInSecondsFromNow > 0) {
+		expTime = time.Now().UTC().Unix() + expirationInSecondsFromNow
+	} //end if
+	//--
+	cu.expireAtTimestamp = expTime
+	lc.objects[id] = cu
+	if(lc.debug == true) {
+		log.Println("[DEBUG] InMemCache [" + lc.name + "] :: SetExpire: `" + id + "` OK:", cu.expireAtTimestamp)
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+//-----
+
 func (lc *InMemCache) Get(id string) (found bool, o CacheEntry, expTimeStamp int64) {
+	//--
+	id = strings.TrimSpace(id)
+	if(id == "") {
+		return false, CacheEntry{}, -1
+	} //end if
 	//--
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
@@ -212,6 +271,7 @@ func (lc *InMemCache) Get(id string) (found bool, o CacheEntry, expTimeStamp int
 	if(lc.debug == true) {
 		log.Println("[DEBUG] InMemCache [" + lc.name + "] :: Get: `" + id + "` OK")
 	} //end if
+	//--
 	return true, cu.CacheEntry, cu.expireAtTimestamp
 	//--
 } //END FUNCTION

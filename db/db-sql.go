@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -91,7 +91,7 @@ type DbSqlConnector struct {
 // 		* RegisterFunc()
 // 		* support DSN: file:test.db?cache=shared&mode=memory ; file::memory: ; :memory:
 
-func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) {
+func NewSqlDb(dbType string, dbUrl string, debug bool) (DbSqlConnector, error) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -101,32 +101,34 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) 
 	//--
 	dbUrl = smart.StrTrimWhitespaces(dbUrl)
 	//--
+	emtyDbConn := DbSqlConnector{}
+	//--
 	switch(dbType) {
 		case DB_SQL_TYPE_SQLITE: // showld allow absolute paths, ex: desktop apps with a path from config
 			if(dbUrl == "") {
-				return nil, smart.NewError("Empty DB Connection String. Must be as `dir/db.sqlite` (relative path) or as `/dir/db.sqlite` (absolute path)")
+				return emtyDbConn, smart.NewError("Empty DB Connection String. Must be as `dir/db.sqlite` (relative path) or as `/dir/db.sqlite` (absolute path)")
 			} //end if
 			if(smart.StrStartsWith(dbUrl, ".")) {
-				return nil, smart.NewError("Invalid DB Connection URL Path Prefix (Must NOT start with a dot): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path Prefix (Must NOT start with a dot): " + dbUrl)
 			} //end if
 			if(smart.StrContains(dbUrl, "://")) {
-				return nil, smart.NewError("Invalid DB Connection URL Path Prefix (Must NOT start with ://): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path Prefix (Must NOT start with ://): " + dbUrl)
 			} //end if
 			if(len(dbUrl) > 255) {
-				return nil, smart.NewError("Invalid DB Connection URL Suffix (Must have max 255 characters): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Suffix (Must have max 255 characters): " + dbUrl)
 			} //end if
 			testPath := strings.NewReplacer("/", "", "\\", "", ":", "")
 			if(len(smart.StrTrimWhitespaces(testPath.Replace(dbUrl))) < 10) { // {{{SYNC-DB-SQLITE-FNAME-MIN-LEN}}} ; expected: extension + 3 letters prefix
-				return nil, smart.NewError("Invalid DB Connection URL Path (Must have at least 8 characters, ex: `abc.sqlite`): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path (Must have at least 8 characters, ex: `abc.sqlite`): " + dbUrl)
 			} //end if
 			if(smart.PathIsEmptyOrRoot(dbUrl)) {
-				return nil, smart.NewError("Invalid DB Connection URL Path (Empty or Root): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path (Empty or Root): " + dbUrl)
 			} //end if
 			if(smart.PathIsBackwardUnsafe(dbUrl)) {
-				return nil, smart.NewError("Invalid DB Connection URL Path (Backward Unsafe): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path (Backward Unsafe): " + dbUrl)
 			} //end if
 			if(!smart.PathIsSafeValidSafePath(dbUrl)) {
-				return nil, smart.NewError("Invalid DB Connection URL Path (Must contain only SafePath/Restricted Characters): " + dbUrl)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path (Must contain only SafePath/Restricted Characters): " + dbUrl)
 			} //end if
 			dir  := smart.StrTrimWhitespaces(smart.PathDirName(dbUrl))
 			file := smart.StrTrimLeft(smart.StrTrimWhitespaces(smart.PathBaseName(dbUrl)), ".")
@@ -135,10 +137,10 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) 
 				smart.PathIsEmptyOrRoot(dir) ||
 				smart.PathIsBackwardUnsafe(dir) ||
 				(!smart.PathIsSafeValidSafePath(dir))) {
-					return nil, smart.NewError("Invalid DB Connection URL Path Dir: " + dir)
+					return emtyDbConn, smart.NewError("Invalid DB Connection URL Path Dir: " + dir)
 			} //end if
 			if(smart.PathIsFile(dir)) {
-				return nil, smart.NewError("Invalid DB Connection URL Path: It points to an existing File: " + dir)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path: It points to an existing File: " + dir)
 			} //end if
 			dir = smart.PathAddDirLastSlash(dir)
 			if(
@@ -146,32 +148,32 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) 
 				smart.PathIsEmptyOrRoot(dir) ||
 				smart.PathIsBackwardUnsafe(dir) ||
 				(!smart.PathIsSafeValidSafePath(dir))) {
-					return nil, smart.NewError("Invalid DB Connection URL Path with Trailing Slash: " + dir)
+					return emtyDbConn, smart.NewError("Invalid DB Connection URL Path with Trailing Slash: " + dir)
 			} //end if
 			if(len(file) < 10) { // {{{SYNC-DB-SQLITE-FNAME-MIN-LEN}}}
-				return nil, smart.NewError("Invalid DB Connection URL File Name Length (must be at least 10 characters): " + file)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Length (must be at least 10 characters): " + file)
 			} //end if
 			if(smart.StrStartsWith(file, ".")) {
-				return nil, smart.NewError("Invalid DB Connection URL File Name Prefix (Must NOT start with a dot): " + file)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Prefix (Must NOT start with a dot): " + file)
 			} //end if
 			if(!smart.StrEndsWith(file, ".sqlite")) {
-				return nil, smart.NewError("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
 			} //end if
 			if(!smart.PathIsSafeValidSafeFileName(file)) {
-				return nil, smart.NewError("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Extension (Must end with .sqlite): " + file)
 			} //end if
 			safePath := dir + file
 			if(!smart.PathIsSafeValidSafePath(safePath)) {
-				return nil, smart.NewError("Invalid DB Connection URL Canonicalized Path: " + safePath)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Canonicalized Path: " + safePath)
 			} //end if
 			if(smart.PathIsDir(safePath)) {
-				return nil, smart.NewError("Invalid DB Connection URL Path: It points to an existing Directory: " + safePath)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL Path: It points to an existing Directory: " + safePath)
 			} //end if
 			if(!smart.PathExists(dir)) {
 				log.Println("[NOTICE]", NAME, smart.CurrentFunctionName(), "DB Dir does not exists, will try to create it:", dir)
 				okDir, errDir := smart.SafePathDirCreate(dir, true, true) // recursive, allow absolute
 				if((okDir != true) || (errDir != nil)) {
-					return nil, smart.NewError("Failed to Create the DB Directory: " + dir)
+					return emtyDbConn, smart.NewError("Failed to Create the DB Directory: " + dir)
 				} //end if
 				if(smart.PathExists(dir)) {
 					log.Println("[INFO]", NAME, smart.CurrentFunctionName(), "DB Dir created:", dir)
@@ -180,11 +182,11 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) 
 				} //end if
 			} //end if
 			if(!smart.PathExists(dir)) {
-				return nil, smart.NewError("The DB Directory cannot be found: " + dir)
+				return emtyDbConn, smart.NewError("The DB Directory cannot be found: " + dir)
 			} //end if
 			dbUrl = safePath
 			if(smart.PathIsDir(dbUrl)) {
-				return nil, smart.NewError("The DB Safe File points to an existing Directory: " + dbUrl)
+				return emtyDbConn, smart.NewError("The DB Safe File points to an existing Directory: " + dbUrl)
 			} //end if
 			if(!smart.PathExists(dbUrl)) {
 				log.Println("[NOTICE]", NAME, smart.CurrentFunctionName(), "DB File does not exists, will be initialized on first connection:", dbUrl)
@@ -193,19 +195,19 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (*DbSqlConnector, error) 
 			break
 		case DB_SQL_TYPE_PGSQL:
 			if((dbUrl == "") || (!smart.StrStartsWith(dbUrl, "postgres://"))) {
-				return nil, smart.NewError("PostgreSQL Connection String is empty or invalid, must be such as (example): `postgres://user:pass@host:port/db_name?sslmode=disable` and is: `" + dbUrl + "")
+				return emtyDbConn, smart.NewError("PostgreSQL Connection String is empty or invalid, must be such as (example): `postgres://user:pass@host:port/db_name?sslmode=disable` and is: `" + dbUrl + "")
 			} //end if
 			break
 		case DB_SQL_TYPE_MYSQL:
 			if((dbUrl == "") || (!smart.StrContains(dbUrl, "multiStatements=true"))) {
-				return nil, smart.NewError("MySQL Connection String is empty or invalid, must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
+				return emtyDbConn, smart.NewError("MySQL Connection String is empty or invalid, must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
 			} //end if
 			break
 		default:
-			return nil, smart.NewError("Invalid DB Type: `" + dbType + "`")
+			return emtyDbConn, smart.NewError("Invalid DB Type: `" + dbType + "`")
 	} //end switch
 	//--
-	conn := &DbSqlConnector{
+	conn := DbSqlConnector{
 		dbType: dbType,
 		dbUrl:  dbUrl,
 		dbConn: nil,

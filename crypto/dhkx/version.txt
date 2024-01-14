@@ -7,5 +7,5 @@ github.com/monnand/dhkx
 # refactored by unixman as:
 github.com/unix-world/smartgo/dhkx
 
-# modified by unixman
+# modified by unixman r.20240112.1858
 

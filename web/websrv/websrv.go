@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"bytes"
 
 	"net/http"
 
@@ -19,11 +18,10 @@ import (
 	assets 			"github.com/unix-world/smartgo/web/assets/web-assets"
 	srvassets 		"github.com/unix-world/smartgo/web/assets/srv-assets"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
-	webdav 			"github.com/unix-world/smartgo/web/webdav" // a modified version of [golang.org / x / net / webdav]: added extra path security checks
 )
 
 const (
-	VERSION string = "r.20240112.1858"
+	VERSION string = "r.20240114.2007"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1"
@@ -32,6 +30,7 @@ const (
 	WEB_PUBLIC_RELATIVE_ROOT_PATH string = "./web-public/"
 	DEFAULT_DIRECTORY_INDEX_HTML string = "index.html"
 
+	DAV_PUBLIC_SAFETY_FILE string = "./webdav-allow-public-no-auth"
 	DAV_STORAGE_RELATIVE_ROOT_PATH  string = "./webdav" // do not add trailing slash
 	DAV_URL_PATH string = "webdav"
 
@@ -49,16 +48,10 @@ const (
 )
 
 const TheStrSignature string = "SmartGO Web Server " + VERSION
-func WSrvSignature() bytes.Buffer {
-	var serverSignature bytes.Buffer
-	serverSignature.WriteString(TheStrSignature + "\n")
-	serverSignature.WriteString(SIGNATURE + "\n")
-	serverSignature.WriteString("\n")
-	return serverSignature
-}
 
 type versionStruct struct {
-	Version string `json:"version"`
+	Version   string `json:"version"`
+	Copyright string `json:"copyright"`
 }
 
 type HttpHandlerFunc func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (code uint16, content string, contentFileName string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string)
@@ -209,7 +202,6 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		webdavOptions = &WebdavRunOptions{Enabled:false, SharedMode:false, SmartSafePaths:false}
 	} //end if
 
-	var wdav *webdav.Handler = nil
 	if(webdavOptions.Enabled == true) {
 		if(isAuthActive == true) {
 			if(webdavOptions.SharedMode == true) {
@@ -218,6 +210,10 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} else {
 			log.Println("[WARNING]", "Web Server: WebDav Service will run as PUBLIC, NO AUTHENTICATION has been Set")
 			webdavOptions.SharedMode = true // this is the only possibility if no auth is enabled !
+			if((!smart.PathExists(DAV_PUBLIC_SAFETY_FILE)) || (!smart.PathIsFile(DAV_PUBLIC_SAFETY_FILE))) {
+				log.Println("[ERROR]", "To allow Running a WebDAV Service as PUBLIC with NO AUTHENTICATION, create this file to confirm: `" + DAV_PUBLIC_SAFETY_FILE + "`")
+				return 1400
+			} //end if
 		} //end if
 		if(webPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}} ; tesh with webPathIsValid() instead of webDirIsValid() because have no trailing slash
 			log.Println("[ERROR]", "Web Server: WebDav Root Path is Invalid:", DAV_STORAGE_RELATIVE_ROOT_PATH)
@@ -227,23 +223,8 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			log.Println("[ERROR]", "Web Server: WebDav Root Path does not Exists or Is Not a Valid Directory:", DAV_STORAGE_RELATIVE_ROOT_PATH)
 			return 1402
 		} //end if
-		wdav = registerWebDavService()
-		if(wdav == nil) {
-			log.Println("[ERROR]", "Web Server: WebDav Service Failed to be Initialized")
-			return 1403
-		} //end if
 		log.Println("Web Server: WebDav Service is ENABLED ::", "SharedMode:", webdavOptions.SharedMode, ";", "SmartSafePaths:", webdavOptions.SmartSafePaths)
 		log.Println("[INFO]", "Web Server WebDAV Serving Path: `" + webDavUrlPath() + "` as: `" + smart.PathGetAbsoluteFromRelative(DAV_STORAGE_RELATIVE_ROOT_PATH) + "`")
-	} //end if
-
-	//-- signature: web
-
-	var serverSignature bytes.Buffer = WSrvSignature()
-
-	if(serveSecure == true) {
-		serverSignature.WriteString("<Secure URL> :: https://" + httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort) + "/" + "\n")
-	} else {
-		serverSignature.WriteString("<URL> :: http://" + httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort) + "/" + "\n")
 	} //end if
 
 	//-- signature: console
@@ -299,12 +280,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//== webDAV
 		if(webdavOptions.Enabled == true) {
 			if((urlPath == webDavUrlPath()) || (smart.StrStartsWith(urlPath, webDavUrlPath()+"/"))) { // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
-				if(wdav == nil) {
-					log.Printf("[SRV] Web Server: Failed to Serve WebDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "400", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-					smarthttputils.HttpStatus500(w, r, "WebDAV Service is N/A: `" + smart.GetHttpPathFromRequest(r) + "`", true)
-					return
-				} //end if
-				webDavHttpHandler(w, r, wdav, webdavOptions.SharedMode, webdavOptions.SmartSafePaths, isAuthActive, allowedIPs, authUser, authPass, customAuthCheck)
+				webDavHttpHandler(w, r, webdavOptions.SharedMode, webdavOptions.SmartSafePaths, isAuthActive, allowedIPs, authUser, authPass, customAuthCheck)
 				return
 			} //end if
 		} //end if

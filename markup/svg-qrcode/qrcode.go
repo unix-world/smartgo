@@ -1,6 +1,12 @@
 // go-qrcode
 // Copyright 2014 Tom Harwood
 
+// QrSVG for GO # r.20240114.2007
+// (c) 2023 unix-world.org
+// License: BSD
+// custom modifications by unixman:
+// 	* return copy not reference of QRCode
+
 /*
 Package qrcode implements a QR Code encoder.
 
@@ -72,7 +78,7 @@ import (
 //
 // To serve over HTTP, remember to send a Content-Type: image/png header.
 func Encode(content string, level RecoveryLevel, size int) ([]byte, error) {
-	var q *QRCode
+	var q QRCode
 
 	q, err := New(content, level)
 
@@ -89,7 +95,7 @@ func Encode(content string, level RecoveryLevel, size int) ([]byte, error) {
 // a larger image is silently written. Negative values for size cause a variable
 // sized image to be written: See the documentation for Image().
 func WriteFile(content string, level RecoveryLevel, size int, filename string) error {
-	var q *QRCode
+	var q QRCode
 
 	q, err := New(content, level)
 
@@ -109,7 +115,7 @@ func WriteFile(content string, level RecoveryLevel, size int, filename string) e
 func WriteColorFile(content string, level RecoveryLevel, size int, background,
 	foreground color.Color, filename string) error {
 
-	var q *QRCode
+	var q QRCode
 
 	q, err := New(content, level)
 
@@ -153,7 +159,7 @@ type QRCode struct {
 //	q, err := qrcode.New("my content", qrcode.Medium)
 //
 // An error occurs if the content is too long.
-func New(content string, level RecoveryLevel) (*QRCode, error) {
+func New(content string, level RecoveryLevel) (QRCode, error) {
 	encoders := []dataEncoderType{dataEncoderType1To9, dataEncoderType10To26,
 		dataEncoderType27To40}
 
@@ -178,12 +184,12 @@ func New(content string, level RecoveryLevel) (*QRCode, error) {
 	}
 
 	if err != nil {
-		return nil, err
+		return QRCode{}, err
 	} else if chosenVersion == nil {
-		return nil, errors.New("content too long to encode")
+		return QRCode{}, errors.New("content too long to encode")
 	}
 
-	q := &QRCode{
+	q := QRCode{
 		Content: content,
 
 		Level:         level,
@@ -206,7 +212,7 @@ func New(content string, level RecoveryLevel) (*QRCode, error) {
 //	q, err := qrcode.NewWithForcedVersion("my content", 25, qrcode.Medium)
 //
 // An error occurs in case of invalid version.
-func NewWithForcedVersion(content string, version int, level RecoveryLevel) (*QRCode, error) {
+func NewWithForcedVersion(content string, version int, level RecoveryLevel) (QRCode, error) {
 	var encoder *dataEncoder
 
 	switch {
@@ -217,30 +223,30 @@ func NewWithForcedVersion(content string, version int, level RecoveryLevel) (*QR
 	case version >= 27 && version <= 40:
 		encoder = newDataEncoder(dataEncoderType27To40)
 	default:
-		return nil, fmt.Errorf("Invalid version %d (expected 1-40 inclusive)", version)
+		return QRCode{}, fmt.Errorf("Invalid version %d (expected 1-40 inclusive)", version)
 	}
 
 	var encoded *bitset.Bitset
 	encoded, err := encoder.encode([]byte(content))
 
 	if err != nil {
-		return nil, err
+		return QRCode{}, err
 	}
 
 	chosenVersion := getQRCodeVersion(level, version)
 
 	if chosenVersion == nil {
-		return nil, errors.New("cannot find QR Code version")
+		return QRCode{}, errors.New("cannot find QR Code version")
 	}
 
 	if encoded.Len() > chosenVersion.numDataBits() {
-		return nil, fmt.Errorf("Cannot encode QR code: content too large for fixed size QR Code version %d (encoded length is %d bits, maximum length is %d bits)",
+		return QRCode{}, fmt.Errorf("Cannot encode QR code: content too large for fixed size QR Code version %d (encoded length is %d bits, maximum length is %d bits)",
 			version,
 			encoded.Len(),
 			chosenVersion.numDataBits())
 	}
 
-	q := &QRCode{
+	q := QRCode{
 		Content: content,
 
 		Level:         level,

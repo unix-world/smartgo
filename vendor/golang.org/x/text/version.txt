@@ -1,4 +1,4 @@
-v.20231213
+v.20240114
 Go 1.18 or later
 
 golang.org/x/text v0.14.0

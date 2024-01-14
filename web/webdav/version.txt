@@ -1,7 +1,8 @@
-v.20240112.1858
+v.20240114.2007
 
 unixman: contains modifications:
 	* added extra path security checks
+	* removed locking system + memFS
 
 Go 1.18 or later
 

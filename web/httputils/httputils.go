@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240112.1858 :: STABLE
+// r.20240114.2007 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -16,7 +16,6 @@ import (
 	"sync"
 
 	"io"
-//	"io/ioutil"
 	"bytes"
 
 	"mime"
@@ -39,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240112.1858"
+	VERSION string = "r.20240114.2007"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -165,11 +164,11 @@ type visitor struct {
 //-----
 
 
-func TlsConfigClient(insecureSkipVerify bool, serverPEM string) *tls.Config {
+func TlsConfigClient(insecureSkipVerify bool, serverPEM string) tls.Config {
 	//--
 	defer smart.PanicHandler()
 	//--
-	cfg := &tls.Config{
+	cfg := tls.Config{
 		InsecureSkipVerify: insecureSkipVerify,
 	}
 	//--
@@ -601,8 +600,10 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		DownloadLocalFileName: "",
 	}
 	//--
+	cliTlsCfg := TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM)
+	//--
 	transport := http.Transport{
-		TLSClientConfig: TlsConfigClient(tlsInsecureSkipVerify, tlsServerPEM),
+		TLSClientConfig: &cliTlsCfg,
 		TLSHandshakeTimeout: time.Duration(HTTP_CLI_TLS_TIMEOUT) * time.Second, // fix for TLS handshake error ; default is 10 seconds
 		DisableKeepAlives: true, // fix ; {{{SYNC-GO-ERR-HTTP-CLI-TOO-MANY-OPEN-FILES}}} : this is a fix for too many open files # this is requires as well as resp.Body.Close() which is handled below
 	}
@@ -1389,11 +1390,11 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 //-----
 
 
-func TlsConfigServer() *tls.Config {
+func TlsConfigServer() tls.Config {
 	//--
 	defer smart.PanicHandler()
 	//--
-	cfg := &tls.Config{
+	cfg := tls.Config{
 		MinVersion: 		tls.VersionTLS12,
 		MaxVersion: 		tls.VersionTLS13,
 		CurvePreferences: 	[]tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -1427,7 +1428,7 @@ func TLSProtoHttpV1Server() map[string]func(*http.Server, *tls.Conn, http.Handle
 //-----
 
 
-func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableGeneralOptionsHandler bool, description string) (*http.ServeMux, *http.Server) {
+func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableGeneralOptionsHandler bool, description string) (*http.ServeMux, http.Server) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -1443,10 +1444,12 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableG
 	//--
 	mux := http.NewServeMux()
 	//--
-	srv := &http.Server{
+	tlsCfgSrv := TlsConfigServer()
+	//--
+	srv := http.Server{
 		Addr: 							srvAddr,
 		Handler: 						mux,
-		TLSConfig: 						TlsConfigServer(),
+		TLSConfig: 						&tlsCfgSrv,
 		ReadTimeout: 					time.Duration(timeoutSec) * time.Second,
 		ReadHeaderTimeout: 				0, // if set to zero, the value of ReadTimeout is used
 		IdleTimeout: 					time.Duration(HTTP_SRV_IDLE_TIMEOUT) * time.Second, // standard
@@ -1524,7 +1527,7 @@ func memRateLimitGetVisitor(ip string, theLimit rate.Limit, theBurst int) *rate.
 		obj.Id = ip
 		obj.Data = smart.CurrentFunctionName() + " [rate limiter]"
 		obj.Obj = xV
-		memRateLimitCache.Set(obj, uint64(theBurst))
+		memRateLimitCache.Set(obj, int64(theBurst))
 		//--
 		return limiter
 		//--
@@ -2355,7 +2358,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	cacheExists, cachedObj, cacheExpTime := memAuthCache.Get(cacheKeyCliIpAddr)
 	if(cacheExists == true) {
 		if((cachedObj.Id == cacheKeyCliIpAddr) && (len(cachedObj.Data) >= int(ICACHEM_FAILS_NUM))) { // allow max 7 invalid attempts then lock for 5 mins ... for this cacheKeyCliIpAddr
-			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(uint32(ICACHEM_EXPIRATION)) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
+			err = "Invalid Login Timeout for Client: `" + cacheKeyCliIpAddr + "` # Lock Timeout: " + smart.ConvertUInt32ToStr(ICACHEM_EXPIRATION) + " seconds / Try again after: " + time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
 			w.Header().Set(HTTP_HEADER_RETRY_AFTER, time.Unix(cacheExpTime, 0).UTC().Format(smart.DATE_TIME_FMT_ISO_STD_GO_EPOCH) + " UTC")
 			HttpStatus429(w, r, err, outputHtml)
 			return smart.NewError(err), aData
@@ -2465,7 +2468,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		} else {
 			cachedObj.Data += "."
 		} //end if
-		memAuthCache.Set(cachedObj, uint64(ICACHEM_EXPIRATION))
+		memAuthCache.Set(cachedObj, int64(ICACHEM_EXPIRATION))
 		log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Set-In-Cache: AUTH.FAILED [" + authRealm + "] for Client: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//--
 		if(smart.AuthBasicIsEnabled() == true) { // show Auth Basic Prompt (Header) ONLY if Auth Basic is Enabled, otherwise does not make sense ...

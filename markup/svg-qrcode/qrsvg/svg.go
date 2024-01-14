@@ -2,7 +2,7 @@ package qrsvg
 
 // based on: github.com/wamuir/svg-qr-code ; go 1.16 @ License: MIT # v.20231205
 
-// QrSVG for GO # r.20231205
+// QrSVG for GO # r.20240114.2007
 // (c) 2023 unix-world.org
 // License: BSD
 // custom modifications by unixman:
@@ -40,7 +40,7 @@ type QR struct {
 	Borderfill  color.Color    // fill color for the border
 	UseDots     bool           // draw using dots or squares
 	Svg         string         // the SVG code
-	qrcode      *qrcode.QRCode // underlying QR Code
+	qrcode      qrcode.QRCode  // underlying QR Code
 }
 
 // SVG is the vector representation of a QR code, as a Go struct.
