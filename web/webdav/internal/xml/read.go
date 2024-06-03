@@ -1,3 +1,8 @@
+
+// SmartGo :: WebDAV / XML :: Read
+// r.20240117.2121 :: STABLE
+// (c) 2024 unix-world.org
+
 // Copyright 2009 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -689,3 +694,5 @@ func (d *Decoder) Skip() error {
 		}
 	}
 }
+
+// #end

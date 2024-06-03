@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240114.2007 :: STABLE
+// r.20240603.2102 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240114.2007"
+	VERSION string = "r.20240603.2102"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -137,6 +137,7 @@ const (
 	HTTP_HEADER_AUTH_AUTHORIZATION string = "authorization"
 	HTTP_HEADER_AUTH_AUTHENTICATE string = "www-authenticate"
 	HTTP_HEADER_VALUE_AUTH_TYPE_BASIC string = "Basic" // keep camel case
+	HTTP_HEADER_VALUE_AUTH_TYPE_BEARER string = "Bearer" // keep camel case
 	//--
 	HTTP_HEADER_DAV_DESTINATION string = "destination"
 	HTTP_HEADER_DAV_OVERWRITE string = "overwrite"
@@ -296,6 +297,24 @@ func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVer
 	var method string = "POST"
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
+	//--
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	//--
+} //END FUNCTION
+
+
+func HttpClientDoRequestPOSTBody(postMime string, postBody string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+	//--
+	var method string = "PUT"
+	var reqArr map[string][]string = map[string][]string{
+		"@put:data":   { postBody },
+		"@put:method": { "POST" },
+		"@put:ctype":  { postMime },
+	}
+	postBody = "" // free mem
+	var upldLocalFilePath string = ""
+	var downloadLocalDirPath string = ""
+	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
 	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
@@ -928,15 +947,21 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	} //end if
 	httpResult.MaxDownloadSize = maxBytesRead
 	//--
-	var useAuth bool = false
+	var useAuth uint8 = smart.HTTP_AUTH_MODE_NONE
 	if(authUsername != "") {
-		useAuth = true
+		if(authUsername == "@TOKEN@") {
+			useAuth = smart.HTTP_AUTH_MODE_TOKEN
+		} else if(authUsername == "@BEARER@") {
+			useAuth = smart.HTTP_AUTH_MODE_BEARER
+		} else {
+			useAuth = smart.HTTP_AUTH_MODE_BASIC
+		} //end if else
 		httpResult.AuthUserName = authUsername
 	} else {
 		httpResult.AuthUserName = ""
 	} //end if else
 	//--
-	if(useAuth == true) {
+	if(useAuth > smart.HTTP_AUTH_MODE_NONE) { // if use auth (any)
 		maxRedirects = 0
 	} else { // safe redirects if 301/302 if no auth/credentials ; min: 0 ; max: 10 ; {{{SYNC-SAFE-HTTP-REDIRECT-POLICY}}}
 		if(maxRedirects < 0) {
@@ -979,6 +1004,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	var patchDataLen int64 = 0
 	var req *http.Request
 	var errReq error
+	var cTypeHdr string = ""
 	//--
 	if(isPost == true) { // POST must have some data to post
 		errData, formData, multipartType = reqArrToHttpFormData(reqArr)
@@ -1033,10 +1059,18 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			blackholePBar = bytes.Buffer{} // free
 			log.Println("[INFO] " + smart.CurrentFunctionName() + ": Upload File [" + httpResult.UploadFileName + "]: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(putDataLen) + ")")
 		} else { // body
+			if(len(reqArr["@put:ctype"]) == 1) {
+				cTypeHdr = reqArr["@put:ctype"][0]
+			} //end if
 			res := bytes.NewBuffer([]byte(reqArr["@put:data"][0]))
 			putDataLen = int64(len(reqArr["@put:data"][0]))
+			if(len(reqArr["@put:method"]) == 1) {
+				if(reqArr["@put:method"][0] == "POST") {
+					method = "POST"
+				} //end if
+			} //end if
 			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": PUT Data ; Size:", putDataLen, "bytes")
+				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Body Data " + method + " ; Size:", putDataLen, "bytes")
 			} //end if
 			ubar = pbar.NewOptions64(
 				putDataLen,
@@ -1082,6 +1116,10 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	} //end if
 	//--
 	req.Header = map[string][]string{} // init, reset
+	cTypeHdr = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(smart.StrToLower(cTypeHdr)))
+	if(cTypeHdr != "") {
+		req.Header.Set(HTTP_HEADER_CONTENT_TYPE, cTypeHdr)
+	} //end if
 	//--
 	var totalSizeCookies int = 0
 	if(ckyArr != nil) {
@@ -1119,7 +1157,15 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		req.Header.Set(HTTP_HEADER_DAV_OVERWRITE, reqArr["@move:overwrite"][0])
 	} //end if
 	//--
-	if(useAuth == true) {
+	if(useAuth == smart.HTTP_AUTH_MODE_TOKEN) { // only for Token Auth
+		if(authPassword != "") {
+			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(authPassword)))
+		} //end if
+	} else if(useAuth == smart.HTTP_AUTH_MODE_BEARER) { // only for Bearer auth
+		if(authPassword != "") {
+			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, HTTP_HEADER_VALUE_AUTH_TYPE_BEARER + " " + smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(authPassword)))
+		} //end if
+	} else if(useAuth == smart.HTTP_AUTH_MODE_BASIC) { // only for Basic auth
 		authHead := HttpClientAuthBasicHeader(authUsername, authPassword)
 		for k, v := range authHead {
 			if(k != "") {
@@ -1428,7 +1474,7 @@ func TLSProtoHttpV1Server() map[string]func(*http.Server, *tls.Conn, http.Handle
 //-----
 
 
-func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableGeneralOptionsHandler bool, description string) (*http.ServeMux, http.Server) {
+func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, allowLargeHeader bool, description string) (*http.ServeMux, http.Server) {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -1446,6 +1492,11 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableG
 	//--
 	tlsCfgSrv := TlsConfigServer()
 	//--
+	var maxBytesHeader int = http.DefaultMaxHeaderBytes // 1MB ; as default in Go ; this should be used for internal networking purposes only, not for public web
+	if(allowLargeHeader == false) {
+		maxBytesHeader = 16384 // limit at 16k (double than standard for web) ; ex: apache / haproxy 8k ; nginx 4k ; iis 16k ; tomcat 48k
+	} //end if
+	//--
 	srv := http.Server{
 		Addr: 							srvAddr,
 		Handler: 						mux,
@@ -1454,7 +1505,7 @@ func HttpMuxServer(srvAddr string, timeoutSec uint32, forceHttpV1 bool, disableG
 		ReadHeaderTimeout: 				0, // if set to zero, the value of ReadTimeout is used
 		IdleTimeout: 					time.Duration(HTTP_SRV_IDLE_TIMEOUT) * time.Second, // standard
 		WriteTimeout: 					time.Duration(timeoutSec) * time.Second,
-		DisableGeneralOptionsHandler:	disableGeneralOptionsHandler,
+		MaxHeaderBytes: 				maxBytesHeader,
 	}
 	//--
 	if(forceHttpV1 == true) {
@@ -2392,11 +2443,11 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 	var pass string = ""
 	var ok bool = false
 	if((smart.AuthBasicIsEnabled() == true) || (smart.AuthBearerIsEnabled() == true)) {
-		authHeader = smart.StrTrimWhitespaces(r.Header.Get("Authorization")) // prefer authorization first
+		authHeader = smart.StrTrimWhitespaces(r.Header.Get(HTTP_HEADER_AUTH_AUTHORIZATION)) // prefer authorization first
 	} //end if
 	//-- order to check: Basic, Bearer, Cookie
 	if(smart.StrTrimWhitespaces(authHeader) != "") {
-		if((smart.AuthBasicIsEnabled() == true) && (smart.StrIStartsWith(authHeader, "Basic "))) { // must be checked first if enabled, because if enabled the Auth Basic Prompt (Header) will be enabled by default
+		if((smart.AuthBasicIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + " "))) { // must be checked first if enabled, because if enabled the Auth Basic Prompt (Header) will be enabled by default
 			httpAuthMode = smart.HTTP_AUTH_MODE_BASIC
 			user, pass, ok = r.BasicAuth() // do not trim password
 			user = smart.StrTrimWhitespaces(user)
@@ -2404,7 +2455,7 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 				ok = false
 			} //end if
 			// DO NOT MANUALLY SET ok TO TRUE, must be preserved as is above comming from r.BasicAuth()
-		} else if((smart.AuthBearerIsEnabled() == true) && (smart.StrIStartsWith(authHeader, "Bearer "))) {
+		} else if((smart.AuthBearerIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_BEARER + " "))) {
 			httpAuthMode = smart.HTTP_AUTH_MODE_BEARER
 			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
 			if(token != "") {
@@ -2476,7 +2527,9 @@ func HttpBasicAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string
 		} //end if
 		HttpStatus401(w, r, "Access to this area requires Authentication", outputHtml)
 		//--
-		log.Printf("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
+		if(user != "") { // log only if non-empty user
+			log.Printf("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: BASIC.AUTH.FAILED [" + authRealm + "] :: UserName: `" + user + "` # [%s %s %s] %s on Host [%s] for RemoteAddress [%s] on Client [%s] with RealClientIP [%s] %s\n", r.Method, r.URL, r.Proto, "401", r.Host, rAddr, ip + ":" + port, realClientIp, " # HTTP Header Key: `" + rawHdrRealIpKey + "` # HTTP Header Value: `" + rawHdrRealIpVal + "`")
+		} //end if
 		//--
 		return smart.NewError(err), aData
 		//--

@@ -1,8 +1,9 @@
-v.20240114.2007
+v.20240117.2121
 
 unixman: contains modifications:
 	* added extra path security checks
 	* removed locking system + memFS
+	* implement global locking system (independent of running instance or running path) to handle different instances (ex: user dirs)
 
 Go 1.18 or later
 

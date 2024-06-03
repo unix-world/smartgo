@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240114.2007 :: STABLE
+// r.20240117.2121 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -881,8 +881,6 @@ func getArrDataFromSQLRows(rows *sql.Rows, hLimit uint64) (arr []map[string]stri
 		return
 	} //end if
 	//--
-	var data map[string]string
-	data = make(map[string]string)
 	var rNum uint64 = 0
 	for rows.Next() {
 		rNum++
@@ -903,6 +901,7 @@ func getArrDataFromSQLRows(rows *sql.Rows, hLimit uint64) (arr []map[string]stri
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Scan Row #", rNum, "::", err)
 			return
 		} //end if
+		data := make(map[string]string)
 		for i, colName := range cols {
 			data[colName] = columns[i]
 		} //end for

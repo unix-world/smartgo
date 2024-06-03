@@ -1,3 +1,8 @@
+
+// SmartGo :: WebDAV
+// r.20240117.2121 :: STABLE
+// (c) 2024 unix-world.org
+
 // Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -15,6 +20,18 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"strconv"
+	"time"
+
+	"log" // unixman
+
+	smart "github.com/unix-world/smartgo" // unixman
+)
+
+const (
+	VERSION string = "v.20240117.2121"
+
+	DEBUG bool = false
 )
 
 type Handler struct {
@@ -22,8 +39,9 @@ type Handler struct {
 	Prefix string
 	// FileSystem is the virtual file system.
 	FileSystem FileSystem
-	// Logger is an optional error logger. If non-nil, it will be called
-	// for all HTTP requests.
+	// LockSystem is the lock management system.
+	LockSys *LockSys
+	// Logger is an optional error logger. If non-nil, it will be called for all HTTP requests.
 	Logger func(*http.Request, error)
 }
 
@@ -48,40 +66,62 @@ type Condition struct {
 //----
 
 //-- unixman
+type loggedResponse struct {
+	http.ResponseWriter
+	status int
+}
+func (l *loggedResponse) WriteHeader(status int) { // capture write status header
+	l.status = status
+	l.ResponseWriter.WriteHeader(status)
+}
 var useSmartSafeValidPaths bool = false
 //func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, smartSafeValidPaths bool) {
+func (h *Handler) ServeHTTP(ww http.ResponseWriter, r *http.Request, smartSafeValidPaths bool) {
+	w := &loggedResponse{ResponseWriter: ww, status:200}
 	useSmartSafeValidPaths = smartSafeValidPaths
 //-- #unixman
 	status, err := http.StatusBadRequest, errUnsupportedMethod
+	if(h.LockSys != nil) {
+		log.Println("[META]", "SmartGo::WebDAV", VERSION, "LockSys: ON")
+	} else {
+		log.Println("[META]", "SmartGo::WebDAV", VERSION, "LockSys: N/A")
+	}
 	if h.FileSystem == nil {
 		status, err = http.StatusInternalServerError, errNoFileSystem
 	} else {
 		switch r.Method {
-		case "OPTIONS":
-			status, err = h.handleOptions(w, r)
-		case "GET", "HEAD", "POST":
-			status, err = h.handleGetHeadPost(w, r)
-		case "DELETE":
-			status, err = h.handleDelete(w, r)
-		case "PUT":
-			status, err = h.handlePut(w, r)
-		case "MKCOL":
-			status, err = h.handleMkcol(w, r)
-		case "COPY", "MOVE":
-			status, err = h.handleCopyMove(w, r)
-		case "PROPFIND":
-			status, err = h.handlePropfind(w, r)
-		case "PROPPATCH":
-			status, err = h.handleProppatch(w, r)
-		//-- unixman
-		case "LOCK":
-			status = http.StatusNotImplemented
-			err = errNoLockSystem
-		case "UNLOCK":
-			status = http.StatusNotImplemented
-			err = errNoLockSystem
-		//-- #unixman
+			case "OPTIONS":
+				status, err = h.handleOptions(w, r)
+				break
+			case "GET", "HEAD", "POST":
+				status, err = h.handleGetHeadPost(w, r)
+				break
+			case "DELETE":
+				status, err = h.handleDelete(w, r)
+				break
+			case "PUT":
+				status, err = h.handlePut(w, r)
+				break
+			case "MKCOL":
+				status, err = h.handleMkcol(w, r)
+				break
+			case "COPY", "MOVE":
+				status, err = h.handleCopyMove(w, r)
+				break
+			case "PROPFIND":
+				status, err = h.handlePropfind(w, r)
+				break
+			case "PROPPATCH":
+				status, err = h.handleProppatch(w, r)
+				break
+			//-- unixman: LOCK/UNLOCK fake support only ; implemented for compatibility with MacOS ; locking is made using flock mechanism provided by filelock package (custom implementation)
+			case "LOCK":
+				status, err = h.handleLock(w, r)
+				break
+			case "UNLOCK":
+				status, err = h.handleUnlock(w, r)
+				break
+			//-- #unixman
 		}
 	}
 
@@ -91,22 +131,214 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, smartSafeVal
 			w.Write([]byte(StatusText(status)))
 		}
 	}
+	if(DEBUG) {
+		errStr := ""
+		if(err != nil) {
+			errStr = "Error: " + err.Error()
+		}
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Status:", w.status, "Method:", r.Method, "Path:", r.URL.Path, errStr)
+	}
 	if h.Logger != nil {
 		h.Logger(r, err)
 	}
 }
 
+
+func (h *Handler) handleLock(w http.ResponseWriter, r *http.Request) (retStatus int, retErr error) { // fake
+	duration, err := parseTimeout(r.Header.Get("Timeout"))
+	if err != nil {
+		return http.StatusBadRequest, err
+	}
+	li, status, err := readLockInfo(r.Body)
+	if err != nil {
+		return status, err
+	}
+
+	var token string = "" // as in PHP
+	var created bool = false
+	ld := LockDetails{}
+
+	if li == (lockInfo{}) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "LockInfo")
+		}
+		// An empty lockInfo means to refresh the lock.
+		ih, ok := parseIfHeader(r.Header.Get("If"))
+		if !ok {
+			return http.StatusBadRequest, errInvalidIfHeader
+		}
+		if len(ih.lists) == 1 && len(ih.lists[0].conditions) == 1 {
+			token = ih.lists[0].conditions[0].Token
+		}
+		if token == "" {
+			return http.StatusBadRequest, errInvalidLockToken
+		}
+		if(h.LockSys != nil) {
+			if(!h.LockSys.Exists(false, token)) { // external lock
+				return http.StatusPreconditionFailed, nil
+			}
+		}
+	} else {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Lock")
+		}
+		// Section 9.10.3 says that "If no Depth header is submitted on a LOCK request,
+		// then the request MUST act as if a "Depth:infinity" had been submitted."
+		depth := infiniteDepth
+		reqPath, status, err := h.stripPrefix(r.URL.Path)
+		if err != nil {
+			return status, err
+		}
+	//	if(li.Owner.InnerXML == "") {
+	//		li.Owner.InnerXML = "default" // TODO: use the auth real user name ? or leave as is ...
+	//	}
+		ld = LockDetails{
+			Root:      reqPath,
+			Duration:  duration,
+			OwnerXML:  li.Owner.InnerXML,
+			ZeroDepth: depth == 0,
+		}
+		if(h.LockSys != nil) {
+			ctx := r.Context()
+			//-- unixman
+			realPath, errRealPath := h.FileSystem.GetRealPath(ctx, reqPath)
+			if(errRealPath != nil) {
+				if(errRealPath == os.ErrInvalid) {
+					errRealPath = nil // fix: avoid logging this kind of path validation errors
+				}
+				return http.StatusUnsupportedMediaType, errRealPath
+			}
+			if(realPath == "") {
+				return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+			}
+			//--
+			t, err := h.LockSys.Lock(false, realPath) // external lock
+			if(err != nil) {
+				return http.StatusPreconditionFailed, err
+			}
+			if(t == "") {
+				return http.StatusInternalServerError, nil
+			}
+			token = t
+		} else {
+			token = FakeLockToken // as in PHP
+		}
+		created = true
+		// http://www.webdav.org/specs/rfc4918.html#HEADER_Lock-Token says that the
+		// Lock-Token value is a Coded-URL. We add angle brackets.
+		w.Header().Set("Lock-Token", "<"+lockTokenScheme+token+">")
+	}
+
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	if created {
+		// This is "w.WriteHeader(http.StatusCreated)" and not "return
+		// http.StatusCreated, nil" because we write our own (XML) response to w
+		// and Handler.ServeHTTP would otherwise write "Created".
+		w.WriteHeader(http.StatusCreated)
+	} else { // fix by unixman, as in PHP
+		w.WriteHeader(http.StatusOK)
+	}
+	writeLockInfo(w, lockTokenScheme+token, ld)
+	return 0, nil // must return zero, status code is written above
+}
+
+
+func (h *Handler) handleUnlock(w http.ResponseWriter, r *http.Request) (status int, err error) { // fake
+	// http://www.webdav.org/specs/rfc4918.html#HEADER_Lock-Token says that the
+	// Lock-Token value is a Coded-URL. We strip its angle brackets.
+	t := r.Header.Get("Lock-Token")
+	if len(t) < 2 || t[0] != '<' || t[len(t)-1] != '>' {
+		return http.StatusBadRequest, errInvalidLockToken
+	}
+	t = t[1 : len(t)-1]
+	t = strings.TrimSpace(t)
+	if(t == "") {
+		return http.StatusBadRequest, errInvalidLockToken
+	}
+	if(h.LockSys != nil) {
+		if(!h.LockSys.Exists(false, t)) { // external lock
+			return http.StatusConflict, errInvalidLockToken
+		}
+		success, err := h.LockSys.Unlock(false, t) // external lock
+		if(err != nil) {
+			return http.StatusPreconditionFailed, err
+		}
+		if(!success) {
+			return http.StatusLocked, nil
+		}
+	} else {
+		if(t != FakeLockToken) {
+			return http.StatusConflict, errInvalidLockToken
+		}
+	}
+	return http.StatusNoContent, nil
+}
+
 func (h *Handler) confirmLocks(r *http.Request, src, dst string) (release func(), status int, err error) {
 	//--
-	hdr := r.Header.Get("If")
+	defer smart.PanicHandler()
+	//--
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Source:", src, "Destination:", dst)
+	}
+	//--
+	release = func(){}
+	//--
+	hdr := r.Header.Get("If") // this is used here just to validate request, for nothing else ...
 	if(hdr != "") {
 		_, ok := parseIfHeader(hdr)
 		if(!ok) {
-			return nil, http.StatusBadRequest, errInvalidIfHeader
+			return release, http.StatusBadRequest, errInvalidIfHeader
 		}
 	}
 	//-- unixman
-	return func(){}, 0, nil
+	if((src == "") && (dst == "")) {
+		return release, http.StatusInternalServerError, errUxmNothingToLock
+	} //end if
+	if(h.LockSys == nil) {
+		return release, 0, nil
+	} //end if
+	//--
+	var tokenSrc string = ""
+	var errSrc error = nil
+	if(src != "") {
+		tokenSrc, errSrc = h.LockSys.Lock(true, src) // internal lock
+		if(errSrc != nil) {
+			return release, http.StatusInternalServerError, errSrc
+		}
+		if(tokenSrc == "") {
+			return release, http.StatusLocked, ErrLocked
+		}
+	}
+	var tokenDst string = ""
+	var errDst error = nil
+	if(dst != "") {
+		release = func(){
+			defer smart.PanicHandler()
+			if(tokenSrc != "") {
+				h.LockSys.Unlock(true, tokenSrc) // internal unlock
+			}
+		}
+		tokenDst, errDst = h.LockSys.Lock(true, dst) // internal lock
+		if(errDst != nil) {
+			return release, http.StatusInternalServerError, errSrc
+		}
+		if(tokenDst == "") {
+			return release, http.StatusLocked, ErrConfirmationFailed
+		}
+	}
+	//--
+	release = func(){
+		defer smart.PanicHandler()
+		if(tokenSrc != "") {
+			h.LockSys.Unlock(true, tokenSrc) // internal unlock
+		}
+		if(tokenDst != "") {
+			h.LockSys.Unlock(true, tokenDst) // internal unlock
+		}
+	}
+	//--
+	return release, 0, nil
 	//--
 }
 
@@ -125,7 +357,7 @@ func (h *Handler) handleOptions(w http.ResponseWriter, r *http.Request) (status 
 			allow = "OPTIONS, DELETE, PROPPATCH, COPY, MOVE, PROPFIND, PUT, MKCOL" // unixman: Dir
 		} else {
 //			allow = "OPTIONS, LOCK, GET, HEAD, POST, DELETE, PROPPATCH, COPY, MOVE, UNLOCK, PROPFIND, PUT"
-			allow = "OPTIONS, DELETE, PROPPATCH, COPY, MOVE, PROPFIND, PUT, GET, HEAD, POST" // unixman: File
+			allow = "OPTIONS, DELETE, PROPPATCH, COPY, MOVE, PROPFIND, PUT, GET, HEAD, POST, LOCK, UNLOCK" // unixman: File
 		}
 	}
 	//-- #unixman
@@ -134,7 +366,8 @@ func (h *Handler) handleOptions(w http.ResponseWriter, r *http.Request) (status 
 	w.Header().Set("DAV", "1, 2")
 	// http://msdn.microsoft.com/en-au/library/cc250217.aspx
 	w.Header().Set("MS-Author-Via", "DAV")
-	return 0, nil
+//	return 0, nil
+	return http.StatusOK, nil // fix by unixman, as in PHP
 }
 
 func (h *Handler) handleGetHeadPost(w http.ResponseWriter, r *http.Request) (status int, err error) {
@@ -164,7 +397,7 @@ func (h *Handler) handleGetHeadPost(w http.ResponseWriter, r *http.Request) (sta
 	w.Header().Set("ETag", etag)
 	// Let ServeContent determine the Content-Type header.
 	http.ServeContent(w, r, reqPath, fi.ModTime(), f)
-	return 0, nil
+	return 0, nil // must return zero ; httpStatusCode is managed by the above method
 }
 
 func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) (status int, err error) {
@@ -172,13 +405,33 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) (status i
 	if err != nil {
 		return status, err
 	}
-	release, status, err := h.confirmLocks(r, reqPath, "")
+
+	ctx := r.Context()
+
+	//-- unixman
+	realPath, errRealPath := h.FileSystem.GetRealPath(ctx, reqPath)
+	if(errRealPath != nil) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Invalid or Unsafe Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+		}
+		if(errRealPath == os.ErrInvalid) {
+			errRealPath = nil // fix: avoid logging this kind of path validation errors
+		}
+		return http.StatusUnsupportedMediaType, errRealPath
+	}
+	if(realPath == "") {
+		return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+	}
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Request Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+	}
+	//-- #unixman
+
+	release, status, err := h.confirmLocks(r, realPath, "") // real path
 	if err != nil {
 		return status, err
 	}
 	defer release()
-
-	ctx := r.Context()
 
 	// TODO: return MultiStatus where appropriate.
 
@@ -202,18 +455,46 @@ func (h *Handler) handlePut(w http.ResponseWriter, r *http.Request) (status int,
 	if err != nil {
 		return status, err
 	}
-	release, status, err := h.confirmLocks(r, reqPath, "")
+
+	//-- unixman: disallow except some extensions ; ex: vcf ; ics
+//	if(!smart.StrEndsWith(reqPath, ".ics")) {
+//		return http.StatusUnsupportedMediaType, err
+//	} //end if
+	//-- #unixman
+
+	ctx := r.Context()
+
+	//-- unixman
+	realPath, errRealPath := h.FileSystem.GetRealPath(ctx, reqPath)
+	if(errRealPath != nil) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Invalid or Unsafe File Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+		}
+		if(errRealPath == os.ErrInvalid) {
+			errRealPath = nil // fix: avoid logging this kind of path validation errors
+		}
+		return http.StatusUnsupportedMediaType, errRealPath
+	}
+	if(realPath == "") {
+		return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+	}
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Request File Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+	}
+	//-- #unixman
+
+	release, status, err := h.confirmLocks(r, realPath, "") // real path
 	if err != nil {
 		return status, err
 	}
 	defer release()
+
 	// TODO(rost): Support the If-Match, If-None-Match headers? See bradfitz'
 	// comments in http.checkEtag.
-	ctx := r.Context()
 
 	f, err := h.FileSystem.OpenFile(ctx, reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
-		//-- unixman: TODO: create a temporary uuid file, then rename to this one, or have an absolute path like lock registry (better idea)
+		//-- unixman
 	//	return http.StatusNotFound, err
 		return http.StatusUnsupportedMediaType, err
 		//--
@@ -245,17 +526,37 @@ func (h *Handler) handleMkcol(w http.ResponseWriter, r *http.Request) (status in
 	if err != nil {
 		return status, err
 	}
-	release, status, err := h.confirmLocks(r, reqPath, "")
+	if r.ContentLength > 0 {
+		return http.StatusUnsupportedMediaType, nil // should be no body for MkCol
+	}
+
+	ctx := r.Context()
+
+	//-- unixman
+	realPath, errRealPath := h.FileSystem.GetRealPath(ctx, reqPath)
+	if(errRealPath != nil) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Invalid or Unsafe Dir Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+		}
+		if(errRealPath == os.ErrInvalid) {
+			errRealPath = nil // fix: avoid logging this kind of path validation errors
+		}
+		return http.StatusUnsupportedMediaType, errRealPath
+	}
+	if(realPath == "") {
+		return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+	}
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Request Dir Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+	}
+	//-- #unixman
+
+	release, status, err := h.confirmLocks(r, realPath, "") // real path
 	if err != nil {
 		return status, err
 	}
 	defer release()
 
-	ctx := r.Context()
-
-	if r.ContentLength > 0 {
-		return http.StatusUnsupportedMediaType, nil
-	}
 	if err := h.FileSystem.Mkdir(ctx, reqPath, 0777); err != nil {
 		if os.IsNotExist(err) {
 			//-- unixman
@@ -265,6 +566,7 @@ func (h *Handler) handleMkcol(w http.ResponseWriter, r *http.Request) (status in
 		}
 		return http.StatusMethodNotAllowed, err
 	}
+
 	return http.StatusCreated, nil
 }
 
@@ -297,21 +599,74 @@ func (h *Handler) handleCopyMove(w http.ResponseWriter, r *http.Request) (status
 	if dst == src {
 		return http.StatusForbidden, errDestinationEqualsSource
 	}
+	//-- unixman
+	if(src == "") {
+		return http.StatusForbidden, errUxmInvalidSource
+	}
+	if(smart.StrTrimRight(dst, " /") == smart.StrTrimRight(src, " /")) {
+		return http.StatusForbidden, errDestinationEqualsSource
+	}
+	//-- #unixman
 
 	ctx := r.Context()
 
-	if r.Method == "COPY" {
-		// Section 7.5.1 says that a COPY only needs to lock the destination,
-		// not both destination and source. Strictly speaking, this is racy,
-		// even though a COPY doesn't modify the source, if a concurrent
-		// operation modifies the source. However, the litmus test explicitly
-		// checks that COPYing a locked-by-another source is OK.
-		release, status, err := h.confirmLocks(r, "", dst)
-		if err != nil {
-			return status, err
+	//-- unixman
+	var overWrite bool = false
+	if(r.Header.Get("Overwrite") == "T") {
+		overWrite = true
+	}
+	if(overWrite != true) {
+		_, err := h.FileSystem.Stat(ctx, dst)
+		if err == nil {
+			return http.StatusPreconditionFailed, nil
 		}
-		defer release()
+	}
+	//-- #unixman
 
+	//-- unixman
+	realSrcPath, errRealSrcPath := h.FileSystem.GetRealPath(ctx, src)
+	if(errRealSrcPath != nil) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), r.Method, "Invalid or Unsafe Src Path: `" + src + "`", "RealPath: `" + realSrcPath + "`")
+		}
+		if(errRealSrcPath == os.ErrInvalid) {
+			errRealSrcPath = nil // fix: avoid logging this kind of path validation errors
+		}
+		return http.StatusUnsupportedMediaType, errRealSrcPath
+	}
+	if(realSrcPath == "") {
+		return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+	}
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), r.Method, "Request Src Path: `" + src + "`", "RealPath: `" + realSrcPath + "`")
+	}
+	//--
+	realDstPath, errRealDstPath := h.FileSystem.GetRealPath(ctx, dst)
+	if(errRealDstPath != nil) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), r.Method, "Invalid or Unsafe Dst Path: `" + dst + "`", "RealPath: `" + realDstPath + "`")
+		}
+		if(errRealDstPath == os.ErrInvalid) {
+			errRealDstPath = nil // fix: avoid logging this kind of path validation errors
+		}
+		return http.StatusUnsupportedMediaType, errRealDstPath
+	}
+	if(realDstPath == "") {
+		return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+	}
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), r.Method, "Request Dst Path: `" + dst + "`", "RealPath: `" + realDstPath + "`")
+	}
+	//-- #unixman
+
+	// unixman: lock both: source and destination also for COPY not only for MOVE
+	release, status, err := h.confirmLocks(r, realSrcPath, realDstPath) // real paths
+	if err != nil {
+		return status, err
+	}
+	defer release()
+
+	if r.Method == "COPY" {
 		// Section 9.8.3 says that "The COPY method on a collection without a Depth
 		// header must act as if a Depth header with value "infinity" was included".
 		depth := infiniteDepth
@@ -323,14 +678,9 @@ func (h *Handler) handleCopyMove(w http.ResponseWriter, r *http.Request) (status
 				return http.StatusBadRequest, errInvalidDepth
 			}
 		}
-		return copyFiles(ctx, h.FileSystem, src, dst, r.Header.Get("Overwrite") != "F", depth, 0)
+	//	return copyFiles(ctx, h.FileSystem, src, dst, r.Header.Get("Overwrite") != "F", depth, 0)
+		return copyFiles(ctx, h.FileSystem, src, dst, overWrite, depth, 0) // fix by unixman
 	}
-
-	release, status, err := h.confirmLocks(r, src, dst)
-	if err != nil {
-		return status, err
-	}
-	defer release()
 
 	// Section 9.9.2 says that "The MOVE method on a collection must act as if
 	// a "Depth: infinity" header was used on it. A client must not submit a
@@ -411,7 +761,7 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status
 	if closeErr != nil {
 		return http.StatusInternalServerError, closeErr
 	}
-	return 0, nil
+	return 0, nil // must return zero ; httpStatusCode is managed by the above methods
 }
 
 func (h *Handler) handleProppatch(w http.ResponseWriter, r *http.Request) (status int, err error) {
@@ -419,13 +769,33 @@ func (h *Handler) handleProppatch(w http.ResponseWriter, r *http.Request) (statu
 	if err != nil {
 		return status, err
 	}
-	release, status, err := h.confirmLocks(r, reqPath, "")
+
+	ctx := r.Context()
+
+	//-- unixman
+	realPath, errRealPath := h.FileSystem.GetRealPath(ctx, reqPath)
+	if(errRealPath != nil) {
+		if(DEBUG) {
+			log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Invalid or Unsafe Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+		}
+		if(errRealPath == os.ErrInvalid) {
+			errRealPath = nil // fix: avoid logging this kind of path validation errors
+		}
+		return http.StatusUnsupportedMediaType, errRealPath
+	}
+	if(realPath == "") {
+		return http.StatusUnsupportedMediaType, errUxmEmptyRealPath
+	}
+	if(DEBUG) {
+		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Request Path: `" + reqPath + "`", "RealPath: `" + realPath + "`")
+	}
+	//-- #unixman
+
+	release, status, err := h.confirmLocks(r, realPath, "") // real path
 	if err != nil {
 		return status, err
 	}
 	defer release()
-
-	ctx := r.Context()
 
 	if _, err := h.FileSystem.Stat(ctx, reqPath); err != nil {
 		if os.IsNotExist(err) {
@@ -451,7 +821,7 @@ func (h *Handler) handleProppatch(w http.ResponseWriter, r *http.Request) (statu
 	if closeErr != nil {
 		return http.StatusInternalServerError, closeErr
 	}
-	return 0, nil
+	return 0, nil // must return zero ; httpStatusCode is managed by the above methods
 }
 
 func makePropstatResponse(href string, pstats []Propstat) *response {
@@ -554,6 +924,10 @@ func StatusText(code int) string {
 }
 
 var (
+	errUxmEmptyRealPath        = errors.New("webdav: real path is empty")
+	errUxmInvalidSource        = errors.New("webdav: invalid source")
+	errUxmNothingToLock        = errors.New("webdav: nothing to lock (confirm)")
+
 	errDestinationEqualsSource = errors.New("webdav: destination equals source")
 	errDirectoryNotEmpty       = errors.New("webdav: directory not empty")
 	errInvalidDepth            = errors.New("webdav: invalid depth")
@@ -573,3 +947,35 @@ var (
 	errUnsupportedLockInfo     = errors.New("webdav: unsupported lock info")
 	errUnsupportedMethod       = errors.New("webdav: unsupported method")
 )
+
+const infiniteTimeout = -1
+
+// parseTimeout parses the Timeout HTTP header, as per section 10.7. If s is
+// empty, an infiniteTimeout is returned.
+func parseTimeout(s string) (time.Duration, error) {
+	if s == "" {
+		return infiniteTimeout, nil
+	}
+	if i := strings.IndexByte(s, ','); i >= 0 {
+		s = s[:i]
+	}
+	s = strings.TrimSpace(s)
+	if s == "Infinite" {
+		return infiniteTimeout, nil
+	}
+	const pre = "Second-"
+	if !strings.HasPrefix(s, pre) {
+		return 0, errInvalidTimeout
+	}
+	s = s[len(pre):]
+	if s == "" || s[0] < '0' || '9' < s[0] {
+		return 0, errInvalidTimeout
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || 1<<32-1 < n {
+		return 0, errInvalidTimeout
+	}
+	return time.Duration(n) * time.Second, nil
+}
+
+// #end

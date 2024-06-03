@@ -1,23 +1,179 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240114.2007 :: STABLE
+// r.20240117.2121 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
 	"log"
+	"time"
 
 	"os"
 	"context"
 
 	"net/http"
 
+	uid 			"github.com/unix-world/smartgo/crypto/uuid"
 	smart 			"github.com/unix-world/smartgo"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
+	smartcache 		"github.com/unix-world/smartgo/data-structs/simplecache"
 	webdav 			"github.com/unix-world/smartgo/web/webdav" // a modified version of [golang.org / x / net / webdav]: added extra path security checks
 )
+
+
+const webdavLockTimeSeconds uint16 = 300 // orphan locks will be cleared after this time
+var webdavLockCache *smartcache.InMemCache = nil
+
+func webDavInitLockSysCache() {
+	webdavLockCache = smartcache.NewCache("smart.websrv.webdav.locking.inMemCache", time.Duration(webdavLockTimeSeconds) * time.Second, webdav.DEBUG)
+} //END FUNCTION
+
+func webdavLockExternalIsValid(token string) bool {
+	if(token != smart.StrTrimWhitespaces(token)) {
+		return false
+	} //end if
+	if(len(token) != 36) {
+		return false
+	} //end if
+	if(len(smart.StrReplaceAll(token, "-", "")) != 32) {
+		return false
+	} //end if
+	return true
+} //end function
+
+func webdavLockingLOCK(internal bool, path string) (token string, err error) {
+	//--
+	if(webdavLockCache == nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
+		return "", smart.NewError("WebDav LockSys is N/A")
+	} //end if
+	//--
+	token = ""
+	err = nil
+	//--
+	if(!internal) {
+	//	token = webdav.FakeLockToken
+		token = uid.UuidUrn()
+	} else {
+		token = smart.Base64ToBase64s(smart.Sh3a512B64(path))
+	} //end if else
+	//--
+	if(webdav.DEBUG) {
+		log.Println("[DEBUG]", "WEBDAV:LOCKING:LOCK", "Internal:", internal, "Path: `" + path + "`", "Token: `" + token + "`", smart.CurrentFunctionName())
+	} //end if
+	//--
+	if(!internal) {
+		if(!webdavLockExternalIsValid(token)) {
+			log.Println("[ERROR]", smart.CurrentFunctionName(), "External Token format should be URN")
+			return "",  smart.NewError("Invalid Token: format should be: URN")
+		} //end if
+		return token, nil // STOP Here, external locking on web systems is unrealistic ; only internal locking is implemented !
+	} //end if
+	//--
+	cacheExists, cachedObj, cacheExpTime := webdavLockCache.Get(token)
+	if(cacheExists) {
+		if(cacheExpTime <= 0) {
+			okFix := webdavLockCache.SetExpiration(token, int64(webdavLockTimeSeconds)) // fix
+			if(!okFix) {
+				log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav:LockSys", "Fix Expiration Failed for Path: `" + path + "` ; Token: `" + token + "`")
+				err = smart.NewError("Failed to Fix WebDAV LockSys Object Expiration")
+			} //end if
+		} //end if
+		if(cachedObj.Id != token) {
+			log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav:LockSys", "Invalid Cached Object for Path: `" + path + "` ; Token: `" + token + "`")
+			err = smart.NewError("WebDAV LockSys Object mismatch")
+		} //end if
+		return "", err // locked
+	} //end if
+	cachedObj.Id = token
+	cachedObj.Data = path
+	cachedObj.Obj = smart.TimeNowUtc()
+	okSet := webdavLockCache.Set(cachedObj, int64(webdavLockTimeSeconds))
+	if(!okSet) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav:LockSys", "Set Cache Object Failed for Path: `" + path + "` ; Token: `" + token + "`")
+		err = smart.NewError("Failed to Set WebDAV LockSys Object")
+		token = ""
+	} //end if
+	//--
+	return token, nil
+	//--
+} //END FUNCTION
+
+func webdavLockingUNLOCK(internal bool, token string) (success bool, err error) {
+	//--
+	if(webdavLockCache == nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
+		return true, smart.NewError("WebDav LockSys is N/A")
+	} //end if
+	//--
+	if(webdav.DEBUG) {
+		log.Println("[DEBUG]", "WEBDAV:LOCKING:UNLOCK", "Internal:", internal, "Token: `" + token + "`", smart.CurrentFunctionName())
+	} //end if
+	//--
+	token = smart.StrTrimWhitespaces(token)
+	if(token == "") {
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "Empty Token")
+		return true, nil
+	} //end if
+	//--
+	if(!internal) {
+		if(!webdavLockExternalIsValid(token)) {
+			return false, smart.NewError("Invalid Token: expects format: URN")
+		} //end if
+		return true, nil // STOP Here, external locking on web systems is unrealistic ; only internal locking is implemented !
+	} //end if
+	//--
+	return webdavLockCache.Unset(token), nil
+	//--
+} //END FUNCTION
+
+func webdavLockingEXISTS (internal bool, token string) bool {
+	//--
+	if(webdavLockCache == nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
+		return false
+	} //end if
+	//--
+	if(webdav.DEBUG) {
+		log.Println("[DEBUG]", "WEBDAV:LOCKING:EXISTS", "Internal:", internal, "Token: `" + token + "`", smart.CurrentFunctionName())
+	} //end if
+	//--
+	token = smart.StrTrimWhitespaces(token)
+	if(token == "") {
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "Empty Token")
+		return false
+	} //end if
+	//--
+	if(!internal) {
+		if(!webdavLockExternalIsValid(token)) {
+			return false
+		} //end if
+		return true // STOP Here, external locking on web systems is unrealistic ; only internal locking is implemented !
+	} //end if
+	//--
+	cacheExists, _, _ := webdavLockCache.Get(token)
+	//--
+	return cacheExists
+	//--
+} //END FUNCTION
+
+func webdavLockSys() *webdav.LockSys { // TODO: implement SimpleCache ...
+	//--
+	if(webdavLockCache == nil) {
+		return nil
+	} //end if
+	//--
+	ls := webdav.LockSys{
+		Lock:   webdavLockingLOCK,
+		Unlock: webdavLockingUNLOCK,
+		Exists: webdavLockingEXISTS,
+	}
+	//--
+	return &ls
+	//--
+} //END FUNCTION
 
 
 func webDavUrlPath() string {
@@ -27,9 +183,11 @@ func webDavUrlPath() string {
 } //END FUNCTION
 
 
-var webDavLogger = func(r *http.Request, err error) {
+func webDavLogger(r *http.Request, err error) {
+	//--
 	remoteAddr, remotePort := smart.GetHttpRemoteAddrIpAndPortFromRequest(r)
 	realClientIp := getVisitorRealIpAddr(r)
+	//--
 	if(err != nil) {
 		if(os.IsNotExist(err)) {
 			log.Printf("[NOTICE] WebDAV Service :: WEBDAV.NOTFOUND: %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", err, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
@@ -39,6 +197,7 @@ var webDavLogger = func(r *http.Request, err error) {
 	} else {
 		log.Printf("[LOG] WebDAV Service :: WEBDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
 	} //end if else
+	//--
 } //END FUNCTION
 
 
@@ -119,9 +278,10 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 	} //end if
 	//--
 	wdav := webdav.Handler{
-		Prefix:     webDavRealUrlPath,
-		FileSystem: webdav.Dir(webDavStorageRootPath),
-		Logger:     webDavLogger,
+		Prefix:     	webDavRealUrlPath,
+		FileSystem: 	webdav.Dir(webDavStorageRootPath),
+		LockSys: 		webdavLockSys(),
+		Logger:     	webDavLogger,
 	}
 	//-- #end auth check
 	if((r.Method == http.MethodHead) || (r.Method == http.MethodGet) || (r.Method == http.MethodPost)) { // all 3 methods are handles by a single webdav internal method handleGetHeadPost()

@@ -1,3 +1,8 @@
+
+// SmartGo :: WebDAV :: File
+// r.20240117.2121 :: STABLE
+// (c) 2024 unix-world.org
+
 // Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -45,6 +50,7 @@ func slashClean(name string) string {
 // might apply". In particular, whether or not renaming a file or directory
 // overwriting another existing file or directory is an error is OS-dependent.
 type FileSystem interface {
+	GetRealPath(ctx context.Context, name string) (string, error) // unixman
 	Mkdir(ctx context.Context, name string, perm os.FileMode) error
 	OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (File, error)
 	RemoveAll(ctx context.Context, name string) error
@@ -99,6 +105,15 @@ func (d Dir) resolve(name string) string {
 	return filepath.Join(dir, filepath.FromSlash(slashClean(name)))
 }
 
+//-- unixman
+func (d Dir) GetRealPath(ctx context.Context, name string) (string, error) {
+	if name = d.resolve(name); name == "" {
+		return "", os.ErrInvalid
+	}
+	return name, nil
+}
+//-- #unixman
+
 func (d Dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
 	if name = d.resolve(name); name == "" {
 		return os.ErrNotExist
@@ -107,6 +122,9 @@ func (d Dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
 }
 
 func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (File, error) {
+	//--
+	defer smart.PanicHandler()
+	//--
 	if name = d.resolve(name); name == "" {
 		return nil, os.ErrNotExist
 	}
@@ -346,12 +364,24 @@ func walkFS(ctx context.Context, fs FileSystem, depth int, name string, info os.
 				return err
 			}
 		} else {
+			//--
+		//	isDir := fileInfo.Mode().IsDir()
+		//	modifTime := fileInfo.ModTime()
+			//--
+			// TODO: vcf / ics:
+		//	if((!isDir) && smart.StrEndsWith(fileInfo.Name(), ".ics")) {
+		//		// ...
+		//	} else {
+		//		// ...
+		//	} //end if else
+			//--
 			err = walkFS(ctx, fs, depth, filename, fileInfo, walkFn)
 			if err != nil {
 				if !fileInfo.IsDir() || err != filepath.SkipDir {
 					return err
 				}
 			}
+			//--
 		}
 	}
 	return nil

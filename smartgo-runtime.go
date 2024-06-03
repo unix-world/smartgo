@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240114.2007 :: STABLE
+// r.20240117.2121 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -59,26 +59,28 @@ func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
 	var theMsg string = StrTrimWhitespaces(StrNormalizeSpaces(string(bytes)))
 	//--
 	if(logColoredOnConsole) {
-		if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+		if(StrIPos(theMsg, "[PANIC]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+			theMsg = color.MagentaString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
+		} else if(StrIPos(theMsg, "[ERROR]") == 0) {
 			theMsg = color.RedString(theMsg)
 		} else if(StrIPos(theMsg, "[WARNING]") == 0) {
 			theMsg = color.HiRedString(theMsg)
+		} else if(StrIPos(theMsg, "[OK]") == 0) {
+			theMsg = color.HiGreenString(theMsg)
+		} else if(StrIPos(theMsg, "[LOG]") == 0) {
+			theMsg = color.WhiteString(theMsg)
 		} else if(StrIPos(theMsg, "[INFO]") == 0) {
 			theMsg = color.HiYellowString(theMsg)
 		} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
 			theMsg = color.HiBlueString(theMsg)
+		} else if(StrIPos(theMsg, "[META]") == 0) {
+			theMsg = color.HiCyanString(theMsg)
 		} else if(StrIPos(theMsg, "[DATA]") == 0) {
 			theMsg = color.YellowString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
 		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
-			if(StrIPos(theMsg, "[OK]") == 0) {
-				theMsg = color.HiGreenString(theMsg)
-			} else if(StrIPos(theMsg, "[PANIC]") == 0) {
-				theMsg = color.WhiteString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
-			} else { // message
-				theMsg = color.HiCyanString(theMsg)
-			} //end if else
+			theMsg = color.HiGreyString(theMsg)
 		} //end if else
 	} //end if
 	//--
@@ -118,7 +120,12 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	//--
 	var theType string = ""
 	var colorMsg string = theMsg
-	if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+	if(StrIPos(theMsg, "[PANIC]") == 0) {
+		theType = "panic"
+		if(logColoredOnConsole) {
+			colorMsg = color.MagentaString(colorMsg)
+		} //end if
+	} else if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 		theType = "error"
 		if(logColoredOnConsole) {
 			colorMsg = color.RedString(colorMsg)
@@ -127,6 +134,16 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		theType = "warning"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiRedString(colorMsg)
+		} //end if
+	} else if(StrIPos(theMsg, "[OK]") == 0) {
+		theType = "ok"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiGreenString(colorMsg)
+		} //end if
+	} else if(StrIPos(theMsg, "[LOG]") == 0) {
+		theType = "log"
+		if(logColoredOnConsole) {
+			colorMsg = color.WhiteString(colorMsg)
 		} //end if
 	} else if(StrIPos(theMsg, "[INFO]") == 0) {
 		theType = "info"
@@ -137,6 +154,11 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		theType = "notice"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiBlueString(colorMsg)
+		} //end if
+	} else if(StrIPos(theMsg, "[META]") == 0) {
+		theType = "meta"
+		if(logColoredOnConsole) {
+			colorMsg = color.HiCyanString(colorMsg)
 		} //end if
 	} else if(StrIPos(theMsg, "[DATA]") == 0) {
 		theType = "data"
@@ -151,12 +173,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} else { // ALL OTHER CASES
 		theType = ""
 		if(logColoredOnConsole) {
-			if(StrIPos(theMsg, "[OK]") == 0) {
-				theType = "ok"
-				colorMsg = color.HiGreenString(colorMsg)
-			} else { // no type
-				colorMsg = color.HiCyanString(colorMsg)
-			} //end if else
+			colorMsg = color.HiGreyString(colorMsg)
 		} //end if
 	} //end if else
 	//--
@@ -241,13 +258,21 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 	//--
 	level = StrToUpper(StrTrimWhitespaces(level))
 	//--
-	var mLevel string = "ERROR"
-	if(level == "WARNING") {
+	var mLevel string = "PANIC"
+	if(level == "ERROR") {
+		mLevel = "ERROR"
+	} else if(level == "WARNING") {
 		mLevel = "WARNING"
+	} else if(level == "OK") {
+		mLevel = "OK"
+	} else if(level == "LOG") {
+		mLevel = "LOG"
 	} else if(level == "INFO") {
 		mLevel = "INFO"
 	} else if(level == "NOTICE") {
 		mLevel = "NOTICE"
+	} else if(level == "META") {
+		mLevel = "META"
 	} else if(level == "DATA") {
 		mLevel = "DATA"
 	} else if(level == "DEBUG") {
@@ -255,10 +280,11 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 	} //end if else
 	//--
 	filter := &logutils.LevelFilter{
-		Levels: []logutils.LogLevel{"DEBUG", "DATA", "NOTICE", "INFO", "WARNING", "ERROR"},
+		Levels: []logutils.LogLevel{"DEBUG", "DATA", "META", "NOTICE", "INFO", "LOG", "OK", "WARNING", "ERROR", "PANIC"},
 		MinLevel: logutils.LogLevel(mLevel),
 		Writer: output,
 	}
+	//--
 	log.SetOutput(filter)
 	//--
 } //END FUNCTION

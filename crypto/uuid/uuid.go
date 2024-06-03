@@ -1,20 +1,27 @@
 
 // GO Lang (1.11 or later) :: SmartGo/Crypto/Uuid :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240102.2114 :: STABLE
+// r.20240117.2121 :: STABLE
 
 package uuid
 
 import (
 	"fmt"
 	"log"
+
 	"sync"
+
 	"strings"
 	"strconv"
+
 	"time"
 	mrand "math/rand"
 	"math/big"
 	crand "crypto/rand"
+
+	"crypto/md5"
+	"io"
+	"encoding/hex"
 )
 
 
@@ -30,6 +37,27 @@ func UuidSessionSequence() uint64 { // returns an id guarenteed to be unique wit
 	uuidSessSeqMutex.Unlock()
 	//--
 	return uuidSessSeqCntVal
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func UuidUrn() string { // ex: 00000000-0000-0000-0000-000000000000
+	//--
+	uid := Uuid17Seq() + ":" + Uuid10Num() // safer against md5 colissions, 28 bytes only and md5 is 32 bytes !
+	//--
+	hash := md5.New()
+	io.WriteString(hash, uid)
+	//--
+	uid = strings.ToLower(hex.EncodeToString(hash.Sum(nil)))
+	//--
+	if(len(uid) != 32) {
+		uid = strings.Repeat("0", 32)
+	} //end if
+	//--
+	return uid[0:8] + "-" + uid[8:12] + "-" + uid[12:16] + "-" + uid[16:20] + "-" + uid[20:]
 	//--
 } //END FUNCTION
 

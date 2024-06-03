@@ -1,10 +1,11 @@
 
 // GO Lang :: SmartGo/LogUtils :: Smart.Go.Framework
-// (c) 2020 unix-world.org
-// r.20200507.1905 :: STABLE
+// (c) 2020-2024 unix-world.org
+// r.20240117.2121 :: STABLE
 
+// original source: github.com/hashicorp/logutils # (c) 2018 hashicorp
 
-// Package logutils augments the standard log package with levels ; original source taken from: github.com/hashicorp/logutils ; (c) 2018 hashicorp
+// Package logutils augments the standard log package with levels
 package logutils
 
 
@@ -18,30 +19,28 @@ import (
 type LogLevel string
 
 
-// LevelFilter is an io.Writer that can be used with a logger that
-// will filter out log messages that aren't at least a certain level.
-//
-// Once the filter is in use somewhere, it is not safe to modify
-// the structure.
+// LevelFilter is an io.Writer that can be used with a logger that will
+// filter out log messages that aren't at least a certain level.
+// Once the filter is in use somewhere, it is not safe to modify the structure.
 type LevelFilter struct {
-	// Levels is the list of log levels, in increasing order of
-	// severity. Example might be: {"DEBUG", "WARN", "ERROR"}.
-	Levels []LogLevel
+	// Levels is the list of log levels, in increasing order of severity.
+	Levels []LogLevel // Example: {"DEBUG", "WARN", "ERROR"}
 
 	// MinLevel is the minimum level allowed through
 	MinLevel LogLevel
 
-	// The underlying io.Writer where log messages that pass the filter
-	// will be set.
+	// The underlying io.Writer where log messages that pass the filter will be set.
 	Writer io.Writer
 
-	badLevels map[LogLevel]struct{}
-	once      sync.Once
+	// Other, unhandled levels
+	otherLevels map[LogLevel]struct{}
+
+	// Synchro
+	once sync.Once
 }
 
 
-// Check will check a given line if it would be included in the level
-// filter.
+// Check will check a given line if it would be included in the level filter.
 func (f *LevelFilter) Check(line []byte) bool {
 	//--
 	f.once.Do(f.init)
@@ -55,7 +54,7 @@ func (f *LevelFilter) Check(line []byte) bool {
 		} //end if
 	} //end if
 	//--
-	_, ok := f.badLevels[level]
+	_, ok := f.otherLevels[level]
 	//--
 	return !ok
 	//--
@@ -89,18 +88,18 @@ func (f *LevelFilter) SetMinLevel(min LogLevel) {
 
 func (f *LevelFilter) init() {
 	//--
-	badLevels := make(map[LogLevel]struct{})
+	otherLevels := make(map[LogLevel]struct{})
 	//--
 	for _, level := range f.Levels {
 		if level == f.MinLevel {
 			break
 		} //end if
-		badLevels[level] = struct{}{}
+		otherLevels[level] = struct{}{}
 	} //end for
 	//--
-	f.badLevels = badLevels
+	f.otherLevels = otherLevels
 	//--
 } //END FUNCTION
 
 
-// #END
+// #end

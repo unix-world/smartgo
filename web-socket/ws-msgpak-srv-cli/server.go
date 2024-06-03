@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240114.2007 :: STABLE
+// r.20240116.2136 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -775,7 +775,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 	} //end function
 
 	var srvAddr string = httpAddr + fmt.Sprintf(":%d", httpPort)
-	mux, srv := smarthttputils.HttpMuxServer(srvAddr, intervalMsgSeconds, true, false, "[MsgPak Server]") // force HTTP/1
+	mux, srv := smarthttputils.HttpMuxServer(srvAddr, intervalMsgSeconds, true, true, "[MsgPak Server]") // force HTTP/1 ; allow large headers, the purpose of this service is different than public web ...
 
 	mux.HandleFunc("/msgpak", srvHandlerMsgPack)
 	mux.HandleFunc("/msgsend", srvHandlerCustomMsg)

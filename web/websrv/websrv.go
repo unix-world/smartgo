@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240114.2007 :: STABLE
+// r.20240117.2121 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -21,11 +21,11 @@ import (
 )
 
 const (
-	VERSION string = "r.20240114.2007"
+	VERSION string = "r.20240117.2121"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
-	SERVER_ADDR string = "127.0.0.1"
-	SERVER_PORT uint16 = 17788
+	SERVER_ADDR string = "127.0.0.1" // default
+	SERVER_PORT uint16 = 17788 // default
 
 	WEB_PUBLIC_RELATIVE_ROOT_PATH string = "./web-public/"
 	DEFAULT_DIRECTORY_INDEX_HTML string = "index.html"
@@ -225,6 +225,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} //end if
 		log.Println("Web Server: WebDav Service is ENABLED ::", "SharedMode:", webdavOptions.SharedMode, ";", "SmartSafePaths:", webdavOptions.SmartSafePaths)
 		log.Println("[INFO]", "Web Server WebDAV Serving Path: `" + webDavUrlPath() + "` as: `" + smart.PathGetAbsoluteFromRelative(DAV_STORAGE_RELATIVE_ROOT_PATH) + "`")
+		webDavInitLockSysCache()
 	} //end if
 
 	//-- signature: console
@@ -233,7 +234,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		log.Println("Starting Web Server: http://" + httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort) + " @ HTTPS/Mux/Insecure # " + VERSION)
 	} else {
 		log.Println("Starting Web Server: https://" + httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort) + " @ HTTPS/Mux/TLS # " + VERSION)
-		log.Println("[NOTICE]", "Web Server Certificates Path:", certifPath)
+		log.Println("[META]", "Web Server Certificates Path:", certifPath)
 	} //end if else
 
 	if(servePublicPath == true) {
@@ -244,13 +245,13 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 
 	//-- server + mux
 
-	mux, srv := smarthttputils.HttpMuxServer(httpAddr + fmt.Sprintf(":%d", httpPort), timeoutSeconds, true, true, "[Web Server]") // force HTTP/1
+	mux, srv := smarthttputils.HttpMuxServer(httpAddr + fmt.Sprintf(":%d", httpPort), timeoutSeconds, true, false, "[Web Server]") // force HTTP/1 ; disallow large headers, the purpose of this service is public web mostly
 
 	//-- rate limit decision
 
 	var useRateLimit bool = ((rateLimit > 0) && (rateBurst > 0))
 	if(useRateLimit) { // RATE LIMIT
-		log.Println("[INFO]", "Web Server: HTTP/S Rate Limiter # Limit:", rateLimit, "Burst:", rateBurst)
+		log.Println("[META]", "Web Server: HTTP/S Rate Limiter # Limit:", rateLimit, "Burst:", rateBurst)
 	} //end if
 
 	//-- http master / root handler: will manage all the rest of sub-handlers
@@ -410,7 +411,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			contentDisposition = ""
 		} //end if
 		//--
-		log.Println("[NOTICE]", "Web Server: Internal Route :: Handler Execution Time:", timerDuration, "# Route: `" + urlPath + "`")
+		log.Println("[META]", "Web Server: Internal Route :: Handler Execution Time:", timerDuration, "# Route: `" + urlPath + "`")
 		log.Printf("[SRV] Web Server: Internal Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		//--
 		var fExt string = ""
