@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240603.2102 :: STABLE
+// r.20240928.0102 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later

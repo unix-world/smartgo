@@ -1,3 +1,3 @@
-// JS-Script (UM): diff.js @ 2023-12-03 00:03:46 +0000
+// JS-Script (UM): diff.js @ 2024-09-27 15:56:59 +0000
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror"],e)}else{e(CodeMirror)}})(function(e){"use strict";e.defineMode("diff",function(){var o={"+":"positive","-":"negative","@":"meta"};return{token:function(e){var i=e.string.search(/[\t ]+?$/);if(!e.sol()||i===0){e.skipToEnd();return("error "+(o[e.string.charAt(0)]||"")).replace(/ $/,"")}var r=o[e.peek()]||e.skipToEnd();if(i===-1){e.skipToEnd()}else{e.pos=i}return r}}});e.defineMIME("text/x-diff","diff")});
 // #END

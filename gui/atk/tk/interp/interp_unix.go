@@ -17,9 +17,12 @@ import (
 	"unsafe"
 )
 
+// the CFLAGS  for MacOS native are: -I/System/Library/Frameworks/Tcl.framework/Headers -I/System/Library/Frameworks/Tk.framework/Headers
+// the LDFLAGS for MacOS native are: -F/Library/Frameworks -framework tcl -framework tk
+
 /*
-#cgo darwin CFLAGS: -I/Library/Frameworks/Tcl.framework/Headers -I/Library/Frameworks/Tk.framework/Headers
-#cgo darwin LDFLAGS: -F/Library/Frameworks -framework tcl -framework tk
+#cgo darwin CFLAGS: -I/opt/homebrew/include/tcl-tk
+#cgo darwin LDFLAGS: -ltcl -ltk -lm -lz
 
 //-- fixes by unixman
 #cgo linux CFLAGS: -I/usr/include/tcl

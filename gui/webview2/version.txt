@@ -7,3 +7,4 @@ github.com/zserge/webview2
 # refactored by unixman as:
 github.com/unix-world/smartgo/webview2
 
+fixes: r.20240928.0102

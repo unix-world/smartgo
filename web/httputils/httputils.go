@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240603.2102 :: STABLE
+// r.20240928.0102 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240603.2102"
+	VERSION string = "r.20240928.0102"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -92,10 +92,12 @@ const (
 	HTTP_STATUS_200 string = "200 OK"
 	HTTP_STATUS_202 string = "202 Accepted"
 	HTTP_STATUS_203 string = "203 Non-Authoritative Information"
+	HTTP_STATUS_204 string = "204 No Content"
 	HTTP_STATUS_208 string = "208 Already Reported"
 	//--
 	HTTP_STATUS_301 string = "301 Moved Permanently"
 	HTTP_STATUS_302 string = "302 Found" // "302 Moved Temporarily"
+	HTTP_STATUS_304 string = "304 Not Modified"
 	//--
 	HTTP_STATUS_400 string = "400 Bad Request"
 	HTTP_STATUS_401 string = "401 Unauthorized"
@@ -103,6 +105,7 @@ const (
 	HTTP_STATUS_404 string = "404 Not Found"
 	HTTP_STATUS_405 string = "405 Method Not Allowed"
 	HTTP_STATUS_410 string = "410 Gone"
+	HTTP_STATUS_422 string = "422 Unprocessable Entity" // 422 Unprocessable Content
 	HTTP_STATUS_429 string = "429 Too Many Requests"
 	//--
 	HTTP_STATUS_500 string = "500 Internal Server Error"
@@ -1665,7 +1668,7 @@ func HttpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 //-----
 
 
-// valid code: 200 ; 202 ; 203 ; 208
+// valid code: 200 ; 202 ; 203 ; 204 ; 208
 // contentFnameOrPath: file.html (will get extension .html and serve mime type by this extension) ; default, fallback to .txt
 // for no cache: 		cacheExpiration = -1 ; cacheLastModified = "" ; cacheControl = "no-cache"
 // for using cache: 	cacheExpiration = 3600 (1h) ; cacheLastModified = "2021-03-16 23:57:58" ; cacheControl = "default" | "public" | "private"
@@ -1674,12 +1677,16 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	//--
 	defer smart.PanicHandler()
 	//--
+	var skipContent bool = false
 	switch(code) {
 		case 200:
 			break
 		case 202:
 			break
 		case 203:
+			break
+		case 204:
+			skipContent = true
 			break
 		case 208:
 			break
@@ -1688,21 +1695,34 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 			code = 200
 	} //end switch
 	//--
-	contentFnameOrPath = smart.PathBaseName(smart.StrToLower(smart.StrTrimWhitespaces(contentFnameOrPath))) // just file name ; ex: `file.txt` | `file.html` | ...
-	if(contentFnameOrPath == "") {
-		contentFnameOrPath = "file.txt"
-	} //end if
-	//--
-	mimeType, mimeUseCharset, mimeDisposition := MimeDispositionEval(contentFnameOrPath)
-	//--
-	contentDisposition = MimeDispositionConformParam(smart.StrToLower(smart.StrTrimWhitespaces(contentDisposition)))
-	if(contentDisposition == "") { // {{{SYNC-MIME-DISPOSITION-AUTO}}}
-		contentDisposition = mimeDisposition
-	} else if(contentDisposition != DISP_TYPE_INLINE) {
-		contentDisposition = DISP_TYPE_ATTACHMENT
-	} //end if
-	if(contentDisposition == DISP_TYPE_ATTACHMENT) {
-		contentDisposition += `; filename="` + smart.EscapeUrl(contentFnameOrPath) + `"`
+	var mimeType string = ""
+	var mimeUseCharset bool = false
+	if(skipContent == true) {
+		content = ""
+		contentFnameOrPath = ""
+		contentDisposition = ""
+		cacheExpiration = -1
+		cacheLastModified = ""
+		cacheControl = CACHE_CONTROL_NOCACHE
+		headers = nil
+	} else {
+		contentFnameOrPath = smart.PathBaseName(smart.StrToLower(smart.StrTrimWhitespaces(contentFnameOrPath))) // just file name ; ex: `file.txt` | `file.html` | ...
+		if(contentFnameOrPath == "") {
+			contentFnameOrPath = "file.txt"
+		} //end if
+		//--
+		var mimeDisposition string = ""
+		mimeType, mimeUseCharset, mimeDisposition = MimeDispositionEval(contentFnameOrPath)
+		//--
+		contentDisposition = MimeDispositionConformParam(smart.StrToLower(smart.StrTrimWhitespaces(contentDisposition)))
+		if(contentDisposition == "") { // {{{SYNC-MIME-DISPOSITION-AUTO}}}
+			contentDisposition = mimeDisposition
+		} else if(contentDisposition != DISP_TYPE_INLINE) {
+			contentDisposition = DISP_TYPE_ATTACHMENT
+		} //end if
+		if(contentDisposition == DISP_TYPE_ATTACHMENT) {
+			contentDisposition += `; filename="` + smart.EscapeUrl(contentFnameOrPath) + `"`
+		} //end if
 	} //end if
 	//--
 	if(headers == nil) {
@@ -1728,29 +1748,33 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 			} //end if
 			if(match != "") {
 				if(match == eTag) {
-					w.WriteHeader(304) // not modified
+					w.WriteHeader(304) // Not Modified: HTTP_STATUS_304
 					return
 				} //end if
 			} //end if
 		} //end if
 	} //end if
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
-	w.Header().Set(HTTP_HEADER_CONTENT_DISP, contentDisposition)
-	w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	if(skipContent == true) {
+		w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(0)) // mandatory
+	} else {
+		w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
+		w.Header().Set(HTTP_HEADER_CONTENT_DISP, contentDisposition)
+		w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	} //end if
 	//--
 	for key, val := range headers {
 		key = smart.StrToLower(smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(key))) // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 		val = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(val))
 		switch(key) { // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-			//-- these headers are managed below
+			//-- these headers are managed above, don't allow rewrite
 			case HTTP_HEADER_CONTENT_TYPE:
 				break
 			case HTTP_HEADER_CONTENT_DISP:
 				break
 			case HTTP_HEADER_CONTENT_LEN:
 				break
-			//-- these headers are managed by HttpHeadersCacheControl()
+			//-- these headers are managed by HttpHeadersCacheControl(), don't allow rewrite
 			case HTTP_HEADER_CACHE_CTRL:
 				break
 			case HTTP_HEADER_CACHE_PGMA:
@@ -1759,13 +1783,18 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 				break
 			case HTTP_HEADER_CACHE_LMOD:
 				break
-			//-- these headers are special, managed above
+			//-- special etag headers, managed above, don't allow rewrite
 			case HTTP_HEADER_ETAG_SUM:
+				break
 			case HTTP_HEADER_ETAG_IFNM:
-			//--
+				break
+			//-- special server headers, don't allow rewrite
 			case HTTP_HEADER_SERVER_DATE:
+				break
 			case HTTP_HEADER_SERVER_SIGN:
+				break
 			case HTTP_HEADER_SERVER_POWERED:
+				break
 			//-- the rest
 			default:
 				if(key == "") {
@@ -1781,7 +1810,7 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	//--
 	w.WriteHeader(int(code)) // status code must be after set headers
 	//--
-	if(r.Method == "HEAD") { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body
+	if((skipContent == true) || (r.Method == "HEAD")) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body ; also don't send for 204
 		return
 	} //end if
 	//--
@@ -1816,6 +1845,12 @@ func HttpStatus203(w http.ResponseWriter, r *http.Request, content string, conte
 	//--
 } //END FUNCTION
 
+// @params description: see httpStatusOKX()
+func HttpStatus204(w http.ResponseWriter, r *http.Request, content string, contentFnameOrPath string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+	//--
+	httpStatusOKX(w, r, 204, content, contentFnameOrPath, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+	//--
+} //END FUNCTION
 
 // @params description: see httpStatusOKX()
 func HttpStatus208(w http.ResponseWriter, r *http.Request, content string, contentFnameOrPath string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
@@ -1828,6 +1863,7 @@ func HttpStatus208(w http.ResponseWriter, r *http.Request, content string, conte
 //-----
 
 
+// valid code: 301 ; 302
 func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirectUrl string, outputHtml bool) {
 	//--
 	defer smart.PanicHandler()
@@ -1902,6 +1938,7 @@ func HttpStatus302(w http.ResponseWriter, r *http.Request, redirectUrl string, o
 //-----
 
 
+// valid code: 400 ; 401 ; 403 ; 404 ; 405 ; 410 ; 422 ; 429 ; 500 ; 501 ; 502 ; 503 ; 504
 func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageText string, outputHtml bool) {
 	//--
 	defer smart.PanicHandler()
@@ -1928,6 +1965,9 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			break
 		case 410:
 			title = HTTP_STATUS_410
+			break
+		case 422:
+			title = HTTP_STATUS_422
 			break
 		case 429:
 			title = HTTP_STATUS_429
@@ -2033,6 +2073,12 @@ func HttpStatus405(w http.ResponseWriter, r *http.Request, messageText string, o
 func HttpStatus410(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 410, messageText, outputHtml)
+	//--
+} //END FUNCTION
+
+func HttpStatus422(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 422, messageText, outputHtml)
 	//--
 } //END FUNCTION
 

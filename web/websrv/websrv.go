@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240117.2121 :: STABLE
+// r.20240928.0102 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20240117.2121"
+	VERSION string = "r.20240928.0102"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1" // default
@@ -435,6 +435,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			case 203:
 				smarthttputils.HttpStatus203(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
 				break
+			case 204:
+				smarthttputils.HttpStatus204(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+				break
 			case 208:
 				smarthttputils.HttpStatus208(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
 				break
@@ -463,6 +466,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				break
 			case 410:
 				smarthttputils.HttpStatus410(w, r, content, isHtmlAnswer)
+				break
+			case 422:
+				smarthttputils.HttpStatus422(w, r, content, isHtmlAnswer)
 				break
 			case 429:
 				smarthttputils.HttpStatus429(w, r, content, isHtmlAnswer)

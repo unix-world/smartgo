@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Session-UUID :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240117.2121 :: STABLE
+// r.20240928.0102 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
