@@ -1,4 +1,4 @@
-github.com/tidwall/gjson @head.20231212
+github.com/tidwall/gjson @head.20240929 # 1.17.3
 
 go 1.12
 
