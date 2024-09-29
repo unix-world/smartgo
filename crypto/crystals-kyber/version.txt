@@ -1,4 +1,5 @@
 v.20231228
+includes security patches (kyberslash1, kyberslash2) by kudelskisecurity: r.20240929
 includes fixes by unixman
 
 Go 1.16 or later
