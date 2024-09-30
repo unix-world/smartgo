@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV / XML :: Xml
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2009 The Go Authors. All rights reserved.
@@ -38,7 +38,7 @@ type SyntaxError struct {
 
 func (e *SyntaxError) Error() string {
 	return "XML syntax error on line " + strconv.Itoa(e.Line) + ": " + e.Msg
-}
+} //END FUNCTION
 
 // A Name represents an XML name (Local) annotated with a name space
 // identifier (Space). In tokens returned by Decoder.Token, the Space
@@ -56,7 +56,7 @@ type Name struct {
 // isNamespace reports whether the name is a namespace-defining name.
 func (name Name) isNamespace() bool {
 	return name.Local == "xmlns" || name.Space == "xmlns"
-}
+} //END FUNCTION
 
 // An Attr represents an attribute in an XML element (Name=Value).
 type Attr struct {
@@ -79,12 +79,12 @@ func (e StartElement) Copy() StartElement {
 	copy(attrs, e.Attr)
 	e.Attr = attrs
 	return e
-}
+} //END FUNCTION
 
 // End returns the corresponding XML end element.
 func (e StartElement) End() EndElement {
 	return EndElement{e.Name}
-}
+} //END FUNCTION
 
 // setDefaultNamespace sets the namespace of the element
 // as the default for all elements contained within it.
@@ -108,7 +108,7 @@ func (e *StartElement) setDefaultNamespace() {
 		},
 		Value: e.Name.Space,
 	})
-}
+} //END FUNCTION
 
 // An EndElement represents an XML end element.
 type EndElement struct {
@@ -124,15 +124,19 @@ func makeCopy(b []byte) []byte {
 	b1 := make([]byte, len(b))
 	copy(b1, b)
 	return b1
-}
+} //END FUNCTION
 
-func (c CharData) Copy() CharData { return CharData(makeCopy(c)) }
+func (c CharData) Copy() CharData {
+	return CharData(makeCopy(c))
+} //END FUNCTION
 
 // A Comment represents an XML comment of the form <!--comment-->.
 // The bytes do not include the <!-- and --> comment markers.
 type Comment []byte
 
-func (c Comment) Copy() Comment { return Comment(makeCopy(c)) }
+func (c Comment) Copy() Comment {
+	return Comment(makeCopy(c))
+} //END FUNCTION
 
 // A ProcInst represents an XML processing instruction of the form <?target inst?>
 type ProcInst struct {
@@ -143,13 +147,15 @@ type ProcInst struct {
 func (p ProcInst) Copy() ProcInst {
 	p.Inst = makeCopy(p.Inst)
 	return p
-}
+} //END FUNCTION
 
 // A Directive represents an XML directive of the form <!text>.
 // The bytes do not include the <! and > markers.
 type Directive []byte
 
-func (d Directive) Copy() Directive { return Directive(makeCopy(d)) }
+func (d Directive) Copy() Directive {
+	return Directive(makeCopy(d))
+} //END FUNCTION
 
 // CopyToken returns a copy of a Token.
 func CopyToken(t Token) Token {
@@ -166,7 +172,7 @@ func CopyToken(t Token) Token {
 		return v.Copy()
 	}
 	return t
-}
+} //END FUNCTION
 
 // A Decoder represents an XML parser reading a particular input stream.
 // The parser assumes that its input is encoded in UTF-8.
@@ -250,7 +256,7 @@ func NewDecoder(r io.Reader) *Decoder {
 	}
 	d.switchToReader(r)
 	return d
-}
+} //END FUNCTION
 
 // Token returns the next XML token in the input stream.
 // At the end of the input stream, Token returns nil, io.EOF.
@@ -327,7 +333,7 @@ func (d *Decoder) Token() (t Token, err error) {
 		t = t1
 	}
 	return
-}
+} //END FUNCTION
 
 const xmlURL = "http://www.w3.org/XML/1998/namespace"
 
@@ -350,7 +356,7 @@ func (d *Decoder) translate(n *Name, isElementName bool) {
 	} else if n.Space == "" {
 		n.Space = d.DefaultSpace
 	}
-}
+} //END FUNCTION
 
 func (d *Decoder) switchToReader(r io.Reader) {
 	// Get efficient byte at a time reader.
@@ -362,7 +368,7 @@ func (d *Decoder) switchToReader(r io.Reader) {
 	} else {
 		d.r = bufio.NewReader(r)
 	}
-}
+} //END FUNCTION
 
 // Parsing state - stack holds old name space translations
 // and the current set of open elements. The translations to pop when
@@ -392,7 +398,7 @@ func (d *Decoder) push(kind int) *stack {
 	s.kind = kind
 	d.stk = s
 	return s
-}
+} //END FUNCTION
 
 func (d *Decoder) pop() *stack {
 	s := d.stk
@@ -402,7 +408,7 @@ func (d *Decoder) pop() *stack {
 		d.free = s
 	}
 	return s
-}
+} //END FUNCTION
 
 // Record that after the current element is finished
 // (that element is already pushed on the stack)
@@ -429,7 +435,7 @@ func (d *Decoder) pushEOF() {
 	s.kind = stkEOF
 	s.next = start.next
 	start.next = s
-}
+} //END FUNCTION
 
 // Undo a pushEOF.
 // The element must have been finished, so the EOF should be at the top of the stack.
@@ -439,13 +445,13 @@ func (d *Decoder) popEOF() bool {
 	}
 	d.pop()
 	return true
-}
+} //END FUNCTION
 
 // Record that we are starting an element with the given name.
 func (d *Decoder) pushElement(name Name) {
 	s := d.push(stkStart)
 	s.name = name
-}
+} //END FUNCTION
 
 // Record that we are changing the value of ns[local].
 // The old value is url, ok.
@@ -454,12 +460,12 @@ func (d *Decoder) pushNs(local string, url string, ok bool) {
 	s.name.Local = local
 	s.name.Space = url
 	s.ok = ok
-}
+} //END FUNCTION
 
 // Creates a SyntaxError with the current line number.
 func (d *Decoder) syntaxError(msg string) error {
 	return &SyntaxError{Msg: msg, Line: d.line}
-}
+} //END FUNCTION
 
 // Record that we are ending an element with the given name.
 // The name must match the record at the top of the stack,
@@ -501,7 +507,7 @@ func (d *Decoder) popElement(t *EndElement) bool {
 	}
 
 	return true
-}
+} //END FUNCTION
 
 // If the top element on the stack is autoclosing and
 // t is not the end tag, invent the end tag.
@@ -521,7 +527,7 @@ func (d *Decoder) autoClose(t Token) (Token, bool) {
 		}
 	}
 	return nil, false
-}
+} //END FUNCTION
 
 var errRawToken = errors.New("xml: cannot use RawToken from UnmarshalXML method")
 
@@ -533,7 +539,7 @@ func (d *Decoder) RawToken() (Token, error) {
 		return nil, errRawToken
 	}
 	return d.rawToken()
-}
+} //END FUNCTION
 
 func (d *Decoder) rawToken() (Token, error) {
 	if d.err != nil {
@@ -832,7 +838,7 @@ func (d *Decoder) rawToken() (Token, error) {
 		d.toClose = name
 	}
 	return StartElement{name, attr}, nil
-}
+} //END FUNCTION
 
 func (d *Decoder) attrval() []byte {
 	b, ok := d.mustgetc()
@@ -866,7 +872,7 @@ func (d *Decoder) attrval() []byte {
 		}
 	}
 	return d.buf.Bytes()
-}
+} //END FUNCTION
 
 // Skip spaces if any
 func (d *Decoder) space() {
@@ -882,7 +888,7 @@ func (d *Decoder) space() {
 			return
 		}
 	}
-}
+} //END FUNCTION
 
 // Read a single byte.
 // If there is no byte to read, return ok==false
@@ -909,14 +915,14 @@ func (d *Decoder) getc() (b byte, ok bool) {
 	}
 	d.offset++
 	return b, true
-}
+} //END FUNCTION
 
 // InputOffset returns the input stream byte offset of the current decoder position.
 // The offset gives the location of the end of the most recently returned token
 // and the beginning of the next token.
 func (d *Decoder) InputOffset() int64 {
 	return d.offset
-}
+} //END FUNCTION
 
 // Return saved offset.
 // If we did ungetc (nextByte >= 0), have to back up one.
@@ -926,7 +932,7 @@ func (d *Decoder) savedOffset() int {
 		n--
 	}
 	return n
-}
+} //END FUNCTION
 
 // Must read a single byte.
 // If there is no byte to read,
@@ -939,7 +945,7 @@ func (d *Decoder) mustgetc() (b byte, ok bool) {
 		}
 	}
 	return
-}
+} //END FUNCTION
 
 // Unread a single byte.
 func (d *Decoder) ungetc(b byte) {
@@ -948,7 +954,7 @@ func (d *Decoder) ungetc(b byte) {
 	}
 	d.nextByte = int(b)
 	d.offset--
-}
+} //END FUNCTION
 
 var entity = map[string]rune{
 	"lt":   '<',
@@ -1125,7 +1131,7 @@ Input:
 	}
 
 	return data
-}
+} //END FUNCTION
 
 // Decide whether the given rune is in the XML Character Range, per
 // the Char production of http://www.xml.com/axml/testaxml.htm,
@@ -1137,7 +1143,7 @@ func isInCharacterRange(r rune) (inrange bool) {
 		r >= 0x20 && r <= 0xDF77 ||
 		r >= 0xE000 && r <= 0xFFFD ||
 		r >= 0x10000 && r <= 0x10FFFF
-}
+} //END FUNCTION
 
 // Get name space name: name with a : stuck in the middle.
 // The part before the : is the name space identifier.
@@ -1154,7 +1160,7 @@ func (d *Decoder) nsname() (name Name, ok bool) {
 		name.Local = s[i+1:]
 	}
 	return name, true
-}
+} //END FUNCTION
 
 // Get name: /first(first|second)*/
 // Do not set d.err if the name is missing (unless unexpected EOF is received):
@@ -1172,7 +1178,7 @@ func (d *Decoder) name() (s string, ok bool) {
 		return "", false
 	}
 	return string(b), true
-}
+} //END FUNCTION
 
 // Read a name and append its bytes to d.buf.
 // The name is delimited by any single-byte character not valid in names.
@@ -1199,14 +1205,14 @@ func (d *Decoder) readName() (ok bool) {
 		d.buf.WriteByte(b)
 	}
 	return true
-}
+} //END FUNCTION
 
 func isNameByte(c byte) bool {
 	return 'A' <= c && c <= 'Z' ||
 		'a' <= c && c <= 'z' ||
 		'0' <= c && c <= '9' ||
 		c == '_' || c == ':' || c == '.' || c == '-'
-}
+} //END FUNCTION
 
 func isName(s []byte) bool {
 	if len(s) == 0 {
@@ -1230,7 +1236,7 @@ func isName(s []byte) bool {
 		}
 	}
 	return true
-}
+} //END FUNCTION
 
 func isNameString(s string) bool {
 	if len(s) == 0 {
@@ -1254,7 +1260,7 @@ func isNameString(s string) bool {
 		}
 	}
 	return true
-}
+} //END FUNCTION
 
 // These tables were generated by cut and paste from Appendix B of
 // the XML spec at http://www.xml.com/axml/testaxml.htm
@@ -1880,7 +1886,7 @@ var (
 // of the plain text data s.
 func EscapeText(w io.Writer, s []byte) error {
 	return escapeText(w, s, true)
-}
+} //END FUNCTION
 
 // escapeText writes to w the properly escaped XML equivalent
 // of the plain text data s. If escapeNewline is true, newline
@@ -1930,7 +1936,7 @@ func escapeText(w io.Writer, s []byte, escapeNewline bool) error {
 		return err
 	}
 	return nil
-}
+} //END FUNCTION
 
 // EscapeString writes to p the properly escaped XML equivalent
 // of the plain text data s.
@@ -1969,14 +1975,14 @@ func (p *printer) EscapeString(s string) {
 		last = i
 	}
 	p.WriteString(s[last:])
-}
+} //END FUNCTION
 
 // Escape is like EscapeText but omits the error return value.
 // It is provided for backwards compatibility with Go 1.0.
 // Code targeting Go 1.1 or later should use EscapeText.
 func Escape(w io.Writer, s []byte) {
 	EscapeText(w, s)
-}
+} //END FUNCTION
 
 // procInst parses the `param="..."` or `param='...'`
 // value out of the provided string, returning "" if not found.
@@ -2000,6 +2006,6 @@ func procInst(param, s string) string {
 		return ""
 	}
 	return v[1 : idx+1]
-}
+} //END FUNCTION
 
 // #end

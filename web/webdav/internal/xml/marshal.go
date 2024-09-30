@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV / XML :: Marshal
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2011 The Go Authors. All rights reserved.
@@ -78,7 +78,7 @@ func Marshal(v interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
-}
+} //END FUNCTION
 
 // Marshaler is the interface implemented by objects that can marshal
 // themselves into valid XML elements.
@@ -126,7 +126,7 @@ func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
-}
+} //END FUNCTION
 
 // An Encoder writes XML data to an output stream.
 type Encoder struct {
@@ -138,7 +138,7 @@ func NewEncoder(w io.Writer) *Encoder {
 	e := &Encoder{printer{Writer: bufio.NewWriter(w)}}
 	e.p.encoder = e
 	return e
-}
+} //END FUNCTION
 
 // Indent sets the encoder to generate XML in which each element
 // begins on a new indented line that starts with prefix and is followed by
@@ -146,7 +146,7 @@ func NewEncoder(w io.Writer) *Encoder {
 func (enc *Encoder) Indent(prefix, indent string) {
 	enc.p.prefix = prefix
 	enc.p.indent = indent
-}
+} //END FUNCTION
 
 // Encode writes the XML encoding of v to the stream.
 //
@@ -160,7 +160,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 		return err
 	}
 	return enc.p.Flush()
-}
+} //END FUNCTION
 
 // EncodeElement writes the XML encoding of v to the stream,
 // using start as the outermost tag in the encoding.
@@ -175,7 +175,7 @@ func (enc *Encoder) EncodeElement(v interface{}, start StartElement) error {
 		return err
 	}
 	return enc.p.Flush()
-}
+} //END FUNCTION
 
 var (
 	begComment   = []byte("<!--")
@@ -256,7 +256,7 @@ func (enc *Encoder) EncodeToken(t Token) error {
 
 	}
 	return p.cachedWriteError()
-}
+} //END FUNCTION
 
 // isValidDirective reports whether dir is a valid directive text,
 // meaning angle brackets are matched, ignoring comments and strings.
@@ -296,13 +296,13 @@ func isValidDirective(dir Directive) bool {
 		}
 	}
 	return depth == 0 && inquote == 0 && !incomment
-}
+} //END FUNCTION
 
 // Flush flushes any buffered XML to the underlying writer.
 // See the EncodeToken documentation for details about when it is necessary.
 func (enc *Encoder) Flush() error {
 	return enc.p.Flush()
-}
+} //END FUNCTION
 
 type printer struct {
 	*bufio.Writer
@@ -346,7 +346,7 @@ func (p *printer) prefixForNS(url string, isAttr bool) string {
 		return ""
 	}
 	return p.attrPrefix[url]
-}
+} //END FUNCTION
 
 // defineNS pushes any namespace definition found in the given attribute.
 // If ignoreNonEmptyDefault is true, an xmlns="nonempty"
@@ -397,7 +397,7 @@ func (p *printer) defineNS(attr Attr, ignoreNonEmptyDefault bool) error {
 	}
 	p.pushPrefix(prefix, attr.Value)
 	return nil
-}
+} //END FUNCTION
 
 // createNSPrefix creates a name space prefix attribute
 // to use for the given name space, defining a new prefix
@@ -457,7 +457,7 @@ func (p *printer) createNSPrefix(url string, isAttr bool) {
 	}
 
 	p.pushPrefix(prefix, url)
-}
+} //END FUNCTION
 
 // writeNamespaces writes xmlns attributes for all the
 // namespace prefixes that have been defined in
@@ -480,7 +480,7 @@ func (p *printer) writeNamespaces() {
 		EscapeText(p, []byte(p.nsForPrefix(prefix.prefix)))
 		p.WriteString(`"`)
 	}
-}
+} //END FUNCTION
 
 // pushPrefix pushes a new prefix on the prefix stack
 // without checking to see if it is already defined.
@@ -490,7 +490,7 @@ func (p *printer) pushPrefix(prefix, url string) {
 		url:    p.nsForPrefix(prefix),
 	})
 	p.setAttrPrefix(prefix, url)
-}
+} //END FUNCTION
 
 // nsForPrefix returns the name space for the given
 // prefix. Note that this is not valid for the
@@ -501,7 +501,7 @@ func (p *printer) nsForPrefix(prefix string) string {
 		return p.defaultNS
 	}
 	return p.attrNS[prefix]
-}
+} //END FUNCTION
 
 // markPrefix marks the start of an element on the prefix
 // stack.
@@ -509,7 +509,7 @@ func (p *printer) markPrefix() {
 	p.prefixes = append(p.prefixes, printerPrefix{
 		mark: true,
 	})
-}
+} //END FUNCTION
 
 // popPrefix pops all defined prefixes for the current
 // element.
@@ -522,7 +522,7 @@ func (p *printer) popPrefix() {
 		}
 		p.setAttrPrefix(prefix.prefix, prefix.url)
 	}
-}
+} //END FUNCTION
 
 // setAttrPrefix sets an attribute name space prefix.
 // If url is empty, the attribute is removed.
@@ -548,7 +548,7 @@ func (p *printer) setAttrPrefix(prefix, url string) {
 	delete(p.attrPrefix, p.attrNS[prefix])
 	p.attrPrefix[url] = prefix
 	p.attrNS[prefix] = url
-}
+} //END FUNCTION
 
 var (
 	marshalerType     = reflect.TypeOf((*Marshaler)(nil)).Elem()
@@ -718,7 +718,7 @@ func (p *printer) marshalValue(val reflect.Value, finfo *fieldInfo, startTemplat
 	}
 
 	return p.cachedWriteError()
-}
+} //END FUNCTION
 
 // fieldAttr returns the attribute of the given field.
 // If the returned attribute has an empty Name.Local,
@@ -777,7 +777,7 @@ func (p *printer) fieldAttr(finfo *fieldInfo, val reflect.Value) (Attr, error) {
 		s = string(b)
 	}
 	return Attr{name, s}, nil
-}
+} //END FUNCTION
 
 // defaultStart returns the default start element to use,
 // given the reflect type, field info, and start template.
@@ -805,7 +805,7 @@ func (p *printer) defaultStart(typ reflect.Type, finfo *fieldInfo, startTemplate
 	}
 	start.setDefaultNamespace()
 	return start
-}
+} //END FUNCTION
 
 // marshalInterface marshals a Marshaler interface value.
 func (p *printer) marshalInterface(val Marshaler, start StartElement) error {
@@ -825,7 +825,7 @@ func (p *printer) marshalInterface(val Marshaler, start StartElement) error {
 	}
 	p.tags = p.tags[:n-1]
 	return nil
-}
+} //END FUNCTION
 
 // marshalTextInterface marshals a TextMarshaler interface value.
 func (p *printer) marshalTextInterface(val encoding.TextMarshaler, start StartElement) error {
@@ -838,7 +838,7 @@ func (p *printer) marshalTextInterface(val encoding.TextMarshaler, start StartEl
 	}
 	EscapeText(p, text)
 	return p.writeEnd(start.Name)
-}
+} //END FUNCTION
 
 // writeStart writes the given start element.
 func (p *printer) writeStart(start *StartElement) error {
@@ -892,7 +892,7 @@ func (p *printer) writeStart(start *StartElement) error {
 	}
 	p.WriteByte('>')
 	return nil
-}
+} //END FUNCTION
 
 // writeName writes the given name. It assumes
 // that p.createNSPrefix(name) has already been called.
@@ -902,7 +902,7 @@ func (p *printer) writeName(name Name, isAttr bool) {
 		p.WriteByte(':')
 	}
 	p.WriteString(name.Local)
-}
+} //END FUNCTION
 
 func (p *printer) writeEnd(name Name) error {
 	if name.Local == "" {
@@ -926,7 +926,7 @@ func (p *printer) writeEnd(name Name) error {
 	p.WriteByte('>')
 	p.popPrefix()
 	return nil
-}
+} //END FUNCTION
 
 func (p *printer) marshalSimple(typ reflect.Type, val reflect.Value) (string, []byte, error) {
 	switch val.Kind() {
@@ -961,7 +961,7 @@ func (p *printer) marshalSimple(typ reflect.Type, val reflect.Value) (string, []
 		return "", val.Bytes(), nil
 	}
 	return "", nil, &UnsupportedTypeError{typ}
-}
+} //END FUNCTION
 
 var ddBytes = []byte("--")
 
@@ -1096,7 +1096,7 @@ func (p *printer) marshalStruct(tinfo *typeInfo, val reflect.Value) error {
 		return err
 	}
 	return p.cachedWriteError()
-}
+} //END FUNCTION
 
 var noField fieldInfo
 
@@ -1104,7 +1104,7 @@ var noField fieldInfo
 func (p *printer) cachedWriteError() error {
 	_, err := p.Write(nil)
 	return err
-}
+} //END FUNCTION
 
 func (p *printer) writeIndent(depthDelta int) {
 	if len(p.prefix) == 0 && len(p.indent) == 0 {
@@ -1135,7 +1135,7 @@ func (p *printer) writeIndent(depthDelta int) {
 		p.depth++
 		p.indentedIn = true
 	}
-}
+} //END FUNCTION
 
 type parentStack struct {
 	p       *printer
@@ -1197,7 +1197,7 @@ func (s *parentStack) setParents(finfo *fieldInfo, vf reflect.Value) error {
 		}
 	}
 	return nil
-}
+} //END FUNCTION
 
 // A MarshalXMLError is returned when Marshal encounters a type
 // that cannot be converted into XML.
@@ -1207,7 +1207,7 @@ type UnsupportedTypeError struct {
 
 func (e *UnsupportedTypeError) Error() string {
 	return "xml: unsupported type: " + e.Type.String()
-}
+} //END FUNCTION
 
 func isEmptyValue(v reflect.Value) bool {
 	switch v.Kind() {
@@ -1225,6 +1225,6 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.IsNil()
 	}
 	return false
-}
+} //END FUNCTION
 
 // #end

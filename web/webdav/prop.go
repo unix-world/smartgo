@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: Prop
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2015 The Go Authors. All rights reserved.
@@ -73,7 +73,7 @@ func makePropstats(x, y Propstat) []Propstat {
 		})
 	}
 	return pstats
-}
+} //END FUNCTION
 
 // DeadPropsHolder holds the dead properties of a resource.
 //
@@ -208,7 +208,7 @@ func props(ctx context.Context, fs FileSystem, lks bool, name string, pnames []x
 		}
 	}
 	return makePropstats(pstatOK, pstatNotFound), nil
-}
+} //END FUNCTION
 
 // propnames returns the property names defined for resource name.
 func propnames(ctx context.Context, fs FileSystem, lks bool, name string) ([]xml.Name, error) {
@@ -241,7 +241,7 @@ func propnames(ctx context.Context, fs FileSystem, lks bool, name string) ([]xml
 		pnames = append(pnames, pn)
 	}
 	return pnames, nil
-}
+} //END FUNCTION
 
 // allprop returns the properties defined for resource name and the properties
 // named in include.
@@ -267,7 +267,7 @@ func allprop(ctx context.Context, fs FileSystem, lks bool, name string, include 
 		}
 	}
 	return props(ctx, fs, lks, name, pnames)
-}
+} //END FUNCTION
 
 // patch patches the properties of resource name. The return values are
 // constrained in the same manner as DeadPropsHolder.Patch.
@@ -331,7 +331,7 @@ loop:
 		}
 	}
 	return []Propstat{pstat}, nil
-}
+} //END FUNCTION
 
 func escapeXML(s string) string {
 	for i := 0; i < len(s); i++ {
@@ -351,14 +351,14 @@ func escapeXML(s string) string {
 		return buf.String()
 	}
 	return s
-}
+} //END FUNCTION
 
 func findResourceType(ctx context.Context, fs FileSystem, lks bool, name string, fi os.FileInfo) (string, error) {
 	if fi.IsDir() {
 		return `<D:collection xmlns:D="DAV:"/>`, nil
 	}
 	return "", nil
-}
+} //END FUNCTION
 
 func findDisplayName(ctx context.Context, fs FileSystem, lks bool, name string, fi os.FileInfo) (string, error) {
 	if slashClean(name) == "/" {
@@ -366,15 +366,15 @@ func findDisplayName(ctx context.Context, fs FileSystem, lks bool, name string, 
 		return "", nil
 	}
 	return escapeXML(fi.Name()), nil
-}
+} //END FUNCTION
 
 func findContentLength(ctx context.Context, fs FileSystem, lks bool, name string, fi os.FileInfo) (string, error) {
 	return strconv.FormatInt(fi.Size(), 10), nil
-}
+} //END FUNCTION
 
 func findLastModified(ctx context.Context, fs FileSystem, lks bool, name string, fi os.FileInfo) (string, error) {
 	return fi.ModTime().UTC().Format(http.TimeFormat), nil
-}
+} //END FUNCTION
 
 // ErrNotImplemented should be returned by optional interfaces if they
 // want the original implementation to be used.
@@ -424,7 +424,7 @@ func findContentType(ctx context.Context, fs FileSystem, lks bool, name string, 
 	// Rewind file.
 	_, err = f.Seek(0, io.SeekStart)
 	return ctype, err
-}
+} //END FUNCTION
 
 // ETager is an optional interface for the os.FileInfo objects
 // returned by the FileSystem.
@@ -455,6 +455,6 @@ func findETag(ctx context.Context, fs FileSystem, lks bool, name string, fi os.F
 	// modification time and size of a file. We replicate the heuristic
 	// with nanosecond granularity.
 	return fmt.Sprintf(`"%x%x"`, fi.ModTime().UnixNano(), fi.Size()), nil
-}
+} //END FUNCTION
 
 // #end

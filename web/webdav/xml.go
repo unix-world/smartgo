@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: XML
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -77,7 +77,7 @@ func readLockInfo(r io.Reader) (li lockInfo, status int, err error) {
 //	}
 	//--
 	return li, 0, nil
-}
+} //END FUNCTION
 
 func writeLockInfo(w io.Writer, token string, ld LockDetails) (int, error) {
 	depth := "infinity"
@@ -97,7 +97,7 @@ func writeLockInfo(w io.Writer, token string, ld LockDetails) (int, error) {
 		"</D:activelock></D:lockdiscovery></D:prop>"+"\n", // unixman: add LF at the end
 		depth, ld.OwnerXML, timeout, escape(token), escape(ld.Root),
 	)
-}
+} //END FUNCTION
 
 //-- #lock
 
@@ -110,7 +110,7 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.n += n
 	return n, err
-}
+} //END FUNCTION
 
 func escape(s string) string {
 	for i := 0; i < len(s); i++ {
@@ -122,7 +122,7 @@ func escape(s string) string {
 		}
 	}
 	return s
-}
+} //END FUNCTION
 
 // next returns the next token, if any, in the XML stream of d.
 // RFC 4918 requires to ignore comments, processing instructions
@@ -142,7 +142,7 @@ func next(d *ixml.Decoder) (ixml.Token, error) {
 			return t, nil
 		}
 	}
-}
+} //END FUNCTION
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_prop (for propfind)
 type propfindProps []xml.Name
@@ -175,7 +175,7 @@ func (pn *propfindProps) UnmarshalXML(d *ixml.Decoder, start ixml.StartElement) 
 			*pn = append(*pn, xml.Name(name))
 		}
 	}
-}
+} //END FUNCTION
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_propfind
 type propfind struct {
@@ -213,7 +213,7 @@ func readPropfind(r io.Reader) (pf propfind, status int, err error) {
 		return propfind{}, http.StatusBadRequest, errInvalidPropfind
 	}
 	return pf, 0, nil
-}
+} //END FUNCTION
 
 // Property represents a single DAV resource property as defined in RFC 4918.
 // See http://www.webdav.org/specs/rfc4918.html#data.model.for.resource.properties
@@ -295,7 +295,7 @@ func (ps propstat) MarshalXML(e *ixml.Encoder, start ixml.StartElement) error {
 	// Distinct type to avoid infinite recursion of MarshalXML.
 	type newpropstat ixmlPropstat
 	return e.EncodeElement(newpropstat(ixmlPs), start)
-}
+} //END FUNCTION
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_response
 // See multistatusWriter for the "D:" namespace prefix.
@@ -354,7 +354,7 @@ func (w *multistatusWriter) write(r *response) error {
 		return err
 	}
 	return w.enc.Encode(r)
-}
+} //END FUNCTION
 
 // writeHeader writes a XML multistatus start element on w's underlying
 // http.ResponseWriter and returns the result of the write operation.
@@ -380,7 +380,7 @@ func (w *multistatusWriter) writeHeader() error {
 			Value: "DAV:",
 		}},
 	})
-}
+} //END FUNCTION
 
 // Close completes the marshalling of the multistatus response. It returns
 // an error if the multistatus response could not be completed. If both the
@@ -409,7 +409,7 @@ func (w *multistatusWriter) close() error {
 		}
 	}
 	return w.enc.Flush()
-}
+} //END FUNCTION
 
 var xmlLangName = ixml.Name{Space: "http://www.w3.org/XML/1998/namespace", Local: "lang"}
 
@@ -420,7 +420,7 @@ func xmlLang(s ixml.StartElement, d string) string {
 		}
 	}
 	return d
-}
+} //END FUNCTION
 
 type xmlValue []byte
 
@@ -449,7 +449,7 @@ func (v *xmlValue) UnmarshalXML(d *ixml.Decoder, start ixml.StartElement) error 
 	}
 	*v = b.Bytes()
 	return nil
-}
+} //END FUNCTION
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_prop (for proppatch)
 type proppatchProps []Property
@@ -487,7 +487,7 @@ func (ps *proppatchProps) UnmarshalXML(d *ixml.Decoder, start ixml.StartElement)
 			*ps = append(*ps, p)
 		}
 	}
-}
+} //END FUNCTION
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_set
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_remove
@@ -527,6 +527,6 @@ func readProppatch(r io.Reader) (patches []Proppatch, status int, err error) {
 		patches = append(patches, Proppatch{Remove: remove, Props: op.Prop})
 	}
 	return patches, 0, nil
-}
+} //END FUNCTION
 
 // #end

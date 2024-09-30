@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240928.0102 :: STABLE
+// r.20240930.1531 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -30,6 +30,18 @@ func webDavInitLockSysCache() {
 	webdavLockCache = smartcache.NewCache("smart.websrv.webdav.locking.inMemCache", time.Duration(webdavLockTimeSeconds) * time.Second, webdav.DEBUG)
 } //END FUNCTION
 
+func webdavLockExternalGetTokenHash(token string) string {
+	token = smart.StrTrimWhitespaces(token)
+	if(token == "") {
+		return ""
+	} //end if
+	if(smart.StrContains(token, ":")) { // ex: urn:uuid:00000000-0000-0000-0000-000000000000
+		arr := smart.ExplodeWithLimit(":", token, 3)
+		token = smart.StrTrimWhitespaces(arr[len(arr)-1]) // get last part
+	} //end if
+	return token
+} //END FUNCTION
+
 func webdavLockExternalIsValid(token string) bool {
 	if(token != smart.StrTrimWhitespaces(token)) {
 		return false
@@ -41,7 +53,7 @@ func webdavLockExternalIsValid(token string) bool {
 		return false
 	} //end if
 	return true
-} //end function
+} //END FUNCTION
 
 func webdavLockingLOCK(internal bool, path string) (token string, err error) {
 	//--
@@ -65,6 +77,7 @@ func webdavLockingLOCK(internal bool, path string) (token string, err error) {
 	} //end if
 	//--
 	if(!internal) {
+		token = webdavLockExternalGetTokenHash(token)
 		if(!webdavLockExternalIsValid(token)) {
 			log.Println("[ERROR]", smart.CurrentFunctionName(), "External Token format should be URN")
 			return "",  smart.NewError("Invalid Token: format should be: URN")
@@ -119,6 +132,7 @@ func webdavLockingUNLOCK(internal bool, token string) (success bool, err error) 
 	} //end if
 	//--
 	if(!internal) {
+		token = webdavLockExternalGetTokenHash(token)
 		if(!webdavLockExternalIsValid(token)) {
 			return false, smart.NewError("Invalid Token: expects format: URN")
 		} //end if
@@ -129,7 +143,7 @@ func webdavLockingUNLOCK(internal bool, token string) (success bool, err error) 
 	//--
 } //END FUNCTION
 
-func webdavLockingEXISTS (internal bool, token string) bool {
+func webdavLockingEXISTS(internal bool, token string) bool {
 	//--
 	if(webdavLockCache == nil) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
@@ -147,7 +161,9 @@ func webdavLockingEXISTS (internal bool, token string) bool {
 	} //end if
 	//--
 	if(!internal) {
+		token = webdavLockExternalGetTokenHash(token)
 		if(!webdavLockExternalIsValid(token)) {
+			log.Println("[WARNING]", smart.CurrentFunctionName(), "Invalid Lock Token: expect format: URN", token)
 			return false
 		} //end if
 		return true // STOP Here, external locking on web systems is unrealistic ; only internal locking is implemented !

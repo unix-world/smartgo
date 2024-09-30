@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV / XML :: TypeInfo
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2011 The Go Authors. All rights reserved.
@@ -113,7 +113,7 @@ func getTypeInfo(typ reflect.Type) (*typeInfo, error) {
 	tinfoMap[typ] = tinfo
 	tinfoLock.Unlock()
 	return tinfo, nil
-}
+} //END FUNCTION
 
 // structFieldInfo builds and returns a fieldInfo for f.
 func structFieldInfo(typ reflect.Type, f *reflect.StructField) (*fieldInfo, error) {
@@ -235,7 +235,7 @@ func structFieldInfo(typ reflect.Type, f *reflect.StructField) (*fieldInfo, erro
 		}
 	}
 	return finfo, nil
-}
+} //END FUNCTION
 
 // lookupXMLName returns the fieldInfo for typ's XMLName field
 // in case it exists and has a valid xml field tag, otherwise
@@ -261,14 +261,14 @@ func lookupXMLName(typ reflect.Type) (xmlname *fieldInfo) {
 		break
 	}
 	return nil
-}
+} //END FUNCTION
 
 func min(a, b int) int {
 	if a <= b {
 		return a
 	}
 	return b
-}
+} //END FUNCTION
 
 // addFieldInfo adds finfo to tinfo.fields if there are no
 // conflicts, or if conflicts arise from previous fields that were
@@ -342,7 +342,7 @@ Loop:
 	}
 	tinfo.fields = append(tinfo.fields, *newf)
 	return nil
-}
+} //END FUNCTION
 
 // A TagPathError represents an error in the unmarshalling process
 // caused by the use of field tags with conflicting paths.
@@ -354,7 +354,7 @@ type TagPathError struct {
 
 func (e *TagPathError) Error() string {
 	return fmt.Sprintf("%s field %q with tag %q conflicts with field %q with tag %q", e.Struct, e.Field1, e.Tag1, e.Field2, e.Tag2)
-}
+} //END FUNCTION
 
 // value returns v's field value corresponding to finfo.
 // It's equivalent to v.FieldByIndex(finfo.idx), but initializes
@@ -373,6 +373,6 @@ func (finfo *fieldInfo) value(v reflect.Value) reflect.Value {
 		v = v.Field(x)
 	}
 	return v
-}
+} //END FUNCTION
 
 // #end

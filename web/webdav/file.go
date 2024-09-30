@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: File
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -37,7 +37,7 @@ func slashClean(name string) string {
 //	return path.Clean(name)
 	return name // no need to fix again, was fixed above
 	//-- #unixman
-}
+} //END FUNCTION
 
 // A FileSystem implements access to a collection of named files. The elements
 // in a file path are separated by slash ('/', U+002F) characters, regardless
@@ -103,7 +103,7 @@ func (d Dir) resolve(name string) string {
 		dir = "."
 	}
 	return filepath.Join(dir, filepath.FromSlash(slashClean(name)))
-}
+} //END FUNCTION
 
 //-- unixman
 func (d Dir) GetRealPath(ctx context.Context, name string) (string, error) {
@@ -111,7 +111,7 @@ func (d Dir) GetRealPath(ctx context.Context, name string) (string, error) {
 		return "", os.ErrInvalid
 	}
 	return name, nil
-}
+} //END FUNCTION
 //-- #unixman
 
 func (d Dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
@@ -119,7 +119,7 @@ func (d Dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
 		return os.ErrNotExist
 	}
 	return os.Mkdir(name, perm)
-}
+} //END FUNCTION
 
 func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (File, error) {
 	//--
@@ -133,7 +133,7 @@ func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMo
 		return nil, err
 	}
 	return f, nil
-}
+} //END FUNCTION
 
 func (d Dir) RemoveAll(ctx context.Context, name string) error {
 	if name = d.resolve(name); name == "" {
@@ -147,7 +147,7 @@ func (d Dir) RemoveAll(ctx context.Context, name string) error {
 		return os.ErrInvalid
 	}
 	return os.RemoveAll(name)
-}
+} //END FUNCTION
 
 func (d Dir) Rename(ctx context.Context, oldName, newName string) error {
 	if oldName = d.resolve(oldName); oldName == "" {
@@ -168,14 +168,14 @@ func (d Dir) Rename(ctx context.Context, oldName, newName string) error {
 		return os.ErrInvalid
 	}
 	return os.Rename(oldName, newName)
-}
+} //END FUNCTION
 
 func (d Dir) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 	if name = d.resolve(name); name == "" {
 		return nil, os.ErrNotExist
 	}
 	return os.Stat(name)
-}
+} //END FUNCTION
 
 
 // moveFiles moves files and/or directories from src to dst.
@@ -206,7 +206,7 @@ func moveFiles(ctx context.Context, fs FileSystem, src, dst string, overwrite bo
 		return http.StatusCreated, nil
 	}
 	return http.StatusNoContent, nil
-}
+} //END FUNCTION
 
 func copyProps(dst, src File) error {
 	d, ok := dst.(DeadPropsHolder)
@@ -227,7 +227,7 @@ func copyProps(dst, src File) error {
 	}
 	_, err = d.Patch([]Proppatch{{Props: props}})
 	return err
-}
+} //END FUNCTION
 
 // copyFiles copies files and/or directories from src to dst.
 //
@@ -322,7 +322,7 @@ func copyFiles(ctx context.Context, fs FileSystem, src, dst string, overwrite bo
 		return http.StatusCreated, nil
 	}
 	return http.StatusNoContent, nil
-}
+} //END FUNCTION
 
 // walkFS traverses filesystem fs starting at name up to depth levels.
 //
@@ -385,6 +385,6 @@ func walkFS(ctx context.Context, fs FileSystem, depth int, name string, info os.
 		}
 	}
 	return nil
-}
+} //END FUNCTION
 
 // #end

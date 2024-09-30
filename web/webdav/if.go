@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: If
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -40,7 +40,7 @@ func parseIfHeader(httpHeader string) (h ifHeader, ok bool) {
 	default:
 		return ifHeader{}, false
 	}
-}
+} //END FUNCTION
 
 func parseNoTagLists(s string) (h ifHeader, ok bool) {
 	for {
@@ -54,7 +54,7 @@ func parseNoTagLists(s string) (h ifHeader, ok bool) {
 		}
 		s = remaining
 	}
-}
+} //END FUNCTION
 
 func parseTaggedLists(s string) (h ifHeader, ok bool) {
 	resourceTag, n := "", 0
@@ -83,7 +83,7 @@ func parseTaggedLists(s string) (h ifHeader, ok bool) {
 			return ifHeader{}, false
 		}
 	}
-}
+} //END FUNCTION
 
 func parseList(s string) (l ifList, remaining string, ok bool) {
 	tokenType, _, s := lex(s)
@@ -105,7 +105,7 @@ func parseList(s string) (l ifList, remaining string, ok bool) {
 		l.conditions = append(l.conditions, c)
 		s = remaining
 	}
-}
+} //END FUNCTION
 
 func parseCondition(s string) (c Condition, remaining string, ok bool) {
 	tokenType, tokenStr, s := lex(s)
@@ -122,7 +122,7 @@ func parseCondition(s string) (c Condition, remaining string, ok bool) {
 		return Condition{}, "", false
 	}
 	return c, s, true
-}
+} //END FUNCTION
 
 // Single-rune tokens like '(' or ')' have a token type equal to their rune.
 // All other tokens have a negative token type.
@@ -175,6 +175,6 @@ loop:
 		return errTokenType, "", ""
 	}
 	return tokenType, s[1:j], s[j+1:]
-}
+} //END FUNCTION
 
 // #end

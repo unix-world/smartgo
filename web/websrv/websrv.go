@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240928.0102 :: STABLE
+// r.20240930.1531 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20240928.0102"
+	VERSION string = "r.20240930.1531"
 	SIGNATURE string = "(c) 2020-2024 unix-world.org"
 
 	SERVER_ADDR string = "127.0.0.1" // default
@@ -223,7 +223,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			log.Println("[ERROR]", "Web Server: WebDav Root Path does not Exists or Is Not a Valid Directory:", DAV_STORAGE_RELATIVE_ROOT_PATH)
 			return 1402
 		} //end if
-		log.Println("Web Server: WebDav Service is ENABLED ::", "SharedMode:", webdavOptions.SharedMode, ";", "SmartSafePaths:", webdavOptions.SmartSafePaths)
+		log.Println("[META]", "Web Server: WebDav Service is ENABLED ::", "SharedMode:", webdavOptions.SharedMode, ";", "SmartSafePaths:", webdavOptions.SmartSafePaths)
 		log.Println("[INFO]", "Web Server WebDAV Serving Path: `" + webDavUrlPath() + "` as: `" + smart.PathGetAbsoluteFromRelative(DAV_STORAGE_RELATIVE_ROOT_PATH) + "`")
 		webDavInitLockSysCache()
 	} //end if

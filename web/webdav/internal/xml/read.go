@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV / XML :: Read
-// r.20240117.2121 :: STABLE
+// r.20240930.1531 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2009 The Go Authors. All rights reserved.
@@ -117,13 +117,13 @@ import (
 // to a freshly allocated value and then mapping the element to that value.
 func Unmarshal(data []byte, v interface{}) error {
 	return NewDecoder(bytes.NewReader(data)).Decode(v)
-}
+} //END FUNCTION
 
 // Decode works like xml.Unmarshal, except it reads the decoder
 // stream to find the start element.
 func (d *Decoder) Decode(v interface{}) error {
 	return d.DecodeElement(v, nil)
-}
+} //END FUNCTION
 
 // DecodeElement works like xml.Unmarshal except that it takes
 // a pointer to the start XML element to decode into v.
@@ -135,12 +135,14 @@ func (d *Decoder) DecodeElement(v interface{}, start *StartElement) error {
 		return errors.New("non-pointer passed to Unmarshal")
 	}
 	return d.unmarshal(val.Elem(), start)
-}
+} //END FUNCTION
 
 // An UnmarshalError represents an error in the unmarshalling process.
 type UnmarshalError string
 
-func (e UnmarshalError) Error() string { return string(e) }
+func (e UnmarshalError) Error() string {
+	return string(e)
+} //END FUNCTION
 
 // Unmarshaler is the interface implemented by objects that can unmarshal
 // an XML element description of themselves.
@@ -180,7 +182,7 @@ func receiverType(val interface{}) string {
 		return t.String()
 	}
 	return "(" + t.String() + ")"
-}
+} //END FUNCTION
 
 // unmarshalInterface unmarshals a single XML element into val.
 // start is the opening tag of the element.
@@ -201,7 +203,7 @@ func (p *Decoder) unmarshalInterface(val Unmarshaler, start *StartElement) error
 	}
 
 	return nil
-}
+} //END FUNCTION
 
 // unmarshalTextInterface unmarshals a single XML element into val.
 // The chardata contained in the element (but not its children)
@@ -226,7 +228,7 @@ func (p *Decoder) unmarshalTextInterface(val encoding.TextUnmarshaler, start *St
 		}
 	}
 	return val.UnmarshalText(buf)
-}
+} //END FUNCTION
 
 // unmarshalAttr unmarshals a single XML attribute into val.
 func (p *Decoder) unmarshalAttr(val reflect.Value, attr Attr) error {
@@ -264,7 +266,7 @@ func (p *Decoder) unmarshalAttr(val reflect.Value, attr Attr) error {
 
 	copyValue(val, []byte(attr.Value))
 	return nil
-}
+} //END FUNCTION
 
 var (
 	unmarshalerType     = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
@@ -554,7 +556,7 @@ Loop:
 	}
 
 	return nil
-}
+} //END FUNCTION
 
 func copyValue(dst reflect.Value, src []byte) (err error) {
 	dst0 := dst
@@ -606,7 +608,7 @@ func copyValue(dst reflect.Value, src []byte) (err error) {
 		dst.SetBytes(src)
 	}
 	return nil
-}
+} //END FUNCTION
 
 // unmarshalPath walks down an XML structure looking for wanted
 // paths, and calls unmarshal on them.
@@ -670,7 +672,7 @@ Loop:
 			return true, nil
 		}
 	}
-}
+} //END FUNCTION
 
 // Skip reads tokens until it has consumed the end element
 // matching the most recent start element already consumed.
@@ -693,6 +695,6 @@ func (d *Decoder) Skip() error {
 			return nil
 		}
 	}
-}
+} //END FUNCTION
 
 // #end
