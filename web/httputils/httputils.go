@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240928.0102 :: STABLE
+// r.20240930.1958 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -38,7 +38,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240928.0102"
+	VERSION string = "r.20240930.1958"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
@@ -952,9 +952,9 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	var useAuth uint8 = smart.HTTP_AUTH_MODE_NONE
 	if(authUsername != "") {
-		if(authUsername == "@TOKEN@") {
+		if(authUsername == smart.HTTP_AUTH_USER_TOKEN) {
 			useAuth = smart.HTTP_AUTH_MODE_TOKEN
-		} else if(authUsername == "@BEARER@") {
+		} else if(authUsername == smart.HTTP_AUTH_USER_BEARER) {
 			useAuth = smart.HTTP_AUTH_MODE_BEARER
 		} else {
 			useAuth = smart.HTTP_AUTH_MODE_BASIC
@@ -1383,7 +1383,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			smart.SafePathFileDelete(theDwnLockFile, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
 		}()
 		//--
-		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data to File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
 		//--
@@ -1400,7 +1400,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		//--
 	} else { // download in memory
 		//--
-		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
+		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Read Data in Memory: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(resp.ContentLength) + ")")
 		//--
 		limitedReader := io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(&bodyData, dbar), &limitedReader)

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240930.1531 :: STABLE
+// r.20240930.1958 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -23,6 +23,9 @@ const (
 	HTTP_AUTH_MODE_TOKEN  uint8 = 4
 
 	REGEX_SAFE_HTTP_USER_NAME string = `^[a-z0-9\.]+$` // Safe UserName Regex
+
+	HTTP_AUTH_USER_BEARER = "@BEARER@"
+	HTTP_AUTH_USER_TOKEN  = "@TOKEN@"
 )
 
 var (
