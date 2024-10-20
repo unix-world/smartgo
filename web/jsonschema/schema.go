@@ -7,6 +7,7 @@ import (
 	"hash/maphash"
 	"math/big"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,7 +52,7 @@ type Schema struct {
 	Properties            map[string]*Schema
 	PropertyNames         *Schema
 	RegexProperties       bool // property names must be valid regex. used only in draft4 as workaround in metaschema.
-	PatternProperties     map[Regexp]*Schema
+	PatternProperties     map[*regexp.Regexp]*Schema
 	AdditionalProperties  interface{}            // nil or bool or *Schema.
 	Dependencies          map[string]interface{} // map value is *Schema or []string.
 	DependentRequired     map[string][]string
@@ -75,7 +76,7 @@ type Schema struct {
 	// string validations
 	MinLength        int // -1 if not specified.
 	MaxLength        int // -1 if not specified.
-	Pattern          Regexp
+	Pattern          *regexp.Regexp
 	ContentEncoding  string
 	decoder          func(string) ([]byte, error)
 	ContentMediaType string

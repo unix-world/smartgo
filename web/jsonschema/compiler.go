@@ -30,12 +30,6 @@ type Compiler struct {
 	// If nil, package global LoadURL is used.
 	LoadURL func(s string) (io.ReadCloser, error)
 
-	// CompileRegex comples given regular expression.
-	// Defaults to golang's regexp implementation.
-	//
-	// NOTE: If you are overriding this, also ensure to override "regex" Format.
-	CompileRegex func(s string) (Regexp, error)
-
 	// Formats can be registered by adding to this map. Key is format name,
 	// value is function that knows how to validate that format.
 	Formats map[string]func(interface{}) bool
@@ -93,13 +87,9 @@ func MustCompileString(url, schema string) *Schema {
 // behavior change Compiler.Draft value
 func NewCompiler() *Compiler {
 	return &Compiler{
-		Draft:     latest,
-		resources: make(map[string]*resource),
-		Formats:   make(map[string]func(interface{}) bool),
-		CompileRegex: func(s string) (Regexp, error) {
-			re, err := regexp.Compile(s)
-			return (*goRegexp)(re), err
-		},
+		Draft:      latest,
+		resources:  make(map[string]*resource),
+		Formats:    make(map[string]func(interface{}) bool),
 		Decoders:   make(map[string]func(string) ([]byte, error)),
 		MediaTypes: make(map[string]func([]byte) error),
 		extensions: make(map[string]extension),
@@ -110,16 +100,7 @@ func NewCompiler() *Compiler {
 //
 // Note that url must not have fragment
 func (c *Compiler) AddResource(url string, r io.Reader) error {
-	doc, err := unmarshal(r)
-	if err != nil {
-		return fmt.Errorf("jsonschema: invalid json %s: %v", url, err)
-	}
-	return c.AddResourceJSON(url, doc)
-}
-
-// AddResourceJSON adds in-memory resource from given json value.
-func (c *Compiler) AddResourceJSON(url string, doc interface{}) error {
-	res, err := newResource(url, doc)
+	res, err := newResource(url, r)
 	if err != nil {
 		return err
 	}
@@ -212,7 +193,6 @@ func (c *Compiler) findResource(url string) (*resource, error) {
 
 	id, err := r.draft.resolveID(r.url, r.doc)
 	if err != nil {
-		r.draft = nil
 		return nil, err
 	}
 	if id != "" {
@@ -220,8 +200,6 @@ func (c *Compiler) findResource(url string) (*resource, error) {
 	}
 
 	if err := r.fillSubschemas(c, r); err != nil {
-		r.draft = nil
-		r.subresources = nil
 		return nil, err
 	}
 
@@ -261,7 +239,6 @@ func (c *Compiler) compileRef(r *resource, stack []schemaRef, refPtr string, res
 	if r.schema == nil {
 		r.schema = newSchema(r.url, r.floc, r.draft, r.doc)
 		if _, err := c.compile(r, nil, schemaRef{"#", r.schema, false}, r); err != nil {
-			r.schema = nil
 			return nil, err
 		}
 	}
@@ -282,11 +259,7 @@ func (c *Compiler) compileRef(r *resource, stack []schemaRef, refPtr string, res
 	}
 
 	sr.schema = newSchema(r.url, sr.floc, r.draft, sr.doc)
-	sch, err := c.compile(r, stack, schemaRef{refPtr, sr.schema, false}, sr)
-	if err != nil {
-		sr.schema = nil
-	}
-	return sch, err
+	return c.compile(r, stack, schemaRef{refPtr, sr.schema, false}, sr)
 }
 
 func (c *Compiler) compileDynamicAnchors(r *resource, res *resource) error {
@@ -432,6 +405,7 @@ func (c *Compiler) compileMap(r *resource, stack []schemaRef, sref schemaRef, re
 				switch jsonType(item) {
 				case "object", "array":
 					allPrimitives = false
+					break
 				}
 			}
 			s.enumError = "enum failed"
@@ -487,11 +461,7 @@ func (c *Compiler) compileMap(r *resource, stack []schemaRef, sref schemaRef, re
 		s.MinLength, s.MaxLength = loadInt("minLength"), loadInt("maxLength")
 
 		if pattern, ok := m["pattern"]; ok {
-			var err error
-			s.Pattern, err = c.CompileRegex(pattern.(string))
-			if err != nil {
-				panic("regex Format and compiler.CompileRegex are incompatible")
-			}
+			s.Pattern = regexp.MustCompile(pattern.(string))
 		}
 
 		if r.draft.version >= 2019 {
@@ -568,7 +538,7 @@ func (c *Compiler) compileMap(r *resource, stack []schemaRef, sref schemaRef, re
 
 		if patternProps, ok := m["patternProperties"]; ok {
 			patternProps := patternProps.(map[string]interface{})
-			s.PatternProperties = make(map[Regexp]*Schema, len(patternProps))
+			s.PatternProperties = make(map[*regexp.Regexp]*Schema, len(patternProps))
 			for pattern := range patternProps {
 				s.PatternProperties[regexp.MustCompile(pattern)], err = compile(nil, "patternProperties/"+escape(pattern))
 				if err != nil {
@@ -697,7 +667,7 @@ func (c *Compiler) compileMap(r *resource, stack []schemaRef, sref schemaRef, re
 			if format, ok := c.Formats[s.Format]; ok {
 				s.format = format
 			} else {
-				s.format = Formats[s.Format]
+				s.format, _ = Formats[s.Format]
 			}
 		}
 	}
@@ -724,7 +694,7 @@ func (c *Compiler) compileMap(r *resource, stack []schemaRef, sref schemaRef, re
 			if decoder, ok := c.Decoders[s.ContentEncoding]; ok {
 				s.decoder = decoder
 			} else {
-				s.decoder = Decoders[s.ContentEncoding]
+				s.decoder, _ = Decoders[s.ContentEncoding]
 			}
 		}
 		if mediaType, ok := m["contentMediaType"]; ok {
@@ -732,7 +702,7 @@ func (c *Compiler) compileMap(r *resource, stack []schemaRef, sref schemaRef, re
 			if mediaType, ok := c.MediaTypes[s.ContentMediaType]; ok {
 				s.mediaType = mediaType
 			} else {
-				s.mediaType = MediaTypes[s.ContentMediaType]
+				s.mediaType, _ = MediaTypes[s.ContentMediaType]
 			}
 			if s.ContentSchema, err = loadSchema("contentSchema", stack); err != nil {
 				return err
@@ -839,26 +809,4 @@ func keywordLocation(stack []schemaRef, path string) string {
 		loc = loc + "/" + path
 	}
 	return loc
-}
-
-// Regexp --
-
-// Regexp is the representation of a compiled regular expression.
-// A Regexp is safe for concurrent use by multiple goroutines.
-type Regexp interface {
-	// MatchString reports whether the string s contains any match of the regular expression.
-	MatchString(s string) bool
-
-	// String returns the source text used to compile the regular expression.
-	String() string
-}
-
-type goRegexp regexp.Regexp
-
-func (re *goRegexp) MatchString(s string) bool {
-	return (*regexp.Regexp)(re).MatchString(s)
-}
-
-func (re *goRegexp) String() string {
-	return (*regexp.Regexp)(re).String()
 }
