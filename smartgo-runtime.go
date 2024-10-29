@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241020.2358 :: STABLE
+// r.20241029.1708 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -28,6 +28,7 @@ import (
 
 const (
 	CMD_EXEC_HAMMER_SIGNATURE string = "[»»»»»»»[SmartGo:{!HAMMER!}:Abort:(Exit):KILL.SIGNAL]«««««««]" // INTERNAL FLAG FOR CMD FORCE EXIT HAMMER
+	CMD_EXEC_TIMED_MAX_TIMEOUT uint  = 86400
 )
 
 
@@ -419,10 +420,93 @@ func ClearPrintTerminal() {
 //-----
 
 
-func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
+// kills a command executed with StartCmd() -> WaitCmd()
+func KillCmd(cmd *exec.Cmd) error {
 	//--
-	if(stopTimeout > 86400) {
-		stopTimeout = 86400 // 0 = no execution timeout ; 1..86400 will stop the cmd execution after this number of seconds
+	if(cmd == nil) {
+		return NewError("Command is NULL")
+	} //end if
+	//--
+	return cmd.Process.Kill()
+	//--
+} //END FUNCTION
+
+
+// wait for a command started with StartCmd() to finalize ; may be defered or executed async in order to call KillCmd after it
+func WaitCmd(cmd *exec.Cmd) error {
+	//--
+	if(cmd == nil) {
+		return NewError("Command is NULL")
+	} //end if
+	//--
+	return cmd.Wait()
+	//--
+} //END FUNCTION
+
+
+// starts a command to be used with WaitCmd() -> KillCmd()
+func StartCmd(additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, errMsg error, stdoutRdr io.ReadCloser, stderrRdr io.ReadCloser, cmd *exec.Cmd) {
+	//-- {{{SYNC-SMARTGO-CMD-MANAGE}}}
+	additionalEnv = StrTrimWhitespaces(additionalEnv) // Additional ENVIRONMENT ; Example: additionalEnv = "FOO=bar"
+	// inputStdin // The Input to Stdin if any ; DO NOT TRIM, must be passed exact how is get
+	//--
+	theExe = StrTrimWhitespaces(theExe)
+	if(theExe == "") {
+		return false, NewError("ERR: EXECUTABLE Name/Path is Empty"), stdoutRdr, stderrRdr, cmd
+	} //end if
+	//--
+	theExe = SafePathFixClean(theExe)
+	//--
+	if(PathIsEmptyOrRoot(theExe) == true) {
+		return false, NewError("ERR: EXECUTABLE Name/Path is Empty/Root"), stdoutRdr, stderrRdr, cmd
+	} //end if
+	if(PathIsSafeValidPath(theExe) != true) {
+		return false, NewError("ERR: EXECUTABLE Name/Path is Invalid Unsafe"), stdoutRdr, stderrRdr, cmd
+	} //end if
+	if(PathIsBackwardUnsafe(theExe) == true) {
+		return false, NewError("ERR: EXECUTABLE Name/Path is Backward Unsafe"), stdoutRdr, stderrRdr, cmd
+	} //end if
+	//--
+	// do not check if path exists, can be a simple executable name as `ping` only !
+	//--
+	cmd = exec.Command(theExe, theArgs...)
+	//--
+	if(additionalEnv != "") {
+		newEnv := append(os.Environ(), additionalEnv)
+		cmd.Env = newEnv
+	} //end if
+	if(inputStdin != "") {
+		stdin, err := cmd.StdinPipe()
+		if(err != nil) {
+			return false, err, stdoutRdr, stderrRdr, cmd
+		} //end if
+		go func() { // If the subprocess doesn't continue before the stdin is closed, the io.WriteString() call needs to be wrapped inside an anonymous function
+			defer stdin.Close()
+			io.WriteString(stdin, inputStdin)
+		}()
+	} //end if
+	//--
+	stdoutRdr, _ = cmd.StdoutPipe()
+	stderrRdr, _ = cmd.StderrPipe()
+	//--
+	err := cmd.Start()
+	if(err != nil) {
+		return false, err, stdoutRdr, stderrRdr, cmd
+	} //end if
+	//--
+	return true, nil, stdoutRdr, stderrRdr, cmd
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+// do execute a command with/without timeout and after it finalizes (or timeouts, if apply) it returns the output
+func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
+	//-- {{{SYNC-SMARTGO-CMD-MANAGE}}}
+	if(stopTimeout > CMD_EXEC_TIMED_MAX_TIMEOUT) {
+		stopTimeout = CMD_EXEC_TIMED_MAX_TIMEOUT // 0 = no execution timeout ; 1..86400 will stop the cmd execution after this number of seconds
 	} //end if
 	//--
 	captureStdout = StrTrimWhitespaces(captureStdout) // "" | "capture" | "capture+output" | "output"
@@ -504,6 +588,7 @@ func cmdExec(stopTimeout uint, captureStdout string, captureStderr string, addit
 } //END FUNCTION
 
 
+// execute command and after it finalizes it returns the output
 func ExecCmd(captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
 	//--
 	return cmdExec(0, captureStdout, captureStderr, additionalEnv, inputStdin, theExe, theArgs ...)
@@ -511,6 +596,7 @@ func ExecCmd(captureStdout string, captureStderr string, additionalEnv string, i
 } //END FUNCTION
 
 
+// execute a command with timeout and after it finalizes or timeouts it returns the output
 func ExecTimedCmd(stopTimeout uint, captureStdout string, captureStderr string, additionalEnv string, inputStdin string, theExe string, theArgs ...string) (isSuccess bool, outStd string, errStd string) {
 	//--
 	return cmdExec(stopTimeout, captureStdout, captureStderr, additionalEnv, inputStdin, theExe, theArgs ...)

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241020.2358 :: STABLE
+// r.20241029.1708 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -51,7 +51,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20241020.2358"
+	VERSION string = "v.20241029.1708"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"

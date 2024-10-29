@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241020.2358 :: STABLE
+// r.20241029.1708 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -21,6 +21,7 @@ const (
 	DATE_TIME_FMT_ISO_STD_GO_EPOCH    string = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
 	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  string = "2006-01-02 15:04:05 -0700" 		// GO EPOCH: WITH TIME, WITH TZ OFFSET
 	DATE_TIME_FMT_RFC1123_GO_EPOCH    string = "Mon, 02 Jan 2006 15:04:05" 		// GO EPOCH: RFC1123
+	DATE_TIME_FMT_CONDENSED           string = "20060102150405" 				// GO EPOCH: WITH TIME,   NO TZ OFFSET, CONDENSED
 	//-- #
 )
 
