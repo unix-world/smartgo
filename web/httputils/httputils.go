@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240930.1958 :: STABLE
+// r.20241031.1532 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"os"
-	"runtime"
 	"sync"
 
 	"io"
@@ -38,13 +37,13 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20240930.1958"
+	VERSION string = "r.20241031.1532"
 
 	DEBUG bool = false
 	DEBUG_CACHE bool = false
 
 	//--
-	DEFAULT_CLIENT_UA string = "NetSurf/3.10"
+	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
 	//--
 	HTTP_CLI_DEF_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M 		//  16MB
 	HTTP_CLI_MAX_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M * 32 	// 512MB
@@ -584,7 +583,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
 	downloadLocalDirPath = smart.SafePathFixSeparator(downloadLocalDirPath)
 	//--
-	var uaSignature string = DEFAULT_CLIENT_UA + " (" + smart.DESCRIPTION + " " + smart.VERSION + " " + VERSION + "; " + runtime.GOOS + "/" + runtime.GOARCH + "; " + "GoLang/" + runtime.Version() + ")"
+	var uaSignature string = DEFAULT_CLIENT_UA + " (" + smart.DESCRIPTION + " " + smart.VERSION + " " + VERSION + "; " + smart.CurrentOSName() + "/" + smart.CurrentOSArch() + "; " + "GoLang/" + smart.CurrentRuntimeVersion() + ")"
 	//--
 	httpResult = HttpClientRequest {
 		Errors: "?",
@@ -1604,6 +1603,32 @@ func memRateLimitGetVisitor(ip string, theLimit rate.Limit, theBurst int) *rate.
 //-----
 
 
+func HttpSafeHeaderValue(str string) string {
+	//--
+	str = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(str))
+	//--
+	return str
+	//--
+} //END FUNCTION
+
+
+func HttpSafeHeaderKey(str string) string {
+	//--
+	str = smart.StrToLower(HttpSafeHeaderValue(str))
+	//--
+	str = smart.StrTrimWhitespaces(smart.StrReplaceAll(str, " ", ""))
+	if(str == "") {
+		str = "z-empty-key" // dissalow empty header key, it is unsafe !
+	} //end if
+	//--
+	return str
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func HttpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration int, modified string, control string) (isCachedContent bool) {
 	//--
 	defer smart.PanicHandler()
@@ -1614,9 +1639,9 @@ func HttpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 	//--
 	now := time.Now().UTC()
 	//-- {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-	w.Header().Set(HTTP_HEADER_SERVER_POWERED, smart.DESCRIPTION + " :: " + smart.VERSION)
-	w.Header().Set(HTTP_HEADER_SERVER_SIGN, DEFAULT_REALM + " / " + VERSION)
-	w.Header().Set(HTTP_HEADER_SERVER_DATE, now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC)
+	w.Header().Set(HTTP_HEADER_SERVER_POWERED, HttpSafeHeaderValue(smart.DESCRIPTION + " :: " + smart.VERSION))
+	w.Header().Set(HTTP_HEADER_SERVER_SIGN,    HttpSafeHeaderValue(DEFAULT_REALM + " / " + VERSION))
+	w.Header().Set(HTTP_HEADER_SERVER_DATE,    now.Format(smart.DATE_TIME_FMT_RFC1123_GO_EPOCH) + " " + TZ_UTC)
 	//--
 	if((expiration >= 0) && (modified != "")) {
 		//--
@@ -1764,8 +1789,8 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	} //end if
 	//--
 	for key, val := range headers {
-		key = smart.StrToLower(smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(key))) // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
-		val = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(val))
+		key = HttpSafeHeaderKey(key) 	// this will also trim ; {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
+		val = HttpSafeHeaderValue(val) 	// this will also trim
 		switch(key) { // {{{SYNC-GO-HTTP-LOW-CASE-HEADERS}}}
 			//-- these headers are managed above, don't allow rewrite
 			case HTTP_HEADER_CONTENT_TYPE:
@@ -1889,7 +1914,7 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 		contentType = assets.TEXT_CONTENT_HEADER
 	} //end if
 	//--
-	redirectUrl = smart.StrTrimWhitespaces(smart.StrNormalizeSpaces(redirectUrl))
+	redirectUrl = HttpSafeHeaderValue(redirectUrl) // this will also trim
 	if(redirectUrl == "") {
 		log.Println("[ERROR]: " + smart.CurrentFunctionName() + ": Empty Redirect URL:", code, "FallBack to HTTP Status 500")
 		HttpStatus500(w, r, "Invalid Redirect URL for Status: " + title, outputHtml)
@@ -2031,6 +2056,8 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 func HttpHeaderAuthBasic(w http.ResponseWriter, authRealm string) {
 	//--
 	defer smart.PanicHandler()
+	//--
+	authRealm = HttpSafeHeaderValue(authRealm)
 	//--
 	w.Header().Set(HTTP_HEADER_AUTH_AUTHENTICATE, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + ` realm="` + smart.StrReplaceAll(authRealm, `"`, `'`) + `"`) // the safety of characters in authRealm should normally checked before calling this method ...
 	//--

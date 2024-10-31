@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241029.1708 :: STABLE
+// r.20241031.1532 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -27,6 +27,8 @@ const (
 
 	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
 	DEFAULT_FAKE_HOSTPORT_SERVER string = "256.256.256.256:65535"
+
+	DEFAULT_BROWSER_UA string = "NetSurf/3.11 (Sf/Go)"
 )
 
 var (
@@ -637,6 +639,106 @@ func GetHttpUserAgentFromRequest(r *http.Request) (ua string) {
 	} //end if
 	//--
 	return
+	//--
+} //END FUNCTION
+
+
+func GetUserAgentBrowserClassOs(signature string) (bw string, cls string, os string, mb bool) {
+	//-- r.20241031
+	signature = StrToLower(StrTrimWhitespaces(signature))
+	//--
+	bw = ""
+	cls = ""
+	os = ""
+	mb = false
+	//-- SF::{{{SYNC-CLI-BW-ID}}} ; identify browser ; real supported browser classes: gk, ie, wk ; other classes as: xy are not trusted ... ;  tx / rb are text/robots browsers
+	if(StrContains(signature, "firefox") || StrContains(signature, "iceweasel") || StrContains(signature, " fxios/")) {
+		bw = "fox" 	// firefox
+		cls = "gk" 	// gecko
+	} else if(StrContains(signature, "seamonkey")) {
+		bw = "smk" 	// mozilla seamonkey
+		cls = "gk" 	// gecko
+	} else if(StrContains(signature, " edg/") || StrContains(signature, " edge/")) {
+		bw = "iee" 	// microsoft edge
+		cls = "bk" 	// blink class
+	} else if(StrContains(signature, "opera") || StrContains(signature, " opr/") || StrContains(signature, " oupeng/") || StrContains(signature, " opios/")) {
+		bw = "opr" 	// opera
+		cls = "bk" 	// blink class
+	} else if(StrContains(signature, "iridium") || StrContains(signature, "chromium") || StrContains(signature, "chrome") || StrContains(signature, " crios/")) {
+		bw = "crm" 	// chromium
+		cls = "bk" 	// blink class
+	} else if(StrContains(signature, "konqueror")) { // must be detected before safari because includes safari signature
+		bw = "knq" 	// konqueror (kde)
+		cls = "bk" 	// blink class ; since recently all konqueror releases are using qt webengine (blink)
+	} else if(StrContains(signature, "epiphany")) { // must be detected before safari because includes safari signature
+		bw = "eph" 	// epiphany (gnome)
+		cls = "wk" 	// webkit class
+	} else if(StrContains(signature, "safari") || StrContains(signature, "applewebkit")) {
+		bw = "sfr" 	// safari
+		cls = "wk" 	// webkit class
+	} else if(StrContains(signature, "webkit")) { // general webkit signature, untrusted
+		bw = "wkt" 	// webkit (component)
+		cls = "wk" 	// webkit class
+	} else if(StrContains(signature, "mozilla") || StrContains(signature, "gecko")) { // general mozilla signature, untrusted
+		bw = "moz" 	// mozilla derivates, but not firefox or seamonkey which are detected above
+		cls = "xy" 	// various class
+	} else if(StrContains(signature, "netsurf/")) { // netsurf have just a simple signature, but avoid detect robots which are faking this signature ...
+		bw = "nsf" 	// netsurf
+		cls = "xy" 	// various class
+	} else if(StrContains(signature, "lynx") || StrContains(signature, "links")) { // console text browsers and derivates
+		bw = "lyx" 	// lynx / links (text browser)
+		cls = "tx" 	// text class
+	} //end if else
+	//-- SF::{{{SYNC-CLI-OS-ID}}} ; identify os
+	if(StrContains(signature, "windows") || StrContains(signature, "winnt")) {
+		os = "win" // ms windows
+	} else if(StrContains(signature, "macos") || StrContains(signature, " mac ") || StrContains(signature, "os x") || StrContains(signature, "osx") || StrContains(signature, "darwin") || StrContains(signature, "macintosh")) {
+		os = "mac" // apple mac / osx / darwin
+	} else if(StrContains(signature, "linux")) {
+		os = "lnx" // *linux
+	} else if(StrContains(signature, "openbsd") || StrContains(signature, "netbsd") || StrContains(signature, "freebsd") || StrContains(signature, "dragonfly") || StrContains(signature, " bsd ")) {
+		os = "bsd" // *bsd
+	} else if(StrContains(signature, "openindiana") || StrContains(signature, "illumos") || StrContains(signature, "opensolaris") || StrContains(signature, "solaris") || StrContains(signature, "sunos")) {
+		os = "sun" // sun solaris incl clones
+	} //end if else
+	//--  identify mobile os
+	if(StrContains(signature, "iphone") || StrContains(signature, "ipad") || StrContains(signature, "ipod") || StrContains(signature, "iwatch") || StrContains(signature, " opios/") || StrContains(signature, " crios/")) {
+		os = "ios" // apple mobile ios: iphone / ipad / ipod / iwatch (and derivatives)
+		mb = true
+	} else if(StrContains(signature, "android") || StrContains(signature, "saphi") || StrContains(signature, " opr/") || StrContains(signature, " oupeng/")) {
+		os = "and" // google android (and derivatives)
+		mb = true
+	} else if(StrContains(signature, "windows ce") || StrContains(signature, "windows phone") || StrContains(signature, "windows mobile") || StrContains(signature, "windows rt")) {
+		os = "wmo" // ms windows mobile
+		mb = true
+	} else if((StrContains(signature, "mobile") && (StrContains(signature, "linux") || StrContains(signature, "ubuntu"))) || StrContains(signature, "tizen") || StrContains(signature, "webos") || StrContains(signature, "raspberry") || StrContains(signature, "blackberry")) {
+		os = "lxm" // linux mobile
+		mb = true
+	} //end if
+	//-- later fix
+	if(bw == "sfr") {
+		if((os != "mac") && (os != "ios")) { // safari can run just on Mac and iOS ; Webkit fakes also the signature as Safari
+			bw = "wkt" // webkit
+			cls = "xy" 	// various class
+		} //end if
+	} //end if
+	//-- app support
+	if(StrContains(signature, "(app.nwjs)") || StrContains(signature, "(app.electron)") || StrContains(signature, "(app.webkit)")) {
+		bw = "app" // app: NwJS, Electron, WebKit based
+		cls = "xy" 	// various class
+	} //end if
+	//-- robots (simplified detection ; actually robots can fake real signatures, so do just a basic detection)
+	if(StrContains(signature, "curl") || StrContains(signature, "wget") || StrContains(signature, "bot") || StrContains(signature, "ftp") || StrContains(signature, "go-") || StrContains(signature, "php") || StrContains(signature, "python") || StrContains(signature, "perl") || StrContains(signature, "htmldoc") || StrContains(signature, "wkhtml") || StrContains(signature, "lighthouse")) {
+		bw = "bot" // robot
+		cls = "rb" 	// bot class
+	} //end if
+	//-- self-robot (simplified, go microservices version ; in go microservices can be split, using a hash does not apply, like in php ...)
+	if(signature == StrToLower(StrTrimWhitespaces(DEFAULT_BROWSER_UA))) {
+		bw = "@s#" // self-robot
+		cls = "rb" 	// bot class
+	} //end if
+	//--
+	return bw, cls, os, mb
 	//--
 } //END FUNCTION
 

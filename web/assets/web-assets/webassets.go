@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240928.0102 :: STABLE
+// r.20241031.1532 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,14 +19,252 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20240928.0102"
+	VERSION string = "r.20241031.1532"
 
-	LAST_MODIFIED_DATE_TIME string = "2024-09-28 01:02:58" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2024-10-31 14:07:08" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 8 * 3600 // (int) cache time of assets ; 8h
 
 	DEBUG bool = false
 )
+
+//-----
+
+
+func getSvgAsset(img string, asPath bool) string {
+	//--
+	var out string = img
+	if(asPath == false) {
+		out = `data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset(img))
+	} //end if
+	//--
+	return out
+	//--
+} //END FUNCTION
+
+
+//--
+
+
+func GetAppLogo(asPath bool) string {
+	//--
+	const img string = "lib/core/img/app/app.svg"
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+func GetServerLogo(asPath bool) string {
+	//--
+	const img string = "lib/core/img/app/server.svg"
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+func GetMaintenanceLogo(asPath bool) string {
+	//--
+	const img string = "lib/core/img/app/maintenance.svg"
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+func GetSfLogo(asPath bool) string {
+	//--
+	const img string = "lib/framework/img/sf-logo.svg"
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+func GetGolangLogo(asPath bool) string {
+	//--
+	const img string = "lib/framework/img/golang-logo.svg"
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+func GetProxyLogo(proxyIpPort string, asPath bool) string {
+	//--
+	var img string = "lib/core/img/browser/@smart-robot.svg"
+	if(smart.StrTrimWhitespaces(proxyIpPort) != "") {
+		img = "lib/framework/img/haproxy-logo.svg"
+	} //end if
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+//--
+
+
+func GetClientBwLogo(bw string, asPath bool) string {
+	//--
+	bw = smart.StrToLower(smart.StrTrimWhitespaces(bw))
+	//--
+	var img string = "lib/core/img/browser/xxx.svg"
+	switch(bw) {
+		case "fox":
+			img = "lib/core/img/browser/fox.svg"
+			break
+		case "smk":
+			img = "lib/core/img/browser/smk.svg"
+			break
+		case "crm":
+			img = "lib/core/img/browser/crm.svg"
+			break
+		case "iee":
+			img = "lib/core/img/browser/iee.svg"
+			break
+		case "sfr":
+			img = "lib/core/img/browser/sfr.svg"
+			break
+		case "wkt":
+			img = "lib/core/img/browser/wkt.svg"
+			break
+		case "eph":
+			img = "lib/core/img/browser/eph.svg"
+			break
+		case "knq":
+			img = "lib/core/img/browser/knq.svg"
+			break
+		case "opr":
+			img = "lib/core/img/browser/opr.svg"
+			break
+		case "moz":
+			img = "lib/core/img/browser/moz.svg"
+			break
+		case "nsf":
+			img = "lib/core/img/browser/nsf.svg"
+			break
+		case "lyx":
+			img = "lib/core/img/browser/lyx.svg"
+			break
+		case "app":
+			img = "lib/core/img/browser/nwjs.svg"
+			break
+		case "@s#":
+			img = "lib/core/img/browser/@smart-robot.svg"
+			break
+		case "bot":
+			img = "lib/core/img/browser/bot.svg"
+			break
+		default:
+			// use default, unknown bw
+	} //end switch
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+func GetClientOSLogo(os string, asPath bool) string {
+	//--
+	os = smart.StrToLower(smart.StrTrimWhitespaces(os))
+	//--
+	var img string = "lib/core/img/os/other-os.svg"
+	switch(os) {
+		case "win":
+			img = "lib/core/img/os/windows-os.svg"
+			break
+		case "mac":
+			img = "lib/core/img/os/mac-os.svg"
+			break
+		case "lnx":
+			img = "lib/core/img/os/linux-generic.svg"
+			break
+		case "bsd":
+			img = "lib/core/img/os/bsd-generic.svg"
+			break
+		case "sun":
+			img = "lib/core/img/os/unix-solaris.svg"
+			break
+		case "ios":
+			img = "lib/core/img/os/mobile/ios.svg"
+			break
+		case "and":
+			img = "lib/core/img/os/mobile/android.svg"
+			break
+		case "lxm":
+			img = "lib/core/img/os/mobile/linux-mobile.svg"
+			break
+		case "wmo":
+			img = "lib/core/img/os/mobile/windows-mobile.svg"
+			break
+		default:
+			// use default, unknown os
+	} //end switch
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
+
+//--
+
+
+func GetOSLogo(asPath bool) string {
+	//--
+	// if asPath is TRUE, will return as Path ; if asPath is FALSE will return dataImage for embed
+	//--
+	os := smart.CurrentOSName()
+	arch := smart.CurrentOSArch()
+	//--
+	var img string = "lib/core/img/os/other-os.svg"
+	if(arch == "wasm") {
+		img = "lib/core/img/os/wasm.svg"
+	} else {
+		switch(os) {
+			case "linux":
+				img = "lib/core/img/os/linux-generic.svg"
+				break
+			case "openbsd":
+				img = "lib/core/img/os/bsd-openbsd.svg"
+				break
+			case "netbsd":
+				img = "lib/core/img/os/bsd-netbsd.svg"
+				break
+			case "freebsd":
+				img = "lib/core/img/os/bsd-freebsd.svg"
+				break
+			case "dragonfly":
+				img = "lib/core/img/os/bsd-dragonfly.svg"
+				break
+			case "illumos": fallthrough
+			case "solaris":
+				img = "lib/core/img/os/unix-solaris.svg"
+				break
+			case "darwin":
+				img = "lib/core/img/os/mac-os.svg"
+				break
+			case "windows":
+				img = "lib/core/img/os/windows-os.svg"
+				break
+			case "ios":
+				img = "lib/core/img/os/mobile/ios.svg"
+				break
+			case "android":
+				img = "lib/core/img/os/mobile/android.svg"
+				break
+		//	case "plan9": fallthrough // use other
+		//	case "aix": fallthrough // use other
+			default:
+				// use default, unknown os
+		} //end switch
+	} //end if
+	//--
+	return getSvgAsset(img, asPath)
+	//--
+} //END FUNCTION
+
 
 //-----
 
@@ -106,12 +344,12 @@ func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool) 
 	} //end if
 	//--
 	arr := map[string]string{ // no server content to avoid loops 9ex: 404 loop)
-		"TITLE-TEXT": titleText,
+		"TITLE-TEXT": 	titleText,
 		"MESSAGE-TEXT": messageText,
-		"FOOTER-HTML": `<img alt="logo-server" title="Go Standalone Web Server" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/core/img/app/globe.svg")) + `">` + " &nbsp;\n" +
-							`<img alt="logo-runtime" title="Built with Go Lang" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/framework/img/golang-logo.svg")) + `">` + " &nbsp;\n" +
-							authLogo +
-							`<img alt="logo-framework" title="Smart.Framework.Go" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/framework/img/sf-logo.svg")) + `">` + "\n",
+		"FOOTER-HTML": 	`<img alt="logo-server" title="Go Standalone Web Server" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/core/img/app/server.svg")) + `">` + " &nbsp;\n" +
+						`<img alt="logo-runtime" title="Built with Go Lang" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/framework/img/golang-logo.svg")) + `">` + " &nbsp;\n" +
+						authLogo +
+						`<img alt="logo-framework" title="Smart.Framework.Go" style="cursor:help;" width="64" height="64" src="data:image/svg+xml,` + smart.EscapeUrl(ReadWebAsset("lib/framework/img/sf-logo.svg")) + `">` + "\n",
 	}
 	//--
 	return smart.RenderMainHtmlMarkersTpl(HTML_TPL_STATUS, arr, nil) + "\n" + "<!-- TPL:Static.Status -->" + "\n"

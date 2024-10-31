@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241029.1708 :: STABLE
+// r.20241031.1532 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -51,7 +51,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20241029.1708"
+	VERSION string = "v.20241031.1532"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -145,6 +145,58 @@ func AppGetNamespace() (string, error) {
 	} //end if
 	//--
 	return ns, nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func CurrentRuntimeVersion() string {
+	//--
+	var rt string = runtime.Version() // ex: go1.22.8
+	//--
+	rt = StrToLower(StrTrimWhitespaces(rt))
+	//--
+	if(rt == "") {
+		rt = "go0.0"
+	} //end if
+	//--
+	return rt
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func CurrentOSName() string {
+	//--
+	var os string = runtime.GOOS // ex: openbsd
+	//--
+	os = StrToLower(StrTrimWhitespaces(os))
+	//--
+	if(os == "") {
+		os = "unknown-os"
+	} //end if
+	//--
+	return os
+	//--
+} //END FUNCTION
+
+// see the complete list of supported combination of OS / ARCH: `go tool dist list | column -c 75 | column -t`
+
+func CurrentOSArch() string {
+	//--
+	var arch string = runtime.GOARCH // ex: amd64
+	//--
+	arch = StrToLower(StrTrimWhitespaces(arch))
+	//--
+	if(arch == "") {
+		arch = "unknown-arch"
+	} //end if
+	//--
+	return arch
 	//--
 } //END FUNCTION
 
