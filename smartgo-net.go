@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -24,6 +24,11 @@ const (
 
 	HTTP_PROTO_PREFIX_HTTP  string = "http://"
 	HTTP_PROTO_PREFIX_HTTPS string = "https://"
+
+	DATA_URL_EMPTY_PREFIX string = "data:,"
+	DATA_URL_CSS_PREFIX string = "data:text/css,"
+	DATA_URL_JS_PREFIX string = "data:application/javascript,"
+	DATA_URL_SVG_IMAGE_PREFIX string = "data:image/svg+xml,"
 
 	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
 	DEFAULT_FAKE_HOSTPORT_SERVER string = "256.256.256.256:65535"
@@ -193,8 +198,7 @@ func HttpSessionUUIDCookieNameSet(cookieName string) bool {
 	cookieName = StrTrimWhitespaces(cookieName)
 	if(cookieName == "") { // do not check below for empty cookie name, must be a way to be unset by passing empty string to this method
 		if(sessionUUIDCookieName == "") {
-		//	log.Println("[INFO]", CurrentFunctionName(), "Session UUID Cookie Name was Set to (Default) `" + sessionUUIDCookieName + "`: Success")
-			return true
+			return true // disallow unset
 		} else {
 			ok = false // invalid, empty ; unset is not allowed
 		} //end if else
@@ -379,7 +383,7 @@ func GetHttpRealClientIpFromRequestHeaders(r *http.Request) (isOk bool, clientRe
 		//--
 		ip, _ = GetHttpRemoteAddrIpAndPortFromRequest(r)
 		ipList = ip
-		hdrKey = "[REMOTE_ADDR]" // this is a special value, not in the headers, with underscore
+		hdrKey = "[REMOTE_ADDR]" // this is a special value, not in the headers, with underscore, keep in square brackets, to identify particular from the rest
 		//--
 	} else {
 		//--

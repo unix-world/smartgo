@@ -1,6 +1,6 @@
 
 // (c) 2024 unix-world.org
-// v.20240103.1301
+// v.20241107.2358
 // license: BSD
 
 // based on: github.com/xlzd/gotp # license: MIT
@@ -22,14 +22,16 @@ import (
 
 
 const (
-	DEBUG bool = false
-
 	DEFAULT_LENGTH uint8 = 256 / 8
 	DEFAULT_ALGO string = "sha384"
 	DEFAULT_DIGITS uint8 = 8
 	DEFAULT_INTERVAL uint16 = 30
 
 	URL_OTPAUTH string = "otpauth://totp/" // just for TOTP ...
+)
+
+var (
+	DEBUG bool = smart.DEBUG
 )
 
 
@@ -130,18 +132,35 @@ func RandomSecret(length uint8) string {
 
 
 // A non-panic way of seeing weather or not a given secret is valid
-func IsSecretValid(secret string) bool {
+func IsSecretValid(secret string, desiredLength uint8) bool {
 	//--
 	defer smart.PanicHandler()
+	//--
+	secret = smart.StrToUpper(smart.StrTrimWhitespaces(secret)) // input is case-insensitive, convert as in Base32 standards to UpperCase
+	//--
+	length := len(secret)
+	if((length < 20) || (length > 128)) { // should be between is 26 (128 bit) and 103 (512 bit), but be more flexible, as in PHP
+		return false
+	} //end if
 	//--
 	missingPadding := len(secret) % 8
 	if(missingPadding != 0) {
 		secret = secret + strings.Repeat("=", 8-missingPadding)
 	} //end if
 	//--
-	_, err := base32.StdEncoding.DecodeString(secret)
+	data, err := base32.StdEncoding.DecodeString(secret)
 	//--
-	return (err == nil)
+	if(err != nil) {
+		return false
+	} //end if
+	//--
+	if(desiredLength > 0) {
+		if((len(data) <= 0) || (len(data) != int(desiredLength))) {
+			return false
+		} //end if
+	} //end if
+	//--
+	return true
 	//--
 } //END FUNCTION
 
@@ -210,6 +229,7 @@ func (o *OTP) getSecret() (string, error) {
 	//--
 	bytes, err := base32.StdEncoding.DecodeString(secret)
 	if(err != nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "Secret B32 Decode Failed", err)
 		return "", err
 	} //end if
 	//--

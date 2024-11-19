@@ -1,64 +1,62 @@
 package jwt
 
 import (
-	"crypto"
-	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
+	crand "crypto/rand"
+	ed25519 "crypto/ed25519"
 )
 
 var (
-	ErrNotEdPrivateKey = errors.New("key is not a valid Ed25519 private key")
-	ErrNotEdPublicKey  = errors.New("key is not a valid Ed25519 public key")
+	ErrNotEdPrivateKey error = errors.New("key is not a valid Ed25519 private key")
+	ErrNotEdPublicKey  error = errors.New("key is not a valid Ed25519 public key")
 )
 
-// ParseEdPrivateKeyFromPEM parses a PEM-encoded Edwards curve private key
-func ParseEdPrivateKeyFromPEM(key []byte) (crypto.PrivateKey, error) {
-	var err error
 
-	// Parse PEM block
-	var block *pem.Block
-	if block, _ = pem.Decode(key); block == nil {
-		return nil, ErrKeyMustBePEMEncoded
+//-- unixman
+
+func GenerateEdPrivateAndPublicKeys(secret []byte) (ed25519.PrivateKey, []byte, error) {
+	pK, errK := GenerateEdPrivateKey(secret)
+	if(errK != nil) {
+		return nil, nil, errK
 	}
-
-	// Parse the key
-	var parsedKey interface{}
-	if parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
-		return nil, err
+	if(pK == nil) {
+		return nil, nil, errors.New("Private Key is NULL")
 	}
-
-	var pkey ed25519.PrivateKey
-	var ok bool
-	if pkey, ok = parsedKey.(ed25519.PrivateKey); !ok {
-		return nil, ErrNotEdPrivateKey
+	pbKey := GetEdPublicKeyFromPrivateKeyToBytes(pK)
+	if(pbKey == nil) {
+		return nil, nil, errors.New("Public Key is NULL")
 	}
-
-	return pkey, nil
+	return pK, pbKey, nil
 }
 
-// ParseEdPublicKeyFromPEM parses a PEM-encoded Edwards curve public key
-func ParseEdPublicKeyFromPEM(key []byte) (crypto.PublicKey, error) {
-	var err error
-
-	// Parse PEM block
-	var block *pem.Block
-	if block, _ = pem.Decode(key); block == nil {
-		return nil, ErrKeyMustBePEMEncoded
+func GenerateEdPrivateKey(secret []byte) (ed25519.PrivateKey, error) {
+	var privKey ed25519.PrivateKey = nil
+	var errKey error = nil
+	if(secret != nil) {
+		if(len(secret) != ed25519.SeedSize) {
+			return nil, errors.New("Secret Key Size must be 32 bytes")
+		}
+		privKey = ed25519.NewKeyFromSeed([]byte(secret))
+	} else {
+		_, privKey, errKey = ed25519.GenerateKey(crand.Reader)
 	}
-
-	// Parse the key
-	var parsedKey interface{}
-	if parsedKey, err = x509.ParsePKIXPublicKey(block.Bytes); err != nil {
-		return nil, err
+	if(errKey != nil) {
+		return nil, errKey
 	}
-
-	var pkey ed25519.PublicKey
-	var ok bool
-	if pkey, ok = parsedKey.(ed25519.PublicKey); !ok {
-		return nil, ErrNotEdPublicKey
+	if(privKey == nil) {
+		return nil, errors.New("Failed to generate a Private Key")
 	}
-
-	return pkey, nil
+	return privKey, nil
 }
+
+func GetEdPublicKeyFromPrivateKeyToBytes(privateKey ed25519.PrivateKey) []byte {
+	publicKey := privateKey.Public()
+	return []byte(publicKey.(ed25519.PublicKey))
+}
+
+func GetEdPublicKeyFromBytes(pKey []byte) ed25519.PublicKey {
+	return ed25519.PublicKey(pKey)
+}
+
+//-- #
+

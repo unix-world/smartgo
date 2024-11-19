@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Session-UUID :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -34,6 +34,10 @@ func GetUuidCookieName() string {
 
 func GetUuidCookieValue(r *http.Request) string {
 	//--
+	if(!smart.HttpSessionUUIDCookieIsEnabled()) {
+		return ""
+	} //end if
+	//--
 	name := GetUuidCookieName()
 	if(name == "") {
 		return ""
@@ -41,7 +45,7 @@ func GetUuidCookieValue(r *http.Request) string {
 	//--
 	value := smart.StrTrimWhitespaces(smarthttputils.HttpRequestGetCookie(r, name))
 	//--
-	if(isSessUUIDCookieValid(value) != true) {
+	if(IsSessUUIDCookieValid(value) != true) {
 		return ""
 	} //end if
 	//--
@@ -50,7 +54,7 @@ func GetUuidCookieValue(r *http.Request) string {
 } //END FUNCTION
 
 
-func isSessUUIDCookieValid(crrUUIDCookieVal string) bool {
+func IsSessUUIDCookieValid(crrUUIDCookieVal string) bool {
 	//--
 	if((smart.StrTrimWhitespaces(crrUUIDCookieVal) == "") || (len(crrUUIDCookieVal) < 34) || (len(crrUUIDCookieVal) > 52) || (!smart.StrRegexMatchString(REGEX_SESS_UUID_COOKIE_VALID_VALUE, crrUUIDCookieVal))) { // if sh3a224 (b62) is mostly ~ 38 characters ; be flexible as +/- 4 characters (34..52 bytes)
 		return false
@@ -78,7 +82,7 @@ func manageSessUUIDCookie(w http.ResponseWriter, r *http.Request) {
 			log.Println("[DEBUG]", "Web Server: Found Previous UUID Sess Cookie", crrUUIDCookieVal)
 		} //end if
 		//--
-		if(isSessUUIDCookieValid(crrUUIDCookieVal) != true) {
+		if(IsSessUUIDCookieValid(crrUUIDCookieVal) != true) {
 			//--
 			if(DEBUG) {
 				log.Println("[DEBUG]", "Web Server: New UUID Sess Cookie", crrUUIDCookieVal)

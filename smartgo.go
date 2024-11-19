@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -51,7 +51,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20241031.1532"
+	VERSION string = "v.20241116.2358"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -212,16 +212,16 @@ func CurrentFunctionName() string {
 		return "[Unknown]"
 	} //end if
 	//--
-	var name string = runtime.FuncForPC(counter).Name() // ex: `main` or `github.com/unix-world/smartgo.CurrentFunctionName`
+	var name string = runtime.FuncForPC(counter).Name() // ex: `main.SomeMethod` or `github.com/unix-world/smartgo.CurrentFunctionName`
 	//--
 	if(StrContains(name, "/")) { // if similar ~ with `github.com/unix-world/smartgo.CurrentFunctionName`
 		arr := Explode("/", name)
 		if(len(arr) > 0) {
-			name = arr[len(arr)-1] // get just the smartgo.CurrentFunctionName part
+			name = arr[len(arr)-1] // get just the package.MethodName part if have more parts
 		} //end if
 	} //end if
 	//--
-	return name
+	return name // returns: package.MethodName
 	//--
 } //END FUNCTION
 
@@ -336,10 +336,13 @@ func Base64Decode(data string) string {
 		return ""
 	} //end if
 	//--
+	if l := len(data) % 4; l > 0 {
+		data += strings.Repeat("=", 4-l) // fix missing padding
+	} //end if
+	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
-	if(err != nil) {
+	if(err != nil) { // be flexible, don't return, try to decode as much as possible, just notice
 		log.Println("[NOTICE] " + CurrentFunctionName() + ": ", err)
-		//return "" // be flexible, don't return, try to decode as much as possible ...
 	} //end if
 	//--
 	return string(decoded)
@@ -1042,6 +1045,20 @@ func StrUcWords(s string) string {
 } //END FUNCTION
 
 
+func StrRepeat(str string, count int) string {
+	//--
+	if(str == "") {
+		return ""
+	} //end if
+	if(count < 1) {
+		count = 1
+	} //end if
+	//--
+	return strings.Repeat(str, count)
+	//--
+} //END FUNC
+
+
 func StrPad2LenLeft(s string, padStr string, overallLen int) string { // LeftPad2Len https://github.com/DaddyOh/golang-samples/blob/master/pad.go
 	//--
 	if(len(s) >= overallLen) { // fix, as in PHP
@@ -1290,6 +1307,21 @@ func StrCreateJsVarName(s string) string {
 } //END FUNCTION
 
 
+func StrCreateStdVarName(s string) string {
+	//--
+	s = StrTrimWhitespaces(s)
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	s = StrRegexReplaceAll(`[^a-zA-Z0-9_]`, s, "")
+	s = StrTrimWhitespaces(s)
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
 func UInt64ToHex(num uint64) string {
 	//--
 	return fmt.Sprintf("%x", num)
@@ -1458,10 +1490,24 @@ func JsonScalarDecodeToStr(data string) (string, error) { // can parse the follo
 
 func JsonGetValueByKeyPath(json string, path string) gjson.Result {
 	//--
+	// to return the full json as root, use an empty path: ""
 	// path can be: "3" ; "a" ; "0.id" ; "a.b.c.7"
 	// will return type Result
 	// Result type can be converted to: .String() | .Bool() | .Int() as int64 | .Uint() as uint64 | .Float() as float64 | .Time() as time.Time | .Array() as []Result
 	// Result can be checked as: .IsObject(), .IsArray(), .IsBool()
+	//--
+	if(StrTrimWhitespaces(json) == "") {
+		return gjson.Result{}
+	} //end if
+	//--
+	if(StrTrimWhitespaces(path) == "") {
+		json = `{ "/":` + json + ` }`
+		path = "/"
+	} //end if
+	//--
+	if(gjson.Valid(json) != true) {
+		return gjson.Result{}
+	} //end if
 	//--
 	return gjson.Get(json, path)
 	//--
@@ -1578,6 +1624,10 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 
 func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 	//--
+	// The following characters have a special meaning in CSS, in sensitive contexts they have to be escaped:
+	// !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, :, ;, <, =, >, ?, @, [, \, ], ^, `, {, |, }, ~
+	// Compatible with javascript: MDN: CSS.escape(str)
+	//--
 	out := bytes.Buffer{}
 	//--
 	for _, c := range s {
@@ -1629,6 +1679,55 @@ func StrNl2Br(s string) string {
 	s = StrReplaceAll(s, LINE_FEED, "<br>")
 	//--
 	return s
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func Ord(c string) int { // this is compatible with PHP, for single byte characters, ASCII ; only returns 0..255
+	//-- DO NOT TRIM !
+	if(c == "") {
+		return -1 // empty
+	} //end if
+	if(len(c) != 1) {
+		return -2 // multibyte
+	} //end if
+	//--
+	r := []rune(c)
+	if(len(r) != 1) {
+		return -3 // conversion error
+	} //end if
+	//--
+	o := int(r[0]) // ord()
+	if(o > 255) {
+		return -4 // out of scope, non-ASCII
+	}
+	if(o < 0) {
+		return -5 // this should never happen, just an extra check
+	}
+	//--
+	if(Chr(uint8(o)) != c) { // must be after the above checks: o is 0..255 because must be uint8 !
+		return -6 // this should never happen, just an extra check
+	} //end if
+	//--
+	return o
+	//--
+} //END FUNCTION
+
+
+func Chr(o uint8) string {
+	//--
+	if(o < 0) {
+		return ""
+	} else if(o > 255) {
+		return ""
+	} //end if
+	//--
+	c := rune(o) // chr()
+	//--
+	return string(c)
 	//--
 } //END FUNCTION
 

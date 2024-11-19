@@ -2,8 +2,8 @@
  * MIT License
  * Copyright (c) 2017 Serge Zaitsev
  *
- * Copyright (c) 2018-2022 unix-world.org
- * v.20220416.0004
+ * Copyright (c) 2018-2024 unix-world.org
+ * v.20241102.2358
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -568,8 +568,8 @@ public:
   }
 
   void eval(const std::string js) {
-    webkit_web_view_run_javascript(WEBKIT_WEB_VIEW(m_webview), js.c_str(), NULL,
-                                   NULL, NULL);
+//  webkit_web_view_run_javascript(WEBKIT_WEB_VIEW(m_webview), js.c_str(), NULL, NULL, NULL); // deprecated
+    webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(m_webview), js.c_str(), js.size(), NULL, NULL, NULL, NULL, NULL);
   }
 
 private:

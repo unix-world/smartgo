@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -194,7 +194,7 @@ func webdavLockSys() *webdav.LockSys { // TODO: implement SimpleCache ...
 
 func webDavUrlPath() string {
 	//--
-	return smart.GetHttpProxyBasePath() + DAV_URL_PATH // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
+	return GetBasePath() + DAV_URL_PATH // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
 	//--
 } //END FUNCTION
 
@@ -230,7 +230,7 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 	var webDavRealUrlPath string = smart.StrTrimWhitespaces(webDavUrlPath())
 	if((webDavRealUrlPath == "") || (!smart.StrStartsWith(webDavRealUrlPath, "/")) || (!webUrlRouteIsValid(webDavRealUrlPath))) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}}
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDAV Service Initialization Error, WebDAV Route is Invalid: `" + webDavRealUrlPath + "`")
-		smarthttputils.HttpStatus500(w, r, "WebDAV Service cannot handle this Path: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+		smarthttputils.HttpStatus500(w, r, "WebDAV Service cannot handle this Path: `" + GetCurrentPath(r) + "`", true)
 		return
 	} //end if
 	//--
@@ -240,14 +240,14 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 		log.Println("[NOTICE]", smart.CurrentFunctionName(), "WebDAV Service: Auth is NOT Enabled, Serving WebDAV as Public")
 	} else {
 		var auth401IsHtml bool = false
-		var crrRoute string = smart.GetHttpPathFromRequest(r)
+		var crrRoute string = GetCurrentPath(r)
 		if((crrRoute == webDavUrlPath()) || (crrRoute == webDavUrlPath()+"/")) {
 			auth401IsHtml = true // outputs HTML just for the entry route on WebDAV, otherwise outputs Text
 		} //end if
-		authErr, authData := smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, auth401IsHtml)
+		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, auth401IsHtml)
 		if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
 			log.Println("[WARNING]", smart.CurrentFunctionName(), "WebDAV Service / Storage Area :: Authentication Failed:", "authData.OK:", authData.OK, "authData.ErrMsg:", authData.ErrMsg, "Error:", authErr)
-			// MUST NOT USE smarthttputils.HttpStatus401() here, is handled directly by smarthttputils.HttpBasicAuthCheck()
+			// MUST NOT USE smarthttputils.HttpStatus401() here, is handled directly by smarthttputils.HttpAuthCheck()
 			return
 		} //end if
 		if(webdavSharedStorage != true) {

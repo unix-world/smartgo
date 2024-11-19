@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Client :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240116.2136 :: STABLE
+// r.20241112.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak

@@ -76,6 +76,7 @@ var (
 		"output":     {},
 		"progress":   {},
 		"section":    {},
+		"svg":        {},
 		"video":      {},
 	}
 )
@@ -925,7 +926,7 @@ func syntaxRange(data []byte, iout *int) (int, int) {
 
 		i++
 	} else {
-		for i < n && !IsSpace(data[i]) {
+		for i < n && data[i] != '\n' {
 			syn++
 			i++
 		}
@@ -1652,7 +1653,9 @@ func (p *Parser) paragraph(data []byte) int {
 			if p.extensions&DefinitionLists != 0 {
 				if i < len(data)-1 && data[i+1] == ':' {
 					listLen := p.list(data[prev:], ast.ListTypeDefinition, 0, '.')
-					return prev + listLen
+					if listLen > 0 {
+						return prev + listLen
+					}
 				}
 			}
 

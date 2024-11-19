@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Web-Public :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -40,7 +40,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		return 500
 	} //end if
 	//--
-	var urlPath string = smart.GetHttpPathFromRequest(r)
+	var urlPath string = GetCurrentPath(r)
 	if(urlPath == "") {
 		urlPath = "/" // required for validation
 	} //end if

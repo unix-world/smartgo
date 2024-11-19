@@ -1,6 +1,6 @@
 
 // (c) 2024 unix-world.org
-// v.20240103.1301
+// v.20241107.2358
 // license: BSD
 
 // based on: github.com/xlzd/gotp # license: MIT
@@ -23,10 +23,9 @@ type TOTP struct {
 func NewTOTP(secret string, digits uint8, interval uint16, algo string) *TOTP {
 	//--
 	secret = smart.StrToUpper(smart.StrTrimWhitespaces(secret)) // input is case-insensitive, convert as in Base32 standards to UpperCase
-	length := len(secret)
 	//--
-	if((length < 20) || (length > 128)) { // should be between is 26 (128 bit) and 103 (512 bit), but be more flexible, as in PHP
-		log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Secret Length", length)
+	if(IsSecretValid(secret, 0) != true) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Secret / Length")
 		return nil
 	} //end if
 	//--

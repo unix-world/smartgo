@@ -1,14 +1,13 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
 	"log"
-	"fmt"
 	"sync"
 	"time"
 
@@ -20,9 +19,15 @@ import (
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
 )
 
+var (
+	DEBUG bool = smart.DEBUG
+)
+
 const (
-	VERSION string = "r.20241031.1532"
-	SIGNATURE string = "(c) 2020-2024 unix-world.org"
+	VERSION string = "r.20241116.2358"
+	SIGNATURE string = smart.COPYRIGHT
+
+	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
 
 	SERVER_ADDR string = "127.0.0.1" // default
 	SERVER_PORT uint16 = 17788 // default
@@ -43,21 +48,43 @@ const (
 	HTTP_AUTH_REALM string = "Smart.Web Server: Auth Area"
 
 	REAL_IP_HEADER_KEY = "" // if used behind a proxy, can be set as: X-REAL-IP, X-FORWARDED-FOR, HTTP-X-CLIENT-IP, ... or any other trusted proxy header ; if no proxy is used, set as an empty string
-
-	DEBUG bool = false
 )
 
-const TheStrSignature string = "SmartGO Web Server " + VERSION
+const TheStrName string = "SmartGO Web Server"
+const TheStrSignature string = TheStrName + " " + VERSION
+
+const apiErrorDefaultCode uint16 = 65535
+const apiErrorDefaultMsg  string = "Unknown Error"
+
+type apiMsgStruct struct {
+	ErrCode uint16 `json:"errCode,omitempty"`
+	ErrMsg  string `json:"errMsg,omitempty"`
+	Data       any `json:"data,omitempty"`
+}
 
 type versionStruct struct {
+	Platform  string `json:"platform"`
+	Server    string `json:"server"`
 	Version   string `json:"version"`
 	GoVersion string `json:"goVersion"`
 	OsName    string `json:"osName"`
 	OsArch    string `json:"osArch"`
-	Copyright string `json:"copyright"`
+	Copyright string `json:"copyright,omitempty"`
 }
 
-type HttpHandlerFunc func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (code uint16, content string, contentFileName string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string)
+type HttpResponse struct {
+	StatusCode         uint16
+	ContentBody        string
+	ContentFileName    string
+	ContentDisposition string
+	CacheExpiration    int
+	CacheLastModified  string
+	CacheControl       string
+	Headers            map[string]string
+	Cookies            []smarthttputils.CookieData
+	LogMessage         string
+}
+type HttpHandlerFunc func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse)
 type smartRoute struct {
 	AuthSkip 		bool 				// if Auth is Enabled: all routes are enforced to authenticate, so to skip a particluar route (w/o tails) from authentication set this to TRUE ; if Auth is not enabled this setting has no effect
 	AllowedMethods  []string 			// "OPTIONS" is handled separately (not allowed to be selected here) ; if is nil will (default) allow "HEAD", "GET", "POST" ; otherwise if explicit must be one or many of the: "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE"
@@ -248,7 +275,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 
 	//-- server + mux
 
-	mux, srv := smarthttputils.HttpMuxServer(httpAddr + fmt.Sprintf(":%d", httpPort), timeoutSeconds, true, false, "[Web Server]") // force HTTP/1 ; disallow large headers, the purpose of this service is public web mostly
+	mux, srv := smarthttputils.HttpMuxServer(httpAddr + ":" + smart.ConvertUInt16ToStr(httpPort), timeoutSeconds, !SERVE_HTTP2, false, "[Web Server]") // force HTTP/1 ; disallow large headers, the purpose of this service is public web mostly
 
 	//-- rate limit decision
 
@@ -258,6 +285,12 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	} //end if
 
 	//-- http master / root handler: will manage all the rest of sub-handlers
+
+	//--
+	// HARDCODED LIMITS:
+	// 		* Max Path Characters: 1024 	(safe for FileSystem access, as path, cross-platform) 			; {{{SYNC-HTTP-WEBSRV-MAX-PATH-LENGTH}}}
+	// 		* Max Path Segments:    128 	(safe for FileSystem access, as dir structure, cross-platform) 	; {{{SYNC-HTTP-WEBSRV-MAX-PATH-SEGMENTS}}}
+	//--
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		//-- panic recovery
@@ -276,9 +309,14 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} //end if
 		//== #end rate limit
 		//--
-		var urlPath string = smart.GetHttpPathFromRequest(r)
+		var urlPath string = GetCurrentPath(r)
 		if(urlPath == "") {
 			urlPath = "/"
+		} //end if
+		if(len(urlPath) > 1024) { // {{{SYNC-HTTP-WEBSRV-MAX-PATH-LENGTH}}} ; max supported path is 1024 characters, as this is the common safe FileSystem max path length on many OSes, ex: OpenBSD or MacOS
+			log.Printf("[SRV] Web Server: Oversized Request Path Detected :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "400", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+			smarthttputils.HttpStatus400(w, r, "Oversized Request Path Detected [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
+			return
 		} //end if
 		//--
 		//== webDAV
@@ -294,13 +332,17 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		manageSessUUIDCookie(w, r) // manage session UUID Cookie
 		//-- shiftPath
 		headPath, tailPaths := getUrlPathSegments(urlPath) // head path or tail paths must not contain slashes !!
+		if(len(tailPaths) > 128) { // {{{SYNC-HTTP-WEBSRV-MAX-PATH-SEGMENTS}}} ; max supported path segments: 128
+			log.Printf("[SRV] Web Server: Oversized Request Path Segments Detected :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "400", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+			smarthttputils.HttpStatus400(w, r, "Oversized Request Path Segments Detected [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
+		} //end if
 		//-- {{{SYNC-PATH-FROM-SLASH-REDIRECT}}} ; apache like fix but inversed: if path has / suffix remove and redirect ; this fix is needed because of tails implementation (shiftPath)
 		if(smart.StrTrimWhitespaces(smart.StrTrim(urlPath, " /")) != "") { // avoid if root slash, will enter infinite cycle !
 			if(smart.StrEndsWith(urlPath, "/")) {
 				var fixedRoute string = smart.StrTrimWhitespaces(smart.StrTrim(urlPath, " /")) // trim on both sides, needs to add prefix below (Base Path)
 				if(fixedRoute != "") {
 					//--
-					fixedRoute = smart.GetHttpProxyBasePath() + fixedRoute
+					fixedRoute = GetBasePath() + fixedRoute
 					//--
 					// MUST NOT Allow Handlers for paths that end with a slash / to avoid infinite cycle in net/http internally: redirectToPathSlash
 					// also must be sure that there is a registered handler for the redirecting URL here
@@ -314,7 +356,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//-- check route safety
 		if((!webUrlRouteIsValid(urlPath)) || (!webUrlRouteIsValid("/"+headPath))) {
 			log.Printf("[SRV] Web Server: Unsafe Request Path Detected :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "400", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-			smarthttputils.HttpStatus400(w, r, "Unsafe Request Path Detected [Rule:DENY]: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+			smarthttputils.HttpStatus400(w, r, "Unsafe Request Path Detected [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
 		//-- serve assets first
@@ -327,7 +369,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			} //end if
 			if((r.Method != "GET") && (r.Method != "HEAD")) {
 				log.Printf("[SRV] Web Server: Invalid Request Method for Assets :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "405", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Assets [Rule:DENY]: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Assets [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 				return
 			} //end if
 			aCode := srvassets.WebAssetsHttpHandler(w, r, "cache:default") // default cache mode ; it is most common than public or private cache ...
@@ -335,7 +377,30 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			return
 		} //end if else
 		//-- manage handlers
-		sr, okPath := urlHandlersMap["/"+headPath]
+		var sr smartRoute = smartRoute{}
+		var okPath bool = false
+		var testPath string = ""
+		var cycles uint64 = 0
+		testPaths := tailPaths
+		for {
+			testPath = "/" + headPath
+			if(len(testPaths) <= 0) { // if no more segments, test the 1st and stop
+				sr, okPath = urlHandlersMap[testPath] // last test
+				break
+			} //end if
+			testPath += "/" + smart.Implode("/", testPaths)
+			sr, okPath = urlHandlersMap[testPath]
+			if(okPath == true) { // if found, stop
+				break
+			} //end if
+			testPaths = testPaths[:len(testPaths)-1] // pop out last segment
+			if(cycles > 128) { // {{{SYNC-HTTP-WEBSRV-MAX-PATH-SEGMENTS}}}
+				break
+			} //end if
+			cycles++
+		} //end for
+	//	sr, okPath := urlHandlersMap["/"+headPath] // previous, original code, replaced with the above
+		//--
 		if(okPath != true) {
 			if(r.Method == "OPTIONS") {
 				log.Printf("[SRV] Web Server: OPTIONS Request Method :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "200", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
@@ -344,7 +409,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			} //end if
 			if((r.Method != "GET") && (r.Method != "HEAD")) {
 				log.Printf("[SRV] Web Server: Invalid Request Method :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "405", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") [Rule:DENY]: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 				return
 			} //end if
 			if((servePublicPath == true) && ((urlPath == "/") || (webUrlPathIsValid(urlPath) == true))) {
@@ -355,12 +420,12 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				} //end if
 			} //end if
 			log.Printf("[SRV] Web Server: Invalid Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "404", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
 		if((sr.MaxTailSegments >= 0) && (len(tailPaths) > sr.MaxTailSegments)) { // if sr.MaxTailSegments is -1, pass to controller
 			log.Printf("[SRV] Web Server: Invalid Internal Route for [/%s] (Max Tail is %d) :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", headPath, sr.MaxTailSegments, "404", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
 		if(r.Method == "OPTIONS") {
@@ -370,31 +435,41 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} //end if
 		if(!smart.InListArr(r.Method, sr.AllowedMethods)) {
 			log.Printf("[SRV] Web Server: Invalid Request Method for Internal Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "405", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-			smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Internal Route [Rule:DENY]: `" + smart.GetHttpPathFromRequest(r) + "`", true)
+			smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Internal Route [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
 		//-- auth check (if set so)
 		var authErr error = nil
 		var authData smart.AuthDataStruct
 		if((isAuthActive == true) && (sr.AuthSkip != true)) { // this check must be before executing fx below
-			authErr, authData = smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, true) // outputs: HTML
+			authErr, authData = smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, true) // outputs: HTML
 			if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
 				log.Println("[WARNING]", "Web Server: Authentication Failed:", "authData.OK:", authData.OK, "authData.ErrMsg:", authData.ErrMsg, "Error:", authErr)
-				// MUST NOT USE HERE: smarthttputils.HttpStatus401() ; it is handled directly by smarthttputils.HttpBasicAuthCheck()
+				// MUST NOT USE HERE: smarthttputils.HttpStatus401() ; it is handled directly by smarthttputils.HttpAuthCheck()
 				return
 			} //end if
 		} //end if
 		//-- #end auth check
 		timerStart := time.Now()
-		code, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers := sr.FxHandler(r, headPath, tailPaths, authData)
+		response := sr.FxHandler(r, headPath, tailPaths, authData)
 		timerDuration := time.Since(timerStart)
+		//-- controller cookie registration
+		numCookies := smarthttputils.HttpRequestSetCookies(w, r, response.Cookies)
+		if(numCookies > 0) {
+			log.Println("[NOTICE]", "Web Server: Controller Cookie Registration: #", numCookies)
+		} //end if
+		//-- custom log
+		response.LogMessage = smart.StrTrimWhitespaces(response.LogMessage)
+		if(response.LogMessage != "") {
+			log.Println("[LOG]", "Web Server: Controller Route:", "`" + urlPath + "`:", response.LogMessage)
+		} //end if
 		//-- fixes for default params
-		if(cacheExpiration <= 0) { // for easing the development if cacheExpiration is not specified the default value is zero but actually for no-cache -1 is needed ; this fix is needed because in http utils cache zero means at least 60 seconds ... and -1 is no cache !
-			cacheExpiration = -1 // if cacheExpiration is not explicit set to a value greater than zero in controller consider is no-cache
-			cacheLastModified = "" // mandatory for no cache, cannot be otherwise ...
-			cacheControl = smarthttputils.CACHE_CONTROL_NOCACHE // mandatory for no cache, cannot be otherwise ...
+		if(response.CacheExpiration <= 0) { // for easing the development if response.CacheExpiration is not specified the default value is zero but actually for no-cache -1 is needed ; this fix is needed because in http utils cache zero means at least 60 seconds ... and -1 is no cache !
+			response.CacheExpiration = -1 // if response.CacheExpiration is not explicit set to a value greater than zero in controller consider is no-cache
+			response.CacheLastModified = "" // mandatory for no cache, cannot be otherwise ...
+			response.CacheControl = smarthttputils.CACHE_CONTROL_NOCACHE // mandatory for no cache, cannot be otherwise ...
 		} else { // if cache is set and no explicit
-			switch(cacheControl) {
+			switch(response.CacheControl) {
 				case smarthttputils.CACHE_CONTROL_PRIVATE:
 					break
 				case smarthttputils.CACHE_CONTROL_PUBLIC:
@@ -402,24 +477,24 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				case smarthttputils.CACHE_CONTROL_DEFAULT:
 					break
 				default:
-					cacheControl = smarthttputils.CACHE_CONTROL_DEFAULT // if no explicit value is set, set to default
+					response.CacheControl = smarthttputils.CACHE_CONTROL_DEFAULT // if no explicit value is set, set to default
 			} //end switch
 		} //end if
-		contentFileName = smart.StrTrimWhitespaces(contentFileName)
-		if(!smart.PathIsSafeValidSafeFileName(contentFileName)) {
-			contentFileName = ""
+		response.ContentFileName = smart.StrTrimWhitespaces(response.ContentFileName)
+		if(!smart.PathIsSafeValidSafeFileName(response.ContentFileName)) {
+			response.ContentFileName = ""
 		} //end if
-		contentDisposition = smart.StrToLower(smart.StrTrimWhitespaces(contentDisposition))
-		if((contentDisposition != smarthttputils.DISP_TYPE_INLINE) && (contentDisposition != smarthttputils.DISP_TYPE_ATTACHMENT)) {
-			contentDisposition = ""
+		response.ContentDisposition = smart.StrToLower(smart.StrTrimWhitespaces(response.ContentDisposition))
+		if((response.ContentDisposition != smarthttputils.DISP_TYPE_INLINE) && (response.ContentDisposition != smarthttputils.DISP_TYPE_ATTACHMENT)) {
+			response.ContentDisposition = ""
 		} //end if
 		//--
 		log.Println("[META]", "Web Server: Internal Route :: Handler Execution Time:", timerDuration, "# Route: `" + urlPath + "`")
-		log.Printf("[SRV] Web Server: Internal Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(int(code)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		log.Printf("[SRV] Web Server: Internal Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(int(response.StatusCode)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 		//--
 		var fExt string = ""
-		if((contentFileName != "") && (!smart.StrContains(contentFileName, "://"))) {
-			fExt = smart.StrTrimWhitespaces(smart.StrToLower(smart.PathBaseExtension(contentFileName)))
+		if((response.ContentFileName != "") && (!smart.StrContains(response.ContentFileName, "://"))) {
+			fExt = smart.StrTrimLeft(smart.StrToLower(smart.PathBaseExtension(response.ContentFileName)), ".")
 		} //end if
 		//--
 		var isHtmlAnswer bool = false
@@ -427,75 +502,80 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			isHtmlAnswer = true
 		} //end if
 		//--
-		switch(code) {
+		switch(response.StatusCode) {
 			//-- ok status codes
 			case 200:
-				smarthttputils.HttpStatus200(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+				smarthttputils.HttpStatus200(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
 			case 202:
-				smarthttputils.HttpStatus202(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+				smarthttputils.HttpStatus202(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
 			case 203:
-				smarthttputils.HttpStatus203(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+				smarthttputils.HttpStatus203(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
 			case 204:
-				smarthttputils.HttpStatus204(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+				smarthttputils.HttpStatus204(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
 			case 208:
-				smarthttputils.HttpStatus208(w, r, content, contentFileName, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+				smarthttputils.HttpStatus208(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
 			//-- redirect 3xx statuses
 			case 301:
-				smarthttputils.HttpStatus301(w, r, content, isHtmlAnswer) // for 3xx the content is the redirect URL
+				smarthttputils.HttpStatus301(w, r, response.ContentBody, isHtmlAnswer) // for 3xx the content is the redirect URL
 				break
 			case 302:
-				smarthttputils.HttpStatus302(w, r, content, isHtmlAnswer) // for 3xx the content is the redirect URL
+				smarthttputils.HttpStatus302(w, r, response.ContentBody, isHtmlAnswer) // for 3xx the content is the redirect URL
 				break
 			//-- client errors
 			case 400:
-				smarthttputils.HttpStatus400(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus400(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 401:
-				smarthttputils.HttpStatus401(w, r, content, isHtmlAnswer)
+				if(response.ContentFileName == "@401.html") { // if the content filename is this, will reply with a custom HTML 401 Html Page ; ex: this is used for logout
+					smarthttputils.HttpHeaderAuthBasic(w, HTTP_AUTH_REALM)
+					smarthttputils.HttpStatus401(w, r, response.ContentBody, isHtmlAnswer, true) // custom 401.html
+				} else {
+					smarthttputils.HttpStatus401(w, r, response.ContentBody, isHtmlAnswer, false)
+				} //end if else
 				break
 			case 403:
-				smarthttputils.HttpStatus403(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus403(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 404:
-				smarthttputils.HttpStatus404(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus404(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 405:
-				smarthttputils.HttpStatus405(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus405(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 410:
-				smarthttputils.HttpStatus410(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus410(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 422:
-				smarthttputils.HttpStatus422(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus422(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 429:
-				smarthttputils.HttpStatus429(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus429(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			//-- server errors
 			case 500:
-				smarthttputils.HttpStatus500(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus500(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 501:
-				smarthttputils.HttpStatus501(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus501(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 502:
-				smarthttputils.HttpStatus502(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus502(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 503:
-				smarthttputils.HttpStatus503(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus503(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 504:
-				smarthttputils.HttpStatus504(w, r, content, isHtmlAnswer)
+				smarthttputils.HttpStatus504(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			//--
 			default: // fallback to 500
-				log.Println("[ERROR]", "Web Server: Invalid Application Level Status Code for the URL Path [" + urlPath + "]:", code)
-				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + smart.ConvertIntToStr(int(code)) + "` for the URL Path: `" + smart.GetHttpPathFromRequest(r) + "`", isHtmlAnswer)
+				log.Println("[ERROR]", "Web Server: Invalid Application Level Status Code for the URL Path [" + urlPath + "]:", response.StatusCode)
+				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + smart.ConvertIntToStr(int(response.StatusCode)) + "` for the URL Path: `" + GetCurrentPath(r) + "`", isHtmlAnswer)
 		} //end switch
 	})
 
@@ -531,6 +611,40 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	return 0
 	//--
 
+} //END FUNCTION
+
+
+func ResponseApiJsonErr(errCode uint16, errMsg string, data any) string {
+	//--
+	if(errCode <= 0) {
+		errCode = apiErrorDefaultCode
+	} //end if
+	errMsg = smart.StrTrimWhitespaces(errMsg)
+	if(errMsg == "") {
+		errMsg = apiErrorDefaultMsg
+	} //end if
+	//--
+	resp := apiMsgStruct{
+		ErrCode: errCode,
+		ErrMsg:  errMsg,
+		Data:    data,
+	}
+	//--
+	return smart.JsonNoErrChkEncode(resp, false, false)
+	//--
+} //END FUNCTION
+
+
+func ResponseApiJsonOK(data any) string {
+	//--
+	resp := apiMsgStruct{
+		ErrCode: 0,
+		ErrMsg:  "",
+		Data:    data,
+	}
+	//--
+	return smart.JsonNoErrChkEncode(resp, false, false)
+	//--
 } //END FUNCTION
 
 

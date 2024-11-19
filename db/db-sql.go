@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240117.2121 :: STABLE
+// r.20241104.2358 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -322,7 +322,7 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 	} else {
 		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "DB Initialization MetaData SQL is Empty", connDescr)
 		conn.dbConn = nil // reset
-		conn.dbErr = smart.NewError("DB Initialization MetaData Failed: `" + conn.dbUrl + "`")
+		conn.dbErr = smart.NewError("DB Initialization MetaData Failed: `" + connDescr + "`")
 		return nil, conn.dbErr
 	} //end if
 	//--
@@ -330,14 +330,14 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if((!smart.PathExists(conn.dbUrl)) || (!smart.PathIsFile(conn.dbUrl))) { // file must exists
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "DB File Creation Error", connDescr)
 			conn.dbConn = nil // reset
-			conn.dbErr = smart.NewError("DB File Creation Failed: `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("DB File Creation Failed: `" + connDescr + "`")
 			return nil, conn.dbErr
 		} //end if
 		fSize, fSzMsgErr := smart.SafePathFileGetSize(conn.dbUrl, true)
 		if((fSize <= 0) || (fSzMsgErr != nil)) { // file size must be greater than zero
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "DB File Creation Invalid Size (zero)", fSize, "Error:", fSzMsgErr, connDescr)
 			conn.dbConn = nil // reset
-			conn.dbErr = smart.NewError("DB File Creation Invalid Size (zero): `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("DB File Creation Invalid Size (zero): `" + connDescr + "`")
 			return nil, conn.dbErr
 		} //end if
 		libVersion, _, _ := sqlite3.Version()
@@ -369,7 +369,7 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(pgEncoding)) != ENCODING) {
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "PostgreSQL Server/Database Encoding is not `" + ENCODING + "` !", connDescr)
 			conn.dbConn = nil // reset
-			conn.dbErr = smart.NewError("PostgreSQL Server/Database Encoding must be `" + ENCODING + "` ! `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("PostgreSQL Server/Database Encoding must be `" + ENCODING + "` ! `" + connDescr + "`")
 			return nil, conn.dbErr
 		} //end if
 	} else if(conn.dbType == DB_SQL_TYPE_MYSQL) {
@@ -377,7 +377,7 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 		if(errSetCl != nil) {
 			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server Connection Collation to: `UTF8.MB4`", errSetCl)
 			conn.dbConn = nil // reset
-			conn.dbErr = smart.NewError("MySQL Server Connection Collation cannot be set to `UTF8.MB4` ! `" + conn.dbUrl + "`")
+			conn.dbErr = smart.NewError("MySQL Server Connection Collation cannot be set to `UTF8.MB4` ! `" + connDescr + "`")
 			return nil, conn.dbErr
 		} //end if
 		var myVersion string = ""

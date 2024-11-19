@@ -4,12 +4,12 @@ import (
 	"errors"
 
 	"crypto"
-	"crypto/ed25519"
-	"crypto/rand"
+	crand "crypto/rand"
+	ed25519 "crypto/ed25519"
 )
 
 var (
-	ErrEd25519Verification = errors.New("ed25519: verification error")
+	ErrEd25519Verification error = errors.New("ed25519: verification error")
 )
 
 // SigningMethodEd25519 implements the EdDSA family.
@@ -29,7 +29,8 @@ func init() {
 }
 
 func (m *SigningMethodEd25519) Alg() string {
-	return "EdDSA"
+//	return "EdDSA"
+	return "Ed25519"
 }
 
 // Verify implements token verification for the SigningMethod.
@@ -77,9 +78,10 @@ func (m *SigningMethodEd25519) Sign(signingString string, key interface{}) (stri
 
 	// Sign the string and return the encoded result
 	// ed25519 performs a two-pass hash as part of its algorithm. Therefore, we need to pass a non-prehashed message into the Sign function, as indicated by crypto.Hash(0)
-	sig, err := ed25519Key.Sign(rand.Reader, []byte(signingString), crypto.Hash(0))
+	sig, err := ed25519Key.Sign(crand.Reader, []byte(signingString), crypto.Hash(0))
 	if err != nil {
 		return "", err
 	}
 	return EncodeSegment(sig), nil
 }
+

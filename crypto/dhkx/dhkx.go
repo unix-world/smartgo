@@ -1,6 +1,6 @@
 
 // (c) 2021-2024 unix-world.org
-// r.20240112.1858
+// r.20241105.2358
 
 //=======
 // This is an implementation of Diffie-Hellman Key Exchange algorithm for a Client/Server suite, based on: github.com/monnand/dhkx
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	VERSION = "r.20230928.2358"
+	VERSION = "r.20241105.2358"
 )
 
 
@@ -38,8 +38,7 @@ type HandleDhkxCliRecvFunc func() (string, []byte, int) 			// () : (err string, 
 
 func DhKxGetRandomGroup(highOnly bool) int {
 	//--
-	rHandle := smart.TimeUnixNanoMathRandHandler()
-	var randGrp int = rHandle.Intn(17) // balance more to the 14 ...
+	var randGrp uint64 = smart.NanoTimeRandInt63N(0, 15) // balance one bit more to the 14 ...
 	var grpID int = 0
 	switch(randGrp) {
 		case 14:
@@ -114,8 +113,6 @@ func DhKxGetRandomGroup(highOnly bool) int {
 			break
 		case 0:  fallthrough
 		case 15: fallthrough
-		case 16: fallthrough
-		case 17: fallthrough
 		default:
 			grpID = 14
 	} //end switch

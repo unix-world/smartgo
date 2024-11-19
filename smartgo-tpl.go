@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 // [ TPL (MARKER-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -156,6 +156,9 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 	return template
 	//--
 } //END FUNCTION
+
+
+//-----
 
 
 func markersTplProcessIfSyntax(template string, arrobj map[string]string) string {
@@ -645,10 +648,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							} else if(escaping == "|jsvar") { // JS-Variable: a-zA-Z0-9_$
 								tmp_marker_val = StrCreateJsVarName(tmp_marker_val)
 							} else if(escaping == "|stdvar") { // Standard Variable: a-zA-Z0-9_
-								tmp_marker_val = StrCreateJsVarName(tmp_marker_val)
-								tmp_marker_val = StrReplaceAll(tmp_marker_val, "$", "")
-								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
-								if(tmp_marker_val == "") {
+								tmp_marker_val = StrCreateStdVarName(tmp_marker_val)
+								if(StrTrimWhitespaces(tmp_marker_val) == "") {
 									tmp_marker_val = UNDEF_VAR_NAME
 								} //end if
 							} else if(escaping == "|normspaces") { // normalize spaces
@@ -921,7 +922,7 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 } //END FUNCTION
 
 
-
+// low level usage only ; use Render* methods from below
 func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
 	//-- syntax: r.20231228
 	defer PanicHandler() // url decode may panic
@@ -1000,6 +1001,9 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 } //END FUNCTION
 
 
+//-----
+
+
 func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
 	//--
 	defer PanicHandler()
@@ -1018,6 +1022,66 @@ func RenderMarkersTpl(template string, arrobj map[string]string) string {
 	defer PanicHandler()
 	//--
 	return MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arrpobj map[string]string) (string, error) {
+	//--
+	defer PanicHandler()
+	//--
+	template, err := readTPLFile(mtplFile)
+	if(err != nil) {
+		return "", err
+	} //end if
+	//--
+	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
+	//--
+	template = PlaceholdersTplRender(template, arrpobj, false, false)
+	//--
+	return template, nil
+	//--
+} //END FUNCTION
+
+
+func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string) (string, error) {
+	//--
+	defer PanicHandler()
+	//--
+	template, err := readTPLFile(mtplFile)
+	if(err != nil) {
+		return "", err
+	} //end if
+	//--
+	template = MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
+	//--
+	return template, nil
+	//--
+} //END FUNCTION
+
+
+func readTPLFile(mtplFile string) (string, error) {
+	//--
+	defer PanicHandler()
+	//--
+	if(StrTrimWhitespaces(mtplFile) == "") {
+		return "", NewError("Empty TPL File Path")
+	} //end if
+	if(!StrEndsWith(mtplFile, ".mtpl.htm")) {
+		return "", NewError("Invalid TPL File Extension")
+	} //end if
+	template, err := SafePathFileRead(mtplFile, false)
+	if(err != nil) {
+		return "", err
+	} //end if
+	if(StrTrimWhitespaces(template) == "") {
+		return "", NewError("TPL File is Unreadable or Empty")
+	} //end if
+	//--
+	return template, nil
 	//--
 } //END FUNCTION
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240116.2136 :: STABLE
+// r.20241112.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -475,7 +475,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		//-- safety
 		defer smart.PanicHandler() // for: socket upgrade
 		//-- check auth
-		authErr, authData := smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, allowedIPs, nil, false) // outputs: TEXT
+		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, allowedIPs, nil, false) // outputs: TEXT
 		if(authErr != nil) {
 			log.Println("[WARNING] MessagePak Server / MsgPak Channel Area :: Authentication Failed:", authErr)
 			return
@@ -670,7 +670,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			return
 		} //end if
 		//--
-		authErr, authData := smarthttputils.HttpBasicAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, allowedIPs, nil, true) // outputs: HTML
+		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, allowedIPs, nil, true) // outputs: HTML
 		if(authErr != nil) {
 			log.Println("[WARNING] MessagePak Server / Task Commands Area :: Authentication Failed:", authErr)
 			return
@@ -694,10 +694,10 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			var paramCmd  string = smart.StrTrimWhitespaces(r.URL.Query().Get("cmd"))
 			var paramData string = smart.StrTrimWhitespaces(r.URL.Query().Get("data"))
 			if((paramMode == "display") && (paramCmd != "")) { // display form
-				smarthttputils.HttpStatus200(w, r, srvassets.HtmlServerTemplate("Server: Task Command Status: Set", "", `<h1>Server: Task Command Status: Set &nbsp; <i class="sfi sfi-tab sfi-3x"></i></h1>` + `<div class="operation_success" title="Command">` + smart.EscapeHtml("<" + paramCmd + ">") + `</div>` + "\n" + `<div class="operation_display icon" title="Data">` + "\n" + `<textarea class="ux-field" style="width:700px; height:250px;" readonly>` + smart.EscapeHtml(paramData) + `</textarea>` + "\n" + `</div>` + "\n" + `<a href="msgsend" class="ux-button ux-button-primary">New Task Command</a>`), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
+				smarthttputils.HttpStatus200(w, r, srvassets.HtmlServerTemplate("Server: Task Command Status: Set", "", `<h1>Server: Task Command Status: Set &nbsp; <i class="sfi sfi-tab sfi-3x"></i></h1>` + `<div class="operation_success" title="Command">` + smart.EscapeHtml("<" + paramCmd + ">") + `</div>` + "\n" + `<div class="operation_display icon" title="Data">` + "\n" + `<textarea class="ux-field" style="width:700px; height:250px;" readonly>` + smart.EscapeHtml(paramData) + `</textarea>` + "\n" + `</div>` + "\n" + `<a href="msgsend" class="ux-button ux-button-primary">New Task Command</a>`, false), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil) // skip js
 				return
 			} else if(paramCmd == "") { // new form
-				smarthttputils.HttpStatus200(w, r, srvassets.HtmlServerTemplate("Server: New Task Command", "", `<h1>Server: New Task Command &nbsp; <i class="sfi sfi-command sfi-3x"></i></h1>` + `<form id="new-task-form" name="new-task-form" method="post" action="#" class="ux-form" onSubmit="return false;"><input type="hidden" name="mode" value="json">` + "\n" + `<div class="operation_result">` + `<input type="text" name="cmd" class="ux-field" placeholder="Cmd" title="Cmd" maxlength="255" style="width:700px;">` + `</div>` + "\n" + `<div class="operation_important">` + `<textarea name="data" class="ux-field" placeholder="Data" title="Data" maxlength="16000000" style="width:700px; height:250px;"></textarea>` + `</div>` + "\n" + `<button type="submit" disabled style="display:none;" aria-hidden="true" data-hint="Prevent Form Submit on Enter"></button>` + "\n" + `<button type="button" class="ux-button ux-button-special" onClick="smartJ$Browser.SubmitFormByAjax('new-task-form', 'msgsend', 'yes'); return false;"><i class="sfi sfi-new-tab"></i>&nbsp;&nbsp; Submit Task Command</button>` + "\n" + `</form>`), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
+				smarthttputils.HttpStatus200(w, r, srvassets.HtmlServerTemplate("Server: New Task Command", "", `<h1>Server: New Task Command &nbsp; <i class="sfi sfi-command sfi-3x"></i></h1>` + `<form id="new-task-form" name="new-task-form" method="post" action="#" class="ux-form" onSubmit="return false;"><input type="hidden" name="mode" value="json">` + "\n" + `<div class="operation_result">` + `<input type="text" name="cmd" class="ux-field" placeholder="Cmd" title="Cmd" maxlength="255" style="width:700px;">` + `</div>` + "\n" + `<div class="operation_important">` + `<textarea name="data" class="ux-field" placeholder="Data" title="Data" maxlength="16000000" style="width:700px; height:250px;"></textarea>` + `</div>` + "\n" + `<button type="submit" disabled style="display:none;" aria-hidden="true" data-hint="Prevent Form Submit on Enter"></button>` + "\n" + `<button type="button" class="ux-button ux-button-special" onClick="smartJ$Browser.SubmitFormByAjax('new-task-form', 'msgsend', 'yes'); return false;"><i class="sfi sfi-new-tab"></i>&nbsp;&nbsp; Submit Task Command</button>` + "\n" + `</form>`, true), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil) // load js
 				return
 			} //end if
 		} else if(r.Method == http.MethodPost) { // POST
@@ -751,7 +751,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			w.WriteHeader(200) // status code must be after content type
 			w.Write([]byte(srvassets.JsonAjaxFormReply("OK", "", "Server: Task Command was Set", "Command: " + "<" + customcmd + ">" + "\n" + "Data Length: " + smart.ConvertIntToStr(len(customdata)) + " bytes", false, "", "msgsend?mode=display&cmd=" + smart.EscapeUrl(customcmd) + "&data=" + smart.EscapeUrl(smart.TextCutByLimit(customdata, 255)), "", "", false)))
 		} else {
-			smarthttputils.HttpStatus202(w, r, srvassets.HtmlServerTemplate("Server: Task Command was Set", "", `<h1>Server: Task Command was Set &nbsp; <i class="sfi sfi-loop sfi-3x"></i></h1>` + `<div class="operation_success" title="Command">` + smart.EscapeHtml("<" + customcmd + ">") + `</div>` + "\n" + `<div class="operation_display icon" title="Data">` + "\n" + `<textarea class="ux-field" style="width:700px; height:250px;" readonly>` + smart.EscapeHtml(customdata) + `</textarea>` + "\n" + `</div>` + "\n" + `<a href="msgsend" class="ux-button ux-button-info">New Task Command</a>`), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
+			smarthttputils.HttpStatus202(w, r, srvassets.HtmlServerTemplate("Server: Task Command was Set", "", `<h1>Server: Task Command was Set &nbsp; <i class="sfi sfi-loop sfi-3x"></i></h1>` + `<div class="operation_success" title="Command">` + smart.EscapeHtml("<" + customcmd + ">") + `</div>` + "\n" + `<div class="operation_display icon" title="Data">` + "\n" + `<textarea class="ux-field" style="width:700px; height:250px;" readonly>` + smart.EscapeHtml(customdata) + `</textarea>` + "\n" + `</div>` + "\n" + `<a href="msgsend" class="ux-button ux-button-info">New Task Command</a>`, false), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil) // skip js
 		} //end if else
 		//--
 	} //end function
@@ -764,7 +764,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		} //end if
 		//--
 		headers := map[string]string{"refresh":"10"}
-		smarthttputils.HttpStatus200(w, r, assets.HtmlStandaloneTemplate("MsgPak Server: HTTP(S)/WsMux", "", `<div class="operation_display">MsgPak Server: HTTP(S)/WsMux # ` + smart.EscapeHtml(VERSION) + `</div>` + `<div class="operation_info"><img width="48" height="48" src="/lib/framework/img/loading-spin.svg"></div>` + `<hr>` + `<small>` + smart.EscapeHtml(smart.COPYRIGHT) + `</small>`), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, headers)
+		smarthttputils.HttpStatus200(w, r, assets.HtmlStandaloneTemplate("MsgPak Server: HTTP(S)/WsMux", "", `<div class="operation_display">MsgPak Server: HTTP(S)/WsMux # ` + smart.EscapeHtml(VERSION) + `</div>` + `<div class="operation_info"><img width="48" height="48" src="/lib/framework/img/loading-spin.svg"></div>` + `<hr>` + `<small>` + smart.EscapeHtml(smart.COPYRIGHT) + `</small>`, false), "index.html", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, headers) // skip js
 		//--
 	} //end function
 

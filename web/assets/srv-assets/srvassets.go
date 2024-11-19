@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241031.1532 :: STABLE
+// r.20241116.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,9 +19,11 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20241031.1532"
+	VERSION string = "r.20241116.2358"
+)
 
-	DEBUG bool = false
+var (
+	DEBUG bool = smart.DEBUG
 )
 
 //-----
@@ -140,21 +142,21 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 
 //-----
 
-func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string) string { // require: a HTTP or HTTPS service, serving assets as: /lib/*
+func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string, loadjs bool) string { // require: a HTTP or HTTPS service, serving assets as: /lib/*
 	//--
-	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, "")
-	//--
-} //END FUNCTION
-
-
-func HtmlServerFaviconTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string { // require: a HTTP or HTTPS service, serving assets as: /lib/* and a favicon
-	//--
-	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, favicon)
+	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, "", loadjs)
 	//--
 } //END FUNCTION
 
 
-func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string) string {
+func HtmlServerFaviconTemplate(titleText string, headHtml string, bodyHtml string, loadjs bool, favicon string) string { // require: a HTTP or HTTPS service, serving assets as: /lib/* and a favicon
+	//--
+	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, favicon, loadjs)
+	//--
+} //END FUNCTION
+
+
+func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string, loadjs bool) string {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -196,27 +198,31 @@ func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string
 	const cssAppGo string = "lib/app-go.css"
 	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssAppGo) + cssEndTag)
 	//--
-	const jsJQueryBase string = "lib/js/jquery/jquery.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryBase) + jsEndTag)
-	const jsJQuerySettings string = "lib/js/jquery/settings-jquery.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySettings) + jsEndTag)
-	const jsJQuerySmartCompat string = "lib/js/jquery/jquery.smart.compat.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySmartCompat) + jsEndTag)
-	//--
-	const cssJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.css"
-	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryGrowl) + cssEndTag)
-	const jsJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryGrowl) + jsEndTag)
-	//--
-	const cssJQueryAlertable string = "lib/js/jquery/jquery.alertable.css"
-	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryAlertable) + cssEndTag)
-	const jsJQueryAlertable string = "lib/js/jquery/jquery.alertable.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryAlertable) + jsEndTag)
-	//--
-	const jsSfSettings string = "lib/js/framework/smart-framework-settings.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfSettings) + jsEndTag)
-	const jsSfPak string = "lib/js/framework/smart-framework.pak.js"
-	assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfPak) + jsEndTag)
+	if(loadjs == true) {
+		const jsJQueryBase string = "lib/js/jquery/jquery.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryBase) + jsEndTag)
+		const jsJQuerySettings string = "lib/js/jquery/settings-jquery.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySettings) + jsEndTag)
+		const jsJQuerySmartCompat string = "lib/js/jquery/jquery.smart.compat.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySmartCompat) + jsEndTag)
+		//--
+		const cssJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.css"
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryGrowl) + cssEndTag)
+		const jsJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryGrowl) + jsEndTag)
+		//--
+		const cssJQueryAlertable string = "lib/js/jquery/jquery.alertable.css"
+		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryAlertable) + cssEndTag)
+		const jsJQueryAlertable string = "lib/js/jquery/jquery.alertable.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryAlertable) + jsEndTag)
+		//--
+		const jsSfSettings string = "lib/js/framework/smart-framework-settings.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfSettings) + jsEndTag)
+		const jsSfPak string = "lib/js/framework/smart-framework.pak.js"
+		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfPak) + jsEndTag)
+	} else {
+		assetsAll = append(assetsAll, `<!-- JS: skip -->`)
+	} //end if else
 	//--
 	if(len(assetsAll) > 0) {
 		headCssJs = smart.Implode("\n", assetsAll)

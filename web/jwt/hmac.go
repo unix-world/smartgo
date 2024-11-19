@@ -23,9 +23,9 @@ type SigningMethodHMAC struct {
 // Specific instances for HS256 and company
 var (
 	SigningMethodHS224   *SigningMethodHMAC
-	SigningMethodHS256   *SigningMethodHMAC
+//	SigningMethodHS256   *SigningMethodHMAC // unsafe to use for signature, it may be vulnerable to length attack
 	SigningMethodHS384   *SigningMethodHMAC
-	SigningMethodHS512   *SigningMethodHMAC
+//	SigningMethodHS512   *SigningMethodHMAC // unsafe to use for signature, it may be vulnerable to length attack
 
 	SigningMethodH3S224  *SigningMethodHMAC
 	SigningMethodH3S256  *SigningMethodHMAC
@@ -46,10 +46,10 @@ func init() {
 	//-- #end
 
 	// HS256
-	SigningMethodHS256 = &SigningMethodHMAC{"HS256", crypto.SHA256}
-	RegisterSigningMethod(SigningMethodHS256.Alg(), func() SigningMethod {
-		return SigningMethodHS256
-	})
+//	SigningMethodHS256 = &SigningMethodHMAC{"HS256", crypto.SHA256}
+//	RegisterSigningMethod(SigningMethodHS256.Alg(), func() SigningMethod {
+//		return SigningMethodHS256
+//	})
 
 	// HS384
 	SigningMethodHS384 = &SigningMethodHMAC{"HS384", crypto.SHA384}
@@ -58,10 +58,10 @@ func init() {
 	})
 
 	// HS512
-	SigningMethodHS512 = &SigningMethodHMAC{"HS512", crypto.SHA512}
-	RegisterSigningMethod(SigningMethodHS512.Alg(), func() SigningMethod {
-		return SigningMethodHS512
-	})
+//	SigningMethodHS512 = &SigningMethodHMAC{"HS512", crypto.SHA512}
+//	RegisterSigningMethod(SigningMethodHS512.Alg(), func() SigningMethod {
+//		return SigningMethodHS512
+//	})
 
 
 	//-- fix by unixman

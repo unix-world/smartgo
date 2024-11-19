@@ -30,8 +30,10 @@ import (
 
 const (
 	VERSION string = "v.20240930.1531"
+)
 
-	DEBUG bool = false
+var (
+	DEBUG bool = smart.DEBUG
 )
 
 type Handler struct {

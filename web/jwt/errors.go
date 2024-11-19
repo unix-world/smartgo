@@ -6,9 +6,9 @@ import (
 
 // Error constants
 var (
-	ErrInvalidKey      = errors.New("key is invalid")
-	ErrInvalidKeyType  = errors.New("key is of invalid type")
-	ErrHashUnavailable = errors.New("the requested hash function is unavailable")
+	ErrInvalidKey            = errors.New("key is invalid")
+	ErrInvalidKeyType        = errors.New("key is of invalid type")
+	ErrHashUnavailable       = errors.New("the requested hash function is unavailable")
 
 	ErrTokenMalformed        = errors.New("token is malformed")
 	ErrTokenUnverifiable     = errors.New("token is unverifiable")
@@ -21,6 +21,8 @@ var (
 	ErrTokenNotValidYet      = errors.New("token is not valid yet")
 	ErrTokenInvalidId        = errors.New("token has invalid id")
 	ErrTokenInvalidClaims    = errors.New("token has invalid claims")
+
+	ErrKeyMustBeEncodedPem   = errors.New("invalid key: Key must be a PEM encoded")
 )
 
 // The errors that might occur when parsing and validating a token

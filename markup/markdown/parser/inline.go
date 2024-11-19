@@ -738,17 +738,17 @@ func leftAngle(p *Parser, data []byte, offset int) (int, ast.Node) {
 }
 
 // '\\' backslash escape
-var escapeChars = []byte("\\`*_{}[]()#+-.!:|&<>~^")
+var EscapeChars = []byte("\\`*_{}[]()#+-.!:|&<>~^$")
 
 func escape(p *Parser, data []byte, offset int) (int, ast.Node) {
 	data = data[offset:]
 
 	if len(data) <= 1 {
-		// fix by unixman because the above condition prevents to go further on backslash + newline
+		//-- fix by unixman because the above condition prevents to go further on backslash + newline
 		if p.extensions&BackslashLineBreak != 0 {
 			return 2, &ast.Hardbreak{}
 		}
-		// #end fix
+		//-- #end fix
 		return 2, nil
 	}
 
@@ -760,7 +760,7 @@ func escape(p *Parser, data []byte, offset int) (int, ast.Node) {
 		return 2, &ast.Hardbreak{}
 	}
 
-	if bytes.IndexByte(escapeChars, data[1]) < 0 {
+	if bytes.IndexByte(EscapeChars, data[1]) < 0 {
 		return 0, nil
 	}
 
@@ -1192,30 +1192,30 @@ func helperFindEmphChar(data []byte, c byte) int {
 func helperEmphasis(p *Parser, data []byte, c byte) (int, ast.Node) {
 	i := 0
 
-	// skip one symbol if coming from emph3
+	// skip two symbol if coming from emph3, as it detected a double emphasis case
 	if len(data) > 1 && data[0] == c && data[1] == c {
-		i = 1
+		i = 2
 	}
 
 	for i < len(data) {
 		length := helperFindEmphChar(data[i:], c)
-		if length == 0 {
-			return 0, nil
-		}
 		i += length
 		if i >= len(data) {
 			return 0, nil
 		}
 
 		if i+1 < len(data) && data[i+1] == c {
-			i++
+			i += 2
 			continue
 		}
 
 		if data[i] == c && !IsSpace(data[i-1]) {
-
 			if p.extensions&NoIntraEmphasis != 0 {
-				if !(i+1 == len(data) || IsSpace(data[i+1]) || IsPunctuation(data[i+1])) {
+				rest := data[i+1:]
+				if !(len(rest) == 0 || IsSpace(rest[0]) || IsPunctuation2(rest)) {
+					if length == 0 {
+						return 0, nil
+					}
 					continue
 				}
 			}
@@ -1223,6 +1223,11 @@ func helperEmphasis(p *Parser, data []byte, c byte) (int, ast.Node) {
 			emph := &ast.Emph{}
 			p.Inline(emph, data[:i])
 			return i + 1, emph
+		}
+
+		// We have to check this at the end, otherwise the scenario where we find repeated c's will get skipped
+		if length == 0 {
+			return 0, nil
 		}
 	}
 
