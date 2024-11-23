@@ -1,5 +1,5 @@
-gopkg.in/yaml.v2 @v2.4.0
-[ github.com/go-yaml/yaml ]
+github.com/go-yaml/yaml @v3.0.1
+[ gopkg.in/yaml.v3 ]
 
 go 1.15
 

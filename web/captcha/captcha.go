@@ -1,7 +1,7 @@
 
 // SmartGo Captcha
 // (c) 2024 unix-world.org
-// v.20241116.2358
+// v.20241123.2358
 // license: BSD
 
 package captcha
@@ -59,8 +59,11 @@ func ValidateCaptcha(ckVal string, ckName string, clientIdentUidHash string) (bo
 		return false, smart.NewError("Captcha Cookie Value is Contains No Code") // empty code completed by visitor
 	} //end if
 	arr[1] = smart.StrTrimWhitespaces(smart.Base64Decode(arr[1]))
-	if((len(arr[1]) < 3) || (len(arr[1]) > 7)) {
-		return false, smart.NewError("Captcha Cookie Value is Too Long or Too Short") // invalid code completed by visitor
+	if(len(arr[1]) < 3) {
+		return false, smart.NewError("Captcha Cookie Value is Too Short") // invalid code completed by visitor
+	} //end if
+	if(len(arr[1]) > 7) {
+		return false, smart.NewError("Captcha Cookie Value is Too Long") // invalid code completed by visitor
 	} //end if
 	//--
 	if(arr[0] != cookieValSafeHash(arr[1], ckName, clientIdentUidHash)) {
@@ -72,22 +75,24 @@ func ValidateCaptcha(ckVal string, ckName string, clientIdentUidHash string) (bo
 } //END FUNCTION
 
 
-func GetCaptchaHtmlAndCode(mode string, ckName string, clientIdentUidHash string) (*CaptchaStruct, error) {
+func GetCaptchaHtmlAndCode(mode string, ckName string, clientIdentUidHash string) (CaptchaStruct, error) {
+	//--
+	captchaStruct := CaptchaStruct{}
 	//--
 	clientIdentUidHash = smart.StrTrimWhitespaces(clientIdentUidHash)
 	if(len(clientIdentUidHash) < 80) { // expects SHA3-512-B64
-		return nil, smart.NewError("Invalid Captcha Client UID Hash: too short")
+		return captchaStruct, smart.NewError("Invalid Captcha Client UID Hash: too short")
 	} //end if
 	//--
 	ckName = smart.StrCreateStdVarName(ckName)
 	if(smart.StrTrimWhitespaces(ckName) == "") {
-		return nil, smart.NewError("Invalid Captcha Cookie Name: `" + ckName + "`")
+		return captchaStruct, smart.NewError("Invalid Captcha Cookie Name: `" + ckName + "`")
 	} //end if
 	//--
 	mode = smart.StrToLower(smart.StrTrimWhitespaces(mode))
 	arrMode := smart.Explode(":", mode)
 	if(len(arrMode) < 1) {
-		return nil, smart.NewError("Invalid Captcha Mode: `" + mode + "`")
+		return captchaStruct, smart.NewError("Invalid Captcha Mode: `" + mode + "`")
 	} //end if
 	//--
 	json := smart.JsonNoErrChkEncode(arrMode, false, false)
@@ -98,7 +103,7 @@ func GetCaptchaHtmlAndCode(mode string, ckName string, clientIdentUidHash string
 			//--
 			typ := gJsonRes.Get("0").String()
 			if(typ != arrMode[0]) {
-				return nil, smart.NewError("Captcha Mode Mismatch: `" + mode + "` ; [`" + typ + "`=`" + arrMode[0] + "`]")
+				return captchaStruct, smart.NewError("Captcha Mode Mismatch: `" + mode + "` ; [`" + typ + "`=`" + arrMode[0] + "`]")
 			} //end if
 			//--
 			palette := gJsonRes.Get("1").Int()
@@ -136,15 +141,14 @@ func GetCaptchaHtmlAndCode(mode string, ckName string, clientIdentUidHash string
 			asciiCaptchaStruct.Code = smart.StrTrimWhitespaces(asciiCaptchaStruct.Code)
 			asciiCaptchaStruct.Html = smart.StrTrimWhitespaces(asciiCaptchaStruct.Html)
 			if(asciiCaptchaStruct.Code == "") {
-				return nil, smart.NewError("Captcha Code is Empty")
+				return captchaStruct, smart.NewError("Captcha Code is Empty")
 			} //end if
 			if(asciiCaptchaStruct.Html == "") {
-				return nil, smart.NewError("Captcha Html is Empty")
+				return captchaStruct, smart.NewError("Captcha Html is Empty")
 			} //end if
 			//--
 			var ckVal string = cookieValSafeHash(asciiCaptchaStruct.Code, ckName, clientIdentUidHash)
 			//--
-			captchaStruct := &CaptchaStruct{}
 			captchaStruct.Code = asciiCaptchaStruct.Code
 			captchaStruct.Html = smart.RenderMarkersTpl(CAPTCHA_TPL_HTML, map[string]string{
 				"UUID": smart.Crc32bB36(typ + smart.FORM_FEED + asciiCaptchaStruct.Html),
@@ -162,7 +166,7 @@ func GetCaptchaHtmlAndCode(mode string, ckName string, clientIdentUidHash string
 			// N/A
 	} //end switch
 	//--
-	return nil, smart.NewError("Unsupported Captcha Mode: `" + mode + "`")
+	return captchaStruct, smart.NewError("Unsupported Captcha Mode: `" + mode + "`")
 	//--
 } //END FUNCTION
 

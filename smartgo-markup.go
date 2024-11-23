@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ MARKUP ]
 
 // REQUIRE: go 1.19 or later
@@ -33,6 +33,10 @@ import (
 func HTMLCodeFixValidate(htmlCode string) (string, error) {
 	//--
 	defer PanicHandler()
+	//--
+	if(htmlCode == "") {
+		return "<!-- Html:empty.vd -->", nil
+	} //end if
 	//--
 	var uuid string = StrToLower(uid.Uuid13Str() + "-" + uid.Uuid10Num() + "-fx." + ConvertUInt64ToStr(uid.UuidSessionSequence()))
 	var validHtml string = ""
@@ -88,6 +92,10 @@ func HTMLCodeFixValidate(htmlCode string) (string, error) {
 func HTMLCodeFixSanitize(htmlCode string) (string, error) {
 	//--
 	defer PanicHandler() // just in case
+	//--
+	if(htmlCode == "") {
+		return "<!-- Html:empty.sn -->", nil
+	} //end if
 	//--
 	sanitizedHtml, errSanitizer := htmlsanitizer.SanitizeString(htmlCode)
 	//--

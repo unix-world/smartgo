@@ -1,13 +1,14 @@
 
 // GO Lang :: SmartGo / Web Server / Routing :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
 	"log"
+	"sort"
 
 	smart "github.com/unix-world/smartgo"
 )
@@ -71,11 +72,11 @@ func UrlHandlerRegisterRoute(route string, skipAuth bool, methods []string, maxT
 	if(methods == nil) {
 		methods = []string{}
 	} //end if
-	var allowedMethods []string = AllowedMethods // OPTIONS is reserved !!
+	var allowedRouteMethods []string = allowedMethods // OPTIONS is reserved !!
 	var allowedSafeMethods []string = []string{}
 	for _, method := range methods {
 		method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
-		if(!smart.InListArr(method, allowedMethods)) {
+		if(!smart.InListArr(method, allowedRouteMethods)) {
 			log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Method [" + method + "] for Route: `" + route + "`")
 			return false
 		} else {
@@ -143,10 +144,12 @@ func listAuthSkipRoutes() []string {
 	if((urlHandlersMap != nil) && (len(urlHandlersMap) > 0)) {
 		for route, sr := range urlHandlersMap {
 			if(sr.AuthSkip == true) {
-				skipAuthRoutes = append(skipAuthRoutes, route)
+				skipAuthRoutes = append(skipAuthRoutes, "`" + route + "`")
 			} //end if
 		} //end for
 	} //end if
+	//--
+	sort.Strings(skipAuthRoutes)
 	//--
 	return skipAuthRoutes
 	//--

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Client :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241112.2358 :: STABLE
+// r.20241121.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -125,7 +125,7 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 		log.Println("[ERROR] MsgPak Client: Empty Auth UserName")
 		return 1003
 	} //end if
-	if((len(authUsername) < 3) || (len(authUsername) > 25)) { // {{{SYNC-GO-SMART-AUTH-USER-LEN}}}
+	if(smart.AuthIsValidUserName(authUsername) != true) {
 		log.Println("[ERROR] MsgPak Client: Invalid Auth UserName Length: must be between 5 and 25 characters")
 		return 1004
 	} //end if
@@ -135,25 +135,25 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 		log.Println("[ERROR] MsgPak Client: Empty Auth Password")
 		return 1005
 	} //end if
-	if((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 55)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
-		log.Println("[ERROR] MsgPak Client: Invalid Auth UserName Length: must be between 7 and 30 characters")
+	if(smart.AuthIsValidPassword(authPassword) != true) {
+		log.Println("[ERROR] MsgPak Client: Invalid Auth Password Length: must be between 7 and 57 characters")
 		return 1006
 	} //end if
 
 	sharedEncPrivKey = smart.StrTrimWhitespaces(sharedEncPrivKey)
 	if(sharedEncPrivKey == "") {
-		log.Println("[ERROR] MsgPak Client: Empty Auth UserName")
+		log.Println("[ERROR] MsgPak Client: Empty Auth Shared PrivKey")
 		return 1007
 	} //end if
-	if((len(sharedEncPrivKey) < 16) || (len(sharedEncPrivKey) > 256)) { // {{{SYNC-GO-SMART-SHARED-PRIV-KEY-LEN}}}
-		log.Println("[ERROR] MsgPak Client: Invalid Auth UserName Length: must be between 16 and 256 characters")
+	if(smart.AuthIsValidPrivKey(sharedEncPrivKey) != true) {
+		log.Println("[ERROR] MsgPak Client: Invalid Auth Shared PrivKey Length: must be between 16 and 256 characters")
 		return 1008
 	} //end if
 
-	if(intervalMsgSeconds < 10) { // {{{SYNC-MSGPAK-INTERVAL-LIMITS}}}
+	if(intervalMsgSeconds < LIMIT_INTERVAL_SECONDS_MIN) { // {{{SYNC-MSGPAK-INTERVAL-LIMITS}}}
 		log.Println("[ERROR] MsgPak Client: Min allowed Message Interval Seconds is", LIMIT_INTERVAL_SECONDS_MIN, "seconds but is set to:", intervalMsgSeconds)
 		return 1009
-	} else if(intervalMsgSeconds > 3600) { // {{{SYNC-MSGPAK-INTERVAL-LIMITS}}}
+	} else if(intervalMsgSeconds > LIMIT_INTERVAL_SECONDS_MAX) { // {{{SYNC-MSGPAK-INTERVAL-LIMITS}}}
 		log.Println("[ERROR] MsgPak Client: Max allowed Message Interval Seconds is", LIMIT_INTERVAL_SECONDS_MAX, "seconds but is set to:", intervalMsgSeconds)
 		return 1010
 	} //end if

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -232,13 +232,16 @@ func HttpSessionUUIDCookieNameSet(cookieName string) bool {
 
 func ValidateCookieName(cookieName string) bool {
 	//--
-	if(cookieName == "") {
+	if(StrTrimWhitespaces(cookieName) == "") {
 		return false // invalid, empty
-	} else if(!StrRegexMatchString(REGEX_SAFE_VAR_NAME, cookieName)) {
+	} //end if
+	if(!StrRegexMatchString(REGEX_SAFE_VAR_NAME, cookieName)) {
 		return false // invalid, regex does not match
-	} else if(len(cookieName) < 2) { // reasonable, min 2 characters
+	} //end if
+	if(len(cookieName) < 2) { // reasonable, min 2 characters
 		return false // invalid, too short
-	} else if(len(cookieName) > 128) { // reasonable, max 128 characters, but anyway this is far too long ... recommended is having ~ max 16 characters ; this is allowed to be longer, by ex for Smart Captcha style cookies with hash suffixes
+	} //end if
+	if(len(cookieName) > 128) { // reasonable, max 128 characters, but anyway this is far too long ... recommended is having ~ max 16 characters ; this is allowed to be longer, by ex for Smart Captcha style cookies with hash suffixes
 		return false // invalid, too long
 	} //end if else
 	//--
@@ -258,6 +261,12 @@ func IsValidHttpHeaderKey(hdrKey string) bool {
 	if(!StrRegexMatchString(REGEX_SMART_SAFE_HTTP_HEADER_KEY, hdrKey)) {
 		return false
 	} //end if
+	if(len(hdrKey) < 1) { // reasonable, min 1 characters
+		return false // invalid, too short
+	} //end if
+	if(len(hdrKey) > 255) { // reasonable, max 255 characters, but anyway this is far too long ... recommended is having ~ max 64 characters ; this is allowed to be longer for exceptional situations only
+		return false // invalid, too long
+	} //end if else
 	//--
 	return true
 	//--
@@ -549,6 +558,11 @@ func GetHttpDomainAndPortFromRequest(r *http.Request) (domain string, portNum st
 func GetBaseDomainFromDomain(domain string) (string, error) {
 	//--
 	defer PanicHandler()
+	//--
+	domain = StrTrimWhitespaces(domain)
+	if(domain == "") {
+		return "", NewError("Domain is Empty")
+	} //end if
 	//--
 	domain = StrTrimWhitespaces(StrTrim(domain, "[] ")) // for IPv6 trim [] ; {{{SYNC-SMART-SERVER-DOMAIN-IPV6-BRACKETS}}}
 	if(domain == "") {

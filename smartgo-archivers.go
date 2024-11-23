@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ ARCHIVERS ]
 
 // REQUIRE: go 1.19 or later
@@ -37,7 +37,7 @@ func DataArchive(str string) string { // v3 only
 	//--
 	defer PanicHandler() // req. by gz deflate panic handler with malformed data
 	//--
-	var ulen int = len(str)
+	var ulen int = StrLen(str)
 	if((str == "") || (ulen <= 0)) {
 		return ""
 	} //end if

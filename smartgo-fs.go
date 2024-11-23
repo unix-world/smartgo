@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -49,6 +49,9 @@ const (
 // 		filepath.ToSlash() 		DO NOT USE ; USE INSTEAD: SafePathFixSeparator() ; only works on Windows (OS Aware) ; just on Windows will convert all non-slash separators into slash
 
 
+//-----
+
+
 func PathDirName(filePath string) string { // returns: `a/path/to` from `a/path/to/lastDirInPath|file.extension` | `/a/path/to` from `/a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
@@ -91,7 +94,7 @@ func PathBaseNoExtName(filePath string) string { // returns: `file` (without ext
 } //END FUNCTION
 
 
-func PathBaseExtension(filePath string) string { // returns: file .extension (includding dot) from `(/)a/path/to/lastDirInPath|file.extension`
+func PathBaseExtension(filePath string) string { // returns: file `.extension` (includding dot) from `(/)a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
 		return ""

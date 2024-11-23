@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Auth :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -29,10 +29,10 @@ type authStatusNfo struct {
 	AuthRealm 			string 				`json:"authRealm"`
 	AuthUserName 		string 				`json:"authUserName"`
 	AuthUserID 			string 				`json:"authUserId"`
-	AuthPassHashSize    uint64              `json:"authPassHashSize"`
+	AuthPassHashSize 	uint64              `json:"authPassHashSize"`
 	AuthPassAlgoID 		uint8  				`json:"authPassAlgoId"`
-	AuthTokenSize       uint64              `json:"authTokenSize"`
-	AuthTokenAlgo       string              `json:"authTokenAlgo"`
+	AuthTokenSize 		uint64              `json:"authTokenSize"`
+	AuthTokenType 		string              `json:"authTokenType"`
 	AuthEmailAddr 		string 				`json:"authEmailAddr"`
 	AuthFullName 		string 				`json:"authFullName"`
 	AuthPrivileges 		string 				`json:"authPrivileges"`
@@ -43,18 +43,19 @@ type authStatusNfo struct {
 }
 
 type authMetaNfo struct {
-	Auth2FAEnabled    bool   `json:"auth2FAEnabled"`
-	AuthBasicEnabled  bool   `json:"authBasicEnabled"`
-	AuthBearerEnabled bool   `json:"authBearerEnabled"`
-	AuthCookieEnabled bool   `json:"authCookieEnabled"`
-	AuthTokenEnabled  bool   `json:"authTokenEnabled"`
-	AuthTokensAlgo    string `json:"AuthTokensAlgo,omitempty"`
+	Auth2FAEnabled 			bool   `json:"auth2FAEnabled"`
+	AuthBasicEnabled 		bool   `json:"authBasicEnabled"`
+	AuthCookieEnabled 		bool   `json:"authCookieEnabled"`
+	AuthBearerEnabled 		bool   `json:"authBearerEnabled"`
+	AuthTokenEnabled 		bool   `json:"authTokenEnabled"`
+	AuthSignedTokensType 	string `json:"authSignedTokensType,omitempty"`
+	AuthOpaqueTokensType 	string `json:"authOpaqueTokensType,omitempty"`
 }
 
 type authNfo struct {
-	Status    authStatusNfo 		`json:"status,omitempty"`
-	MetaInfo  authMetaNfo 			`json:"metaInfo,omitempty"`
-	DebugData *smart.AuthDataStruct `json:"debugData,omitempty"`
+	Status    *authStatusNfo 		`json:"status,omitempty"`
+	MetaInfo  *authMetaNfo 			`json:"metaInfo,omitempty"`
+	DebugData *smart.AuthDataStruct  `json:"debugData,omitempty"`
 }
 
 //-- auth token api
@@ -63,7 +64,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 	// routes:
 	// 			/auth
 	// 			/auth/2fatotp
-	// 			/auth/token
+	// 			/auth/jwt
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
@@ -82,10 +83,11 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 	response.StatusCode = 208
 	response.ContentFileName = "error.json"
 	//--
-	var jwtSignMethod string = smart.AuthTokenJwtAlgoGet()
+	var jwtSignMethod string = AuthTokenJwtAlgoGet()
 	//--
-	switch(subRoute) { // must be as: `/auth` | `/auth/2fatotp` | `auth/token` | `auth/token?expMinutes=2880`
+	switch(subRoute) { // must be as: `/auth` | `/auth/2fatotp` | `auth/jwt` | `auth/jwt?expMinutes=2880`
 		case "": // OK: handle: `/auth`
+			// TODO: use GetClientMimeAcceptHeader() and by default display HTML if not accept application/json ; required just for 2xx codes
 			if(RequestHaveQueryString(r)) { // dissalow query string
 				response.StatusCode = 302
 				response.ContentBody = GetCurrentBrowserPath(r) // for 3xx the content is the redirect URL
@@ -97,29 +99,34 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				return
 			} //end if
 			var tkTyp string = ""
-			if(smart.AuthTokenJwtIsEnabled() == true) {
+			if(AuthTokenJwtIsEnabled() == true) {
 				tkTyp = jwtSignMethod
 				if(tkTyp != "") {
 					tkTyp = "JWT:" + tkTyp
 				} //end if
 			} //end if
+			var tkOpqTyp string = ""
+			if(smart.AuthTokenIsEnabled() == true) {
+				tkOpqTyp = smart.OPAQUE_TOKEN_FULL_NAME
+			} //end if
 			var errUserAuth string = authData.ErrMsg
 			if(smart.AuthIsValidUserName(authData.UserName) != true) {
 				errUserAuth = smart.StrTrimWhitespaces("ERR: UserName is Empty ; " + errUserAuth)
 			} //end if
-			metaInfo := &authMetaNfo{
-				Auth2FAEnabled:    smart.Auth2FACookieIsEnabled(),
-				AuthBasicEnabled:  smart.AuthBasicIsEnabled(),
-				AuthBearerEnabled: smart.AuthBearerIsEnabled(),
-				AuthTokenEnabled:  smart.AuthTokenIsEnabled(),
-				AuthCookieEnabled: smart.AuthCookieIsEnabled(),
-				AuthTokensAlgo:    tkTyp,
+			metaInfo := authMetaNfo{
+				Auth2FAEnabled: 		smart.Auth2FACookieIsEnabled(),
+				AuthBasicEnabled: 		smart.AuthBasicIsEnabled(),
+				AuthCookieEnabled: 		smart.AuthCookieIsEnabled(),
+				AuthBearerEnabled: 		smart.AuthBearerIsEnabled(),
+				AuthTokenEnabled: 		smart.AuthTokenIsEnabled(),
+				AuthSignedTokensType: 	tkTyp,
+				AuthOpaqueTokensType: 	tkOpqTyp,
 			}
-			status := &authStatusNfo{
+			status := authStatusNfo{
 				Authenticated: authData.OK,
 				AuthErrors: errUserAuth,
 				AuthMethodID: authData.Method,
-				AuthMethodName: smart.AuthMethodGetNameById(authData.Method),
+				AuthMethodName: "Auth:" + smart.AuthMethodGetNameById(authData.Method),
 				AuthArea: authData.Area,
 				AuthRealm: authData.Realm,
 				AuthUserName: authData.UserName,
@@ -127,7 +134,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				AuthPassHashSize: uint64(len(authData.PassHash)),
 				AuthPassAlgoID: authData.PassAlgo,
 				AuthTokenSize: uint64(len(authData.TokenData)),
-				AuthTokenAlgo: authData.TokenAlgo,
+				AuthTokenType: authData.TokenAlgo,
 				AuthEmailAddr: authData.EmailAddr,
 				AuthFullName: authData.FullName,
 				AuthPrivileges: authData.Privileges,
@@ -136,12 +143,12 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				AuthQuota: authData.Quota,
 				AuthMetaData: authData.MetaData,
 			}
-			nfo := &authNfo {
-				Status: *status,
-				MetaInfo: *metaInfo,
+			nfo := authNfo {
+				Status: &status,
+				MetaInfo: &metaInfo,
 			}
 			if(DEBUG_AUTH) {
-				nfo.DebugData = &authData
+				nfo.DebugData = &authData // safe pointer, it is comming from current auth context (method)
 			} //end if
 			response.StatusCode = 200
 			response.ContentFileName = "auth.json"
@@ -175,10 +182,11 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "500.html"
 				return
 			} //end if
-			if(authData.Method < 1) { // req. at least one valid auth method (min 1) ; see smart.see: HTTP_AUTH_MODE_*
-				response.StatusCode = 500
-				response.ContentBody = "Authentication Method is Invalid: [" + smart.ConvertUInt8ToStr(authData.Method) + "]"
-				response.ContentFileName = "500.html"
+		//	if(authData.Method < 1) { // req. at least one valid auth method (min 1) ; see smart.see: HTTP_AUTH_MODE_*
+			if((authData.Method != smart.HTTP_AUTH_MODE_BASIC) && (authData.Method != smart.HTTP_AUTH_MODE_COOKIE)) { // alow just Auth Basic and Cookie, they have also 2FA if enabled
+				response.StatusCode = 403
+				response.ContentBody = "Authentication Method is Not Accepted for this Area: [" + smart.ConvertUInt8ToStr(authData.Method) + "] / [Auth:" + smart.AuthMethodGetNameById(authData.Method) + "]"
+				response.ContentFileName = "403.html"
 				return
 			} //end if
 		//	if(smart.Auth2FACookieIsEnabled() != true) {
@@ -229,7 +237,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			response.ContentFileName = "auth-2fatotp.html"
 			return
 		break
-		case "token": // OK: handle: `/auth/token`
+		case "jwt": // OK: handle: `/auth/jwt`
 			if(r.Method != "GET") {
 				response.LogMessage = "Unsupported Request Method: `" + r.Method + "`"
 				response.ContentBody = ResponseApiJsonErr(405, response.LogMessage, nil)
@@ -245,11 +253,12 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentBody = ResponseApiJsonErr(500, "Authentication Error", nil)
 				return
 			} //end if
-			if(authData.Method < 1) { // req. at least one valid auth method (min 1) ; see smart.see: HTTP_AUTH_MODE_*
-				response.ContentBody = ResponseApiJsonErr(500, "Authentication Method is Invalid: [" + smart.ConvertUInt8ToStr(authData.Method) + "]", nil)
+		//	if(authData.Method < 1) { // req. at least one valid auth method (min 1) ; see smart.see: HTTP_AUTH_MODE_*
+			if((authData.Method != smart.HTTP_AUTH_MODE_BASIC) && (authData.Method != smart.HTTP_AUTH_MODE_COOKIE)) { // alow just Auth Basic and Cookie, they have also 2FA if enabled
+				response.ContentBody = ResponseApiJsonErr(403, "Authentication Method is Not Accepted for this Area: [" + smart.ConvertUInt8ToStr(authData.Method) + "] / [Auth:" + smart.AuthMethodGetNameById(authData.Method) + "]", nil)
 				return
 			} //end if
-			if(smart.AuthTokenJwtIsEnabled() != true) {
+			if(AuthTokenJwtIsEnabled() != true) {
 				response.ContentBody = ResponseApiJsonErr(501, "Authentication JWT is Disabled", nil)
 				return
 			} //end if

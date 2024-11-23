@@ -1,11 +1,14 @@
 package fastjson
 
+// modified by unixman
+
 import (
 	"fmt"
-	"github.com/unix-world/smartgo/data-structs/fastjson/fastfloat"
 	"strconv"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/unix-world/smartgo/data-structs/fastjson/fastfloat"
 )
 
 // Parser parses JSON.
@@ -826,6 +829,36 @@ func (v *Value) GetUint64(keys ...string) uint64 {
 	return fastfloat.ParseUint64BestEffort(v.s)
 }
 
+//-- unixman:
+// this method was derived from the below GetStringBytes() to get any scalar value as string
+// the below method GetStringBytes() will return a value only if type is string
+// this method will return a value if type is: string, number, boolean ; PHP compatible
+//
+// GetScalarAsString returns string value by the given keys path.
+//
+// Array indexes may be represented as decimal numbers in keys.
+//
+// nil is returned for non-existing keys path or for invalid value type.
+//
+// The returned string is valid until Parse is called on the Parser returned v.
+func (v *Value) GetScalarAsString(keys ...string) string {
+	v = v.Get(keys...)
+	if v == nil {
+		return "" // null to string conversion in PHP is: ''
+	}
+	if v.t == TypeFalse {
+		return "" // true to string conversion in PHP is: ''
+	}
+	if v.t == TypeTrue {
+		return "1" // true to string conversion in PHP is: '1'
+	}
+	if v.Type() == TypeNumber || v.Type() == TypeString {
+		return v.s // number or strings will be returned as they are, in the form of string ; ex: '', 'str', '78', '18.17'
+	}
+	return "" // unsupported, other non-scalar types, return empty string for the rest: object or array ...
+}
+//-- #end" unixman
+
 // GetStringBytes returns string value by the given keys path.
 //
 // Array indexes may be represented as decimal numbers in keys.
@@ -877,6 +910,36 @@ func (v *Value) Array() ([]*Value, error) {
 	}
 	return v.a, nil
 }
+
+//-- unixman:
+// this method was derived from the below StringBytes() to get any scalar value as string
+// the below method StringBytes() will return a value only if type is string
+// this method will return a value if type is: string, number, boolean ; PHP compatible
+//
+// ScalarAsString returns string value by the given keys path.
+//
+// Array indexes may be represented as decimal numbers in keys.
+//
+// nil is returned for non-existing keys path or for invalid value type.
+//
+// The returned string is valid until Parse is called on the Parser returned v.
+func (v *Value) ScalarAsString(keys ...string) (string, error) {
+	v = v.Get(keys...)
+	if v == nil {
+		return "", nil // null to string conversion in PHP is: ''
+	}
+	if v.t == TypeFalse {
+		return "", nil // true to string conversion in PHP is: ''
+	}
+	if v.t == TypeTrue {
+		return "1", nil // true to string conversion in PHP is: '1'
+	}
+	if v.Type() == TypeNumber || v.Type() == TypeString {
+		return v.s, nil // number or strings will be returned as they are, in the form of string ; ex: '', 'str', '78', '18.17'
+	}
+	return "", fmt.Errorf("value cannot be converted to a scalar / string; it contains %s", v.Type()) // unsupported, other non-scalar types, return empty string for the rest: object or array ...
+}
+//-- #end" unixman
 
 // StringBytes returns the underlying JSON string for the v.
 //

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -16,14 +16,15 @@ import (
 const (
 	ALGO_PASS_SMART_SAFE_SF_PASS 		uint8 =   1
 	ALGO_PASS_SMART_SAFE_ARGON_PASS 	uint8 =   2
-	ALGO_PASS_SMART_UNSAFE_BF_PASS 		uint8 = 254 // Cookie Pre-Auth: BF[usr,pw] ; this is unsafe, it is reversible, must be converted to a JWT
-	ALGO_PASS_SMART_SAFE_JWT_TOKEN 		uint8 = 255 // JWT
+	ALGO_PASS_SMART_UNSAFE_BF_PASS 		uint8 = 154 // Cookie Pre-Auth: BF[usr,pw] ; this is unsafe, it is reversible, must be converted to an Apikey Token
+	ALGO_PASS_SMART_SAFE_WEB_TOKEN 		uint8 = 254 // Web (Signed) Token
+	ALGO_PASS_SMART_SAFE_OPQ_TOKEN 		uint8 = 255 // Opaque Token
 	// 0 is reserved for none ; 10..200 other pass algos ; 2..10 and 201..255 is reserved for internal use
 
 	HTTP_AUTH_MODE_NONE   uint8 =   0
 	HTTP_AUTH_MODE_BASIC  uint8 =   1
-	HTTP_AUTH_MODE_BEARER uint8 =   2
-	HTTP_AUTH_MODE_TOKEN  uint8 =   3
+	HTTP_AUTH_MODE_TOKEN  uint8 =   2
+	HTTP_AUTH_MODE_BEARER uint8 =   3
 	HTTP_AUTH_MODE_COOKIE uint8 =   4
 	HTTP_AUTH_MODE_RAW    uint8 = 255 // used for 3rd party
 
@@ -31,19 +32,21 @@ const (
 	HTTP_AUTH_DEFAULT_PRIVS string = "<admin>"
 	HTTP_AUTH_DEFAULT_RESTR string = "<none>"
 
-	REGEX_SAFE_HTTP_USER_NAME string = `^[a-z0-9\.]+$`  // Safe UserName Regex
-	REGEX_SAFE_AUTH_2FA_TOKEN string = `^[0-9]{6,8}$`   // Safe 2FA Regex 6..8 digits
+	REGEX_SAFE_HTTP_USER_NAME 		string = `^[a-z0-9\.]{5,25}$` 		// Safe UserName Regex ; intended as a safe user ID
+	REGEX_SAFE_AUTH_OPAQUE_TOKEN 	string = `^[a-zA-Z0-9\-]{48,128}$` 	// Safe (Opaque) Token Regex
+	REGEX_SAFE_AUTH_2FA_CODE 		string = `^[0-9]{6,8}$` 			// Safe 2FA Regex 6..8 digits
 
-	HTTP_AUTH_USER_BEARER string = "@BEARER@"
-	HTTP_AUTH_USER_TOKEN  string = "@TOKEN@"
-	HTTP_AUTH_USER_RAW    string = "@TOKEN@" // used for 3rd party
+	OPAQUE_TOKEN_FULL_NAME string = "Opaque:UUID"
+
+	HTTP_AUTH_USER_TOKEN  string = "@TOKEN@" 	// used for http client to add header: 				`Authorization: Apikey ****` where `****` is the password
+	HTTP_AUTH_USER_BEARER string = "@BEARER@" 	// used for http client to add header: 				`Authorization: Bearer ****` where `****` is the password
+	HTTP_AUTH_USER_RAW    string = "@RAW@" 		// used for http client to add custom header like: 	`Authorization: %Custom% ****` where `%Custom% ****` is the password
 )
 
 var (
-	authBasicEnabled bool = true 		// default is TRUE,  does accept Auth Basic if HTTP Server ask for it ; to disable, set to FALSE
+	authBasicEnabled bool = false 		// default is FALSE, does not accept Auth Basic if HTTP Server ask for it ; to enable, set to TRUE
 	authBearerEnabled bool = false 		// default is FALSE, does not accept Auth Bearer ; to accept Auth Bearer, set to TRUE
 	authTokenEnabled bool = false 		// default is FALSE, does not accept Auth Apikey ; to accept Auth Apikey, set to TRUE
-	authJwtAlgo string = "" 			// if this is empty, will dissalow JWT use ; allowed values: "Ed448" ; "Edx25519" ; "Ed25519" ; "H3S512" ; "H3S384" ; "H3S256" ; "H3S224" ; "HS384" ; "HS224"
 	authCookieName string = "" 			// [2..16 characters ; valid REGEX_SAFE_VAR_NAME] ; default is EMPTY, does not accept Auth by Cookies ; to accept Auth by Cookie, set to ~ "Sf_Auth" ; this is intended to store a Token inside this Cookie for Cookie based auth
 	auth2FACookieName string = "" 		// [2..16 characters ; valid REGEX_SAFE_VAR_NAME] ; default is EMPTY, to Enable 2FA (TOTP), set to ~ "Sf_2FA" ; this is intended to be used with Basic Auth, but for custom auth can be implemented also with Cookie or Bearer ...
 )
@@ -60,11 +63,6 @@ func AuthBasicIsEnabled() bool { // Basic
 
 
 func AuthBasicModeSet(mode bool) bool { // Basic
-	//--
-	if(mode == true) { // disallow reset ! default is true, only allow set once to false
-		log.Println("[WARNING]", CurrentFunctionName(), "Auth Basic cannot be Re-Set to: [", mode, "]: Success")
-		return false
-	} //end if
 	//--
 	authBasicEnabled = mode
 	//--
@@ -87,11 +85,6 @@ func AuthBearerIsEnabled() bool { // Bearer
 
 func AuthBearerModeSet(mode bool) bool { // Bearer
 	//--
-	if(mode != true) { // disallow reset ! default is false, only allow set once to true
-		log.Println("[WARNING]", CurrentFunctionName(), "Auth Bearer cannot be Re-Set to: [", mode, "]: Success")
-		return false
-	} //end if
-	//--
 	authBearerEnabled = mode
 	//--
 	return true
@@ -111,96 +104,9 @@ func AuthTokenIsEnabled() bool { // Apikey
 
 func AuthTokenModeSet(mode bool) bool { // Apikey
 	//--
-	if(mode != true) { // disallow reset ! default is false, only allow set once to true
-		log.Println("[WARNING]", CurrentFunctionName(), "Auth Token cannot be Re-Set to: [", mode, "]: Success")
-		return false
-	} //end if
-	//--
 	authTokenEnabled = mode
 	//--
 	return true
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func AuthTokenJwtIsEnabled() bool {
-	//--
-	if(StrTrimWhitespaces(authJwtAlgo) == "") {
-		return false
-	} //end if
-	//--
-	return true
-	//--
-} //END FUNCTION
-
-
-func authTokenJwtAlgoValidGet(algo string) string {
-	//--
-	switch(algo) { // {{{SYNC-SMARTGO-AUTH-JWT-ALGOS}}}
-		//-- sha2:  sha-256 and sha-512 are unsafe to use for signature, they may be vulnerable to length attacks, not supported in this scenario ...
-		// only sha-224 and sha-384 are safe from the sha2 !
-		// https://crypto.stackexchange.com/questions/89561/known-text-attack-on-hash-function-sha-256-or-sha512
-		case "HS224":    fallthrough  // sha-224
-		case "HS384":    fallthrough  // sha-384
-		//-- sha3: all safe
-		case "H3S224":   fallthrough  // sha3-224
-		case "H3S256":   fallthrough  // sha3-256
-		case "H3S384":   fallthrough  // sha3-384
-		case "H3S512":   fallthrough  // sha3-512 ; best symmetric security level
-		case "Ed25519":  fallthrough
-		case "Edx25519": fallthrough
-		case "Ed448":                 // best asymmetric security level
-			return algo
-			break
-		default:
-			// N/A
-	} //end switch
-	//--
-	return ""
-	//--
-} //END FUNCTION
-
-
-func AuthTokenJwtAlgoGet() string {
-	//--
-	return authTokenJwtAlgoValidGet(authJwtAlgo)
-	//--
-} //END FUNCTION
-
-
-func AuthTokenJwtAlgoSet(jwtAlgo string) bool {
-	//--
-	var ok bool = false
-	//--
-	if(authJwtAlgo != "") {
-		log.Println("[WARNING]", CurrentFunctionName(), "Failed to Set JWT Algo to: `" + jwtAlgo + "`, already set")
-		return false
-	} //end if
-	//--
-	if(jwtAlgo == "") {
-		if(authJwtAlgo == "") {
-			return true // no change
-		} else {
-			return false // dissalow unset
-		} //end if else
-	} //end if
-	//--
-	algo := StrTrimWhitespaces(authTokenJwtAlgoValidGet(jwtAlgo))
-	if(algo != "") {
-		authJwtAlgo = algo
-		ok = true
-	} //end if else
-	//--
-	if(ok) {
-		log.Println("[INFO]", CurrentFunctionName(), "JWT Algo was Set to `" + authJwtAlgo + "`: Success")
-	} else {
-		log.Println("[ERROR]", CurrentFunctionName(), "Failed to Set JWT Algo to: `" + jwtAlgo + "`")
-	} //end if else
-	//--
-	return ok
 	//--
 } //END FUNCTION
 
@@ -439,7 +345,7 @@ func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string
 		} //end if
 	} //end if
 	//--
-	if(passAlgo == ALGO_PASS_SMART_SAFE_JWT_TOKEN) {
+	if((passAlgo == ALGO_PASS_SMART_SAFE_OPQ_TOKEN) || (passAlgo == ALGO_PASS_SMART_SAFE_WEB_TOKEN)) {
 		if(passHash != "") {
 			ok = false
 			if(errMsg == "") {
@@ -498,16 +404,26 @@ func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string
 
 func AuthIsValidUserName(user string) bool {
 	//--
-	if(len(user) != len(StrTrimWhitespaces(user))) {
-		return false
-	} //end if
 	if(StrTrimWhitespaces(user) == "") {
 		return false
 	} //end if
-	if((len(user) < 3) || (len(user) > 128)) { // {{{SYNC-GO-SMART-AUTH-USER-LEN}}} ; std max username length is 128 ; min 3, from Smart.Framework
+	if(StrLen(user) != StrLen(StrTrimWhitespaces(user))) {
 		return false
 	} //end if
-	if(!StrRegexMatchString(REGEX_SAFE_HTTP_USER_NAME, user)) { // {{{SYNC-SF:REGEX_VALID_USER_NAME}}}
+	if((StrLen(user) < 5) || (StrLen(user) > 25)) { // std max username length is 25 ; min is 5
+		return false
+	} //end if
+	if(!StrRegexMatchString(REGEX_SAFE_HTTP_USER_NAME, user)) {
+		return false
+	} //end if
+	//--
+	if(StrContains(user, "..")) {
+		return false
+	} //end if
+	if(StrStartsWith(user, ".")) {
+		return false
+	} //end if
+	if(StrEndsWith(user, ".")) {
 		return false
 	} //end if
 	//--
@@ -518,13 +434,25 @@ func AuthIsValidUserName(user string) bool {
 
 func AuthIsValidPassword(pass string) bool {
 	//--
-	if(len(pass) != len(StrTrimWhitespaces(pass))) {
-		return false
-	} //end if
 	if(StrTrimWhitespaces(pass) == "") {
 		return false
 	} //end if
-	if((len(StrTrimWhitespaces(pass)) < 7) || (len(pass) > 512)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}} ; allow tokens, length can be up to 512 (ex: JWT) ; min 7, from Smart.Framework (security)
+	if(StrLen(pass) != StrLen(StrTrimWhitespaces(pass))) {
+		return false
+	} //end if
+	if((StrLen(StrTrimWhitespaces(pass)) < 7) || (StrLen(pass) > 57)) { // std max password length is 57 ; min is 7
+		return false
+	} //end if
+	//--
+	if(StrNormalizeSpaces(pass) != pass) { // disallow null and other weird characters
+		return false
+	} //end if
+	//--
+	if( // password min complexity check ; disallow too simple passwords for security reasons ...
+		(StrRegexMatchString(`[A-Z]+`, pass) != true) || // must have at least one caps letter
+		(StrRegexMatchString(`[a-z]+`, pass) != true) || // must have at least one small letter
+		(StrRegexMatchString(`[0-9]+`, pass) != true) || // must have at least one digit
+		(StrRegexMatchString(`[^A-Za-z0-9]+`, pass) != true)) { // must have at least one special character
 		return false
 	} //end if
 	//--
@@ -533,21 +461,18 @@ func AuthIsValidPassword(pass string) bool {
 } //END FUNCTION
 
 
-func AuthIsValidPrivKey(pkey string) bool { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
+func AuthIsValidTokenOpaque(token string) bool {
 	//--
-	if(len(pkey) != len(StrTrimWhitespaces(pkey))) {
+	if(StrTrimWhitespaces(token) == "") {
 		return false
 	} //end if
-	//--
-	pkey = StrTrimWhitespaces(pkey)
-	//--
-	if(pkey == "") {
+	if(StrLen(token) != StrLen(StrTrimWhitespaces(token))) {
 		return false
 	} //end if
-	if(len(pkey) < 16) {
+	if((StrLen(token) < 48) || (StrLen(token) > 128)) { // {{{SYNC-MAX-AUTH-APIKEY-TOKEN-LENGTH}}}
 		return false
 	} //end if
-	if(len(pkey) > 255) {
+	if(!StrRegexMatchString(REGEX_SAFE_AUTH_OPAQUE_TOKEN, token)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_OPAQUE_TOKEN}}}
 		return false
 	} //end if
 	//--
@@ -558,16 +483,33 @@ func AuthIsValidPrivKey(pkey string) bool { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-K
 
 func AuthIsValid2FACode(code string) bool {
 	//--
-	if(len(code) != len(StrTrimWhitespaces(code))) {
-		return false
-	} //end if
 	if(StrTrimWhitespaces(code) == "") {
 		return false
 	} //end if
-	if((len(code) < 6) || (len(code) > 8)) { // flexible, between 6 and 8 characters
+	if(StrLen(code) != StrLen(StrTrimWhitespaces(code))) {
 		return false
 	} //end if
-	if(!StrRegexMatchString(REGEX_SAFE_AUTH_2FA_TOKEN, code)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_2FA_TOKEN}}}
+	if((StrLen(code) < 6) || (StrLen(code) > 8)) { // flexible, between 6 and 8 characters
+		return false
+	} //end if
+	if(!StrRegexMatchString(REGEX_SAFE_AUTH_2FA_CODE, code)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_2FA_CODE}}}
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func AuthIsValidPrivKey(pkey string) bool { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
+	//--
+	if(StrTrimWhitespaces(pkey) == "") {
+		return false
+	} //end if
+	if(StrLen(pkey) != StrLen(StrTrimWhitespaces(pkey))) {
+		return false
+	} //end if
+	if((StrLen(pkey) < 16) || (StrLen(pkey) > 256)) {
 		return false
 	} //end if
 	//--
@@ -579,9 +521,37 @@ func AuthIsValid2FACode(code string) bool {
 //-----
 
 
-func AutAnyIsEnabled() bool {
+func AuthAnyIsEnabled() bool {
 	//--
-	if((AuthBasicIsEnabled() != true) && (AuthBearerIsEnabled() != true) && (AuthTokenIsEnabled() != true) && (AuthCookieIsEnabled() != true)) {
+	if((AuthBasicIsEnabled() != true) && (AuthTokenIsEnabled() != true) && (AuthBearerIsEnabled() != true) && (AuthCookieIsEnabled() != true)) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func AuthSafeCompare(val1 string, val2 string) bool {
+	//--
+	// the logic of the checks before is for security not for speed or memory or cpu !
+	//--
+	if(subtle.ConstantTimeCompare([]byte(val1), []byte(val2)) != 1) { // compare first values (and length too) as bytes, in constant time, safe against timing attacks
+		return false
+	} //end if
+	//--
+	if(len(val1) != len(val2)) { // second redundant check, length as strings
+		return false
+	} //end if
+	//--
+	if(val1 != val2) { // third, redundant check as strings
+		return false
+	} //end if
+	//--
+	if((StrTrimWhitespaces(val1) == "") || (StrTrimWhitespaces(val2) == "")) { // finally, disallow empty values
 		return false
 	} //end if
 	//--
@@ -599,9 +569,10 @@ func AuthUserPassDefaultCheck(authRealm string, clientIP string, user string, pa
 		OK: false,
 		ErrMsg: "??",
 		Method: authMode,
+		UserName: user, // for logging purposes
 	}
 	//--
-	if(AutAnyIsEnabled() != true) { // {{{SYNC-AUTH-CHECK-ANY}}} ; will check if any auth is available: basic, bearer, token, cookie
+	if(AuthBasicIsEnabled() != true) { // can be used just with Auth Basic ; Auth Cookie requires custom implementation for Verification
 		//--
 		authData.ErrMsg = "Auth is Disabled: No Active Auth Providers are Available"
 		//--
@@ -609,32 +580,122 @@ func AuthUserPassDefaultCheck(authRealm string, clientIP string, user string, pa
 		//--
 	} //end if
 	//-- {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
+	if((AuthSafeCompare(user, requiredUsername) != true) || (AuthSafeCompare(pass, requiredPassword) != true)) {
+		authData.ErrMsg = "Invalid UserName / Password"
+		return false, authData
+	} //end if
+	//-- {{{SYNC-HTTP-AUTH-CHECKS-2ND-GO-SMART}}}
+	if(StrTrimWhitespaces(user) == "") {
+		authData.ErrMsg = "Empty UserName"
+		return false, authData
+	} //end if
 	if(AuthIsValidUserName(user) != true) {
 		authData.ErrMsg = "Invalid UserName"
+		return false, authData
+	} //end if
+	if(StrTrimWhitespaces(pass) == "") {
+		authData.ErrMsg = "Empty Password"
 		return false, authData
 	} //end if
 	if(AuthIsValidPassword(pass) != true) {
 		authData.ErrMsg = "Invalid Password"
 		return false, authData
 	} //end if
+	//-- #end: sync
+	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, SafePassHashSmart(pass, user, false), ALGO_PASS_SMART_SAFE_SF_PASS, "", "", "", "", HTTP_AUTH_DEFAULT_PRIVS, HTTP_AUTH_DEFAULT_RESTR, "", 0, nil)
+	if(authChkData.ErrMsg != "") {
+		return false, authChkData
+	} //end if
+	if(authChkData.OK != true) {
+		authChkData.ErrMsg = "Invalid Auth Data Status"
+		return false, authChkData
+	} //end if
 	//--
-	if( // {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
+	return authChkData.OK, authChkData
+	//--
+} //END FUNCTION
+
+
+func AuthUserTokenDefaultCheck(authRealm string, clientIP string, user string, token string, authMode uint8, requiredUsername string, requiredToken string) (bool, AuthDataStruct) {
+	//--
+	authData := AuthDataStruct{
+		OK: false,
+		ErrMsg: "??",
+		Method: authMode,
+		UserName: user, // for logging purposes
+	}
+	//--
+	if(AuthTokenIsEnabled() != true) { // can be used just with Auth Token (Apikey) ; Auth Bearer requires custom implementation for Verification
 		//--
-		(len(user) != len(requiredUsername)) ||
-		(len(pass) != len(requiredPassword)) ||
-		(subtle.ConstantTimeCompare([]byte(user), []byte(requiredUsername)) != 1) ||
-		(subtle.ConstantTimeCompare([]byte(pass), []byte(requiredPassword)) != 1) ||
-		(user != requiredUsername) || (pass != requiredPassword)) {
-		//--
-		authData.ErrMsg = "Invalid UserName / Password"
+		authData.ErrMsg = "Auth is Disabled: No Active Auth Providers are Available"
 		//--
 		return false, authData
 		//--
 	} //end if
+	//-- {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
+	if((AuthSafeCompare(user, requiredUsername) != true) || (AuthSafeCompare(token, requiredToken) != true)) {
+		authData.ErrMsg = "Invalid UserName / Token"
+		return false, authData
+	} //end if
+	//-- {{{SYNC-HTTP-AUTH-CHECKS-2ND-GO-SMART}}}
+	if(StrTrimWhitespaces(user) == "") {
+		authData.ErrMsg = "Empty UserName"
+		return false, authData
+	} //end if
+	if(AuthIsValidUserName(user) != true) {
+		authData.ErrMsg = "Invalid UserName"
+		return false, authData
+	} //end if
+	if(StrTrimWhitespaces(token) == "") {
+		authData.ErrMsg = "Empty Token"
+		return false, authData
+	} //end if
+	if(AuthIsValidTokenOpaque(token) != true) {
+		authData.ErrMsg = "Invalid Token"
+		return false, authData
+	} //end if
+	//-- #end: sync
+	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, "", ALGO_PASS_SMART_SAFE_OPQ_TOKEN, token, OPAQUE_TOKEN_FULL_NAME, "", "", HTTP_AUTH_DEFAULT_PRIVS, HTTP_AUTH_DEFAULT_RESTR, "", 0, nil)
 	//--
-	authData = AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, SafePassHashSmart(pass, user, false), ALGO_PASS_SMART_SAFE_SF_PASS, "", "", "", "", HTTP_AUTH_DEFAULT_PRIVS, HTTP_AUTH_DEFAULT_RESTR, "", 0, nil)
+	if(authChkData.ErrMsg != "") {
+		return false, authChkData
+	} //end if
+	if(authChkData.OK != true) {
+		authChkData.ErrMsg = "Invalid Auth Data Status"
+		return false, authChkData
+	} //end if
 	//--
-	return true, authData
+	return authChkData.OK, authChkData
+	//--
+} //END FUNCTION
+
+
+func AuthUserTokenDefaultSepareParts(token string) (string, string, error) { // returns: userName, tokenHash, errTokenSepare
+	//--
+	// expects: user@token-hash
+	//--
+	token = StrTrimWhitespaces(token)
+	if(token == "") {
+		return "", "", NewError("Token is Empty")
+	} //end if
+	//--
+	if(!StrContains(token, "@")) {
+		return "", "", NewError("Token is Malformed")
+	} //end if
+	tokenParts := ExplodeWithLimit("@", token, 2)
+	if(len(tokenParts) != 2) {
+		return "", "", NewError("Invalid Token Format")
+	} //end if
+	var userName string = StrTrimWhitespaces(tokenParts[0]) // username part
+	if((userName == "") || (AuthIsValidUserName(userName) != true)) {
+		return userName, "", NewError("Invalid Token UserName Format")
+	} //end if
+	var tokenHash string = StrTrimWhitespaces(tokenParts[1]) // hash (uuid) part, the real token
+	if((tokenHash == "") || (AuthIsValidTokenOpaque(tokenHash) != true)) {
+		return userName, tokenHash, NewError("Invalid Token Hash Format")
+	} //end if
+	//--
+	return userName, tokenHash, nil
 	//--
 } //END FUNCTION
 

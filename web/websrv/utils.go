@@ -1,20 +1,42 @@
 
 // GO Lang :: SmartGo / Web Server / Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
 	"time"
-	"strings"
 	"net/http"
 
 	smart 			"github.com/unix-world/smartgo"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
-	jsonschema 		"github.com/unix-world/smartgo/web/jsonschema"
 )
+
+
+func GetVisitorRemoteIpAddrAndPort(r *http.Request) (string, string) { // returns: remoteAddr, remotePort
+	//--
+	// returns the zero level client IP address and Port ; to get real client IP use: GetVisitorRealIpAddr() ; the current method may return wrong results if the web server is behind a proxy, in this case the proxy IP and Port will be returned
+	//--
+	defer smart.PanicHandler() // safe recovery handler
+	//--
+	return smart.GetHttpRemoteAddrIpAndPortFromRequest(r)
+	//--
+} //END FUNCTION
+
+
+func GetVisitorRealIpAddr(r *http.Request) (bool, string) { // returns: isOk, clientRealIp
+	//--
+	// this is the real IP address of the user that should be used ; if the server is behind a proxy it will be different than remote IP which in this case is the proxy IP
+	//--
+	defer smart.PanicHandler() // safe recovery handler
+	//--
+	isOk, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
+	//--
+	return isOk, realClientIp
+	//--
+} //END FUNCTION
 
 
 func GetCookie(r *http.Request, name string) string {
@@ -32,6 +54,13 @@ func GetUrlQueryParam(r *http.Request, param string) string {
 	} //end if
 	//--
 	return r.URL.Query().Get(param)
+	//--
+} //END FUNCTION
+
+
+func GetClientMimeAcceptHeader(r *http.Request) string {
+	//--
+	return smart.StrToLower(smart.StrTrimWhitespaces(smarthttputils.HttpRequestGetHeaderStr(r, smarthttputils.HTTP_HEADER_ACCEPT_MIMETYPE))) // {{{SYNC-SMARTGO-HTTP-ACCEPT-HEADER}}} ; accept headers can be many, just get the prefered one
 	//--
 } //END FUNCTION
 
@@ -96,45 +125,6 @@ func RequestHaveQueryString(r *http.Request) bool {
 	defer smart.PanicHandler()
 	//--
 	return (len(r.URL.RawQuery) > 0)
-	//--
-} //END FUNCTION
-
-
-func JsonValidateWithSchema(schema string, json string) error { // if OK returns TRUE
-	//--
-	schema = smart.StrTrimWhitespaces(schema)
-	json = smart.StrTrimWhitespaces(json)
-	//--
-	if(schema == "") {
-		return smart.NewError("JSON Schema is Empty")
-	} //end if
-	if(json == "") {
-		return smart.NewError("JSON is Empty")
-	} //end if
-	//--
-	compiler := jsonschema.NewCompiler()
-	//--
-	errInit := compiler.AddResource("schema.json", strings.NewReader(schema));
-	if(errInit != nil) {
-		return smart.NewError("JSON Schema Init Error: " + errInit.Error())
-	} //end if
-	//--
-	compiledSchema, errCompile := compiler.Compile("schema.json")
-	if(errCompile != nil) {
-		return smart.NewError("JSON Schema Compile Error: " + errCompile.Error())
-	} //end if
-	//--
-	jsonObj, jsonErr := smart.JsonObjDecode(json)
-	if(jsonErr != nil) {
-		return smart.NewError("JSON Decode Error: " + jsonErr.Error())
-	} //end if
-	//--
-	errValidate := compiledSchema.Validate(jsonObj);
-	if(errValidate != nil) {
-		return smart.NewError("JSON is Invalid: " + errValidate.Error())
-	} //end if
-	//--
-	return nil
 	//--
 } //END FUNCTION
 

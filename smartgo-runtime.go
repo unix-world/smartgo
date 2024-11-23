@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ RUNTIME ]
 
 // REQUIRE: go 1.19 or later
@@ -331,7 +331,7 @@ func LogToStdErr(level string) {
 
 func LogToConsole(level string, withColorsOnConsole bool) {
 	//--
-	if(ini_RUN_IN_BACKGROUND) {
+	if(AppGetRunInBackground()) {
 		withColorsOnConsole = false
 	} //end if
 	//--
@@ -389,7 +389,7 @@ func HandleAbortCtrlC(delay uint32) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		if(ini_RUN_IN_BACKGROUND) { // no colors ; weird characters should not appear in logs ...
+		if(AppGetRunInBackground()) { // no colors ; weird characters should not appear in logs ...
 			fmt.Println(LINE_FEED + "»»»»»»»»", "[ Hammer (Abort) ]", "... KILL.SIGNAL ...", "[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]", "««««««««" + LINE_FEED)
 		} else {
 			fmt.Println(LINE_FEED + color.GreenString("»»»»»»»»"), color.MagentaString("[ Hammer (Abort) ]"), color.BlueString("... KILL.SIGNAL ..."), color.BlackString("[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]"), color.GreenString("««««««««") + LINE_FEED)
@@ -408,7 +408,7 @@ func HandleAbortCtrlC(delay uint32) {
 // set terminal theme Dark (bg:black ; fg:white) : print("\033[0;37;40m")
 func ClearPrintTerminal() {
 	//--
-	if(ini_RUN_IN_BACKGROUND) {
+	if(AppGetRunInBackground()) {
 		return // stop here, weird characters should not appear in logs ...
 	} //end if
 	//--

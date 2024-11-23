@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -592,6 +592,13 @@ func Poly1305(key string, str string, b64 bool) (string, error) {
 // case the caller should not continue.
 func GenerateRandomBytes(n int) ([]byte, error) { // https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb
 	//--
+	if(n <= 0) {
+		return nil, NewError("Number of Bytes must be Positive, Greater than Zero")
+	} //end if
+	if(n > 65535) {
+		return nil, NewError("Number of Bytes must be no more than 65535")
+	} //end if
+	//--
 	b := make([]byte, n)
 	//--
 	_, err := cryptorand.Read(b) // Note that err == nil only if we read len(b) bytes.
@@ -604,11 +611,18 @@ func GenerateRandomBytes(n int) ([]byte, error) { // https://gist.github.com/dop
 } //END FUNCTION
 
 
-// GenerateRandomString returns a securely generated random string.
+// GenerateRandomString returns a securely generated random string [1..65535].
 // It will return an error if the system's secure random
 // number generator fails to function correctly, in which
 // case the caller should not continue.
 func GenerateRandomString(n int) (string, error) { // https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb
+	//--
+	if(n <= 0) {
+		return "", NewError("Number of Characters must be Positive, Greater than Zero")
+	} //end if
+	if(n > 65535) {
+		return "", NewError("Number of Characters must be no more than 65535")
+	} //end if
 	//--
 	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
 	//--

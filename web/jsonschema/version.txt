@@ -1,4 +1,9 @@
-github.com/santhosh-tekuri/jsonschema/v5 @ v.5.3.1 #20240930
+github.com/santhosh-tekuri/jsonschema/v6 @ v.6.0.1.1 #20241123
 
-go 1.19
+go 1.21
 
+requires:
+	golang.org/x/text
+
+refactored as: github.com/unix-world/smartgo/web/jsonschema
+includes modifications by unixman: commented out returning full path/url in validation error message

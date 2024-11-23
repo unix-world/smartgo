@@ -1,29 +1,51 @@
 package jsonschema
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 )
 
-// Decoders is a registry of functions, which know how to decode
-// string encoded in specific format.
-//
-// New Decoders can be registered by adding to this map. Key is encoding name,
-// value is function that knows how to decode string in that format.
-var Decoders = map[string]func(string) ([]byte, error){
-	"base64": base64.StdEncoding.DecodeString,
+// Decoder specifies how to decode specific contentEncoding.
+type Decoder struct {
+	// Name of contentEncoding.
+	Name string
+	// Decode given string to byte array.
+	Decode func(string) ([]byte, error)
 }
 
-// MediaTypes is a registry of functions, which know how to validate
-// whether the bytes represent data of that mediaType.
-//
-// New mediaTypes can be registered by adding to this map. Key is mediaType name,
-// value is function that knows how to validate that mediaType.
-var MediaTypes = map[string]func([]byte) error{
-	"application/json": validateJSON,
+var decoders = map[string]*Decoder{
+	"base64": {
+		Name: "base64",
+		Decode: func(s string) ([]byte, error) {
+			return base64.StdEncoding.DecodeString(s)
+		},
+	},
 }
 
-func validateJSON(b []byte) error {
-	var v interface{}
-	return json.Unmarshal(b, &v)
+// MediaType specified how to validate bytes against specific contentMediaType.
+type MediaType struct {
+	// Name of contentMediaType.
+	Name string
+
+	// Validate checks whether bytes conform to this mediatype.
+	Validate func([]byte) error
+
+	// UnmarshalJSON unmarshals bytes into json value.
+	// This must be nil if this mediatype is not compatible
+	// with json.
+	UnmarshalJSON func([]byte) (any, error)
+}
+
+var mediaTypes = map[string]*MediaType{
+	"application/json": {
+		Name: "application/json",
+		Validate: func(b []byte) error {
+			var v any
+			return json.Unmarshal(b, &v)
+		},
+		UnmarshalJSON: func(b []byte) (any, error) {
+			return UnmarshalJSON(bytes.NewReader(b))
+		},
+	},
 }

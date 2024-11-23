@@ -1,13 +1,17 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
+	"log"
 	"net/http"
+
+	"io"
+	"os"
 
 	smart 			"github.com/unix-world/smartgo"
 	assets 			"github.com/unix-world/smartgo/web/assets/web-assets"
@@ -43,6 +47,39 @@ var RouteHandlerHomePage HttpHandlerFunc = func(r *http.Request, headPath string
 } //end fx
 
 
+//-- favicon (streaming) page (svg)
+var RouteHandlerFaviconStream HttpHandlerFunc = func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse) {
+	//--
+	// route: /favicon
+	//--
+	defer smart.PanicHandler() // safe recovery handler
+	//--
+	response.Headers = map[string]string{}
+	response.Headers["Z-Content"] = "Streaming"
+	//--
+	var fName string = "favicon.svg"
+	var fPath string = WEB_PUBLIC_RELATIVE_ROOT_PATH + fName
+	if(!smart.PathIsFile(fPath)) {
+		response.StatusCode = 500
+		response.ContentBody = "Streaming File cannot be found: `" + fName + "`"
+		response.ContentFileName = "500.html"
+		return
+	} //end if
+	response.ContentFileName = fName
+	response.ContentStream = func() (ioReadStream io.Reader) {
+		ioReadStream, fErr := os.Open(fPath)
+		if(fErr != nil) {
+			log.Println("[ERROR]", "Streaming Handler File `" + fPath + "` Open Error", fErr)
+			return
+		} //end if
+		return
+	} //end fx
+	//--
+	return
+	//--
+} //end fx
+
+
 //-- info page (html)
 var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse) {
 	//--
@@ -50,8 +87,8 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
-	remoteAddr, remotePort := smart.GetHttpRemoteAddrIpAndPortFromRequest(r)
-	_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
+	remoteAddr, remotePort := GetVisitorRemoteIpAddrAndPort(r)
+	_, realClientIp := GetVisitorRealIpAddr(r)
 	basedom, dom, port, _ := GetBaseDomainDomainPort(r)
 	var proxySetDetected string = smart.GetHttpProxyRealServerHostPortHeaderKey() // Proxy IP:port (if used) ; Go Server Port (may differ from the above external port)
 	var proxyRealClientIp string = smart.GetHttpProxyRealClientIpHeaderKey()
@@ -73,7 +110,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 //	bodyHtml += "&nbsp;"
 	bodyHtml += smart.EscapeHtml(title)
 	bodyHtml += `</h1>`
-	bodyHtml += `<h4>` + smart.StrNl2Br(smart.EscapeHtml(TheStrSignature)) + `</h4>`
+	bodyHtml += `<h4>` + smart.Nl2Br(smart.EscapeHtml(TheStrSignature)) + `</h4>`
 	bodyHtml += `<hr>`
 	bodyHtml += "Client Real-IP [" + smart.EscapeHtml(proxyRealIpStatus) + "] is: <b>`" + smart.EscapeHtml(realClientIp) + "`</b> ; Remote-IP (Host:Port) is: " + smart.EscapeHtml("`" + remoteAddr + "`:`" + remotePort + "`") + "<br>"
 	bodyHtml += "Client UserAgent: <i>`" + smart.EscapeHtml(signature) + "`</i>" + "<br>"

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20241116.2358"
+	VERSION string = "r.20241123.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2024-10-31 14:08:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2024-11-23 13:57:08" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
@@ -482,6 +482,8 @@ func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml st
 const (
 	TEXT_CONTENT_HEADER string = "text/plain; charset=" + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
 	HTML_CONTENT_HEADER string = "text/html; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
+	JSON_CONTENT_HEADER string = "application/json; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
+	XML_CONTENT_HEADER  string = "application/xml; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
 
 	HTML_META_FAVICON   string = `<link rel="icon" href="` + smart.DATA_URL_EMPTY_PREFIX + `">`
 	HTML_META_VIEWPORT  string = `<meta name="viewport" content="width=device-width, initial-scale=1.0">`

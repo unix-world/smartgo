@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241112.2358 :: STABLE
+// r.20241121.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -161,7 +161,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		log.Println("[ERROR] MsgPak Server: Empty Auth UserName")
 		return 1005
 	} //end if
-	if((len(authUsername) < 3) || (len(authUsername) > 25)) { // {{{SYNC-GO-SMART-AUTH-USER-LEN}}}
+	if(smart.AuthIsValidUserName(authUsername) != true) {
 		log.Println("[ERROR] MsgPak Server: Invalid Auth UserName Length: must be between 5 and 25 characters")
 		return 1006
 	} //end if
@@ -171,18 +171,18 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		log.Println("[ERROR] MsgPak Server: Empty Auth Password")
 		return 1007
 	} //end if
-	if((len(smart.StrTrimWhitespaces(authPassword)) < 7) || (len(authPassword) > 55)) { // {{{SYNC-GO-SMART-AUTH-PASS-LEN}}}
-		log.Println("[ERROR] MsgPak Server: Invalid Auth UserName Length: must be between 7 and 30 characters")
+	if(smart.AuthIsValidPassword(authPassword) != true) {
+		log.Println("[ERROR] MsgPak Server: Invalid Auth Password Length: must be between 7 and 57 characters")
 		return 1008
 	} //end if
 
 	sharedEncPrivKey = smart.StrTrimWhitespaces(sharedEncPrivKey)
 	if(sharedEncPrivKey == "") {
-		log.Println("[ERROR] MsgPak Server: Empty Auth UserName")
+		log.Println("[ERROR] MsgPak Server: Empty Auth Shared PrivKey")
 		return 1009
 	} //end if
-	if((len(sharedEncPrivKey) < 16) || (len(sharedEncPrivKey) > 256)) { // {{{SYNC-GO-SMART-SHARED-PRIV-KEY-LEN}}}
-		log.Println("[ERROR] MsgPak Server: Invalid Auth UserName Length: must be between 16 and 256 characters")
+	if(smart.AuthIsValidPrivKey(sharedEncPrivKey) != true) {
+		log.Println("[ERROR] MsgPak Server: Invalid Auth Shared PrivKey Length: must be between 16 and 256 characters")
 		return 1010
 	} //end if
 
@@ -475,7 +475,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		//-- safety
 		defer smart.PanicHandler() // for: socket upgrade
 		//-- check auth
-		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, allowedIPs, nil, false) // outputs: TEXT
+		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, "", allowedIPs, nil, false) // outputs: TEXT
 		if(authErr != nil) {
 			log.Println("[WARNING] MessagePak Server / MsgPak Channel Area :: Authentication Failed:", authErr)
 			return
@@ -670,7 +670,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			return
 		} //end if
 		//--
-		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, allowedIPs, nil, true) // outputs: HTML
+		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUsername, authPassword, "", allowedIPs, nil, true) // outputs: HTML
 		if(authErr != nil) {
 			log.Println("[WARNING] MessagePak Server / Task Commands Area :: Authentication Failed:", authErr)
 			return

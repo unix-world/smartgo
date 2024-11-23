@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20241116.2358"
+	VERSION string = "r.20241123.2358"
 )
 
 var (
@@ -49,7 +49,7 @@ func JsonAjaxFormReply(status string, action string, title string, message strin
 	//--
 	title = smart.EscapeHtml(title)
 	if(!isHtmlMessage) {
-		message = smart.StrNl2Br(smart.EscapeHtml(message))
+		message = smart.Nl2Br(smart.EscapeHtml(message))
 	} //end if
 	//--
 	var hideFormOnSuccess string = ""

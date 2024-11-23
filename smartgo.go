@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 // [ CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable since go 1.19)
@@ -28,7 +28,6 @@ import (
 
 	"net/url"
 
-	"mime"
 	"html"
 	"encoding/xml"
 	"encoding/json"
@@ -48,10 +47,11 @@ import (
 	"github.com/unix-world/smartgo/data-structs/yaml"
 	"github.com/unix-world/smartgo/data-structs/xml2json"
 	"github.com/unix-world/smartgo/data-structs/tidwall/gjson"
+	"github.com/unix-world/smartgo/data-structs/fastjson"
 )
 
 const (
-	VERSION string = "v.20241116.2358"
+	VERSION string = "v.20241123.2358"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -228,6 +228,17 @@ func CurrentFunctionName() string {
 
 //-----
 
+
+func NewError(err string) error {
+	//--
+	return errors.New(err)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 // call as: defer PanicHandler()
 func PanicHandler() {
 	if panicInfo := recover(); panicInfo != nil {
@@ -236,11 +247,17 @@ func PanicHandler() {
 	} //end if
 } //END FUNCTION
 
+
 //-----
 
-func NewError(err string) error {
+
+func MemoryStats() runtime.MemStats {
 	//--
-	return errors.New(err)
+	var memStats runtime.MemStats
+	//--
+	runtime.ReadMemStats(&memStats)
+	//--
+	return memStats
 	//--
 } //END FUNCTION
 
@@ -778,231 +795,6 @@ func StrIReplaceAll(s string, part string, replacement string) string {
 } //END FUNCTION
 
 
-func TextCutByLimit(s string, length int) string {
-	//--
-	if(s == "") {
-		return ""
-	} //end if
-	//--
-	if(length < 5) {
-		length = 5
-	} //end if
-	//--
-	max := len(s)
-	if(length >= max) {
-		return s
-	} //end if
-	//--
-	s = StrMBSubstr(s, 0, length - 3) // substract -3 because of the trailing dots ...
-	s = StrRegexReplaceAll(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
-	s = s + "..." // add trailing dots
-	//--
-	return s
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func ConvertJsonNumberToStr(data interface{}) string { // after convert to string can be re-converted into int64 / float64 / ...
-	//--
-	return data.(json.Number).String()
-	//--
-} //END FUNCTION
-
-
-//----- IMPORTANT: never use string(number) ... it will lead to strange situations ... use the convert methods from below
-
-
-func ConvertFloat64ToStr(f float64) string {
-	//--
-	return strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
-	//--
-} //END FUNCTION
-
-
-func ConvertFloat32ToStr(f float32) string {
-	//--
-	return ConvertFloat64ToStr(float64(f)) // use precision 14 as in PHP
-	//--
-} //END FUNCTION
-
-
-//--
-
-
-func ConvertInt64ToStr(i int64) string {
-	//--
-	return strconv.FormatInt(i, 10)
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt64ToStr(i uint64) string {
-	//--
-	return strconv.FormatUint(i, 10)
-	//--
-} //END FUNCTION
-
-
-func ConvertIntToStr(i int) string {
-	//--
-	return ConvertInt64ToStr(int64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertUIntToStr(i uint) string {
-	//--
-	return ConvertUInt64ToStr(uint64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertInt32ToStr(i int32) string {
-	//--
-	return ConvertInt64ToStr(int64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt32ToStr(i uint32) string {
-	//--
-	return ConvertUInt64ToStr(uint64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertInt16ToStr(i int16) string {
-	//--
-	return ConvertInt64ToStr(int64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt16ToStr(i uint16) string {
-	//--
-	return ConvertUInt64ToStr(uint64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertInt8ToStr(i int8) string {
-	//--
-	return ConvertInt64ToStr(int64(i))
-	//--
-} //END FUNCTION
-
-
-func ConvertUInt8ToStr(i uint8) string {
-	//--
-	return ConvertUInt64ToStr(uint64(i))
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func ParseBoolStrAsBool(s string) bool {
-	//--
-	s = ParseBoolStrAsStdBoolStr(s)
-	//--
-	if(s == "true") {
-		return true
-	} //end if
-	return false
-	//--
-} //END FUNCTION
-
-
-func ParseBoolStrAsStdBoolStr(s string) string {
-	//--
-	s = StrToLower(StrTrimWhitespaces(s))
-	//--
-	if((s != "") && (s != "0") && (s != "false")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
-		s = "true"
-	} else {
-		s = "false"
-	} //end if else
-	//--
-	return s
-	//--
-} //END FUNCTION
-
-
-func ParseFloatStrAsDecimalStr(s string, d uint8) string {
-	//--
-	if(d < 1) {
-		d = 1
-	} else if(d > 8) {
-		d = 8
-	} //end if else
-	//--
-	var f float64 = 0
-	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
-		f = tmpFlt
-	} //end if
-	s = fmt.Sprintf("%." + ConvertUInt8ToStr(d) + "f", f)
-	//--
-	return string(s)
-	//--
-} //END FUNCTION
-
-
-func ParseStrAsFloat64(s string) float64 {
-	//--
-	var num float64 = 0
-	conv, err := strconv.ParseFloat(s, 64)
-	if(err == nil) {
-		num = conv
-	} //end if else
-	//--
-	return num
-	//--
-} //END FUNCTION
-
-
-func ParseStrAsFloat64StrFixedPrecision(s string) string {
-	//--
-	s = strconv.FormatFloat(ParseStrAsFloat64(s), 'g', 14, 64) // use precision 14 as in PHP
-	//--
-	return string(s)
-	//--
-} //END FUNCTION
-
-
-func ParseStrAsInt64(s string) int64 {
-	//--
-	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
-	//--
-	var num int64 = 0
-	conv, err := strconv.ParseInt(s, 10, 64)
-	if(err == nil) {
-		num = conv
-	} //end if else
-	//--
-	return num
-	//--
-} //END FUNCTION
-
-
-func ParseStrAsUInt64(s string) uint64 {
-	//--
-	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
-	//--
-	var num uint64 = 0
-	conv, err := strconv.ParseUint(s, 10, 64)
-	if(err == nil) {
-		num = conv
-	} //end if else
-	//--
-	return num
-	//--
-} //END FUNCTION
-
-
 //-----
 
 
@@ -1322,6 +1114,210 @@ func StrCreateStdVarName(s string) string {
 } //END FUNCTION
 
 
+//-----
+
+
+func ConvertJsonNumberToStr(data interface{}) string { // after convert to string can be re-converted into int64 / float64 / ...
+	//--
+	return data.(json.Number).String()
+	//--
+} //END FUNCTION
+
+
+//----- IMPORTANT: never use string(number) ... it will lead to strange situations ... use the convert methods from below
+
+
+func ConvertFloat64ToStr(f float64) string {
+	//--
+	return strconv.FormatFloat(f, 'g', 14, 64) // use precision 14 as in PHP
+	//--
+} //END FUNCTION
+
+
+func ConvertFloat32ToStr(f float32) string {
+	//--
+	return ConvertFloat64ToStr(float64(f)) // use precision 14 as in PHP
+	//--
+} //END FUNCTION
+
+
+//--
+
+
+func ConvertInt64ToStr(i int64) string {
+	//--
+	return strconv.FormatInt(i, 10)
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt64ToStr(i uint64) string {
+	//--
+	return strconv.FormatUint(i, 10)
+	//--
+} //END FUNCTION
+
+
+func ConvertIntToStr(i int) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUIntToStr(i uint) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt32ToStr(i int32) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt32ToStr(i uint32) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt16ToStr(i int16) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt16ToStr(i uint16) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertInt8ToStr(i int8) string {
+	//--
+	return ConvertInt64ToStr(int64(i))
+	//--
+} //END FUNCTION
+
+
+func ConvertUInt8ToStr(i uint8) string {
+	//--
+	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ParseBoolStrAsBool(s string) bool {
+	//--
+	s = ParseBoolStrAsStdBoolStr(s)
+	//--
+	if(s == "true") {
+		return true
+	} //end if
+	return false
+	//--
+} //END FUNCTION
+
+
+func ParseBoolStrAsStdBoolStr(s string) string {
+	//--
+	s = StrToLower(StrTrimWhitespaces(s))
+	//--
+	if((s != "") && (s != "0") && (s != "false")) { // fix PHP and Javascript as syntax if(tmp_marker_val){}
+		s = "true"
+	} else {
+		s = "false"
+	} //end if else
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func ParseFloatStrAsDecimalStr(s string, d uint8) string {
+	//--
+	if(d < 1) {
+		d = 1
+	} else if(d > 8) {
+		d = 8
+	} //end if else
+	//--
+	var f float64 = 0
+	if tmpFlt, convErr := strconv.ParseFloat(s, 64); convErr == nil {
+		f = tmpFlt
+	} //end if
+	s = fmt.Sprintf("%." + ConvertUInt8ToStr(d) + "f", f)
+	//--
+	return string(s)
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsFloat64(s string) float64 {
+	//--
+	var num float64 = 0
+	conv, err := strconv.ParseFloat(s, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	return num
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsFloat64StrFixedPrecision(s string) string {
+	//--
+	s = strconv.FormatFloat(ParseStrAsFloat64(s), 'g', 14, 64) // use precision 14 as in PHP
+	//--
+	return string(s)
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsInt64(s string) int64 {
+	//--
+	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
+	//--
+	var num int64 = 0
+	conv, err := strconv.ParseInt(s, 10, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	return num
+	//--
+} //END FUNCTION
+
+
+func ParseStrAsUInt64(s string) uint64 {
+	//--
+	s = strconv.FormatFloat(math.Round(ParseStrAsFloat64(s)), 'g', 14, 64)
+	//--
+	var num uint64 = 0
+	conv, err := strconv.ParseUint(s, 10, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	return num
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func UInt64ToHex(num uint64) string {
 	//--
 	return fmt.Sprintf("%x", num)
@@ -1383,7 +1379,7 @@ func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, erro
 
 
 func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
-	//--
+	//-- no need any panic handler
 	str, _ := JsonEncode(data, prettyprint, htmlsafe)
 	//--
 	return str
@@ -1494,22 +1490,145 @@ func JsonGetValueByKeyPath(json string, path string) gjson.Result {
 	// path can be: "3" ; "a" ; "0.id" ; "a.b.c.7"
 	// will return type Result
 	// Result type can be converted to: .String() | .Bool() | .Int() as int64 | .Uint() as uint64 | .Float() as float64 | .Time() as time.Time | .Array() as []Result
-	// Result can be checked as: .IsObject(), .IsArray(), .IsBool()
+	// Result can be checked as: .Exists(), .IsObject(), .IsArray(), .IsBool()
 	//--
 	if(StrTrimWhitespaces(json) == "") {
 		return gjson.Result{}
-	} //end if
-	//--
-	if(StrTrimWhitespaces(path) == "") {
-		json = `{ "/":` + json + ` }`
-		path = "/"
 	} //end if
 	//--
 	if(gjson.Valid(json) != true) {
 		return gjson.Result{}
 	} //end if
 	//--
-	return gjson.Get(json, path)
+	if(StrTrimWhitespaces(path) == "") {
+		return gjson.Parse(json) // get the root of json
+	} //end if
+	//--
+	return gjson.Get(json, path) // get the path of json
+	//--
+} //END FUNCTION
+
+
+func JsonGetValueByKeysPath(json string, keys ...string) (*fastjson.Value, error) {
+	//--
+	// to return the full json as root, use no keys
+	// keys can be: "3" ; "a" ; "0", "id" ; "a", "b", "c", "7"
+	// will return type *Value
+	// Result type can be converted to: .GetScalarAsString() | .GetStringBytes() | .GetBool() | .GetInt() as int32 | .GetInt64() as int64 | .GetUint() as uint32 | .GetUint64() as uint64 | .GetFloat64() as float64 | .GetArray() as []*Value | .GetObject() as *Object
+	// Result can be checked as: .Exists()
+	//--
+	if(StrTrimWhitespaces(json) == "") {
+		return nil, NewError("JSON is Empty") // return null and an empty type error
+	} //end if
+	//--
+	var p fastjson.Parser
+	jsonVal, jsonErr := p.Parse(json)
+	if(jsonErr != nil) {
+		return nil, jsonErr // return null and the parsing error
+	} //end if
+	//--
+	if(len(keys) <= 0) {
+		return jsonVal, nil // return the root of json, no error
+	} //end if
+	//--
+	return jsonVal.Get(keys...), nil // return the path of json, no error
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func XmlEncode(data interface{}, prettyprint bool, includeHeader bool) (string, error) {
+	//-- no need any panic handler
+	out := bytes.Buffer{}
+	//--
+	encoder := xml.NewEncoder(&out)
+	if(prettyprint == true) {
+		encoder.Indent("", "    ") // 4 spaces
+	} //end if
+	//--
+	err := encoder.Encode(data)
+	if(err != nil) {
+		return "", err
+	} //end if
+	//--
+	var hdr string = ""
+	if(includeHeader == true) {
+		hdr = xml.Header
+		if(prettyprint != true) {
+			hdr = StrTrimRightWhitespaces(hdr)
+		} //end if
+	} //end if
+	//--
+	return hdr + StrTrimWhitespaces(out.String()), nil // must trim as will add a new line at the end ...
+	//--
+} //END FUNCTION
+
+
+func XmlNoErrChkEncode(data interface{}, prettyprint bool, includeHeader bool) string {
+	//-- no need any panic handler
+	str, _ := XmlEncode(data, prettyprint, includeHeader)
+	//--
+	return str
+	//--
+} //END FUNCTION
+
+
+func XmlConvertToJson(xmlData string) (string, error) {
+	//--
+	xml := strings.NewReader(xmlData) // xml is an io.Reader
+	json, err := xml2json.Convert(xml)
+	if(err != nil) {
+		return "", err // returns empty string and the conversion error
+	} //end if
+	//--
+	return json.String(), nil // returns the json as string, no error
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func TextCutByLimit(s string, length int) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	if(length < 5) {
+		length = 5
+	} //end if
+	//--
+	max := len(s)
+	if(length >= max) {
+		return s
+	} //end if
+	//--
+	s = StrMBSubstr(s, 0, length - 3) // substract -3 because of the trailing dots ...
+	s = StrRegexReplaceAll(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
+	s = s + "..." // add trailing dots
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func Nl2Br(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, "<br>")
+	s = StrReplaceAll(s, CARRIAGE_RETURN, "<br>")
+	s = StrReplaceAll(s, LINE_FEED, "<br>")
+	//--
+	return s
 	//--
 } //END FUNCTION
 
@@ -1518,6 +1637,10 @@ func JsonGetValueByKeyPath(json string, path string) gjson.Result {
 
 
 func AddCSlashes(s string, c string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
 	//--
 	var tmpRune []rune
 	//--
@@ -1591,6 +1714,10 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 	// GO :  1234567890_ abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ:;\u0022\u0027~`!@#$%^\u0026*()+=[]{}|\\\u003C\u003E,.?\/\t\r\n
 	// PHP:  1234567890_ abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ:;\u0022\u0027~`!@#$%^\u0026*()+=[]{}|\\\u003C\u003E,.?\/\t\r\n
 	//--
+	if(in == "") {
+		return ""
+	} //end if
+	//--
 	out := bytes.Buffer{}
 	//--
 	for _, c := range in {
@@ -1628,6 +1755,10 @@ func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 	// !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, :, ;, <, =, >, ?, @, [, \, ], ^, `, {, |, }, ~
 	// Compatible with javascript: MDN: CSS.escape(str)
 	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
 	out := bytes.Buffer{}
 	//--
 	for _, c := range s {
@@ -1645,12 +1776,20 @@ func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
 
 func EscapeUrl(s string) string { // provides a Smart.Framework ~ EscapeUrl, an alias to RawUrlEncode
 	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
 	return RawUrlEncode(s)
 	//--
 } //END FUNCTION
 
 
 func RawUrlEncode(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
 	//--
 	return StrReplaceAll(url.QueryEscape(s), "+", "%20")
 	//--
@@ -1661,24 +1800,13 @@ func RawUrlDecode(s string) string {
 	//--
 	defer PanicHandler() // req. by raw url decode panic handler with malformed data
 	//--
-	u, _ := url.QueryUnescape(StrReplaceAll(s, "%20", "+"))
-	//--
-	return u
-	//--
-} //END FUNCTION
-
-
-func StrNl2Br(s string) string {
-	//--
 	if(s == "") {
 		return ""
 	} //end if
 	//--
-	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, "<br>")
-	s = StrReplaceAll(s, CARRIAGE_RETURN, "<br>")
-	s = StrReplaceAll(s, LINE_FEED, "<br>")
+	u, _ := url.QueryUnescape(StrReplaceAll(s, "%20", "+"))
 	//--
-	return s
+	return u
 	//--
 } //END FUNCTION
 
@@ -1735,55 +1863,8 @@ func Chr(o uint8) string {
 //-----
 
 
-func PrettyPrintBytes(b int64) string {
-	//--
-	const unit int64 = 1024
-	if(b < unit) {
-		return fmt.Sprintf("%d B", b)
-	} //end if
-	div, exp := unit, 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	} //end for
-	//--
-	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func MimeTypeByFileExtension(fext string) string {
-	//--
-	fext = StrTrimWhitespaces(fext)
-	if(fext == "") {
-		return ""
-	} //end if
-	//--
-	return mime.TypeByExtension(fext)
-	//--
-} //END FUNCTION
-
-
-func MimeTypeByFilePath(path string) string {
-	//--
-	path = StrTrimWhitespaces(path)
-	if(path == "") {
-		return ""
-	} //end if
-	//--
-	return MimeTypeByFileExtension(PathBaseExtension(path))
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
 func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]string, errMsg error) {
-	//--
+	//-- no panic handler needed
 	iniData, errParseIni := parseini.Load(iniContent)
 	if(errParseIni != nil) {
 		return nil, NewError("INI # Parse Error: " + errParseIni.Error())
@@ -1820,6 +1901,8 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 
 func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg error) {
 	//--
+	defer PanicHandler() // for YAML Parser
+	//--
 	yamlData = StrTrimWhitespaces(yamlData)
 	if(yamlData == "") {
 		return
@@ -1837,19 +1920,6 @@ func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg erro
 	} //end if
 	//--
 	return
-	//--
-} //END FUNCTION
-
-
-func XmlConvertToJson(xmlData string) (string, error) {
-	//--
-	xml := strings.NewReader(xmlData) // xml is an io.Reader
-	json, err := xml2json.Convert(xml)
-	if(err != nil) {
-		return "", err
-	} //end if
-	//--
-	return json.String(), nil
 	//--
 } //END FUNCTION
 

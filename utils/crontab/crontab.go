@@ -1,8 +1,8 @@
 
 // Go CronTab
 // (c) 2017 Miloš Mileusnić # github.com/mileusna/crontab
-// (c) 2022 unix-world.org
-// r.20220410.0520
+// (c) 2022-2024 unix-world.org
+// r.20241120.2358
 
 package crontab
 
@@ -130,7 +130,7 @@ func (c *Crontab) AddJob(schedule string, fn interface{}, args ...interface{}) e
 func (c *Crontab) MustAddJob(schedule string, fn interface{}, args ...interface{}) {
 	if err := c.AddJob(schedule, fn, args...); err != nil {
 	//	panic(err)
-		log.Println("[ERROR] CronTab :: MustAddJob:", err) // fix by unixman
+		log.Println("[ERROR]", "CronTab :: MustAddJob:", err) // fix by unixman
 	}
 }
 
@@ -177,7 +177,7 @@ func (j *job) run() {
 	j.RLock()
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("Crontab error", r)
+			log.Println("[ERROR]", "CronTab :: run:", r) // fix by unixman
 		}
 	}()
 	v := reflect.ValueOf(j.fn)

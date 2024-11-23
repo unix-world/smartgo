@@ -1,13 +1,13 @@
 
 // GO Lang :: SmartGo / Web Server / Internals :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
-	"net/http"
+	"sort"
 
 	smart "github.com/unix-world/smartgo"
 )
@@ -50,22 +50,15 @@ func getUrlPathSegments(urlPath string) (headPath string, tailPaths []string) {
 } //END FUNCTION
 
 
-func getVisitorRealIpAddr(r *http.Request) string {
-	//--
-	defer smart.PanicHandler() // safe recovery handler
-	//--
-	_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
-	//--
-	return realClientIp
-	//--
-} //END FUNCTION
-
-
 func listActiveWebAuthProviders() []string {
 	//--
 	var authProviders []string = []string{}
+	//--
 	if(smart.AuthBasicIsEnabled() == true) {
 		authProviders = append(authProviders, "Auth:Basic")
+	} //end if
+	if(smart.AuthTokenIsEnabled() == true) {
+		authProviders = append(authProviders, "Auth:Token")
 	} //end if
 	if(smart.AuthBearerIsEnabled() == true) {
 		authProviders = append(authProviders, "Auth:Bearer")
@@ -84,6 +77,7 @@ func listMethods(methods []string) string {
 	var options string = "OPTIONS"
 	//--
 	if((methods != nil) && (len(methods) > 0)) {
+		sort.Strings(methods)
 		for _, method := range methods {
 			method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
 			if(method != "OPTIONS") {

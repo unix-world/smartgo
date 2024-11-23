@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241116.2358 :: STABLE
+// r.20241123.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20241116.2358"
+	VERSION string = "r.20241123.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -46,8 +46,6 @@ const (
 	CERTIFICATE_PEM_KEY string = "cert.key"
 
 	HTTP_AUTH_REALM string = "Smart.Web Server: Auth Area"
-
-	REAL_IP_HEADER_KEY = "" // if used behind a proxy, can be set as: X-REAL-IP, X-FORWARDED-FOR, HTTP-X-CLIENT-IP, ... or any other trusted proxy header ; if no proxy is used, set as an empty string
 )
 
 const TheStrName string = "SmartGO Web Server"
@@ -74,6 +72,7 @@ type versionStruct struct {
 
 type HttpResponse struct {
 	StatusCode         uint16
+	ContentStream      smarthttputils.HttpStreamerFunc
 	ContentBody        string
 	ContentFileName    string
 	ContentDisposition string
@@ -91,7 +90,7 @@ type smartRoute struct {
 	MaxTailSegments int 				// if is zero, will allow no tails ; if is -1 will allow any number of tails and will pass them to controller ; if is 1 will alow one tail ; if is 2 will allow 2 tails, and so on ...
 	FxHandler  		HttpHandlerFunc 	// see UrlHandlerRegisterRoute()
 }
-var AllowedMethods []string = []string{ "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE" }
+var allowedMethods []string = []string{ "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE" } // OPTIONS is always available thus must not be includded here
 var urlHandlersMap = map[string]smartRoute{}
 var handlersWriteMutex sync.Mutex
 var handlersAreLocked bool = false // after server boot process no more handlers are allowed to be registered, by setting this flag to TRUE
@@ -105,7 +104,7 @@ type WebdavRunOptions struct {
 
 
 // IMPORTANT: If using Proxy with different PROXY_HTTP_BASE_PATH than "/" (ex: "/api/") the Proxy MUST strip back PROXY_HTTP_BASE_PATH to "/" for this backend
-func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
+func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
 
 	//--
 	// this method should return (error codes) just int16 positive values and zero if ok ; negative values are reserved for outsite managers
@@ -122,18 +121,20 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	} //en dif
 	//--
 
+	log.Println("[META] Web Server: Allowed Methods:", listMethods(allowedMethods))
+
 	//-- auth user / pass
 
 	var isAuthActive bool = false
 	authUser = smart.StrTrimWhitespaces(authUser)
 	if(authUser != "") {
 		isAuthActive = true
-		if(smart.StrTrimWhitespaces(authPass) == "") {
-			log.Println("[ERROR] Web Server: Empty Auth Password when a UserName is Set")
+		if((smart.StrTrimWhitespaces(authPass) == "") && (smart.StrTrimWhitespaces(authToken) == "")) {
+			log.Println("[ERROR] Web Server: Empty Auth Password and Token when a UserName is Set")
 			return 1100
 		} //end if
 		if(customAuthCheck != nil) {
-			log.Println("[ERROR] Web Server: Auth User / Pass is set but also a custom Auth Handler")
+			log.Println("[ERROR] Web Server: Auth User / Pass / Token is set but also a custom Auth Handler")
 			return 1101
 		} //end if
 	} else if(customAuthCheck != nil) {
@@ -144,22 +145,38 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} //end if
 	} //end if
 
+	var isAuthCustom bool = false
+	if(customAuthCheck != nil) {
+		isAuthCustom = true
+	} //end if
+
 	if(isAuthActive) {
 		//--
 		authProviders := listActiveWebAuthProviders()
 		//--
+		var authDescr string = "Default.Handler"
+		if(isAuthCustom == true) {
+			authDescr = "Custom.Handler"
+		} //end if
+		//--
 		if(len(authProviders) > 0) {
-			log.Println("[OK]", "Web Server: Authentication is ENABLED using these Auth Providers:", authProviders)
+			log.Println("[OK]", "Web Server: Authentication [" + authDescr + "] is ENABLED using the following Auth Providers: [ " + smart.Implode(", ", authProviders) + " ]")
 		} else {
-			log.Println("[ERROR]", "Web Server: Authentication is ENABLED but there are no active Auth Providers")
+			log.Println("[ERROR]", "Web Server: Authentication [" + authDescr + "] is ENABLED but there are no active Auth Providers")
 			return 1103
+		} //end if else
+		//--
+		if(smart.Auth2FACookieIsEnabled() == true) {
+			log.Println("[INFO]", "Web Server: Authentication 2FA is ENABLED")
+		} else {
+			log.Println("[NOTICE]", "Web Server: Authentication 2FA is DISABLED")
 		} //end if else
 		//--
 		var skipAuthRoutes []string = listAuthSkipRoutes()
 		if(len(skipAuthRoutes) <= 0) {
-			log.Println("[OK]", "Web Server: Authentication is ENABLED for All Routes")
+			log.Println("[OK]", "Web Server: Authentication is ENABLED for All Registered Routes")
 		} else {
-			log.Println("[WARNING]", "Web Server: Authentication is DISABLED for some Routes:", skipAuthRoutes)
+			log.Println("[WARNING]", "Web Server: Authentication is DISABLED for", len(skipAuthRoutes) ,"Registered Routes: [", smart.Implode(" ; ", skipAuthRoutes), "] - check the routes listed here and ensure this is not a security concern ...")
 		} //end if else
 		//--
 	} else {
@@ -229,7 +246,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//-- webdav dir
 
 	if(webdavOptions == nil) {
-		webdavOptions = &WebdavRunOptions{Enabled:false, SharedMode:false, SmartSafePaths:false}
+		webdavOptions = &WebdavRunOptions{Enabled:false, SharedMode:false, SmartSafePaths:false} // safe pointer, webdav options must be used overall
 	} //end if
 
 	if(webdavOptions.Enabled == true) {
@@ -296,14 +313,14 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//-- panic recovery
 		defer smart.PanicHandler() // safe recovery handler
 		//-- get real client IP
-		realClientIp := getVisitorRealIpAddr(r)
+		_, realClientIp := GetVisitorRealIpAddr(r)
 		//--
 		//== rate limit interceptor (must be first)
 		if(useRateLimit) { // RATE LIMIT
 			var isRateLimited bool = smarthttputils.HttpServerIsIpRateLimited(r, rateLimit, rateBurst)
 			if(isRateLimited) { // if the current request/ip is rate limited
 				log.Printf("[SRV] Web Server: Rate Limit :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "429", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-				smarthttputils.HttpStatus429(w, r, "Rate Limit: Your IP Address have submitted too many requests in a short period of time and have exceeded the number of allowed requests. Try again in few minutes.", true)
+				smarthttputils.HttpStatus429(w, r, "Rate Limit: Your IP Address have submitted too many requests in a short period of time and have exceeded the number of allowed requests. Try again in few minutes.", true, false) // do not display captcha
 				return
 			} //end if
 		} //end if
@@ -319,10 +336,10 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			return
 		} //end if
 		//--
-		//== webDAV
+		//== webDAV (manages authentication internally, identical with the below auth implementation)
 		if(webdavOptions.Enabled == true) {
 			if((urlPath == webDavUrlPath()) || (smart.StrStartsWith(urlPath, webDavUrlPath()+"/"))) { // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
-				webDavHttpHandler(w, r, webdavOptions.SharedMode, webdavOptions.SmartSafePaths, isAuthActive, allowedIPs, authUser, authPass, customAuthCheck)
+				webDavHttpHandler(w, r, webdavOptions.SharedMode, webdavOptions.SmartSafePaths, isAuthActive, allowedIPs, authUser, authPass, authToken, customAuthCheck)
 				return
 			} //end if
 		} //end if
@@ -377,20 +394,21 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			return
 		} //end if else
 		//-- manage handlers
+
 		var sr smartRoute = smartRoute{}
-		var okPath bool = false
+		var okInternalRoute bool = false
 		var testPath string = ""
 		var cycles uint64 = 0
 		testPaths := tailPaths
 		for {
 			testPath = "/" + headPath
 			if(len(testPaths) <= 0) { // if no more segments, test the 1st and stop
-				sr, okPath = urlHandlersMap[testPath] // last test
+				sr, okInternalRoute = urlHandlersMap[testPath] // last test
 				break
 			} //end if
 			testPath += "/" + smart.Implode("/", testPaths)
-			sr, okPath = urlHandlersMap[testPath]
-			if(okPath == true) { // if found, stop
+			sr, okInternalRoute = urlHandlersMap[testPath]
+			if(okInternalRoute == true) { // if found, stop
 				break
 			} //end if
 			testPaths = testPaths[:len(testPaths)-1] // pop out last segment
@@ -399,9 +417,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			} //end if
 			cycles++
 		} //end for
-	//	sr, okPath := urlHandlersMap["/"+headPath] // previous, original code, replaced with the above
-		//--
-		if(okPath != true) {
+	//	sr, okInternalRoute := urlHandlersMap["/"+headPath] // previous, original code, replaced with the above
+		//-- serve public routes (no authentication) ; if the current route is not inside the internal ones, try ...
+		if(okInternalRoute != true) { // if not an internal route, try to see if it is an existing web public path, if not, exit with 404
 			if(r.Method == "OPTIONS") {
 				log.Printf("[SRV] Web Server: OPTIONS Request Method :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "200", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 				smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{"Allow":"OPTIONS, GET, HEAD"})
@@ -423,6 +441,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
+		//-- serve internal routes
 		if((sr.MaxTailSegments >= 0) && (len(tailPaths) > sr.MaxTailSegments)) { // if sr.MaxTailSegments is -1, pass to controller
 			log.Printf("[SRV] Web Server: Invalid Internal Route for [/%s] (Max Tail is %d) :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", headPath, sr.MaxTailSegments, "404", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + GetCurrentPath(r) + "`", true)
@@ -438,14 +457,14 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Internal Route [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
-		//-- auth check (if set so)
+		//-- auth check (if auth is active and not explicit skip auth by route)
 		var authErr error = nil
 		var authData smart.AuthDataStruct
 		if((isAuthActive == true) && (sr.AuthSkip != true)) { // this check must be before executing fx below
-			authErr, authData = smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, allowedIPs, customAuthCheck, true) // outputs: HTML
+			authErr, authData = smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, authToken, allowedIPs, customAuthCheck, true) // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
 			if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
-				log.Println("[WARNING]", "Web Server: Authentication Failed:", "authData.OK:", authData.OK, "authData.ErrMsg:", authData.ErrMsg, "Error:", authErr)
-				// MUST NOT USE HERE: smarthttputils.HttpStatus401() ; it is handled directly by smarthttputils.HttpAuthCheck()
+				log.Println("[LOG]", "Web Server: Authentication Failed:", "authData: OK [", authData.OK, "] ; ErrMsg: `" + authData.ErrMsg + "` ; UserName: `" + authData.UserName + "` ; Error:", authErr)
+				// MUST NOT WRITE ANY ANSWER HERE ON FAIL: smarthttputils.HttpStatusXXX() as 401, 403, 429 because the smarthttputils.HttpAuthCheck() method manages 4xx-5xx codes directly if not success
 				return
 			} //end if
 		} //end if
@@ -489,8 +508,19 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			response.ContentDisposition = ""
 		} //end if
 		//--
-		log.Println("[META]", "Web Server: Internal Route :: Handler Execution Time:", timerDuration, "# Route: `" + urlPath + "`")
+		memStats := smart.MemoryStats()
+		//--
+		log.Println("[META]", "Web Server Metrics [Peak System Memory: " + smart.ConvertUInt64ToStr(smart.BytesToMegaBytes(memStats.Sys)) + "MB / Allocated: " + smart.PrettyPrintBytes(memStats.Alloc) + "] :: Handler Execution Time:", timerDuration, "# Route: `" + urlPath + "`")
 		log.Printf("[SRV] Web Server: Internal Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertIntToStr(int(response.StatusCode)), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+		//--
+		if(response.StatusCode == 0) {
+			response.StatusCode = 200 // this is default, if not explicit set in handler
+		} //end if
+		//--
+		if(response.ContentStream != nil) {
+			smarthttputils.HttpStreamContent(w, r, response.StatusCode, response.ContentStream, response.ContentFileName, response.ContentDisposition, response.Headers)
+			return
+		} //end if
 		//--
 		var fExt string = ""
 		if((response.ContentFileName != "") && (!smart.StrContains(response.ContentFileName, "://"))) {
@@ -502,6 +532,16 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			isHtmlAnswer = true
 		} //end if
 		//--
+		if(isHtmlAnswer == true) { // only if HTML, but this can be rewritten by accept headers that client send, add below extra conditions
+			if((response.StatusCode >= 200) && (response.StatusCode < 300)) { // only for 2xx status codes
+				if((fExt == "html") || (fExt == "htm")) { // only if explicit html/htm extensions, ommit if empty extension, can be something different
+					if(smart.StrContains(response.ContentBody, "</html>")) { // detect html end tag, case sensitive, for speed
+						response.ContentBody += `<!-- Server-Side Metrics:  ` + smart.EscapeHtml(smart.StrPad2LenRight("Total Execution Time = " + timerDuration.String(), " ", 38)) + `  -->` + "\n"
+					} //end if
+				} //end if
+			} //end if
+		} //end if
+		//-- from this point the HTTP Writer will begin to write the response, no reads are safe and guaranteed
 		switch(response.StatusCode) {
 			//-- ok status codes
 			case 200:
@@ -554,7 +594,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				smarthttputils.HttpStatus422(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 429:
-				smarthttputils.HttpStatus429(w, r, response.ContentBody, isHtmlAnswer)
+				smarthttputils.HttpStatus429(w, r, response.ContentBody, isHtmlAnswer, false) // do not display captcha
 				break
 			//-- server errors
 			case 500:
@@ -577,6 +617,16 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				log.Println("[ERROR]", "Web Server: Invalid Application Level Status Code for the URL Path [" + urlPath + "]:", response.StatusCode)
 				smarthttputils.HttpStatus500(w, r, "Invalid Application Level Status Code: `" + smart.ConvertIntToStr(int(response.StatusCode)) + "` for the URL Path: `" + GetCurrentPath(r) + "`", isHtmlAnswer)
 		} //end switch
+		//--
+	//	// Depending on the HTTP protocol version and the client, calling Write or WriteHeader may prevent future reads on the Request
+	//	// For HTTP/1.x requests, handlers should read any needed request body data before writing the response
+	//	// the below commented code may work but only in certain circumstances and is intended just for Development / Debugging
+	//	if(DEBUG) {
+	//		hdrCType := w.Header().Get(smarthttputils.HTTP_HEADER_CONTENT_TYPE)
+	//		mType, mCharSet := smarthttputils.MimeAndCharsetGetFromMimeType(hdrCType)
+	//		log.Println("[DEBUG]", "Web Server Mux Handler Response Content Type:", "MimeType = `" + mType + "` / Charset = `" + mCharSet + "` / Header [" + smarthttputils.HTTP_HEADER_CONTENT_TYPE + "] Raw Value is: `" + hdrCType + "`")
+	//	} //end if
+		//--
 	})
 
 	//-- serve logic: is better to manage outside the async calls because extra monitoring logic can be implemented !

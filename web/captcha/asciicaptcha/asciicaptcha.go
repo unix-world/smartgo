@@ -1,7 +1,7 @@
 
 // SmartGo ASCII Captcha - Plugin for: SmartGo Captcha
 // (c) 2024 unix-world.org
-// v.20241116.2358
+// v.20241123.2358
 // license: BSD
 
 //-- based on:
@@ -147,7 +147,7 @@ func GetCaptchaHtmlAndCode(palette uint8, size string, numChars uint8, pool stri
 	// palette: 0: grey ; 1: blue/yellow ; 2: red/green ; 3: rgb
 	// size: @see: DefaultFontSize accepted values
 	//--
-	captchaStruct := &CaptchaStruct{}
+	captchaStruct := CaptchaStruct{}
 	//--
 	if(pool == "") {
 		pool = captchaGlyphsPool // default, if empty
@@ -156,11 +156,11 @@ func GetCaptchaHtmlAndCode(palette uint8, size string, numChars uint8, pool stri
 	pool = smart.StrTrimWhitespaces(pool)
 	if(pool == "") {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "Pool is Empty")
-		return *captchaStruct
+		return captchaStruct
 	} //end if
 	if(!smart.StrRegexMatchString("^[A-Za-z0-9]+$", pool)) {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "Pool contains Invalid Characters: `" + pool + "`")
-		return *captchaStruct
+		return captchaStruct
 	} //end if
 	//--
 	if(numChars <= 0) {
@@ -174,10 +174,10 @@ func GetCaptchaHtmlAndCode(palette uint8, size string, numChars uint8, pool stri
 	//--
 	if(smart.StrLen(pool) < int(numChars)) {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "Pool is Too Short vs. numChars")
-		return *captchaStruct
+		return captchaStruct
 	} else if(smart.StrLen(pool) > int(maxPoolSize)) {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "Pool is Too Long vs. GlyphsPool")
-		return *captchaStruct
+		return captchaStruct
 	} //end if else
 	//--
 	size = smart.ParseFloatStrAsDecimalStr(size, 3)
@@ -209,7 +209,7 @@ func GetCaptchaHtmlAndCode(palette uint8, size string, numChars uint8, pool stri
 	captchaStruct.Code = smart.StrToUpper(code)
 	captchaStruct.Html = `<div title="Captcha"><div class="Smart-Captcha-AsciiArt" style="background:#FFFFFF; border:1px solid #E7E7E7; display:inline-block!important; padding:0!important; padding-left:5px; padding-right:5px; margin-bottom:5px;"><pre style="margin:3px!important; padding:0!important; font-weight:bold!important; font-size:` + smart.EscapeHtml(size) + `rem!important; line-height:` + smart.EscapeHtml(size) + `rem!important;">` + "\n" + renderHtml(ascii, palette, size) + "\n" + `</pre></div></div>`
 	//--
-	return *captchaStruct
+	return captchaStruct
 	//--
 } //END FUNCTION
 
