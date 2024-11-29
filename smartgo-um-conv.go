@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241129.2358 :: STABLE
 // [ UM / CONV ]
 
 // REQUIRE: go 1.19 or later
@@ -9,6 +9,10 @@ package smartgo
 
 import (
 	"fmt"
+)
+
+const (
+	SIZE_BYTES_16M uint64 = 16777216 // Reference Unit
 )
 
 

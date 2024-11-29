@@ -2,8 +2,8 @@ package qrsvg
 
 // based on: github.com/wamuir/svg-qr-code ; go 1.16 @ License: MIT # v.20231205
 
-// QrSVG for GO # r.20240114.2007
-// (c) 2023 unix-world.org
+// QrSVG for GO # r.20241124.2358
+// (c) 2023-2024 unix-world.org
 // License: BSD
 // custom modifications by unixman:
 // 	* implement ellipse
@@ -15,13 +15,14 @@ import (
 	"fmt"
 	"errors"
 
+	"strings"
 	"strconv"
 	"encoding/xml"
 
 	"image"
 	"image/color"
 
-	"github.com/unix-world/smartgo/markup/svg-qrcode"
+	qrcode "github.com/unix-world/smartgo/markup/svg-qrcode"
 )
 
 // defaults
@@ -29,7 +30,7 @@ const (
 	blocksize   uint8 = 3
 	borderwidth uint8 = 1
 
-	radiusRatio float32 = 1.95
+	radiusRatio float32 = 1.85 // 1.95 was not readable by iOS BarCode Scanner
 )
 
 // QR holds a QR Code (from github.com/unix-world/smartgo/markup/svg-qrcode) and SVG settings.
@@ -71,9 +72,10 @@ type EBlock struct { // ellipse
 	Fill   string  `xml:"fill,attr"`
 }
 
+
 // SVG returns the vector representation of a QR code, as a Go struct.
 // This could, for instance, be marshaled with encoding/xml.
-func (q *QR) generateSVG() *SVG {
+func (q *QR) generateSVG(transparentBgColor string) *SVG {
 
 	q.qrcode.DisableBorder = true
 	var i image.Image = q.qrcode.Image(0)
@@ -95,16 +97,27 @@ func (q *QR) generateSVG() *SVG {
 	svg.Width  = uint(width)
 	svg.Height = uint(width)
 
-	svg.RBlocks = append(svg.RBlocks, RBlock{0, 0, int(svg.Width), int(svg.Height), hex(q.Borderfill)})
+	bgColor := hex(q.Borderfill)
+	if(transparentBgColor != "") {
+		bgColor = "none"
+	}
+
+	svg.RBlocks = append(svg.RBlocks, RBlock{0, 0, int(svg.Width), int(svg.Height), bgColor})
 	for x := 0; x < w; x++ {
 		for y := 0; y < w; y++ {
+			theFill := hex(i.At(x, y))
+			if(transparentBgColor != "") {
+				if(strings.ToUpper(theFill) == transparentBgColor) { // {{{QR-SVG-SYNC-COLOR-NONE}}}
+					theFill = "none"
+				}
+			}
 			if(q.UseDots) {
 				svg.EBlocks = append(svg.EBlocks, EBlock{
 					X:      (x + int(q.Borderwidth)) * int(q.Blocksize),
 					Y:      (y + int(q.Borderwidth)) * int(q.Blocksize),
 					Width:  float32(q.Blocksize) / radiusRatio,
 					Height: float32(q.Blocksize) / radiusRatio,
-					Fill:   hex(i.At(x, y)),
+					Fill:   theFill,
 				})
 			} else {
 				svg.RBlocks = append(svg.RBlocks, RBlock{
@@ -112,7 +125,7 @@ func (q *QR) generateSVG() *SVG {
 					Y:      (y + int(q.Borderwidth)) * int(q.Blocksize),
 					Width:  int(q.Blocksize),
 					Height: int(q.Blocksize),
-					Fill:   hex(i.At(x, y)),
+					Fill:   theFill,
 				})
 			}
 		}
@@ -179,8 +192,20 @@ func New(s string, level string, fgColor string, bgColor string, useDots bool, b
 		return qerr, errFgClr
 	}
 
-	if(bgColor == "") {
-		bgColor = "#FFFFFF"
+	var transparentBgColor string = ""
+	var isTransparentBg bool = false
+	if(bgColor == "none") {
+		isTransparentBg = true
+	}
+	if((bgColor == "") || (bgColor == "none")) {
+		if(fgColor == "#FFFFFF") {
+			bgColor = "#000000"
+		} else {
+			bgColor = "#FFFFFF"
+		} //end if else
+		if(isTransparentBg) {
+			transparentBgColor = bgColor // {{{QR-SVG-SYNC-COLOR-NONE}}}
+		}
 	}
 	bgClr, errBgClr := parseHexColor(bgColor)
 	if(errBgClr != nil) {
@@ -213,7 +238,7 @@ func New(s string, level string, fgColor string, bgColor string, useDots bool, b
 	}
 
 	q := QR{s, blockSize, borderWidth, code.BackgroundColor, useDots, "", code}
-	q.Svg = q.generateSVG().getAsString()
+	q.Svg = q.generateSVG(transparentBgColor).getAsString()
 
 	return q, nil
 }

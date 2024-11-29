@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241129.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -39,6 +39,9 @@ const (
 	REGEX_SMART_SAFE_PATH_NAME string 		= `^[_a-zA-Z0-9\-\.@#\/]+$` 		// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM PATHS ...
 	REGEX_SMART_SAFE_FILE_NAME string 		= `^[_a-zA-Z0-9\-\.@#]+$` 			// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM FILE AND DIR NAMES ... ; like above, just missing slash /
 	//-- allow just: "_ a-z A-Z 0-9 - . @ #" ; for dir paths also allow "/"
+
+	MAX_PATH_LENGTH int     = 1024 // path can be up to 4096 characters, safe is 1024 to be cross platform
+	MAX_FILENAME_LENGTH int =  255 // file can be up to  512 characters, safe is  255 to be cross platform
 
 	INVALID_ABSOLUTE_PATH string = "/tmp/err-absolute-path/invalid-path/"
 )
@@ -113,6 +116,10 @@ func PathIsSafeValidFileName(fileName string) bool {
 		return false
 	} //end if
 	//--
+	if(len(fileName) > MAX_FILENAME_LENGTH) {
+		return false
+	} //end if
+	//--
 	if(StrRegexMatchString(REGEX_SAFE_FILE_NAME, fileName) != true) {
 		return false
 	} //end if
@@ -165,6 +172,10 @@ func PathIsSafeValidSafePath(filePath string) bool {
 func PathIsSafeValidPath(filePath string) bool {
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
+		return false
+	} //end if
+	//--
+	if(len(filePath) > MAX_PATH_LENGTH) {
 		return false
 	} //end if
 	//--
@@ -241,7 +252,7 @@ func PathIsBackwardUnsafe(filePath string) bool {
 	filePath = SafePathFixSeparator(filePath) // DO NOT USE Clean, path here must be un-cleaned to correct detect backward sequences, only need to normalize slashes ...
 	//--
 	if(
-		(len(filePath) > 1024) || // check max path length !
+		(len(filePath) > MAX_PATH_LENGTH) || // check max path length !
 		StrContains(filePath, "\\") ||
 		StrContains(filePath, "/../") ||
 		StrContains(filePath, "/./")  ||
@@ -916,73 +927,6 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 	hexSha := StrToLower(hex.EncodeToString(h.Sum(nil)))
 	//--
 	return hexSha, nil
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func SafePathIniFileReadAndParse(iniFilePath string, allowAbsolutePath bool, iniKeys []string) (iniMap map[string]string, errMsg error) {
-	//--
-	defer PanicHandler()
-	//--
-	if(StrTrimWhitespaces(iniFilePath) == "") {
-		return nil, NewError("INI File # File Path is Empty")
-	} //end if
-	//--
-	iniFilePath = SafePathFixClean(iniFilePath)
-	//--
-	if(PathIsEmptyOrRoot(iniFilePath) == true) {
-		return nil, NewError("INI File # File Path is Empty/Root")
-	} //end if
-	//--
-	iniContent, iniFileErr := SafePathFileRead(iniFilePath, true)
-	if(iniFileErr != nil) {
-		return nil, NewError("INI File # Read Failed `" + iniFilePath + "`: " + iniFileErr.Error())
-	} //end if
-	if(StrTrimWhitespaces(iniContent) == "") {
-		return nil, NewError("INI File # Content is Empty `" + iniFilePath + "`")
-	} //end if
-	//--
-	dat, err := IniContentParse(iniContent, iniKeys)
-	if(err != nil) {
-		return nil, NewError("INI File # Parse ERR: " + err.Error() + " # `" + iniFilePath + "`")
-	} //end if
-	//--
-	return dat, nil
-	//--
-} //END FUNCTION
-
-
-func SafePathYamlFileReadAndParse(yamlFilePath string, allowAbsolutePath bool) (yamlMap map[string]interface{}, errMsg error) {
-	//--
-	defer PanicHandler()
-	//--
-	if(StrTrimWhitespaces(yamlFilePath) == "") {
-		return nil, NewError("YAML File # File Path is Empty")
-	} //end if
-	//--
-	yamlFilePath = SafePathFixClean(yamlFilePath)
-	//--
-	if(PathIsEmptyOrRoot(yamlFilePath) == true) {
-		return nil, NewError("YAML File # File Path is Empty/Root")
-	} //end if
-	//--
-	yamlData, errYaml := SafePathFileRead(yamlFilePath, true)
-	if(errYaml != nil) {
-		return nil, NewError("YAML File # Read Failed `" + yamlFilePath + "`: " + errYaml.Error())
-	} //end if
-	if(StrTrimWhitespaces(yamlData) == "") {
-		return nil, NewError("YAML File # Content is Empty `" + yamlFilePath + "`")
-	} //end if
-	//--
-	yml, err := YamlDataParse(yamlData)
-	if(err != nil) {
-		return nil, NewError("YAML File # Parse ERR: " + err.Error() + " # `" + yamlFilePath + "`")
-	} //end if
-	//--
-	return yml, nil
 	//--
 } //END FUNCTION
 

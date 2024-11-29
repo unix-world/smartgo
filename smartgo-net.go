@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241129.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -17,10 +17,18 @@ import (
 )
 
 const (
+	REGEX_SAFE_VAR_NAME string 				= `^[_a-zA-Z0-9]+$` 				// Safe VarName Regex
+
 	REGEX_SMART_SAFE_BASE_PATH string 		= `^[_a-z0-9\-\/]+$` 				// CONFORMANCE: SUPPORT ONLY THESE CHARACTERS IN HTML BASE PATHS
 
 	REGEX_SMART_SAFE_NET_HOSTNAME string 	= `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
 	REGEX_SMART_SAFE_HTTP_HEADER_KEY string = `^[A-Za-z0-9\-]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN HEADER KEY VALUES
+
+	REGEX_SMART_SAFE_EMAIL_ADDRESS string 	= `^[_a-zA-Z0-9\-\.\+~]{1,63}@[a-z0-9\-\.]{3,63}$` 	// internet email@(subdomain.)domain.name
+	REGEX_SMART_SAFE_NET_USERNAME  string 	= `^[_a-zA-Z0-9\-\.\+~@]{3,127}$` 					// general characters accepted in a username
+
+	MAX_HOSTNAME_FULL_LENGTH int    = 253 // The entire hostname, including the delimiting dots, has a maximum of 253 ASCII characters
+	MAX_HOSTNAME_SEGMENT_LENGTH int =  63 // For example, "en.wikipedia.org" is a hostname. Each label must be 1 to 63 octets long
 
 	HTTP_PROTO_PREFIX_HTTP  string = "http://"
 	HTTP_PROTO_PREFIX_HTTPS string = "https://"
@@ -400,7 +408,9 @@ func GetHttpRealClientIpFromRequestHeaders(r *http.Request) (isOk bool, clientRe
 			log.Println("[DEBUG]", "Request Header Keys", r.Header)
 		} //end if
 		//--
-		ipList = StrTrimWhitespaces(r.Header.Get(hdrKey))
+		if((r.Header != nil) && (len(r.Header) > 0)) {
+			ipList = StrTrimWhitespaces(r.Header.Get(hdrKey))
+		} //end if
 		if(ipList == "") {
 			log.Println("[WARNING]", CurrentFunctionName(), "Failed to get a valid IP Address from custom Header Key: `" + ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP + "`")
 			return false, DEFAULT_FAKE_IP_CLIENT, "", hdrKey
@@ -467,7 +477,10 @@ func GetHttpProtocolFromRequest(r *http.Request) (proto string) {
 	//--
 	var hdrKey string = StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_SERVER_PROTO) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
 	if(hdrKey != "") { // behind proxy
-		var hdrVal string = StrToLower(StrTrimWhitespaces(r.Header.Get(hdrKey)))
+		var hdrVal string = ""
+		if((r.Header != nil) && (len(r.Header) > 0)) {
+			hdrVal = StrToLower(StrTrimWhitespaces(r.Header.Get(hdrKey)))
+		} //end if
 		if(hdrVal == "https") {
 			proto = HTTP_PROTO_PREFIX_HTTPS
 		} else {
@@ -499,7 +512,10 @@ func GetHttpDomainAndPortFromRequest(r *http.Request) (domain string, portNum st
 	//--
 	var hdrKey string = StrTrimWhitespaces(ini_SMART_FRAMEWORK_SRVPROXY_SERVER_HOSTPORT) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
 	if(hdrKey != "") {
-		var proxyHostPort string = StrTrimWhitespaces(r.Header.Get(hdrKey)) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
+		var proxyHostPort string = ""
+		if((r.Header != nil) && (len(r.Header) > 0)) {
+			proxyHostPort = StrTrimWhitespaces(r.Header.Get(hdrKey)) // {{{SYNC-HEADER-KEY-GO-CASE-SENSITIVE}}}
+		} //end if
 		if(proxyHostPort == "") {
 			log.Println("[WARNING]", CurrentFunctionName(), "Failed to get a valid HostPort from custom Header Key: `" + ini_SMART_FRAMEWORK_SRVPROXY_SERVER_HOSTPORT + "`")
 			proxyHostPort = DEFAULT_FAKE_HOSTPORT_SERVER // use an impossible value to avoid spoofing
@@ -791,6 +807,10 @@ func IsNetValidPortStr(s string) bool { // can be a valid STRING(as NUMERIC) por
 func IsNetValidHostName(s string) bool { // can contains only
 	//--
 	if(StrTrimWhitespaces(s) == "") {
+		return false
+	} //end if
+	//--
+	if(len(s) > MAX_HOSTNAME_FULL_LENGTH) {
 		return false
 	} //end if
 	//--

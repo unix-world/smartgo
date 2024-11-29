@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241125.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20241123.2358"
+	VERSION string = "r.20241125.2358"
 )
 
 var (
@@ -95,7 +95,13 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 		path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/ ")) // remove `/` and space + all whitespaces
 		if(len(path) > 4) {
 			if(smart.StrStartsWith(path, "lib/")) {
-				assetContent = assets.ReadWebAsset(path)
+				if(smart.StrStartsWith(path, "lib/tpl/")) { // no-serve.http-access
+					log.Println("StatusCode: 410 # Inaccessible Asset: `" + path + "`", "# Protected", "::", smart.CurrentFunctionName())
+					smarthttputils.HttpStatus410(w, r, "Inaccessible Asset: `" + path + "`", true) // html
+					return 410
+				} else {
+					assetContent = assets.ReadWebAsset(path)
+				} //end if
 			} //end if
 		} //end if
 	} //end if

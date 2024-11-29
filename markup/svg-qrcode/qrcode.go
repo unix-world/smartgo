@@ -1,8 +1,8 @@
 // go-qrcode
 // Copyright 2014 Tom Harwood
 
-// QrSVG for GO # r.20240114.2007
-// (c) 2023 unix-world.org
+// QrSVG for GO # r.20241124.2358
+// (c) 2023-2024 unix-world.org
 // License: BSD
 // custom modifications by unixman:
 // 	* return copy not reference of QRCode
@@ -160,8 +160,7 @@ type QRCode struct {
 //
 // An error occurs if the content is too long.
 func New(content string, level RecoveryLevel) (QRCode, error) {
-	encoders := []dataEncoderType{dataEncoderType1To9, dataEncoderType10To26,
-		dataEncoderType27To40}
+	encoders := []dataEncoderType{dataEncoderType1To9, dataEncoderType10To26, dataEncoderType27To40}
 
 	var encoder *dataEncoder
 	var encoded *bitset.Bitset

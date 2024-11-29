@@ -1,8 +1,8 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
-// [ TPL (MARKER-TPL TEMPLATING) ]
+// r.20241129.2358 :: STABLE
+// [ TPL (MARKERS-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
@@ -21,12 +21,123 @@ const (
 	SPECIAL_TRIM string = "\n\r\x00\x0B"
 
 	UNDEF_VAR_NAME string = "Undef____V_a_r"
+
+	MTPL_FILE_EXTENSION string = ".mtpl.htm"
 )
 
 //-----
 
 
+//-----
+
+
+func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
+	//--
+	// render a string TPL with markers and placeholders ; this is intended to be used for a main template only
+	//--
+	defer PanicHandler()
+	//--
+	if(template == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
+		return ""
+	} //end if
+	//--
+	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
+	//--
+	template = PlaceholdersTplRender(template, arrpobj, false, false)
+	//--
+	return template
+	//--
+} //END FUNCTION
+
+
+func RenderMarkersTpl(template string, arrobj map[string]string) string {
+	//--
+	// render a string TPL with markers ; this is intended to be used for a partial template only
+	//--
+	defer PanicHandler()
+	//--
+	if(template == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
+		return ""
+	} //end if
+	//--
+	return MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arrpobj map[string]string) (string, error) {
+	//--
+	// render a file TPL with markers, placeholders and sub-templates (1 level only) ; this is intended to be used for a main template only
+	//--
+	defer PanicHandler()
+	//--
+	template, err := readTPLFile(mtplFile)
+	if(err != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
+		return "", err
+	} //end if
+	//--
+	if(StrTrimWhitespaces(template) == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty", mtplFile)
+		return "", NewError("TPL File is Empty: `" + mtplFile + "`")
+	} //end if
+	//--
+	var errStplProcess error = nil
+	template, errStplProcess = markersTplProcessSubTemplates(mtplFile, template)
+	if(errStplProcess != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Sub-TPL Process Failed", mtplFile, "#", errStplProcess)
+	} //end if
+	//--
+	template = MarkersTplRender(template, arrobj, false, false, true, true) // escapes the remaining syntax + is main html
+	//--
+	template = PlaceholdersTplRender(template, arrpobj, false, false)
+	//--
+	return template, nil
+	//--
+} //END FUNCTION
+
+
+func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string) (string, error) {
+	//--
+	// render a file TPL with markers and sub-templates (1 level only) ; this is intended to be used for a partial template only
+	//--
+	defer PanicHandler()
+	//--
+	template, err := readTPLFile(mtplFile)
+	if(err != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
+		return "", err
+	} //end if
+	//--
+	if(StrTrimWhitespaces(template) == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty", mtplFile)
+		return "", NewError("TPL File is Empty: `" + mtplFile + "`")
+	} //end if
+	//--
+	var errStplProcess error = nil
+	template, errStplProcess = markersTplProcessSubTemplates(mtplFile, template)
+	if(errStplProcess != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Sub-TPL Process Failed", mtplFile, "#", errStplProcess)
+	} //end if
+	//--
+	template = MarkersTplRender(template, arrobj, false, false, true, false) // escapes the remaining syntax + is not main html
+	//--
+	return template, nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func MarkersTplEscapeTpl(tpl string) string {
+	//--
+	// encode a markers TPL string for safe using with inline javascript code inside HTML to avoid interferences with existing syntax
 	//--
 	if(tpl == "") {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
@@ -38,28 +149,14 @@ func MarkersTplEscapeTpl(tpl string) string {
 } //END FUNCTION
 
 
-func MarkersTplEscapeSyntaxContent(tpl string, isMainHtml bool) string {
-	//--
-	// no warning on empty
-	//--
-	tpl = StrReplaceAll(tpl, "[###", "⁅###¦")
-	tpl = StrReplaceAll(tpl, "###]", "¦###⁆")
-	tpl = StrReplaceAll(tpl, "[%%%", "⁅%%%¦")
-	tpl = StrReplaceAll(tpl, "%%%]", "¦%%%⁆")
-	tpl = StrReplaceAll(tpl, "[@@@", "⁅@@@¦")
-	tpl = StrReplaceAll(tpl, "@@@]", "¦@@@⁆")
-	if(isMainHtml == false) { // for a main template these must remain to be able to post replace placeholders
-		tpl = StrReplaceAll(tpl, "[:::", "⁅:::¦")
-		tpl = StrReplaceAll(tpl, ":::]", "¦:::⁆")
-	} //end if
-	//--
-	return tpl
-	//--
-} //END FUNCTION
+//-----
+//===== below methods are intended just for low level or internal usage
+//-----
 
 
 func MarkersTplPrepareNosyntaxContent(tpl string) string {
 	//--
+	// low level usage only
 	// no warning on empty
 	//--
 	tpl = StrReplaceAll(tpl, "[###", "［###")
@@ -78,6 +175,7 @@ func MarkersTplPrepareNosyntaxContent(tpl string) string {
 
 func MarkersTplRevertNosyntaxContent(tpl string) string {
 	//--
+	// low level usage only
 	// no warning on empty
 	//--
 	tpl = StrReplaceAll(tpl, "［###", "[###")
@@ -96,6 +194,7 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 
 func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
 	//--
+	// low level usage only
 	// no warning on empty
 	//--
 	tpl = StrReplaceAll(tpl, "[###", "&lbrack;&num;&num;&num;")
@@ -123,7 +222,33 @@ func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
 } //END FUNCTION
 
 
+func MarkersTplEscapeSyntaxContent(tpl string, isMainHtml bool) string {
+	//--
+	// low level usage only ; this is applied automatically on render
+	// escapes a markers TPL string before injecting into a TPL, to avoid interferences
+	// no warning on empty
+	//--
+	tpl = StrReplaceAll(tpl, "[###", "⁅###¦")
+	tpl = StrReplaceAll(tpl, "###]", "¦###⁆")
+	tpl = StrReplaceAll(tpl, "[%%%", "⁅%%%¦")
+	tpl = StrReplaceAll(tpl, "%%%]", "¦%%%⁆")
+	tpl = StrReplaceAll(tpl, "[@@@", "⁅@@@¦")
+	tpl = StrReplaceAll(tpl, "@@@]", "¦@@@⁆")
+	if(isMainHtml == false) { // for a main template these must remain to be able to post replace placeholders
+		tpl = StrReplaceAll(tpl, "[:::", "⁅:::¦")
+		tpl = StrReplaceAll(tpl, ":::]", "¦:::⁆")
+	} //end if
+	//--
+	return tpl
+	//--
+} //END FUNCTION
+
+
 func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded bool, revertSyntax bool) string {
+	//--
+	// render a file TPL with placeholders
+	// this is intended for low level usage only
+	// use Render* methods from above
 	//--
 	defer PanicHandler() // url decode may panic
 	//--
@@ -158,7 +283,273 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 } //END FUNCTION
 
 
+func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
+	//-- syntax: r.20231228
+	// render a string TPL with markers and placeholders and custom options
+	// low level usage only
+	// use Render* methods from above
+	//--
+	defer PanicHandler() // url decode may panic
+	//--
+	if(StrTrimWhitespaces(template) == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
+		return ""
+	} //end if
+	//--
+	if(isEncoded == true) {
+		template = RawUrlDecode(template)
+	} //end if
+	if(revertSyntax == true) {
+		template = MarkersTplRevertNosyntaxContent(template)
+	} //end if
+	//-- trim whitespaces
+	template = StrTrimWhitespaces(template)
+	//-- replace out comments
+	if((StrContains(template, "[%%%COMMENT%%%]") == true) && (StrContains(template, "[%%%/COMMENT%%%]") == true)) {
+		template = StrRegexReplaceAll(`(?s)\s??\[%%%COMMENT%%%\](.*?)??\[%%%\/COMMENT%%%\]\s??`, template, "") // regex syntax as in PHP
+	} //end if
+	//-- process loop syntax
+	if(StrContains(template, "[%%%LOOP:") == true) {
+	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing LOOP Syntax")
+		template = markersTplProcessLoopSyntax(template, arrobj)
+	} //end if
+	//-- process if (conditionals) syntax
+	if(StrContains(template, "[%%%IF:") == true) {
+	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing IF Syntax")
+		template = markersTplProcessIfSyntax(template, arrobj)
+	} //end if
+	//-- process markers
+	if(StrContains(template, "[###") == true) {
+	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing MARKER Syntax")
+		template = markersTplProcessMarkerSyntax(template, arrobj, "")
+	} //end if
+	//-- replace specials: Square-Brackets(L/R) R N TAB SPACE
+	if(StrContains(template, "[%%%|") == true) {
+	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing SPECIALS Syntax")
+		template = StrReplaceAll(template, "[%%%|SB-L%%%]", "［")
+		template = StrReplaceAll(template, "[%%%|SB-R%%%]", "］")
+		template = StrReplaceAll(template, "[%%%|R%%%]",    CARRIAGE_RETURN)
+		template = StrReplaceAll(template, "[%%%|N%%%]",    LINE_FEED)
+		template = StrReplaceAll(template, "[%%%|T%%%]",    HORIZONTAL_TAB)
+		template = StrReplaceAll(template, "[%%%|SPACE%%%]", " ")
+	} //end if
+	//--
+	template = StrReplaceAll(template, NULL_BYTE, " ")
+	template = StrReplaceAll(template, BACK_SPACE, " ")
+	template = StrReplaceAll(template, ASCII_BELL, " ")
+	template = StrReplaceAll(template, FORM_FEED, " ")
+	template = StrReplaceAll(template, VERTICAL_TAB, " ")
+	//--
+	if(escapeRemainingSyntax == true) {
+		//--
+		if(isMainHtml == false) {
+			if(StrContains(template, "[:::") == true) {
+				log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Placeholders detected in Template ###}")
+			} //end if
+		} //end if
+		if(StrContains(template, "[###") == true) {
+			log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Markers detected in Template ###}")
+		} //end if
+		if(StrContains(template, "[%%%") == true) {
+			log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Marker Syntax detected in Template ###}")
+		} //end if
+		if(StrContains(template, "[@@@") == true) {
+			log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Marker Sub-Templates detected in Template ###}")
+		} //end if
+		//--
+		template = MarkersTplEscapeSyntaxContent(template, isMainHtml) // this will not escape the syntax already prepared by MarkersTplPrepareNosyntaxContent (PrepareNosyntax) that comes from a value, but only remaining syntax
+		//--
+	} //end if
+	//--
+	if(isMainHtml == true) {
+		template = MarkersTplPrepareNosyntaxHtml(template, true) // this will revert to html entities the Syntax or PrepareNosyntax ; but in the case if syntax is escaped above, will just process PrepareNosyntax
+	} //end if
+	//--
+	return template
+	//--
+} //END FUNCTION
+
+
 //-----
+//===== below methods are intended just for internal usage
+//-----
+
+
+func markersTplProcessSubTemplates(mtplFile string, template string) (string, error) {
+	//--
+	// the current implementation supports just 1st level sub-templates, to simplify things and have a better security management
+	//--
+	if((template == "") || (!StrContains(template, "[@@@SUB-TEMPLATE:")) || (!StrContains(template, "@@@]"))) {
+		return template, nil
+	} //end if
+	//--
+	arrSTPLs := markersTplDetectSubTemplates(template)
+	//--
+	if((arrSTPLs != nil) && (len(arrSTPLs) > 0)) {
+		var errStplLoad error = nil
+		template, errStplLoad = markersTplLoadSubTemplates(mtplFile, template, arrSTPLs)
+		if(errStplLoad != nil) {
+			return template, errStplLoad
+		} //end if
+	} //end if
+	//--
+	return template, nil
+	//--
+} //END FUNCTION
+
+
+func markersTplDetectSubTemplates(template string) map[string]string {
+	//
+	// may return: nil | map[string]string
+	//--
+	defer PanicHandler()
+	//--
+	if(template == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
+		return nil
+	} //end if
+	//-- process if (conditionals)
+//	var rExp string = `\[@@@SUB\-TEMPLATE\:([a-zA-Z0-9_\-\.\/\!\?\|]+)@@@\]` // {{{SYNC-TPL-EXPR-SUBTPL}}} ; full support, compatible with Smart.Framework.PHP
+	var rExp string = `\[@@@SUB\-TEMPLATE\:([a-zA-Z0-9_\-\.\/\|]+)@@@\]` // {{{SYNC-TPL-EXPR-SUBTPL}}} ; partial support, for Go only ; unsupported mode: `!?`
+	re, matches := StrRegex2FindAllStringMatches("PERL", rExp, template, 0, 0)
+	var arrSTPLs map[string]string = map[string]string{}
+	for c := 0; c < len(matches); c++ {
+		//--
+		if m, e := re.FindStringMatch(matches[c]); m != nil && e == nil {
+			//--
+			g := m.Groups()
+			//--
+			var tmp_stpl_expr string = string(g[0].String()) // the whole subtpl expression: [@@@SUB-TEMPLATE:sub-templates/sub-tpl.inc.mtpl.htm|xyz@@@]
+			var tmp_stpl_fpth string = string(g[1].String()) // the path part, includding escapes: sub-templates/sub-tpl.inc.mtpl.htm|xyz
+			//--
+			arrSTPLs[tmp_stpl_expr] = tmp_stpl_fpth
+			//--
+		} //end if
+		//--
+	} //end for
+	//--
+	return arrSTPLs
+	//--
+} //END FUNCTION
+
+
+func markersTplLoadSubTemplates(mtplFile string, template string, arrSTPLs map[string]string) (string, error) {
+	//--
+	// supported escapings: `|trim` `|js` `|js|html` `|html`
+	//--
+	mtplFile = StrTrimWhitespaces(mtplFile)
+	if(
+		(mtplFile == "") ||
+		(PathIsEmptyOrRoot(mtplFile) == true) ||
+		(PathIsSafeValidPath(mtplFile) != true) ||
+		(PathIsBackwardUnsafe(mtplFile) == true) ||
+		(PathIsAbsolute(mtplFile) == true)) {
+		return template, NewError("Sub-TPL File Path is Empty or Unsafe")
+	} //end if
+	if(!StrEndsWith(mtplFile, MTPL_FILE_EXTENSION)) {
+		return template, NewError("Sub-TPL File Path is Not MTPL")
+	} //end if
+	if(!PathIsFile(mtplFile)) {
+		return template, NewError("TPL File Path does not exists")
+	} //end if
+	//--
+	mtplDir := StrTrimWhitespaces(PathDirName(mtplFile))
+	if(
+		(mtplDir == "") ||
+		(PathIsEmptyOrRoot(mtplDir) == true) ||
+		(PathIsSafeValidPath(mtplDir) != true) ||
+		(PathIsBackwardUnsafe(mtplDir) == true) ||
+		(PathIsAbsolute(mtplDir) == true)) {
+		return template, NewError("Sub-TPL Dir Path is Empty or Unsafe")
+	} //end if
+	if(!PathIsDir(mtplDir)) {
+		return template, NewError("Sub-TPL Dir Path is Not a Dir")
+	} //end if
+	//--
+	if((template == "") || (!StrContains(template, "[@@@SUB-TEMPLATE:")) || (!StrContains(template, "@@@]"))) {
+		return template, NewError("Sub-TPL Syntax Not Found")
+	} //end if
+	//--
+	if((arrSTPLs == nil) || (len(arrSTPLs) <= 0)) {
+		return template, NewError("Sub-TPL Map List is Empty")
+	} //end if
+	//--
+	for key, val := range arrSTPLs {
+		key = StrTrimWhitespaces(key)
+		val = StrTrimWhitespaces(val)
+		if(key == "") {
+			return template, NewError("Sub-TPL Map Key is Empty")
+		} //end if
+		if(val == "") {
+			return template, NewError("Sub-TPL Map Val is Empty for Key: `" + key + "`")
+		} //end if
+		if(StrContains(template, key)) { // if does not contain is not an error, maybe already replaced at a previous cycle if duplicate ...
+			//--
+			arrVal := ExplodeWithLimit("|", val, 2) // allow just one level escaping: |xyz
+			//--
+			var stplFName string = StrTrimWhitespaces(arrVal[0])
+			if(stplFName == "") {
+				return template, NewError("Sub-TPL File Value Name is Empty for Key: `" + key + "`")
+			} //end if
+			//--
+			var stplEscape string = ""
+			if(len(arrVal) > 1) {
+				stplEscape = StrTrimWhitespaces(arrVal[1])
+				if(stplEscape != "") {
+					stplEscape = "|" + stplEscape
+				} //end if
+			} //end if
+			//--
+			stplFContent, stplErr := readTPLFile(PathAddDirLastSlash(mtplDir) +  stplFName)
+			if(stplErr != nil) {
+				return template, NewError("Sub-TPL Read SubTemplate ERR for Key: `" + key + "` # " + stplErr.Error())
+			} //end if
+			switch(stplEscape) {
+				//--
+				case "": // no process
+					break
+				//--
+				case "|tpl-trim":
+					stplFContent = StrTrimWhitespaces(stplFContent)
+					break
+				case "|tpl-uri-encode":
+					stplFContent = RawUrlEncode(stplFContent)
+					break
+				case "|tpl-b64-encode":
+					stplFContent = Base64Encode(stplFContent)
+					break
+				//--
+				case "|plain": 		// plain only TPL: all syntax inside will be escaped
+					stplFContent = MarkersTplPrepareNosyntaxContent(stplFContent) // disable all syntax
+					break
+				case "|html": 		// plain only TPL: all syntax inside will be escaped ; intended only to display a tpl in html context, will preserve the syntax as escaped html
+					stplFContent = EscapeHtml(stplFContent) // escape html before prepare nosyntax
+					stplFContent = MarkersTplPrepareNosyntaxHtml(stplFContent, true) // escape also placeholders, mark as being main tpl
+					break
+				case "|js": 		// plain only TPL: all syntax inside will be escaped ; intended only to display a tpl in js context, will preserve the syntax as escaped html
+					stplFContent = MarkersTplPrepareNosyntaxHtml(stplFContent, true) // escape also placeholders, mark as being main tpl
+					stplFContent = EscapeJs(stplFContent) // escape js after prepare nosyntax
+					break
+				//--
+				default:
+					return template, NewError("Sub-TPL Escape Value is Unsupported for Key: `" + key + "` ; Escape: `" + stplEscape + "`")
+				//--
+			} //end switch
+			if(stplFContent == "") {
+				return template, NewError("Sub-TPL Read SubTemplate ERR: Empty content after escaping for Key: `" + key + "`")
+			} //end if
+			//--
+			template = StrReplaceAll(template, key, stplFContent)
+			if(StrTrimWhitespaces(template) == "") {
+				return template, NewError("Sub-TPL Read SubTemplate ERR: Empty content after processing for Key: `" + key + "`")
+			} //end if
+			//--
+		} //end if
+	} //end for
+	//--
+	return template, nil
+	//--
+} //END FUNCTION
 
 
 func markersTplProcessIfSyntax(template string, arrobj map[string]string) string {
@@ -944,162 +1335,7 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 } //END FUNCTION
 
 
-// low level usage only ; use Render* methods from below
-func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
-	//-- syntax: r.20231228
-	defer PanicHandler() // url decode may panic
-	//--
-	if(StrTrimWhitespaces(template) == "") {
-		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
-		return ""
-	} //end if
-	//--
-	if(isEncoded == true) {
-		template = RawUrlDecode(template)
-	} //end if
-	if(revertSyntax == true) {
-		template = MarkersTplRevertNosyntaxContent(template)
-	} //end if
-	//-- trim whitespaces
-	template = StrTrimWhitespaces(template)
-	//-- replace out comments
-	if((StrContains(template, "[%%%COMMENT%%%]") == true) && (StrContains(template, "[%%%/COMMENT%%%]") == true)) {
-		template = StrRegexReplaceAll(`(?s)\s??\[%%%COMMENT%%%\](.*?)??\[%%%\/COMMENT%%%\]\s??`, template, "") // regex syntax as in PHP
-	} //end if
-	//-- process loop syntax
-	if(StrContains(template, "[%%%LOOP:") == true) {
-	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing LOOP Syntax")
-		template = markersTplProcessLoopSyntax(template, arrobj)
-	} //end if
-	//-- process if (conditionals) syntax
-	if(StrContains(template, "[%%%IF:") == true) {
-	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing IF Syntax")
-		template = markersTplProcessIfSyntax(template, arrobj)
-	} //end if
-	//-- process markers
-	if(StrContains(template, "[###") == true) {
-	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing MARKER Syntax")
-		template = markersTplProcessMarkerSyntax(template, arrobj, "")
-	} //end if
-	//-- replace specials: Square-Brackets(L/R) R N TAB SPACE
-	if(StrContains(template, "[%%%|") == true) {
-	//	log.Println("[DEBUG]", CurrentFunctionName(), "Processing SPECIALS Syntax")
-		template = StrReplaceAll(template, "[%%%|SB-L%%%]", "［")
-		template = StrReplaceAll(template, "[%%%|SB-R%%%]", "］")
-		template = StrReplaceAll(template, "[%%%|R%%%]",    CARRIAGE_RETURN)
-		template = StrReplaceAll(template, "[%%%|N%%%]",    LINE_FEED)
-		template = StrReplaceAll(template, "[%%%|T%%%]",    HORIZONTAL_TAB)
-		template = StrReplaceAll(template, "[%%%|SPACE%%%]", " ")
-	} //end if
-	//--
-	template = StrReplaceAll(template, NULL_BYTE, " ")
-	template = StrReplaceAll(template, BACK_SPACE, " ")
-	template = StrReplaceAll(template, ASCII_BELL, " ")
-	template = StrReplaceAll(template, FORM_FEED, " ")
-	template = StrReplaceAll(template, VERTICAL_TAB, " ")
-	//--
-	if(escapeRemainingSyntax == true) {
-		//--
-		if(isMainHtml == false) {
-			if(StrContains(template, "[:::") == true) {
-				log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Placeholders detected in Template ###}")
-			} //end if
-		} //end if
-		if(StrContains(template, "[###") == true) {
-			log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Markers detected in Template ###}")
-		} //end if
-		if(StrContains(template, "[%%%") == true) {
-			log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Marker Syntax detected in Template ###}")
-		} //end if
-		if(StrContains(template, "[@@@") == true) {
-			log.Println("[WARNING]", CurrentFunctionName(), ": {### Undefined Marker Sub-Templates detected in Template ###}")
-		} //end if
-		//--
-		template = MarkersTplEscapeSyntaxContent(template, isMainHtml) // this will not escape the syntax already prepared by MarkersTplPrepareNosyntaxContent (PrepareNosyntax) that comes from a value, but only remaining syntax
-		//--
-	} //end if
-	//--
-	if(isMainHtml == true) {
-		template = MarkersTplPrepareNosyntaxHtml(template, true) // this will revert to html entities the Syntax or PrepareNosyntax ; but in the case if syntax is escaped above, will just process PrepareNosyntax
-	} //end if
-	//--
-	return template
-	//--
-} //END FUNCTION
-
-
 //-----
-
-
-func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj map[string]string) string {
-	//--
-	defer PanicHandler()
-	//--
-	if(template == "") {
-		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
-		return ""
-	} //end if
-	//--
-	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
-	//--
-	template = PlaceholdersTplRender(template, arrpobj, false, false)
-	//--
-	return template
-	//--
-} //END FUNCTION
-
-
-func RenderMarkersTpl(template string, arrobj map[string]string) string {
-	//--
-	defer PanicHandler()
-	//--
-	if(template == "") {
-		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
-		return ""
-	} //end if
-	//--
-	return MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arrpobj map[string]string) (string, error) {
-	//--
-	defer PanicHandler()
-	//--
-	template, err := readTPLFile(mtplFile)
-	if(err != nil) {
-		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
-		return "", err
-	} //end if
-	//--
-	template = MarkersTplRender(template, arrobj, false, false, true, true) // escape remaining syntax + is main html
-	//--
-	template = PlaceholdersTplRender(template, arrpobj, false, false)
-	//--
-	return template, nil
-	//--
-} //END FUNCTION
-
-
-func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string) (string, error) {
-	//--
-	defer PanicHandler()
-	//--
-	template, err := readTPLFile(mtplFile)
-	if(err != nil) {
-		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
-		return "", err
-	} //end if
-	//--
-	template = MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
-	//--
-	return template, nil
-	//--
-} //END FUNCTION
 
 
 func readTPLFile(mtplFile string) (string, error) {
@@ -1111,7 +1347,7 @@ func readTPLFile(mtplFile string) (string, error) {
 	if(mtplFile == "") {
 		return "", NewError("Empty TPL File Path")
 	} //end if
-	if(!StrEndsWith(mtplFile, ".mtpl.htm")) {
+	if(!StrEndsWith(mtplFile, MTPL_FILE_EXTENSION)) {
 		return "", NewError("Invalid TPL File Extension")
 	} //end if
 	template, err := SafePathFileRead(mtplFile, false)

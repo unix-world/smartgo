@@ -1,7 +1,7 @@
 
 // GO Lang (1.11 or later) :: SmartGo/Crypto/Uuid :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20240117.2121 :: STABLE
+// r.20241129.2358 :: STABLE
 
 package uuid
 
@@ -30,7 +30,7 @@ import (
 
 var uuidSessSeqMutex sync.Mutex
 var uuidSessSeqCntVal uint64 = 0
-func UuidSessionSequence() uint64 { // returns an id guarenteed to be unique within the session (just a simple counter ; starts at 1) ; taken from: https://github.com/chrisfarms/jsapi/uuid.go
+func UuidSessionSequence() uint64 { // returns an id guaranteed to be unique within the session (just a simple counter ; starts at 1) ; taken from: https://github.com/chrisfarms/jsapi/uuid.go
 	//--
 	uuidSessSeqMutex.Lock()
 	uuidSessSeqCntVal += 1

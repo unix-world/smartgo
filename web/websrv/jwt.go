@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / JWT :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241128.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -34,8 +34,9 @@ type JwtClaims struct {
 }
 
 type JwtData struct {
-	Token 		string 		`json:"token"`
 	Type  		string 		`json:"type"`
+	Size 		uint64 		`json:"size"`
+	Token 		string 		`json:"token"`
 	TimeNow     int64 		`json:"timeNow"`
 	ExpMinutes 	int64 		`json:"expMinutes"`
 	ExpAt 		string 		`json:"expAt"`
@@ -274,8 +275,9 @@ func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port stri
 	} //end if
 	//--
 	data := JwtData{
-		Token: tokenString,
 		Type: JwtGetFullNameSigningAlgo(jwtSignMethod),
+		Size: uint64(len(tokenString)),
+		Token: tokenString,
 		TimeNow: timeNow.Unix(),
 		ExpMinutes: expirationMinutes,
 		ExpAt: smart.DateFromTime(expirationTime),

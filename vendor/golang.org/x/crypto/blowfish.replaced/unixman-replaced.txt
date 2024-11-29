@@ -1,5 +1,5 @@
-v.20231228
+v.20241226
 unixman:
-    * replaced with: github.com/unix-world/smartgo/blowfish
+    * replaced with: github.com/unix-world/smartgo/crypto/blowfish
 
 

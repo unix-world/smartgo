@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241129.2358 :: STABLE
 // [ CRYPTO ]
 
 // REQUIRE: go 1.19 or later
@@ -20,8 +20,9 @@ import (
 	"encoding/hex"
 	"encoding/base64"
 
-	"crypto/cipher"
+	"crypto/subtle"
 	cryptorand "crypto/rand"
+	"crypto/cipher"
 
 	"hash/crc32"
 	"crypto/md5"
@@ -38,6 +39,7 @@ import (
 	"github.com/unix-world/smartgo/crypto/blowfish"
 	"github.com/unix-world/smartgo/crypto/twofish"
 	"github.com/unix-world/smartgo/crypto/threefish"
+	"github.com/unix-world/smartgo/crypto/bcrypt"
 )
 
 const (
@@ -73,6 +75,7 @@ const (
 	PASSWORD_PLAIN_MIN_LENGTH uint8 		=    7 											// Password Plain Min Lentgth
 	PASSWORD_PLAIN_MAX_LENGTH uint8 		=   55 											// Password Plain Max Lentgth
 	PASSWORD_HASH_LENGTH uint8 				=  128 											// fixed length ; {{{SYNC-AUTHADM-PASS-LENGTH}}} ; if lower then padd to right with * ; {{{SYNC-AUTHADM-PASS-PADD}}}
+	PASSWORD_BHASH_LENGTH uint8 			=   60 											// fixed length ; bhash passwords
 	PASSWORD_PREFIX_VERSION string 			= "$fPv3.7!" 									// {{{SYNC-AUTHADM-PASS-PREFIX}}}
 	PASSWORD_PREFIX_A2ID_VERSION string 	= "a2idP37!" 									// go lang only (no PHP), curent v3, argon2id password ; must be the same length as PASSWORD_PREFIX_VERSION
 )
@@ -643,7 +646,7 @@ func GenerateRandomString(n int) (string, error) { // https://gist.github.com/do
 //-----
 
 
-func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
+func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, error) { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
 	//-- r.20231204
 	// Create a safe checksum of data
 	// It will append the salt to the end of data to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
@@ -661,14 +664,12 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 		customSalt = SALT_PREFIX + " " + SALT_SEPARATOR + " " + SALT_SUFFIX // dissalow empty salt, fallback to have at least something
 		appNs, errAppNs := AppGetNamespace()
 		if(errAppNs != nil) {
-			log.Println("[WARNING]", CurrentFunctionName(), "App Namespace value Error:", errAppNs)
-			return ""
+			return "", NewError("App Namespace value Error: " + errAppNs.Error())
 		} //end if
 		customSalt += " " + appNs
 		secKey, errSecKey := CryptoGetSecurityKey()
 		if(errSecKey != nil) {
-			log.Println("[WARNING]", CurrentFunctionName(), "Security Key value Error:", errSecKey)
-			return ""
+			return "", NewError("Security Key value Error: " + errSecKey.Error())
 		} //end if
 		customSalt += " " + secKey
 	} //end if
@@ -680,8 +681,7 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 	//--
 	oSalt, errOSalt := HashHmac("SHA3-384", customSalt, NULL_BYTE + plainTextData + NULL_BYTE + antiAtkLen, false) // Hex
 	if(errOSalt != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Hmac Checksum Failed:", errOSalt)
-		return ""
+		return "", NewError("Hmac Checksum Failed: " + errOSalt.Error())
 	} //end if
 	var pSalt string = DataRRot13(Base64sEncode(Hex2Bin(oSalt))) // B64s
 	var rSalt string = Sh3a256(cSalt + NULL_BYTE + Sh3a224B64(pSalt + NULL_BYTE + antiAtkB64Len) + NULL_BYTE + Sha512B64(plainTextData) + NULL_BYTE + Md5B64(plainTextData) + NULL_BYTE + Sha1B64(plainTextData) + NULL_BYTE + Sha224B64(plainTextData) + NULL_BYTE + Sha256B64(plainTextData) + NULL_BYTE + Sha384B64(plainTextData) + NULL_BYTE + StrRev(antiAtkLen)) // Hex
@@ -695,13 +695,12 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 	var polyData string = customSalt + NULL_BYTE + plainTextData + NULL_BYTE + wSalt // ascii
 	zSalt, errZSalt := Poly1305(polyKey, polyData, true) // B64
 	if(errZSalt != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Poly Checksum Failed:", errOSalt)
-		return ""
+		return "", NewError("Poly Checksum Failed: " + errOSalt.Error())
 	} //end if
 	//--
 	var b64CkSum string = Sh3a384B64(ySalt + VERTICAL_TAB + plainTextData + HORIZONTAL_TAB + vSalt + LINE_FEED + customSalt + CARRIAGE_RETURN + xSalt + NULL_BYTE + zSalt) // SHA3-384 B64 of B64 derived salt (88 characters) + data + B92 derived salt (variable length ~ 72 characters)
 	//--
-	return DataRRot13(BaseEncode([]byte(Base64Decode(b64CkSum)), "b62")) // B62
+	return DataRRot13(BaseEncode([]byte(Base64Decode(b64CkSum)), "b62")), nil // B62
 	//--
 } //END FUNCTION
 
@@ -709,7 +708,7 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) string { // 
 //-----
 
 
-func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) string { // {{{SYNC-HASH-PASSWORD}}} [PHP]
+func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) (string, error) { // {{{SYNC-HASH-PASSWORD}}} [PHP]
 	//-- r.20231204 + Argon2Id
 	defer PanicHandler() // for: Hex2Bin ; Argon2Id
 	//--
@@ -725,63 +724,53 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 	// ex: azA-Z09 pass, prepend needs 26^6 permutations while append 26^10, so append adds more complexity
 	//--
 	if(StrTrimWhitespaces(plainPass) == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password is Empty !")
-		return ""
+		return "", NewError("Password is Empty")
 	} //end if
 	if(StrTrimWhitespaces(theSalt) == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Salt is Empty !")
-		return ""
+		return "", NewError("Salt is Empty")
 	} //end if
 	//--
 	if(
 		(StrUnicodeLen(plainPass) < int(PASSWORD_PLAIN_MIN_LENGTH)) ||
 		(StrUnicodeLen(plainPass) > int(PASSWORD_PLAIN_MAX_LENGTH))) { // {{{SYNC-PASS-HASH-SHA512-PLUS-SALT-SAFE}}} ; sync with auth validate password: max pass allowed length is 55 !
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Password is too long or too short !")
-		return ""
+		return "", NewError("Password is too long or too short")
 	} //end if
 	//--
 	if(
 		(StrLen(theSalt) < int(DERIVE_MIN_KLEN)) ||
 		(StrLen(theSalt) > int(DERIVE_MAX_KLEN))) { // {{{SYNC-CRYPTO-KEY-MAX}}} divided by 2 as it is composed of both
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Salt is too long or too short !")
-		return ""
+		return "", NewError("Salt is too long or too short")
 	} //end if
 	//--
 	key, errKey := Pbkdf2PreDerivedKey(plainPass + NULL_BYTE + theSalt)
 	key = StrTrimWhitespaces(key)
 	if(errKey != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Key Error: " + errKey.Error())
-		return ""
+		return "", NewError("Pre-Derived Key Error: " + errKey.Error())
 	} else if(len(key) != int(DERIVE_PREKEY_LEN)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Key Length is Invalid: " + ConvertIntToStr(len(key)))
-		return ""
+		return "", NewError("Pre-Derived Key Length is Invalid: " + ConvertIntToStr(len(key)))
 	} //end if else
 	//--
 	pbkdf2Salt, errSalt := Pbkdf2PreDerivedKey(theSalt + NULL_BYTE + theSalt)
 	pbkdf2Salt = StrTrimWhitespaces(pbkdf2Salt)
 	if(errSalt != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Salt Error: " + errSalt.Error())
-		return ""
+		return "", NewError("Pre-Derived Salt Error: " + errSalt.Error())
 	} else if(len(pbkdf2Salt) != int(DERIVE_PREKEY_LEN)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Pre-Derived Salt Length is Invalid: " + ConvertIntToStr(len(pbkdf2Salt)))
-		return ""
+		return "", NewError("Pre-Derived Salt Length is Invalid: " + ConvertIntToStr(len(pbkdf2Salt)))
 	} //end if else
 	//--
 	const reqLen uint16 = 34 // be sure it is an even number ; must fit max len for B92 + Padding
 	var sSalt string = ""
 	var errSSalt error = nil
 	if(useArgon2id == true) {
-		sSalt = string(argon2.IDKey([]byte(key), []byte(pbkdf2Salt + VERTICAL_TAB + DataRot13(BaseEncode([]byte(pbkdf2Salt), "b32"))), uint32(math.Floor((float64(DERIVE_CENTITER_PW) * 2.8) - 2)), 128*1024, 1, uint32(reqLen))) // Argon2id resources: 215 cycles, 128MB memory, 1 thread, 34 bytes = 272 bits
+		sSalt = string(argon2.IDKey([]byte(key), []byte(pbkdf2Salt + VERTICAL_TAB + DataRot13(BaseEncode([]byte(pbkdf2Salt), "b32"))), uint32(math.Floor((float64(DERIVE_CENTITER_PW) / 2) - 1)), 64*1024, 1, uint32(reqLen))) // Argon2id resources: 37 cycles, 64MB memory, 1 thread, 34 bytes = 272 bits
 		sSalt = StrSubstr(StrPad2LenRight(BaseEncode([]byte(sSalt), "b92"), "'", int(reqLen)), 0, int(reqLen))
 	} else {
 		sSalt, errSSalt = Pbkdf2DerivedKey("sha3-384", key, pbkdf2Salt, reqLen, DERIVE_CENTITER_PW, true) // B92
 	} //end if else
 	if(errSSalt != nil) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Error: " + errSSalt.Error())
-		return ""
+		return "", NewError("Derived Key Error: " + errSSalt.Error())
 	} else if(len(sSalt) != int(reqLen)) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Length is Invalid: " + ConvertIntToStr(len(sSalt)))
-		return ""
+		return "", NewError("Derived Key Length is Invalid: " + ConvertIntToStr(len(sSalt)))
 	} //end if else
 	//--
 	fSalt := StrSubstr(StrPad2LenLeft(sSalt, "'", 22), 0, 22) // fixed length sale: 22 chars (from ~ 21..22), with a more wider character set: B92
@@ -794,8 +783,7 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 	hashHexPass := Sh3a512(hashData) // hex, 128
 	hashBinPass := Hex2Bin(hashHexPass)
 	if(hashBinPass == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived Key Hash Hex is Invalid")
-		return ""
+		return "", NewError("Derived Key Hash Hex is Invalid")
 	} //end if
 	hashB92Pass := BaseEncode([]byte(hashBinPass), "b92")
 	hashPass := StrPad2LenRight(hashB92Pass, "'", 80) // 79..80 chars ; fixed length: 80
@@ -803,8 +791,7 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 	antiAtkLen := Sh3a224(fSalt + NULL_BYTE + plainPass + NULL_BYTE + chksPPass)
 	antiAtkLen = Hex2Bin(antiAtkLen)
 	if(antiAtkLen == "") {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Derived antiAtkLen Hash Hex is Invalid")
-		return ""
+		return "", NewError("Derived antiAtkLen Hash Hex is Invalid")
 	} //end if
 	antiAtkLen = StrPad2LenRight(BaseEncode([]byte(antiAtkLen), "b92"), "'", 36) // 35..36 chars ; fixed length: 36
 	//--
@@ -822,11 +809,94 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) strin
 		(StrTrimWhitespaces(hash) == "") ||
 		(StrTrimWhitespaces(hash) != hash) ||
 		(len(hash) != int(PASSWORD_HASH_LENGTH))) {
-		log.Println("[WARNING] " + CurrentFunctionName() + ":", "Internal Error: Password Hash :: Length must be " + ConvertUInt8ToStr(PASSWORD_HASH_LENGTH) + " bytes !")
-		return ""
+		return "", NewError("Internal Error: Password Hash :: Length must be " + ConvertUInt8ToStr(PASSWORD_HASH_LENGTH) + " bytes !")
 	} //end if
 	//--
-	return hash
+	return hash, nil
+	//--
+} //END FUNCTION
+
+
+func SafePassHashSmartVerify(hashedPass string, plainPass string, theSalt string, useArgon2id bool) bool {
+	//--
+	hashedPass = StrTrimWhitespaces(hashedPass)
+	if((hashedPass == "") || (len(hashedPass) != int(PASSWORD_HASH_LENGTH))) {
+		return false
+	} //end if
+	//--
+	plainPass = StrTrimWhitespaces(plainPass)
+	if(plainPass == "") {
+		return false
+	} //end if
+	//--
+	pHash, errHash := SafePassHashSmart(plainPass, theSalt, useArgon2id)
+	if(errHash != nil) {
+		return false
+	} //end if
+	if(subtle.ConstantTimeCompare([]byte(hashedPass), []byte(pHash)) != 1) { // compare first values (and length too) as bytes, in constant time, safe against timing attacks
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SafePassHashBcrypt(plainPass string, cost uint8) (string, error) { // {{{SYNC-PASS-HASH-AUTH-BCRYPT}}} [PHP]
+	//--
+	if(StrTrimWhitespaces(plainPass) == "") {
+		return "", NewError("Password is Empty")
+	} //end if
+	if(
+		(StrUnicodeLen(plainPass) < int(PASSWORD_PLAIN_MIN_LENGTH)) ||
+		(StrUnicodeLen(plainPass) > int(PASSWORD_PLAIN_MAX_LENGTH))) { // {{{SYNC-PASS-HASH-SHA512-PLUS-SALT-SAFE}}} ; sync with auth validate password: max pass allowed length is 55 !
+		return "", NewError("Password is too long or too short")
+	} //end if
+	//--
+	if(cost <= 0) {
+		cost = 8 // bcrypt.DefaultCost ; the default cost
+	} //end if
+	if(int(cost) < bcrypt.MinCost) {
+		return "", NewError("Password Hash Cost is Too Low")
+	} else if(int(cost) > bcrypt.MaxCost) {
+		return "", NewError("Password Hash Cost is Too High")
+	} //end if
+	//--
+	bHash, errHash := bcrypt.GenerateFromPassword([]byte(plainPass), int(cost))
+	if(errHash != nil) {
+		return "", NewError("Password Hash Failed with Errors: " + errHash.Error())
+	} //end if
+	//--
+	if((bHash == nil) || (len(bHash) != int(PASSWORD_BHASH_LENGTH))) { // bcrypt pass hash is 60 bytes, fixed
+		return "", NewError("Password Hash Length is Invalid")
+	} //end if
+	//--
+	return string(bHash), nil
+	//--
+} //END FUNCTION
+
+
+func SafePassHashBcryptVerify(hashedPass string, plainPass string) bool {
+	//--
+	hashedPass = StrTrimWhitespaces(hashedPass)
+	if((hashedPass == "") || (len(hashedPass) != int(PASSWORD_BHASH_LENGTH))) { // bcrypt pass hash is 60 bytes, fixed
+		return false
+	} //end if
+	//--
+	plainPass = StrTrimWhitespaces(plainPass)
+	if(plainPass == "") {
+		return false
+	} //end if
+	//--
+	errCompare := bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(plainPass))
+	if(errCompare != nil) {
+		return false
+	} //end if
+	//--
+	return true
 	//--
 } //END FUNCTION
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241128.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -309,12 +309,15 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 		if(err == nil) {
 			if(info.IsDir()) {
 				r.Method = "PROPFIND" // this is a mapping for a directory from GET to PROPFIND ; TODO: it can be later supplied as a HTML Page listing all entries ; by mapping to PROPFIND will serve an XML
+				if(r.Header == nil) { // fix for null
+					r.Header = http.Header{}
+				} //end if
 				r.Header.Set("Depth", "1") // fix: ignore depth infinity, to avoid overload the file system
 			} //end if
 		} //end if
 	} //end if
 	if(DEBUG) {
-		log.Println("[DEBUG]", smart.CurrentFunctionName(), "WebDAV Service", "Method:", r.Method, "Depth:", r.Header.Get("Depth"))
+		log.Println("[DEBUG]", smart.CurrentFunctionName(), "WebDAV Service", "Method:", r.Method, "Depth:", smarthttputils.HttpRequestGetHeaderStr(r, "Depth"))
 	} //end if
 	//-- use no locks: first because many clients are buggy and can lock infinite a resource ; 2nd because on per-user instance the locking system is reset on each request
 	wdav.ServeHTTP(w, r, webDavUseSmartSafeValidPaths) // if all ok above (basic auth + credentials ok, serve ...)

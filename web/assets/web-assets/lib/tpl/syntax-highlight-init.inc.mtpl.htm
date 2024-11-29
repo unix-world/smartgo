@@ -1,0 +1,46 @@
+<!-- start Marker-TPL highlight syntax template r.20241123 -->
+<style>
+.hilite pre {
+	border: 1px solid #F0F0F0;
+	background: #F9F9F9;
+	color: #222222;
+	padding: 3px;
+	white-space: pre;
+	overflow: auto;
+}
+.hilite code {
+	background: #F9F9F9;
+	color: #222222;
+	white-space: pre;
+}
+@media (prefers-color-scheme: dark) {
+	.hilite pre {
+		border: 1px dashed #888888;
+		background: #444444;
+		color: #F8F8F8;
+	}
+	.hilite code {
+		background: #444444;
+		color: #F8F8F8;
+	}
+}
+</style>
+<!-- Partial Template: Plugins.SyntaxHighlightInitAndProcess -->
+<link rel="stylesheet" href="lib/js/jshilitecode/prism/fonts.css">
+<link rel="stylesheet" href="lib/js/jshilitecode/prism/prism[%%%IF:THEME:?dark|light;%%%]-[###THEME|htmid|lower|html###][%%%/IF:THEME%%%].css">[%%%COMMENT%%%] Themes: `` | `dark` | `light` [%%%/COMMENT%%%]
+<script src="lib/js/jshilitecode/prism/prism.js"></script>
+<script src="lib/js/jshilitecode/smart-highlight.js"></script>
+<script>
+const SmartViewHelpersSyntaxHighlightAreas = '[###AREAS|js|html###]';[%%%COMMENT%%%] ex: body [%%%/COMMENT%%%]
+</script>
+<!-- Partial Template: JsHiliteCode.SyntaxHighlightProcess -->
+<script>
+[%%%COMMENT%%%]// var SmartViewHelpersSyntaxHighlightAreas = 'selector'; // required[%%%/COMMENT%%%]
+jQuery(() => {
+	if((typeof(SmartJS_Custom_Syntax_Highlight) == 'function') && (typeof(SmartViewHelpersSyntaxHighlightAreas) == 'string') && (SmartViewHelpersSyntaxHighlightAreas)) {
+		SmartJS_Custom_Syntax_Highlight(String(SmartViewHelpersSyntaxHighlightAreas)); } else { console.warn('Missing Syntax Highlight Smart Helper');
+	}
+});
+</script>
+<!-- #END :: Partial Template: JsHiliteCode.SyntaxHighlightProcess -->
+<!-- #END :: Partial Template: Plugins.SyntaxHighlightInitAndProcess -->

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241128.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -13,6 +13,13 @@ import (
 	smart 			"github.com/unix-world/smartgo"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
 )
+
+
+func IsAjaxRequest(r *http.Request) bool {
+	//--
+	return smarthttputils.IsAjaxRequest(r)
+	//--
+} //END FUNCTION
 
 
 func GetVisitorRemoteIpAddrAndPort(r *http.Request) (string, string) { // returns: remoteAddr, remotePort
@@ -58,9 +65,25 @@ func GetUrlQueryParam(r *http.Request, param string) string {
 } //END FUNCTION
 
 
-func GetClientMimeAcceptHeader(r *http.Request) string {
+func HttpRequestGetHeaderStr(r *http.Request, hdrKey string) string {
 	//--
-	return smart.StrToLower(smart.StrTrimWhitespaces(smarthttputils.HttpRequestGetHeaderStr(r, smarthttputils.HTTP_HEADER_ACCEPT_MIMETYPE))) // {{{SYNC-SMARTGO-HTTP-ACCEPT-HEADER}}} ; accept headers can be many, just get the prefered one
+	defer smart.PanicHandler()
+	//--
+	return smarthttputils.HttpRequestGetHeaderStr(r, hdrKey)
+	//--
+} //END FUNCTION
+
+
+func GetClientMimeAcceptHeaders(r *http.Request) []string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	arrAccepts := smarthttputils.ParseClientMimeAcceptHeader(smarthttputils.HttpRequestGetHeaderStr(r, smarthttputils.HTTP_HEADER_ACCEPT_MIMETYPE)) // {{{SYNC-SMARTGO-HTTP-ACCEPT-HEADER}}} ; accept headers can be many, just get the prefered one
+	if(arrAccepts == nil) {
+		arrAccepts = []string{}
+	} //end if
+	//--
+	return arrAccepts
 	//--
 } //END FUNCTION
 

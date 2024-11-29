@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV / XML :: Read
-// r.20240930.1531 :: STABLE
+// r.20241125.2358 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2009 The Go Authors. All rights reserved.

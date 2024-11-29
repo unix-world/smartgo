@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Client-Ident :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241128.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	smart 			"github.com/unix-world/smartgo"
+	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
 	otp 			"github.com/unix-world/smartgo/web/2fa-totp"
 )
 
@@ -46,42 +47,16 @@ func Get2FATotp(secret string) (string, *otp.TOTP, error) {
 } //END FUNCTION
 
 
-func GetClientIdentUidHash(r *http.Request) string {
+func GetClientIdentAppSafeSignature(r *http.Request) string {
 	//--
-	pk := GetClientIdentPrivateKey(r)
-	//--
-	ckUid := GetUuidCookieValue(r)
-	if(ckUid != "") {
-		pk += smart.FORM_FEED + ckUid
-	} //end if
-	//--
-	return smart.Base64ToBase64s(smart.Sh3a512B64(pk))
+	return smarthttputils.GetClientIdentAppSafeSignature(r)
 	//--
 } //END FUNCTION
 
 
-func GetClientIdentPrivateKey(r *http.Request) string {
+func GetClientIdentUidHash(r *http.Request) string { // used for captcha and other specific purposes
 	//--
-	ns, _ := smart.AppGetNamespace()
-	sk, _ := smart.CryptoGetSecurityKey()
-	//--
-	return getClientIdentSignature(r) + " [#] " + ns + "*" + smart.Base64ToBase64s(smart.Sh3a512B64(sk)) + "." // use a hash of security key to avoid expose by mistake !
-	//--
-} //END FUNCTION
-
-
-func getClientIdentSignature(r *http.Request) string {
-	//--
-	signature := smart.GetHttpUserAgentFromRequest(r)
-	//--
-	isOk, clientRealIp := GetVisitorRealIpAddr(r)
-	//--
-	var cliType string = "Client"
-	if(isOk != true) {
-		cliType = "Fake-Client"
-	} //end if
-	//--
-	return cliType + " // " + clientRealIp + " :: " + signature // fix: do not use Proxy client IP here ... if using DNS load balancing + multiple load balancers with multiple backends switching the load balancer (aka reverse proxy) when browsing and changing between web pages will change this signature which will change the client_ident_private_key() and then may lead to user session expired ...
+	return smarthttputils.GetClientIdentUidHash(r, GetUuidCookieValue(r))
 	//--
 } //END FUNCTION
 

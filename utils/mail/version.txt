@@ -1,0 +1,7 @@
+
+gopkg.in/mail.v2
+github.com/go-mail/mail @ v2.3.1 # head.20241128
+
+modified by unixman: r.20241129
+	* added LoginAuth() method to export auth login
+	* added LoginXOauth2() method + structure implementation

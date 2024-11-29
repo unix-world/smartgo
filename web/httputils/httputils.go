@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241128.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -39,7 +39,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20241123.2358"
+	VERSION string = "r.20241128.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -70,7 +70,35 @@ const (
 	//--
 	DISP_TYPE_INLINE string 	= "inline"
 	DISP_TYPE_ATTACHMENT string = "attachment"
+	//--
+	MIME_TYPE_ANY string 		= "*/*" // reserved just for request accept header, never use for responses
 	MIME_TYPE_DEFAULT string 	= "application/octet-stream"
+	MIME_TYPE_TEXT string 		= "text/plain"
+	MIME_TYPE_HTML string 		= "text/html"
+	MIME_TYPE_CSS string 		= "text/css"
+	MIME_TYPE_JS string 		= "application/javascript"
+	MIME_TYPE_JSON string 		= "application/json"
+	MIME_TYPE_XML string 		= "application/xml"
+	MIME_TYPE_SVG string 		= "image/svg+xml"
+	MIME_TYPE_PNG string 		= "image/png"
+	MIME_TYPE_GIF string 		= "image/gif"
+	MIME_TYPE_JPEG string 		= "image/jpeg"
+	MIME_TYPE_WEBP string 		= "image/webp"
+	MIME_TYPE_CSV string 		= "text/csv"
+	MIME_TYPE_EMAIL_MSG string 	= "message/rfc822"
+	MIME_TYPE_ICALENDAR string 	= "text/calendar"
+	MIME_TYPE_VCARD string 		= "text/x-vcard"
+	MIME_TYPE_SIG_GPG string 	= "application/pgp-signature"
+	MIME_TYPE_PDF string 		= "application/pdf"
+	MIME_TYPE_AUDIO_OGG string 	= "audio/ogg"
+	MIME_TYPE_VIDEO_OGV string 	= "video/ogg"
+	MIME_TYPE_VIDEO_WEBM string = "video/webm"
+	MIME_TYPE_AUDIO_MPEG string = "audio/mpeg"
+	MIME_TYPE_VIDEO_MPEG string = "video/mpeg"
+	MIME_TYPE_WOFF2 string 		= "application/x-font-woff2"
+	MIME_TYPE_WOFF1 string 		= "application/x-font-woff"
+	MIME_TYPE_TTF string 		= "application/x-font-ttf"
+	MIME_TYPE_FAVICON string 	= "image/vnd.microsoft.icon"
 	//--
 	ICACHEM_CLEANUP_INTERVAL uint32 =   5 // 5 seconds
 	ICACHEM_EXPIRATION       uint32 = 300 // 300 seconds = 5 mins ; cache unsuccessful logins for 5 mins
@@ -114,6 +142,12 @@ const (
 	//--
 
 	//--
+	HTTP_AJAX_REQUEST_SIGNATURE string = "xmlhttprequest"
+	//--
+
+	//--
+	HTTP_HEADER_CONTENT_X_REQUESTED_WITH string = "x-requested-with"
+	//--
 	HTTP_HEADER_ACCEPT_MIMETYPE string = "accept"
 	//--
 	HTTP_HEADER_CONTENT_TYPE string = "content-type"
@@ -137,8 +171,10 @@ const (
 	//--
 	HTTP_HEADER_REDIRECT_LOCATION string = "location"
 	//--
-	HTTP_HEADER_AUTH_AUTHORIZATION string = "authorization"
+	HTTP_HEADER_DISABLE_AUTH_PROMPT string = "w-no-auth-prompt" // {{{SYNC-HTTP-UTILS-CLI-HDR-NO-AUTH-PROMPT-TRUE}}} ; if client send this header with a value of `true` will disable auth prompt
+	//--
 	HTTP_HEADER_AUTH_AUTHENTICATE string = "www-authenticate"
+	HTTP_HEADER_AUTH_AUTHORIZATION string = "authorization"
 	HTTP_HEADER_VALUE_AUTH_TYPE_BASIC string = "Basic" // keep camel case
 	HTTP_HEADER_VALUE_AUTH_TYPE_BEARER string = "Bearer" // keep camel case
 	HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN string = "Apikey" // keep camel case
@@ -1130,7 +1166,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		return
 	} //end if
 	//--
-	req.Header = map[string][]string{} // init, reset
+//	req.Header = map[string][]string{} // init, reset
+	req.Header = http.Header{} // init, reset
 	cTypeHdr = HttpSafeHeaderValue(smart.StrToLower(cTypeHdr))
 	if(cTypeHdr != "") {
 		req.Header.Set(HTTP_HEADER_CONTENT_TYPE, cTypeHdr)
@@ -1311,11 +1348,13 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	var useB64Encoding bool = true
 	if(
-		(httpResult.MimeType == "application/javascript") || (httpResult.MimeType == "application/json") ||
-		(httpResult.MimeType == "application/xml") || (httpResult.MimeType == "image/svg+xml") ||
-		(httpResult.MimeType == "application/x-php") || (httpResult.MimeType == "application/pgp-signature") ||
-		(httpResult.MimeType == "message/rfc822") ||
-		(smart.StrStartsWith(httpResult.MimeType, "text/"))) { // css, html, txt, ...
+		(httpResult.MimeType == MIME_TYPE_HTML) || (httpResult.MimeType == MIME_TYPE_CSS) ||
+		(httpResult.MimeType == MIME_TYPE_JS) || (httpResult.MimeType == MIME_TYPE_JSON) ||
+		(httpResult.MimeType == MIME_TYPE_XML) || (httpResult.MimeType == MIME_TYPE_SVG) ||
+		(httpResult.MimeType == MIME_TYPE_TEXT) || (httpResult.MimeType == MIME_TYPE_CSV) ||
+		(httpResult.MimeType == MIME_TYPE_EMAIL_MSG) || (httpResult.MimeType == MIME_TYPE_VCARD) ||
+		(httpResult.MimeType == MIME_TYPE_ICALENDAR) || (httpResult.MimeType == MIME_TYPE_SIG_GPG) ||
+		(smart.StrStartsWith(httpResult.MimeType, "text/"))) { // other text types
 			useB64Encoding = false
 	} //end if
 	//--
@@ -1743,10 +1782,11 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 	//--
 	defer smart.PanicHandler()
 	//--
+	_, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
 	route := smart.GetHttpPathFromRequest(r)
 	//--
 	if(streamBytesFunc == nil) {
-		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Serving Stream: `" + route + "` Failed: Content Streaming Handler is Null ; StatusCode:", 500)
+		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Serving Stream: `" + route + "` Failed: Content Streaming Handler is Null ; StatusCode:", 500, "ClientIP:", realClientIp)
 		HttpStatus500(w, r, "Content Streaming Handler is Null", true)
 		return
 	} //end if
@@ -1762,7 +1802,7 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 		case 208:
 			break
 		default:
-			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Invalid Status Code:", code, "; Fallback to 200")
+			log.Println("[ERROR] " + smart.CurrentFunctionName() + ": Invalid Status Code:", code, "; Fallback to 200 ; Route:", route, "; ClientIP:", realClientIp)
 			code = 200
 	} //end switch
 	//--
@@ -1796,10 +1836,10 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 	//--
 	w.WriteHeader(int(code))
 	//--
-	log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Stream: `" + route + "` ; ContentType: `" + contentType + "` ; ContentDisposition: `" + contentDisposition + "` ; StatusCode:", code)
+	log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Stream: `" + route + "` ; ContentType: `" + contentType + "` ; ContentDisposition: `" + contentDisposition + "` ; StatusCode:", code, "; ClientIP:", realClientIp)
 	_, errStream := io.Copy(w, streamBytesFunc()) // transfer stream to response
 	if(errStream != nil) {
-		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Failed to Serve Stream: `" + route + "` ; Error:", errStream)
+		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Failed to Serve Stream: `" + route + "` ; ClientIP: " + realClientIp + " ; Error:", errStream)
 		fmt.Fprintf(w, "%s", errStream) // write error also on stream ...
 	} //end if
 	return
@@ -1954,7 +1994,7 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 		} //end if
 		if(eTag != "") {
 			w.Header().Set(HTTP_HEADER_ETAG_SUM, `"`+eTag+`"`) // trick: use a Weak ETag as (W/"") or by enclosing ETag in double quotes to allow GZip compression ...
-			var match string = smart.StrTrimWhitespaces(r.Header.Get(HTTP_HEADER_ETAG_IFNM))
+			var match string = smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_ETAG_IFNM))
 			if(DEBUG == true) {
 				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": If None Match (Header):", match)
 			} //end if
@@ -2178,18 +2218,25 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			displayCaptcha = false
 	} //end switch
 	//--
+	// display captcha or auth logo are optional, and should not care below if instead serving 429 html+captcha will serve a json because client ask for in the accepted header ...
+	//--
 	var outputTEXT bool = false
 	var outputJSON bool = false
 	var outputXML bool = false
-	if(outputHtml == true) { // {{{SYNC-HTTP-UTILS-OUTPUT-STATUS-TEXT-FLEXIBLE}}} ; only if default output is to HTML, otherwise if is text it can be: text, json, xml, etc ..., to simplify things
-		cliAcceptHdr := smart.StrToLower(smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_ACCEPT_MIMETYPE))) // {{{SYNC-SMARTGO-HTTP-ACCEPT-HEADER}}} ; accept headers can be many, just get the prefered one
-		if(cliAcceptHdr == "text/plain") {
-			outputTEXT = true // must be set as explicit text only of was html and client request explicit header text
-			outputHtml = false
-		} else if(cliAcceptHdr == "application/json") {
-			outputJSON = true
-		} else if(cliAcceptHdr == "application/xml") {
-			outputXML = true
+	if((outputHtml == true) && (isMessageTextHtmlPage != true)) { // {{{SYNC-HTTP-UTILS-OUTPUT-STATUS-TEXT-FLEXIBLE}}}
+		//-- do the below detections only in the following conditions: if default output is HTML and is not MessageTextHtmlPage ; otherwise if is text do not do at all, it can be: text, json, xml, etc ..., to simplify things
+		arrAccepts := ParseClientMimeAcceptHeader(HttpRequestGetHeaderStr(r, HTTP_HEADER_ACCEPT_MIMETYPE)) // {{{SYNC-SMARTGO-HTTP-ACCEPT-HEADER}}} ; accept headers can be many, just get the prefered one
+		if((arrAccepts != nil) && (len(arrAccepts) > 0)) {
+			if(!smart.InListArr(MIME_TYPE_HTML, arrAccepts)) { // only if does not accept html, try other mimes: json, xml, text
+				if(smart.InListArr(MIME_TYPE_JSON, arrAccepts)) { // check for JSON 1st, have priority
+					outputJSON = true
+				} else if(smart.InListArr(MIME_TYPE_XML, arrAccepts)) { // 2nd check for xml, have 2nd priority
+					outputXML = true
+				} else if(smart.InListArr(MIME_TYPE_TEXT, arrAccepts)) { // 3rd check for text, have lower priority
+					outputTEXT = true // must be set as explicit text only of was html and client request explicit header text
+					outputHtml = false
+				} //end if else
+			} //end if
 		} //end if
 	} //end if
 	//--
@@ -2233,7 +2280,7 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			var extraHtml string = ""
 			if(displayCaptcha == true) {
 				var ckName string = "Status" + smart.ConvertUInt16ToStr(code) // ex: `Status429` {{{SYNC-HTTP-UTILS-STATUS-COOKIE-NAME}}}
-				var cliUidHash string = clientIdentUidHash(r)
+				var cliUidHash string = GetClientIdentUidHash(r, DEFAULT_REALM)
 				captcha, errCaptcha := smartcaptcha.GetCaptchaHtmlAndCode("ascii", ckName, cliUidHash)
 				if(errCaptcha == nil) {
 					extraHtml = captcha.Html
@@ -2267,25 +2314,45 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 } //END FUNCTION
 
 
-func clientIdentUidHash(r *http.Request) string {
+//-----
+
+
+func getClientIdentSignature(r *http.Request) string {
 	//--
-	okIpAddr, clientIP, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
-	if(okIpAddr != true) {
-		log.Println("[ERROR]", smart.CurrentFunctionName(), "Captcha Get Client IP Failed")
-		return ""
-	} //end if
-	clientIP = smart.StrTrimWhitespaces(clientIP)
-	if(clientIP == "") {
-		return ""
-	} //end if
+	signature := smart.GetHttpUserAgentFromRequest(r)
 	//--
-	cliSignature := smart.StrTrimWhitespaces(smart.GetHttpUserAgentFromRequest(r))
-	if(cliSignature == "") {
-		log.Println("[ERROR]", smart.CurrentFunctionName(), "Captcha Get Client UA Failed")
-		return ""
+	isOk, realClientIp, _, _ := smart.GetHttpRealClientIpFromRequestHeaders(r)
+	//--
+	var cliType string = "Client"
+	if(isOk != true) {
+		cliType = "Fake-Client"
 	} //end if
 	//--
-	return smart.Sh3a512B64(clientIP + smart.ASCII_BELL + cliSignature)
+	return cliType + " // " + realClientIp + " :: " + signature // fix: do not use Proxy client IP here ... if using DNS load balancing + multiple load balancers with multiple backends switching the load balancer (aka reverse proxy) when browsing and changing between web pages will change this signature which will change the client_ident_private_key() and then may lead to user session expired ...
+	//--
+} //END FUNCTION
+
+
+func GetClientIdentAppSafeSignature(r *http.Request) string { // aaaaa: search for all occurences
+	//--
+	ns, _ := smart.AppGetNamespace()
+	sk, _ := smart.CryptoGetSecurityKey()
+	//--
+	return getClientIdentSignature(r) + " [#] " + ns + "*" + smart.Base64ToBase64s(smart.Sh3a512B64(sk)) + "." // use a hash of security key to avoid expose by mistake !
+	//--
+} //END FUNCTION
+
+
+func GetClientIdentUidHash(r *http.Request, suffix string) string { // used for captcha and other specific purposes
+	//--
+	pk := GetClientIdentAppSafeSignature(r)
+	//--
+	suffix = smart.StrTrimWhitespaces(suffix)
+	if(suffix != "") {
+		pk += smart.FORM_FEED + suffix
+	} //end if
+	//--
+	return smart.Base64ToBase64s(smart.Sh3a512B64(pk))
 	//--
 } //END FUNCTION
 
@@ -2605,11 +2672,79 @@ func HttpRequestGetCookie(r *http.Request, name string) string {
 //-----
 
 
+func IsAjaxRequest(r *http.Request) bool {
+	//--
+	hdrReqWith := smart.StrToLower(smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_CONTENT_X_REQUESTED_WITH)))
+	//--
+	if(hdrReqWith == "") {
+		return false
+	} //end if
+	//--
+	if(hdrReqWith != HTTP_AJAX_REQUEST_SIGNATURE) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func ParseClientMimeAcceptHeader(str string) []string {
+	//--
+	// ex: `application/json, text/javascript, */*; q=0.01`
+	// returns: [`application/json`, `text/javascript`, `*/*`]
+	//--
+	var arr []string = []string{}
+	//--
+	str = smart.StrTrimWhitespaces(str)
+	if(str == "") {
+		return arr
+	} //end if
+	//--
+	str = smart.StrToLower(str)
+	//--
+	if(smart.StrContains(str, ",")) {
+		//--
+		exp := smart.Explode(",", str)
+		for i:=0; i<len(exp); i++ {
+			exp[i] = smart.StrTrimWhitespaces(exp[i])
+			if(exp[i] != "") {
+				if(smart.StrContains(exp[i], ";")) {
+					exr := smart.ExplodeWithLimit(";", exp[i], 2)
+					exr[0] = smart.StrTrimWhitespaces(exr[0])
+					if(exr[0] != "") {
+						arr = append(arr, exr[0])
+					} //end if
+				} else {
+					arr = append(arr, exp[i])
+				} //end if
+			} //end if
+		} //end for
+		//--
+	} else {
+		//--
+		arr = append(arr, str)
+		//--
+	} //end if
+	//--
+	return arr
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func HttpRequestGetHeaderStr(r *http.Request, hdrKey string) string {
 	//--
 	defer smart.PanicHandler()
 	//--
 	if((r.Header == nil) || (len(r.Header) <= 0)) {
+		return ""
+	} //end if
+	//--
+	hdrKey = smart.StrTrimWhitespaces(hdrKey)
+	if(hdrKey == "") {
 		return ""
 	} //end if
 	//--
@@ -2623,6 +2758,11 @@ func HttpRequestGetHeaderArr(r *http.Request, hdrKey string) []string {
 	defer smart.PanicHandler()
 	//--
 	if((r.Header == nil) || (len(r.Header) <= 0)) {
+		return []string{}
+	} //end if
+	//--
+	hdrKey = smart.StrTrimWhitespaces(hdrKey)
+	if(hdrKey == "") {
 		return []string{}
 	} //end if
 	//--
@@ -2779,7 +2919,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 			var ckName string = "Status429" // {{{SYNC-HTTP-UTILS-STATUS-COOKIE-NAME}}}
 			var ckVal string = smart.StrTrimWhitespaces(HttpRequestGetCookie(r, ckName))
 			if(ckVal != "") {
-				var cliUidHash string = clientIdentUidHash(r)
+				var cliUidHash string = GetClientIdentUidHash(r, DEFAULT_REALM)
 				isCaptchaValid, captchaValidateErr := smartcaptcha.ValidateCaptcha(ckVal, ckName, cliUidHash)
 				if(captchaValidateErr == nil) {
 					if(isCaptchaValid == true) {
@@ -2825,7 +2965,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	var pass string = ""
 	var ok bool = false
 	if((smart.AuthBasicIsEnabled() == true) || (smart.AuthBearerIsEnabled() == true) || (smart.AuthTokenIsEnabled() == true)) {
-		authHeader = smart.StrTrimWhitespaces(r.Header.Get(HTTP_HEADER_AUTH_AUTHORIZATION)) // prefer authorization first
+		authHeader = smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_AUTH_AUTHORIZATION)) // prefer authorization first
 	} //end if
 	//-- order to check: Cookie, Bearer, Token, Basic
 	if(
@@ -2894,7 +3034,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 			if(errTokenSepare != nil) {
 				err = "Auth.Default: [Token:Opaque:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: " + errTokenSepare.Error()
 			} else {
-				tokenAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, realClientIp, tkUserName, tokenHash, httpAuthMode, authUsername, authToken) // default check: user, token, authMode, requiredUsername, requiredToken
+				tokenAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, smart.HTTP_AUTH_DEFAULT_PRIVS, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only opaque tokens are supported
 				if(tokenAuthOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 					aData.OK = false // make sure to set to false, it was not OK
 					err = "Auth.Default: [Token:Opaque:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
@@ -2903,7 +3043,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only, no 2FA (2FA req. custom implementation)
 			if(smart.Auth2FACookieIsEnabled() != true) {
 				var authBasicOk bool = false
-				authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, realClientIp, user, pass, httpAuthMode, authUsername, authPassword)
+				authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, user, pass, httpAuthMode, authUsername, authPassword, smart.ALGO_PASS_PLAIN, smart.HTTP_AUTH_DEFAULT_PRIVS, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only plain type password can be provided in the default mode ; to use hashed passwords needs custom auth check implementation
 				if(authBasicOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 					aData.OK = false // make sure to set to false, it was not OK
 					err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
@@ -2930,7 +3070,13 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 		if(smart.AuthBasicIsEnabled() == true) { // show Auth Basic Prompt (Header) ONLY if Auth Basic is Enabled, otherwise does not make sense ...
 		//	if((httpAuthMode != smart.HTTP_AUTH_MODE_COOKIE) && (httpAuthMode != smart.HTTP_AUTH_MODE_BEARER) && (httpAuthMode != smart.HTTP_AUTH_MODE_TOKEN)) {
 			if((httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) || (httpAuthMode == smart.HTTP_AUTH_MODE_NONE)) { // this condition is better than above ; needs to include also auth none because prior the browser will authenticate is actually Auth None instead of Auth Basic
-				HttpHeaderAuthBasic(w , authRealm)
+				var authDisableHeader string = ""
+				if(IsAjaxRequest(r) == true) {
+					authDisableHeader = smart.StrToLower(smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_DISABLE_AUTH_PROMPT)))
+				} //end if
+				if(authDisableHeader != "true") { // {{{SYNC-HTTP-UTILS-CLI-HDR-NO-AUTH-PROMPT-TRUE}}} ; support (just for ajax requests) without raising the auth prompt
+					HttpHeaderAuthBasic(w , authRealm)
+				} //end if
 			} //end if
 		} //end if
 		HttpStatus401(w, r, "Access to this area requires Authentication", outputHtml, false)
@@ -3051,78 +3197,138 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 	switch(extension) {
 		//-------------- text : must be default inline
 		case "txt":
-			mimeType = "text/plain"
+			mimeType = MIME_TYPE_TEXT
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- html : must be default inline
 		case "html":
-			mimeType = "text/html"
+			mimeType = MIME_TYPE_HTML
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- css
 		case "css":
-			mimeType = "text/css"
+			mimeType = MIME_TYPE_CSS
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- javascript
 		case "js":
-			mimeType = "application/javascript"
+			mimeType = MIME_TYPE_JS
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		case "json":
-			mimeType = "application/json"
+			mimeType = MIME_TYPE_JSON
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- web images
 		case "svg":
-			mimeType = "image/svg+xml"
+			mimeType = MIME_TYPE_SVG
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		case "png":
-			mimeType = "image/png"
+			mimeType = MIME_TYPE_PNG
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		case "gif":
-			mimeType = "image/gif"
+			mimeType = MIME_TYPE_GIF
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		case "jpeg": fallthrough
 		case "jpe": fallthrough
 		case "jpg":
-			mimeType = "image/jpeg"
+			mimeType = MIME_TYPE_JPEG
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		case "webp":
-			mimeType = "image/webp"
+			mimeType = MIME_TYPE_WEBP
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		case "ico":
-			mimeType = "image/vnd.microsoft.icon"
+			mimeType = MIME_TYPE_FAVICON
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- fonts
 		case "woff2":
-			mimeType = "application/x-font-woff2"
+			mimeType = MIME_TYPE_WOFF2
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		case "woff":
-			mimeType = "application/x-font-woff"
+			mimeType = MIME_TYPE_WOFF1
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		case "ttf":
-			mimeType = "application/x-font-ttf"
+			mimeType = MIME_TYPE_TTF
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		//-------------- xml
 		case "xml":
-			mimeType = "application/xml"
+			mimeType = MIME_TYPE_XML
 			mimeUseCharset = true
+			mimeDisposition = DISP_TYPE_INLINE
+			break
+		//-------------- data
+		case "csv": fallthrough // csv comma
+		case "tab": // csv tab
+			mimeType = MIME_TYPE_CSV
+			mimeUseCharset = true
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		//-------------- email / calendar / addressbook
+		case "eml":
+			mimeType = MIME_TYPE_EMAIL_MSG
+			mimeUseCharset = true
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		case "vcf":
+			mimeType = MIME_TYPE_VCARD
+			mimeUseCharset = true
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		case "ics":
+			mimeType = MIME_TYPE_ICALENDAR
+			mimeUseCharset = true
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		//-------------- specials
+		case "asc": fallthrough
+		case "sig":
+			mimeType = MIME_TYPE_SIG_GPG
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		//-------------- portable documents
+		case "pdf":
+			mimeType = MIME_TYPE_PDF
+			mimeDisposition = DISP_TYPE_INLINE // DISP_TYPE_ATTACHMENT
+			break
+		//-------------- theora
+		case "ogg": fallthrough // theora audio
+		case "oga":
+			mimeType = MIME_TYPE_AUDIO_OGG
+			mimeDisposition = DISP_TYPE_INLINE
+			break
+		case "ogv": // theora video
+			mimeType = MIME_TYPE_VIDEO_OGV
+			mimeDisposition = DISP_TYPE_INLINE
+			break
+		//-------------- webm
+		case "webm": // google vp8
+			mimeType = MIME_TYPE_VIDEO_WEBM
+			mimeDisposition = DISP_TYPE_INLINE
+			break
+		//-------------- mp3 / mp4
+		case "mp4": fallthrough // mp4 video (it can be also mp4 audio, but cast it as video by default)
+		case "m4v": // mp4 video
+			mimeType = MIME_TYPE_VIDEO_MPEG
+			mimeDisposition = DISP_TYPE_INLINE
+			break
+		case "mp3": fallthrough // mp3 audio
+		case "mp4a": // mp4 audio
+			mimeType = MIME_TYPE_AUDIO_MPEG
 			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- html: tpl
@@ -3133,22 +3339,32 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 		case "t3fluid": fallthrough // typo3 fluid templating
 		case "django": fallthrough // django templating
 		case "htm":
-			mimeType = "text/html"
+			mimeType = MIME_TYPE_HTML
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		//-------------- php
 		case "php":
-			mimeType = "application/x-php"
+			mimeType = MIME_TYPE_TEXT // application/x-php is just for environments where PHP is executable, not for golang
 			mimeUseCharset = true
-		//	mimeDisposition = DISP_TYPE_ATTACHMENT
-			mimeDisposition = DISP_TYPE_INLINE
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+		//	mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- plain text and development
+		case "ini": fallthrough // ini file
+		case "yml": fallthrough // yaml file
+		case "yaml": fallthrough // yaml file
+		case "md": fallthrough // markdown
+		case "markdown": fallthrough // markdown
+		case "pem": fallthrough // PEM Certificate File
+		case "crl": fallthrough // Certificate Revocation List
+		case "crt": fallthrough // Certificate File
+		case "cer": fallthrough // Certificate File
+		case "key": fallthrough // Certificate Key File
 		case "log": fallthrough // log file
 		case "sql": fallthrough // sql file
+		case "inc": fallthrough // include file
 		case "sh": fallthrough // shell script
-		case "bash": fallthrough // bash (shell) script
 		case "diff": fallthrough // Diff File
 		case "patch": fallthrough // Diff Patch
 		case "go": fallthrough // Go Lang
@@ -3168,85 +3384,10 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 		case "swift": fallthrough // apple swift language
 		case "java": fallthrough // java source code
 		case "pas": fallthrough // Delphi / Pascal
-		case "inc": fallthrough // include file
-		case "ini": fallthrough // ini file
-		case "yml": fallthrough // yaml file
-		case "yaml": fallthrough // yaml file
-		case "md": fallthrough // markdown
-		case "markdown": fallthrough // markdown
-		case "pem": fallthrough // PEM Certificate File
-		case "crl": fallthrough // Certificate Revocation List
-		case "crt": fallthrough // Certificate File
-		case "cer": fallthrough // Certificate File
-		case "key": // Certificate Key File
-			mimeType = "text/plain"
+		case "bash":  // bash (shell) script
+			mimeType = MIME_TYPE_TEXT
 			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- portable documents
-		case "pdf":
-			mimeType = "application/pdf"
-			mimeDisposition = DISP_TYPE_INLINE // DISP_TYPE_ATTACHMENT
-			break
-		//-------------- email / calendar / addressbook
-		case "eml":
-			mimeType = "message/rfc822"
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		case "ics":
-			mimeType = "text/calendar"
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		case "vcf":
-			mimeType = "text/x-vcard"
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		case "vcs":
-			mimeType = "text/x-vcalendar"
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- data
-		case "csv": fallthrough // csv comma
-		case "tab": // csv tab
-			mimeType = "text/csv"
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- specials
-		case "asc": fallthrough
-		case "sig":
-			mimeType = "application/pgp-signature"
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- theora
-		case "ogg": fallthrough // theora audio
-		case "oga":
-			mimeType = "audio/ogg"
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "ogv": // theora video
-			mimeType = "video/ogg"
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- webm
-		case "webm": // google vp8
-			mimeType = "video/webm"
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- mp3 / mp4
-		case "mp4": fallthrough // mp4 video (it can be also mp4 audio, but cast it as video by default)
-		case "m4v": // mp4 video
-			mimeType = "video/mpeg"
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "mp3": fallthrough // mp3 audio
-		case "mp4a": // mp4 audio
-			mimeType = "audio/mpeg"
-			mimeDisposition = DISP_TYPE_INLINE
 			break
 		//-------------- default
 		default: // others

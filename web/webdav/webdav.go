@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV
-// r.20240930.1531 :: STABLE
+// r.20241125.2358 :: STABLE
 // (c) 2024 unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20240930.1531"
+	VERSION string = "v.20241125.2358"
 )
 
 var (
@@ -147,6 +147,9 @@ func (h *Handler) ServeHTTP(ww http.ResponseWriter, r *http.Request, smartSafeVa
 
 
 func (h *Handler) handleLock(w http.ResponseWriter, r *http.Request) (retStatus int, retErr error) { // fake
+	if(r.Header == nil) {
+		return http.StatusBadRequest, errUxmNoHeaders
+	}
 	duration, err := parseTimeout(r.Header.Get("Timeout"))
 	if err != nil {
 		return http.StatusBadRequest, err
@@ -246,6 +249,9 @@ func (h *Handler) handleLock(w http.ResponseWriter, r *http.Request) (retStatus 
 
 
 func (h *Handler) handleUnlock(w http.ResponseWriter, r *http.Request) (status int, err error) { // fake
+	if(r.Header == nil) {
+		return http.StatusBadRequest, errUxmNoHeaders
+	}
 	// http://www.webdav.org/specs/rfc4918.html#HEADER_Lock-Token says that the
 	// Lock-Token value is a Coded-URL. We strip its angle brackets.
 	t := r.Header.Get("Lock-Token")
@@ -297,6 +303,10 @@ func (h *Handler) confirmLocks(r *http.Request, src, dst string) (release func()
 	} //end if
 	//--
 	release = func(){}
+	//--
+	if(r.Header == nil) {
+		return release, http.StatusBadRequest, errUxmNoHeaders
+	}
 	//--
 	hdr := r.Header.Get("If") // this is used here just to validate request, for nothing else ...
 	if(hdr != "") {
@@ -941,6 +951,7 @@ var (
 	errUxmEmptyRealPath        = errors.New("webdav: real path is empty")
 	errUxmInvalidSource        = errors.New("webdav: invalid source")
 	errUxmNothingToLock        = errors.New("webdav: nothing to lock (confirm)")
+	errUxmNoHeaders            = errors.New("webdav: http headers are missing")
 
 	errDestinationEqualsSource = errors.New("webdav: destination equals source")
 	errDirectoryNotEmpty       = errors.New("webdav: directory not empty")

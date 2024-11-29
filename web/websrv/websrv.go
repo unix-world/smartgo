@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241128.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20241123.2358"
+	VERSION string = "r.20241128.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -53,12 +53,6 @@ const TheStrSignature string = TheStrName + " " + VERSION
 
 const apiErrorDefaultCode uint16 = 65535
 const apiErrorDefaultMsg  string = "Unknown Error"
-
-type apiMsgStruct struct {
-	ErrCode uint16 `json:"errCode,omitempty"`
-	ErrMsg  string `json:"errMsg,omitempty"`
-	Data       any `json:"data,omitempty"`
-}
 
 type versionStruct struct {
 	Platform  string `json:"platform"`
@@ -541,6 +535,8 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				} //end if
 			} //end if
 		} //end if
+		//-- notice of content type served
+		log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Internal Route: `" + urlPath + "` ; Content: `" + response.ContentFileName + "` ; ContentDisposition: `" + response.ContentDisposition + "` ; StatusCode:", response.StatusCode, "; ClientIP:", realClientIp)
 		//-- from this point the HTTP Writer will begin to write the response, no reads are safe and guaranteed
 		switch(response.StatusCode) {
 			//-- ok status codes
@@ -661,40 +657,6 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	return 0
 	//--
 
-} //END FUNCTION
-
-
-func ResponseApiJsonErr(errCode uint16, errMsg string, data any) string {
-	//--
-	if(errCode <= 0) {
-		errCode = apiErrorDefaultCode
-	} //end if
-	errMsg = smart.StrTrimWhitespaces(errMsg)
-	if(errMsg == "") {
-		errMsg = apiErrorDefaultMsg
-	} //end if
-	//--
-	resp := apiMsgStruct{
-		ErrCode: errCode,
-		ErrMsg:  errMsg,
-		Data:    data,
-	}
-	//--
-	return smart.JsonNoErrChkEncode(resp, false, false)
-	//--
-} //END FUNCTION
-
-
-func ResponseApiJsonOK(data any) string {
-	//--
-	resp := apiMsgStruct{
-		ErrCode: 0,
-		ErrMsg:  "",
-		Data:    data,
-	}
-	//--
-	return smart.JsonNoErrChkEncode(resp, false, false)
-	//--
 } //END FUNCTION
 
 

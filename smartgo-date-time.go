@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241129.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -34,6 +34,7 @@ const (
 var (
 	ini_SMART_FRAMEWORK_TIMEZONE string = DATE_TIME_DEFAULT_LOCAL_TIMEZONE // set via DateTimeSetLocation
 )
+
 
 //-----
 
@@ -430,6 +431,7 @@ func NanoTimeRandInt63N(min int64, max int64) uint64 {
 	return uint64(rnd.Int63n(max-min) + min)
 	//--
 } //END FUNCTION
+
 
 //-----
 

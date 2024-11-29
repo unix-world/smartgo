@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-2024 unix-world.org
-// r.20241123.2358 :: STABLE
+// r.20241129.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -14,13 +14,17 @@ import (
 )
 
 const (
-	ALGO_PASS_SMART_SAFE_SF_PASS 		uint8 =   1
-	ALGO_PASS_SMART_SAFE_ARGON_PASS 	uint8 =   2
-	ALGO_PASS_SMART_UNSAFE_BF_PASS 		uint8 = 154 // Cookie Pre-Auth: BF[usr,pw] ; this is unsafe, it is reversible, must be converted to an Apikey Token
+	// {{{SYNC-AUTH-PASS-ALGOS}}}
+	ALGO_PASS_NONE 						uint8 =   0
+	ALGO_PASS_PLAIN 					uint8 =   1
+	ALGO_PASS_SMART_SAFE_SF_PASS 		uint8 =   2
+	ALGO_PASS_SMART_SAFE_ARGON_PASS 	uint8 =   3
+	ALGO_PASS_SMART_SAFE_BCRYPT 		uint8 =   4
 	ALGO_PASS_SMART_SAFE_WEB_TOKEN 		uint8 = 254 // Web (Signed) Token
 	ALGO_PASS_SMART_SAFE_OPQ_TOKEN 		uint8 = 255 // Opaque Token
 	// 0 is reserved for none ; 10..200 other pass algos ; 2..10 and 201..255 is reserved for internal use
 
+	// {{{SYNC-AUTH-MODES}}}
 	HTTP_AUTH_MODE_NONE   uint8 =   0
 	HTTP_AUTH_MODE_BASIC  uint8 =   1
 	HTTP_AUTH_MODE_TOKEN  uint8 =   2
@@ -29,8 +33,8 @@ const (
 	HTTP_AUTH_MODE_RAW    uint8 = 255 // used for 3rd party
 
 	HTTP_AUTH_DEFAULT_AREA  string = "DEFAULT"
-	HTTP_AUTH_DEFAULT_PRIVS string = "<admin>"
-	HTTP_AUTH_DEFAULT_RESTR string = "<none>"
+	HTTP_AUTH_DEFAULT_PRIVS string = "<default>" // must include only the default privileges   for a valid user, not admin !
+	HTTP_AUTH_DEFAULT_RESTR string = "<none>"    // must include only the default restrictions for a valid user, not admin !
 
 	REGEX_SAFE_HTTP_USER_NAME 		string = `^[a-z0-9\.]{5,25}$` 		// Safe UserName Regex ; intended as a safe user ID
 	REGEX_SAFE_AUTH_OPAQUE_TOKEN 	string = `^[a-zA-Z0-9\-]{48,128}$` 	// Safe (Opaque) Token Regex
@@ -87,6 +91,8 @@ func AuthBearerModeSet(mode bool) bool { // Bearer
 	//--
 	authBearerEnabled = mode
 	//--
+	log.Println("[INFO]", CurrentFunctionName(), "Auth Bearer was Set to: [", authBearerEnabled, "]: Success")
+	//--
 	return true
 	//--
 } //END FUNCTION
@@ -105,6 +111,8 @@ func AuthTokenIsEnabled() bool { // Apikey
 func AuthTokenModeSet(mode bool) bool { // Apikey
 	//--
 	authTokenEnabled = mode
+	//--
+	log.Println("[INFO]", CurrentFunctionName(), "Auth Token was Set to: [", authTokenEnabled, "]: Success")
 	//--
 	return true
 	//--
@@ -256,28 +264,31 @@ type AuthDataStruct struct {
 	ErrMsg       string             `json:"errMsg"` 		// error message (if any) or empty string
 	Method       uint8              `json:"method"` 		// see: HTTP_AUTH_MODE_*
 	Area         string             `json:"area"` 			// Auth Area
-	Realm        string             `json:"-"` 				// Auth Realm
-	UserID       string             `json:"-"` 				// User ID (if no specific ID can be the same as User Name) ; it may be different than UserName ; UserID is intended only for internal use in contrast with UserName which is public
+	Realm        string             `json:"realm"` 			// Auth Realm
+	UserID       string             `json:"userId"` 		// User ID (if no specific ID can be the same as User Name) ; it may be different than UserName ; UserID is intended only for internal use in contrast with UserName which is public
 	UserName     string             `json:"userName"` 		// User Name
 	PassHash     string             `json:"-"` 				// Password Hash
 	PassAlgo     uint8              `json:"-"` 				// Password Hash Algo ; 0 for SafePassHashSmart ; 1..255 for the rest
 	RawAuthData  string             `json:"-"` 				// Auth Raw Data, reserved for special usage, ex: auth cookie pre-auth
 	TokenData    string             `json:"-"` 				// Auth Token Data (Ex: JWT Token)
 	TokenAlgo    string             `json:"-"` 				// Token Algo (Ex: `JWT:Ed448`)
-	EmailAddr    string             `json:"emailAddr"` 		// User Email Address
-	FullName     string             `json:"fullName"` 		// Full Name
+	PrivKey      string             `json:"-"` 				// Private Key
 	Privileges   string             `json:"privileges"` 	// Privileges: <priv1>,<priv2>,...
 	Restrictions string             `json:"restrictions"` 	// Restrictions: <restr1>,<restr2>,...
-	PrivKey      string             `json:"-"` 				// Private Key
-	Quota        uint64             `json:"-"` 				// Quota
-	MetaData     map[string]string  `json:"-"` 				// MetaData ... Associative Array {"key1":"Val1", "key2":"Val2", ...}
-	// TODO: add clientIP, userAgent, ...
+	EmailAddr    string             `json:"emailAddr"` 		// User Email Address
+	FullName     string             `json:"fullName"` 		// Full Name
+	Quota        uint64             `json:"quota"` 			// Quota
+	MetaData     map[string]string  `json:"metaData"` 		// MetaData ... Associative Array {"key1":"Val1", "key2":"Val2", ...}
 }
+
 
 //-----
 
 
 func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string, userID string, userName string, passHash string, passAlgo uint8, tokenData string, tokenAlgo string, emailAddr string, fullName string, privileges string, restrictions string, privKey string, quota uint64, metaData map[string]string) AuthDataStruct {
+	//--
+	// TODO: validate privileges and restrictions
+	// {{{SYNC-AUTH-PASS-ALGOS}}}
 	//--
 	errMsg 			= StrTrimWhitespaces(errMsg)
 	area 			= StrToUpper(StrTrimWhitespaces(area))
@@ -440,7 +451,7 @@ func AuthIsValidPassword(pass string) bool {
 	if(StrLen(pass) != StrLen(StrTrimWhitespaces(pass))) {
 		return false
 	} //end if
-	if((StrLen(StrTrimWhitespaces(pass)) < 7) || (StrLen(pass) > 57)) { // std max password length is 57 ; min is 7
+	if((StrLen(StrTrimWhitespaces(pass)) < 7) || (StrLen(pass) > int(PASSWORD_PLAIN_MAX_LENGTH))) { // {{{SYNC-PASS-MAX-SAFE-LENGTH}}} ; std max password length is 55 (compatible with PHP BCrypt) ; min is 7
 		return false
 	} //end if
 	//--
@@ -563,7 +574,13 @@ func AuthSafeCompare(val1 string, val2 string) bool {
 //-----
 
 
-func AuthUserPassDefaultCheck(authRealm string, clientIP string, user string, pass string, authMode uint8, requiredUsername string, requiredPassword string) (bool, AuthDataStruct) {
+func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMode uint8, requiredUsername string, requiredPassword string, passHashAlgo uint8, privileges string, restrictions string, privKey string) (bool, AuthDataStruct) {
+	//--
+	// the requiredPassword must be the plain password just if passHashAlgo = ALGO_PASS_PLAIN
+	// otherwise must be the already hashed password as:
+	// 	* SafePassHashSmart(pass, user, false) for ALGO_PASS_SMART_SAFE_SF_PASS
+	// 	* SafePassHashSmart(pass, user, true)  for ALGO_PASS_SMART_SAFE_ARGON_PASS
+	// 	* SafePassHashBcrypt(pass, 0)          for ALGO_PASS_SMART_SAFE_BCRYPT
 	//--
 	authData := AuthDataStruct{
 		OK: false,
@@ -572,16 +589,13 @@ func AuthUserPassDefaultCheck(authRealm string, clientIP string, user string, pa
 		UserName: user, // for logging purposes
 	}
 	//--
-	if(AuthBasicIsEnabled() != true) { // can be used just with Auth Basic ; Auth Cookie requires custom implementation for Verification
-		//--
+	if((AuthBasicIsEnabled() != true) && (AuthCookieIsEnabled() != true)) { // this only supports: Auth Basic (default or custom check) or Auth Cookie (custom check only)
 		authData.ErrMsg = "Auth is Disabled: No Active Auth Providers are Available"
-		//--
 		return false, authData
-		//--
 	} //end if
-	//-- {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
-	if((AuthSafeCompare(user, requiredUsername) != true) || (AuthSafeCompare(pass, requiredPassword) != true)) {
-		authData.ErrMsg = "Invalid UserName / Password"
+	//-- {{{SYNC-AUTH-MODES}}}
+	if((authMode != HTTP_AUTH_MODE_BASIC) && (authMode != HTTP_AUTH_MODE_COOKIE)) {
+		authData.ErrMsg = "Unsupported Auth Mode: " + ConvertUInt8ToStr(authMode)
 		return false, authData
 	} //end if
 	//-- {{{SYNC-HTTP-AUTH-CHECKS-2ND-GO-SMART}}}
@@ -602,7 +616,54 @@ func AuthUserPassDefaultCheck(authRealm string, clientIP string, user string, pa
 		return false, authData
 	} //end if
 	//-- #end: sync
-	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, SafePassHashSmart(pass, user, false), ALGO_PASS_SMART_SAFE_SF_PASS, "", "", "", "", HTTP_AUTH_DEFAULT_PRIVS, HTTP_AUTH_DEFAULT_RESTR, "", 0, nil)
+	var useArgonId bool = false
+	var hashedPass string = ""
+	switch(passHashAlgo) { // {{{SYNC-AUTH-PASS-ALGOS}}}
+		case ALGO_PASS_SMART_SAFE_SF_PASS:
+			hashedPass, _ = SafePassHashSmart(pass, user, false)
+			break
+		case ALGO_PASS_SMART_SAFE_ARGON_PASS: // recommended just with Auth Cookie, will be used one time, then JWT ... ; auth basic is doing auth at every page entry, it is to costly ...
+			useArgonId = true
+			hashedPass, _ = SafePassHashSmart(pass, user, true)
+			break
+		case ALGO_PASS_SMART_SAFE_BCRYPT:
+			hashedPass = requiredPassword // bcrypt hashes are never are the same, keep the entry value ...
+			break
+		case ALGO_PASS_PLAIN: // encode as Blowfish using the app secret key, to avoid display plain password accidentally
+			sKey, _ := CryptoGetSecurityKey()
+			hashedPass = BlowfishEncryptCBC(pass, sKey)
+			break
+		default:
+			authData.ErrMsg = "Invalid Pass Hashing Algo: [" + ConvertUInt8ToStr(passHashAlgo) + "]"
+			return false, authData
+	} //end if
+	//-- {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
+	if(AuthSafeCompare(user, requiredUsername) != true) {
+		authData.ErrMsg = "UserName does not match"
+		return false, authData
+	} //end if
+	if(passHashAlgo == ALGO_PASS_PLAIN) {
+		if(AuthSafeCompare(pass, requiredPassword) != true) {
+			authData.ErrMsg = "Password does not match (1)"
+			return false, authData
+		} //end if
+	} else if(passHashAlgo == ALGO_PASS_SMART_SAFE_BCRYPT) {
+		if(SafePassHashBcryptVerify(requiredPassword, pass) != true) {
+			authData.ErrMsg = "Password does not match (2)"
+			return false, authData
+		} //end if
+	} else { // SmartPass
+		if(SafePassHashSmartVerify(requiredPassword, pass, user, useArgonId) != true) { // compare the plain passwords, the hash has been created only at this step to be safe stored in auth data ; step 1 verification
+			authData.ErrMsg = "Password does not match (3." + ConvertBoolToStr(useArgonId) + ")" // 3.0 default ; 3.1 argon
+			return false, authData
+		} //end if
+		if(AuthSafeCompare(hashedPass, requiredPassword) != true) { // compare with the entry hash of this method with the hash created in this method, required too ; step 2 verification
+			authData.ErrMsg = "Password Hash does not match"
+			return false, authData
+		} //end if
+	} //end if else
+	//-- #end: sync
+	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, hashedPass, passHashAlgo, "", "", "", "", privileges, restrictions, privKey, 0, nil)
 	if(authChkData.ErrMsg != "") {
 		return false, authChkData
 	} //end if
@@ -616,7 +677,7 @@ func AuthUserPassDefaultCheck(authRealm string, clientIP string, user string, pa
 } //END FUNCTION
 
 
-func AuthUserTokenDefaultCheck(authRealm string, clientIP string, user string, token string, authMode uint8, requiredUsername string, requiredToken string) (bool, AuthDataStruct) {
+func AuthUserTokenDefaultCheck(authRealm string, user string, token string, authMode uint8, requiredUsername string, requiredToken string, privileges string, restrictions string, privKey string) (bool, AuthDataStruct) {
 	//--
 	authData := AuthDataStruct{
 		OK: false,
@@ -625,16 +686,13 @@ func AuthUserTokenDefaultCheck(authRealm string, clientIP string, user string, t
 		UserName: user, // for logging purposes
 	}
 	//--
-	if(AuthTokenIsEnabled() != true) { // can be used just with Auth Token (Apikey) ; Auth Bearer requires custom implementation for Verification
-		//--
+	if((AuthTokenIsEnabled() != true) && (AuthBearerIsEnabled() != true)) { // can be used just with Auth Token (Apikey) in the default or custom check implementations ; may be also used with Auth Bearer (if Auth Bearer is with Opaque Tokens only, not with JWT) in the custom check implementation mode
 		authData.ErrMsg = "Auth is Disabled: No Active Auth Providers are Available"
-		//--
 		return false, authData
-		//--
 	} //end if
-	//-- {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
-	if((AuthSafeCompare(user, requiredUsername) != true) || (AuthSafeCompare(token, requiredToken) != true)) {
-		authData.ErrMsg = "Invalid UserName / Token"
+	//-- {{{SYNC-AUTH-MODES}}}
+	if((authMode != HTTP_AUTH_MODE_TOKEN) && (authMode != HTTP_AUTH_MODE_BEARER)) {
+		authData.ErrMsg = "Unsupported Auth Mode: " + ConvertUInt8ToStr(authMode)
 		return false, authData
 	} //end if
 	//-- {{{SYNC-HTTP-AUTH-CHECKS-2ND-GO-SMART}}}
@@ -654,9 +712,17 @@ func AuthUserTokenDefaultCheck(authRealm string, clientIP string, user string, t
 		authData.ErrMsg = "Invalid Token"
 		return false, authData
 	} //end if
+	//-- {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
+	if(AuthSafeCompare(user, requiredUsername) != true) {
+		authData.ErrMsg = "UserName does not match"
+		return false, authData
+	} //end if
+	if(AuthSafeCompare(token, requiredToken) != true) {
+		authData.ErrMsg = "Token does not match"
+		return false, authData
+	} //end if
 	//-- #end: sync
-	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, "", ALGO_PASS_SMART_SAFE_OPQ_TOKEN, token, OPAQUE_TOKEN_FULL_NAME, "", "", HTTP_AUTH_DEFAULT_PRIVS, HTTP_AUTH_DEFAULT_RESTR, "", 0, nil)
-	//--
+	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, "", ALGO_PASS_SMART_SAFE_OPQ_TOKEN, token, OPAQUE_TOKEN_FULL_NAME, "", "", privileges, restrictions, privKey, 0, nil)
 	if(authChkData.ErrMsg != "") {
 		return false, authChkData
 	} //end if
@@ -703,7 +769,7 @@ func AuthUserTokenDefaultSepareParts(token string) (string, string, error) { // 
 //-----
 
 
-func AuthGetDefaultUserPrivKey() string {
+func AuthGetDefaultUserPrivKey() string { // for internal use only !
 	//--
 	pkey, err := CryptoGetSecurityKey()
 	if(err != nil) {
@@ -713,6 +779,9 @@ func AuthGetDefaultUserPrivKey() string {
 	return BaseEncode([]byte(Sh3a512(pkey)), "b85") // use this when not having per/user security key
 	//--
 } //END FUNCTION
+
+
+//-----
 
 
 func AuthMethodGetNameById(methodId uint8) string {
@@ -734,7 +803,45 @@ func AuthMethodGetNameById(methodId uint8) string {
 		case HTTP_AUTH_MODE_COOKIE:
 			name = "Cookie"
 			break
+		case HTTP_AUTH_MODE_RAW:
+			name = "Raw"
+			break
 	} //end switch
+	//--
+	return name
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func AuthPassHashAlgoGetNameById(algo uint8) string {
+	//--
+	var name string = "Unknown"
+	switch(algo) { // {{{SYNC-AUTH-PASS-ALGOS}}}
+		case ALGO_PASS_NONE:
+			name = "None"
+			break
+		case ALGO_PASS_PLAIN:
+			name = "Plain"
+			break
+		case ALGO_PASS_SMART_SAFE_SF_PASS:
+			name = "SafePass.Smart"
+			break
+		case ALGO_PASS_SMART_SAFE_ARGON_PASS:
+			name = "SafePass.Smart.Argon"
+			break
+		case ALGO_PASS_SMART_SAFE_BCRYPT:
+			name = "BCrypt"
+			break
+		case ALGO_PASS_SMART_SAFE_WEB_TOKEN:
+			name = "Token.Signed"
+			break
+		case ALGO_PASS_SMART_SAFE_OPQ_TOKEN:
+			name = "Token.Opaque"
+			break
+	} //end if
 	//--
 	return name
 	//--
