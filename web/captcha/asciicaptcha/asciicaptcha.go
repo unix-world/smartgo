@@ -1,7 +1,7 @@
 
 // SmartGo ASCII Captcha - Plugin for: SmartGo Captcha
-// (c) 2024 unix-world.org
-// v.20241123.2358
+// (c) 2024-present unix-world.org
+// v.20241216.2358
 // license: BSD
 
 //-- based on:
@@ -158,7 +158,7 @@ func GetCaptchaHtmlAndCode(palette uint8, size string, numChars uint8, pool stri
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "Pool is Empty")
 		return captchaStruct
 	} //end if
-	if(!smart.StrRegexMatchString("^[A-Za-z0-9]+$", pool)) {
+	if(!smart.StrRegexMatch(`^[A-Za-z0-9]+$`, pool)) {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "Pool contains Invalid Characters: `" + pool + "`")
 		return captchaStruct
 	} //end if

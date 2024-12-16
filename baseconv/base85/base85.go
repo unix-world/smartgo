@@ -1,8 +1,8 @@
 
 // Go Lang Base85
-// (c) 2021-2023 unix-world.org
+// (c) 2021-present unix-world.org
 // License: BSD
-// v.20231129.2358
+// v.20241216.2358
 
 package base85
 

@@ -1,4 +1,4 @@
-v.20241123
+v.20241212
 Go 1.18 or later
 
-golang.org/x/net v0.31.0
+golang.org/x/net v0.32.0

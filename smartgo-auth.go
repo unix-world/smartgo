@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -424,7 +424,7 @@ func AuthIsValidUserName(user string) bool {
 	if((StrLen(user) < 5) || (StrLen(user) > 25)) { // std max username length is 25 ; min is 5
 		return false
 	} //end if
-	if(!StrRegexMatchString(REGEX_SAFE_HTTP_USER_NAME, user)) {
+	if(!StrRegexMatch(REGEX_SAFE_HTTP_USER_NAME, user)) {
 		return false
 	} //end if
 	//--
@@ -460,10 +460,10 @@ func AuthIsValidPassword(pass string) bool {
 	} //end if
 	//--
 	if( // password min complexity check ; disallow too simple passwords for security reasons ...
-		(StrRegexMatchString(`[A-Z]+`, pass) != true) || // must have at least one caps letter
-		(StrRegexMatchString(`[a-z]+`, pass) != true) || // must have at least one small letter
-		(StrRegexMatchString(`[0-9]+`, pass) != true) || // must have at least one digit
-		(StrRegexMatchString(`[^A-Za-z0-9]+`, pass) != true)) { // must have at least one special character
+		(StrRegexMatch(`[A-Z]+`, pass) != true) || // must have at least one caps letter
+		(StrRegexMatch(`[a-z]+`, pass) != true) || // must have at least one small letter
+		(StrRegexMatch(`[0-9]+`, pass) != true) || // must have at least one digit
+		(StrRegexMatch(`[^A-Za-z0-9]+`, pass) != true)) { // must have at least one special character
 		return false
 	} //end if
 	//--
@@ -483,7 +483,7 @@ func AuthIsValidTokenOpaque(token string) bool {
 	if((StrLen(token) < 48) || (StrLen(token) > 128)) { // {{{SYNC-MAX-AUTH-APIKEY-TOKEN-LENGTH}}}
 		return false
 	} //end if
-	if(!StrRegexMatchString(REGEX_SAFE_AUTH_OPAQUE_TOKEN, token)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_OPAQUE_TOKEN}}}
+	if(!StrRegexMatch(REGEX_SAFE_AUTH_OPAQUE_TOKEN, token)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_OPAQUE_TOKEN}}}
 		return false
 	} //end if
 	//--
@@ -503,7 +503,7 @@ func AuthIsValid2FACode(code string) bool {
 	if((StrLen(code) < 6) || (StrLen(code) > 8)) { // flexible, between 6 and 8 characters
 		return false
 	} //end if
-	if(!StrRegexMatchString(REGEX_SAFE_AUTH_2FA_CODE, code)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_2FA_CODE}}}
+	if(!StrRegexMatch(REGEX_SAFE_AUTH_2FA_CODE, code)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_2FA_CODE}}}
 		return false
 	} //end if
 	//--
@@ -630,7 +630,7 @@ func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMo
 			hashedPass = requiredPassword // bcrypt hashes are never are the same, keep the entry value ...
 			break
 		case ALGO_PASS_PLAIN: // encode as Blowfish using the app secret key, to avoid display plain password accidentally
-			sKey, _ := CryptoGetSecurityKey()
+			sKey, _ := AppGetSecurityKey()
 			hashedPass = BlowfishEncryptCBC(pass, sKey)
 			break
 		default:
@@ -771,7 +771,7 @@ func AuthUserTokenDefaultSepareParts(token string) (string, string, error) { // 
 
 func AuthGetDefaultUserPrivKey() string { // for internal use only !
 	//--
-	pkey, err := CryptoGetSecurityKey()
+	pkey, err := AppGetSecurityKey()
 	if(err != nil) {
 		return ""
 	} //end if

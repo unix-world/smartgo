@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ TPL (MARKERS-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -18,11 +18,13 @@ import (
 //-----
 
 const (
-	SPECIAL_TRIM string = "\n\r\x00\x0B"
+	SPECIAL_TRIM string = "\n\r\x00\x0B" // {{{SYNC-TPL-FIX-TRIM-PARTS}}}
 
 	UNDEF_VAR_NAME string = "Undef____V_a_r"
 
 	MTPL_FILE_EXTENSION string = ".mtpl.htm"
+
+	MAX_DOC_SIZE_TPL uint64 = SIZE_BYTES_16M
 )
 
 //-----
@@ -39,6 +41,10 @@ func RenderMainHtmlMarkersTpl(template string, arrobj map[string]string, arrpobj
 	//--
 	if(template == "") {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
+		return ""
+	} //end if
+	if(uint64(len(template)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
 		return ""
 	} //end if
 	//--
@@ -61,6 +67,10 @@ func RenderMarkersTpl(template string, arrobj map[string]string) string {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
 		return ""
 	} //end if
+	if(uint64(len(template)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//--
 	return MarkersTplRender(template, arrobj, false, false, true, false) // escape remaining syntax + is not main html
 	//--
@@ -80,6 +90,10 @@ func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arr
 	if(err != nil) {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
 		return "", err
+	} //end if
+	if(uint64(len(template)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized", mtplFile)
+		return "", NewError("TPL is OverSized")
 	} //end if
 	//--
 	if(StrTrimWhitespaces(template) == "") {
@@ -113,6 +127,10 @@ func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string) (string, er
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
 		return "", err
 	} //end if
+	if(uint64(len(template)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized", mtplFile)
+		return "", NewError("TPL is OverSized")
+	} //end if
 	//--
 	if(StrTrimWhitespaces(template) == "") {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty", mtplFile)
@@ -143,6 +161,10 @@ func MarkersTplEscapeTpl(tpl string) string {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
 		return ""
 	} //end if
+	if(uint64(len(tpl)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//--
 	return RawUrlEncode(tpl)
 	//--
@@ -157,18 +179,26 @@ func MarkersTplEscapeTpl(tpl string) string {
 func MarkersTplPrepareNosyntaxContent(tpl string) string {
 	//--
 	// low level usage only
-	// no warning on empty
 	//--
-	tpl = StrReplaceAll(tpl, "[###", "［###")
-	tpl = StrReplaceAll(tpl, "###]", "###］")
-	tpl = StrReplaceAll(tpl, "[%%%", "［%%%")
-	tpl = StrReplaceAll(tpl, "%%%]", "%%%］")
-	tpl = StrReplaceAll(tpl, "[@@@", "［@@@")
-	tpl = StrReplaceAll(tpl, "@@@]", "@@@］")
-	tpl = StrReplaceAll(tpl, "[:::", "［:::")
-	tpl = StrReplaceAll(tpl, ":::]", ":::］")
+	if(tpl == "") {
+		// no warning on empty
+		return ""
+	} //end if
+	if(uint64(len(tpl)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//--
-	return tpl
+	return StrTr(tpl, map[string]string{ // ok: order does not matter ; {{{SYNC-GOLANG-UNORDERED-MAP}}}
+		"[###": "［###",
+		"###]": "###］",
+		"[%%%": "［%%%",
+		"%%%]": "%%%］",
+		"[@@@": "［@@@",
+		"@@@]": "@@@］",
+		"[:::": "［:::",
+		":::]": ":::］",
+	})
 	//--
 } //END FUNCTION
 
@@ -176,18 +206,26 @@ func MarkersTplPrepareNosyntaxContent(tpl string) string {
 func MarkersTplRevertNosyntaxContent(tpl string) string {
 	//--
 	// low level usage only
-	// no warning on empty
 	//--
-	tpl = StrReplaceAll(tpl, "［###", "[###")
-	tpl = StrReplaceAll(tpl, "###］", "###]")
-	tpl = StrReplaceAll(tpl, "［%%%", "[%%%")
-	tpl = StrReplaceAll(tpl, "%%%］", "%%%]")
-	tpl = StrReplaceAll(tpl, "［@@@", "[@@@")
-	tpl = StrReplaceAll(tpl, "@@@］", "@@@]")
-	tpl = StrReplaceAll(tpl, "［:::", "[:::")
-	tpl = StrReplaceAll(tpl, ":::］", ":::]")
+	if(tpl == "") {
+		// no warning on empty
+		return ""
+	} //end if
+	if(uint64(len(tpl)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//--
-	return tpl
+	return StrTr(tpl, map[string]string{ // ok: order does not matter ; {{{SYNC-GOLANG-UNORDERED-MAP}}}
+		"［###": "[###",
+		"###］": "###]",
+		"［%%%": "[%%%",
+		"%%%］": "%%%]",
+		"［@@@": "[@@@",
+		"@@@］": "@@@]",
+		"［:::": "[:::",
+		":::］": ":::]",
+	})
 	//--
 } //END FUNCTION
 
@@ -195,7 +233,15 @@ func MarkersTplRevertNosyntaxContent(tpl string) string {
 func MarkersTplPrepareNosyntaxHtml(tpl string, isMainHtml bool) string {
 	//--
 	// low level usage only
-	// no warning on empty
+	//--
+	if(tpl == "") {
+		// no warning on empty
+		return ""
+	} //end if
+	if(uint64(len(tpl)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//--
 	tpl = StrReplaceAll(tpl, "[###", "&lbrack;&num;&num;&num;")
 	tpl = StrReplaceAll(tpl, "###]", "&num;&num;&num;&rbrack;")
@@ -226,7 +272,15 @@ func MarkersTplEscapeSyntaxContent(tpl string, isMainHtml bool) string {
 	//--
 	// low level usage only ; this is applied automatically on render
 	// escapes a markers TPL string before injecting into a TPL, to avoid interferences
-	// no warning on empty
+	//--
+	if(tpl == "") {
+		// no warning on empty
+		return ""
+	} //end if
+	if(uint64(len(tpl)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//--
 	tpl = StrReplaceAll(tpl, "[###", "⁅###¦")
 	tpl = StrReplaceAll(tpl, "###]", "¦###⁆")
@@ -256,6 +310,10 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
 		return ""
 	} //end if
+	if(uint64(len(template)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
+		return ""
+	} //end if
 	//-- syntax: r.20231228
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
@@ -271,7 +329,7 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 	if(arrpobj != nil) {
 		for k, v := range arrpobj {
 			if(k != "") {
-				if(StrRegexMatchString(regexPlaceholderVarName, k)) {
+				if(StrRegexMatch(regexPlaceholderVarName, k)) {
 					template = StrReplaceAll(template, "[:::" + k + ":::]", v)
 				} //end if
 			} //end if
@@ -293,6 +351,10 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 	//--
 	if(StrTrimWhitespaces(template) == "") {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
+		return ""
+	} //end if
+	if(uint64(len(template)) > MAX_DOC_SIZE_TPL) {
+		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
 		return ""
 	} //end if
 	//--
@@ -408,19 +470,29 @@ func markersTplDetectSubTemplates(template string) map[string]string {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
 		return nil
 	} //end if
-	//-- process if (conditionals)
+	//-- detect all sub templates
 //	var rExp string = `\[@@@SUB\-TEMPLATE\:([a-zA-Z0-9_\-\.\/\!\?\|]+)@@@\]` // {{{SYNC-TPL-EXPR-SUBTPL}}} ; full support, compatible with Smart.Framework.PHP
-	var rExp string = `\[@@@SUB\-TEMPLATE\:([a-zA-Z0-9_\-\.\/\|]+)@@@\]` // {{{SYNC-TPL-EXPR-SUBTPL}}} ; partial support, for Go only ; unsupported mode: `!?`
-	re, matches := StrRegex2FindAllStringMatches("PERL", rExp, template, 0, 0)
+	var rExp string = `\[@@@SUB\-TEMPLATE\:([a-zA-Z0-9_\-\.\/\|]+)@@@\]`     // {{{SYNC-TPL-EXPR-SUBTPL}}} ; partial support, for Go only ; unsupported mode: `!?`
 	var arrSTPLs map[string]string = map[string]string{}
+//	matches, errRx := StrRegex2FindAllMatches("PERL", rExp, template, 0, 0)
+	matches, errRx := StrRegexFindAllMatches(rExp, template, 0)
+	if(errRx != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Regex Failed", errRx)
+		return arrSTPLs
+	} //end if
 	for c := 0; c < len(matches); c++ {
 		//--
-		if m, e := re.FindStringMatch(matches[c]); m != nil && e == nil {
+		g := matches[c]
+		//--
+		if(len(g) != 2) { // expects 2 regex groups
 			//--
-			g := m.Groups()
+			log.Println("[WARNING]", CurrentFunctionName(), "Regex Group Size Error, Expected is # 2 but having #", len(g))
+			return arrSTPLs
 			//--
-			var tmp_stpl_expr string = string(g[0].String()) // the whole subtpl expression: [@@@SUB-TEMPLATE:sub-templates/sub-tpl.inc.mtpl.htm|xyz@@@]
-			var tmp_stpl_fpth string = string(g[1].String()) // the path part, includding escapes: sub-templates/sub-tpl.inc.mtpl.htm|xyz
+		} else {
+			//--
+			var tmp_stpl_expr string = g[0] // the whole subtpl expression: [@@@SUB-TEMPLATE:sub-templates/sub-tpl.inc.mtpl.htm|xyz@@@]
+			var tmp_stpl_fpth string = g[1] // the path part, includding escapes: sub-templates/sub-tpl.inc.mtpl.htm|xyz
 			//--
 			arrSTPLs[tmp_stpl_expr] = tmp_stpl_fpth
 			//--
@@ -562,24 +634,33 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 	} //end if
 	//-- process if (conditionals)
 	var rExp string = `(?s)\[%%%IF\:([a-zA-Z0-9_\-\.]+?)\:(@\=\=|@\!\=|@\<\=|@\<|@\>\=|@\>|\=\=|\!\=|\<\=|\<|\>\=|\>|\!%|%|\!\?|\?|\^~|\^\*|&~|&\*|\$~|\$\*)([^\[\]]*?);((\([0-9]+\))??)%%%\](.*?)??(\[%%%ELSE\:\1\4%%%\](.*?)??)??\[%%%\/IF\:\1\4%%%\]` // {{{SYNC-TPL-EXPR-IF}}} ; {{{SYNC-TPL-EXPR-IF-IN-LOOP}}}
-	re, matches := StrRegex2FindAllStringMatches("PERL", rExp, template, 0, 0)
+	matches, errRx := StrRegex2FindAllMatches("PERL", rExp, template, 0, 0)
+	if(errRx != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Regex Failed", errRx)
+		return template
+	} //end if
 	for c := 0; c < len(matches); c++ {
 		//--
-		if m, e := re.FindStringMatch(matches[c]); m != nil && e == nil {
+		g := matches[c]
+		//--
+		if(len(g) != 9) { // expects 9 regex groups
 			//--
-			g := m.Groups()
+			log.Println("[WARNING]", CurrentFunctionName(), "Regex Group Size Error, Expected is # 9 but having #", len(g))
+			return template
 			//--
-			var tmp_ifs_cond_block string 		= string(g[0].String()) 				// the whole conditional block [%%%IF:VARNAME:==xyz;%%%] .. ([%%%ELSE:VARNAME%%%] ..) [%%%/IF:VARNAME%%%]
-			var tmp_ifs_part_if string			= string(g[6].String()) 				// the part between IF and ELSE ; or the part between IF and /IF in the case that ELSE is missing
-			var tmp_ifs_part_else string		= string(g[8].String()) 				// the part between ELSE and /IF
-		//	var tmp_ifs_tag_if string			= "" 									// [%%%IF:VARNAME:==xyz;%%%]
-		//	var tmp_ifs_tag_else string			= "" 									// [%%%ELSE:VARNAME%%%]
-		//	var tmp_ifs_tag_endif string 		= "" 									// [%%%/IF:VARNAME%%%]
-			var tmp_ifs_var_if string 			= string(g[1].String()) 				// the 'VARNAME' part of IF
-			var tmp_ifs_var_else string 		= tmp_ifs_var_if 						// the 'VARNAME' part of ELSE
-			var tmp_ifs_var_endif string 		= tmp_ifs_var_if 						// the 'VARNAME' part of \IF
-			var tmp_ifs_operation string 		= string(g[2].String()) 				// the IF operation ; at the moment just '==' or '!=' are supported
-			var tmp_ifs_value string 			= string(g[3].String()) 				// the IF value to compare the VARNAME with
+		} else {
+			//--
+			var tmp_ifs_cond_block string 		= g[0] 				// the whole conditional block [%%%IF:VARNAME:==xyz;%%%] .. ([%%%ELSE:VARNAME%%%] ..) [%%%/IF:VARNAME%%%]
+			var tmp_ifs_part_if string			= g[6] 				// the part between IF and ELSE ; or the part between IF and /IF in the case that ELSE is missing
+			var tmp_ifs_part_else string		= g[8] 				// the part between ELSE and /IF
+		//	var tmp_ifs_tag_if string			= "" 				// [%%%IF:VARNAME:==xyz;%%%]
+		//	var tmp_ifs_tag_else string			= "" 				// [%%%ELSE:VARNAME%%%]
+		//	var tmp_ifs_tag_endif string 		= "" 				// [%%%/IF:VARNAME%%%]
+			var tmp_ifs_var_if string 			= g[1] 				// the 'VARNAME' part of IF
+			var tmp_ifs_var_else string 		= tmp_ifs_var_if 	// the 'VARNAME' part of ELSE
+			var tmp_ifs_var_endif string 		= tmp_ifs_var_if 	// the 'VARNAME' part of \IF
+			var tmp_ifs_operation string 		= g[2] 				// the IF operation ; at the moment just '==' or '!=' are supported
+			var tmp_ifs_value string 			= g[3] 				// the IF value to compare the VARNAME with
 			//--
 	//		log.Println("[DEBUG]", CurrentFunctionName(), "---------- : `" + tmp_ifs_cond_block + "`")
 	//	//	log.Println("[DEBUG]", CurrentFunctionName(), "[IF] : `" + tmp_ifs_tag_if + "`")
@@ -596,8 +677,8 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 			var isConditionalBlockERR string = ""
 			//-- check the conditional block: should not be empty
 			if(isConditionalBlockERR == "") {
-				if((StrTrimWhitespaces(tmp_ifs_cond_block) == "") || (StrPos(tmp_ifs_cond_block, "[%%%IF:") != 0)) {
-					isConditionalBlockERR = "Conditional IF/(ELSE)/IF block is empty"
+				if((StrTrimWhitespaces(tmp_ifs_cond_block) == "") || (StrStartsWith(tmp_ifs_cond_block, "[%%%IF:") != true)) {
+					isConditionalBlockERR = "Conditional IF/(ELSE)/IF block is empty or invalid"
 				} //end if
 			} //end if
 			//-- check if tag: should not be empty ; DISABLED, it is wrong !
@@ -620,7 +701,7 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 			} //end if
 			//-- check if var: should match a particular regex ; DISABLED, it is wrong !
 		//	if(isConditionalBlockERR == "") {
-		//		if(!StrRegexMatchString(regexIfVarName, tmp_ifs_var_if)) {
+		//		if(!StrRegexMatch(regexIfVarName, tmp_ifs_var_if)) {
 		//			isConditionalBlockERR = "IF var name is invalid: `" + tmp_ifs_var_if + "`"
 		//		} //end if
 		//	} //end if
@@ -736,6 +817,15 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 					} //end if
 					//--
 					var theConditionalResult = ""
+					//-- fix ###var###
+					//origIfsValue := tmp_ifs_value
+					if(StrStartsWith(tmp_ifs_value, "###") && StrEndsWith(tmp_ifs_value, "###")) { // compare with a comparison marker (from a variable) instead of static value
+						realIfVar := StrTrim(tmp_ifs_value, "#")
+						if((realIfVar != "") && ArrMapKeyExists(realIfVar, arrobj)) {
+							tmp_ifs_value = arrobj[realIfVar]
+						} //end if
+					} //end if
+					//log.Println("[DEBUG]", CurrentFunctionName(), "IF variable: `" + tmp_ifs_var_if + "` ; IF value [`" + origIfsValue + "`]:`" + tmp_ifs_value + "` ; Required value: `" + iKeyValue + "`")
 					//-- strings or numbers (compare all as strings)
 					if(tmp_ifs_operation == "==") {
 						if(iKeyValue == tmp_ifs_value) {
@@ -803,14 +893,12 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 						} //end if
 					//-- strings
 					} else if(tmp_ifs_operation == "^~") { // if variable starts with part, case sensitive
-					//	if(StrPos(iKeyValue, tmp_ifs_value) == 0) {
 						if(StrStartsWith(iKeyValue, tmp_ifs_value) == true) {
 							theConditionalResult = tmp_ifs_part_if
 						} else {
 							theConditionalResult = tmp_ifs_part_else
 						} //end if
 					} else if(tmp_ifs_operation == "^*") { // if variable starts with part, case insensitive
-					//	if(StrIPos(iKeyValue, tmp_ifs_value) == 0) {
 						if(StrIStartsWith(iKeyValue, tmp_ifs_value) == true) {
 							theConditionalResult = tmp_ifs_part_if
 						} else {
@@ -852,7 +940,7 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 						isConditionalBlockERR = "IF operation mismatch: `" + tmp_ifs_operation + "`"
 					} //end if else
 					//--
-					theConditionalResult = StrTrim(theConditionalResult, SPECIAL_TRIM) // special trim
+					theConditionalResult = StrTrim(theConditionalResult, SPECIAL_TRIM) // special trim ; {{{SYNC-TPL-FIX-TRIM-PARTS}}}
 					//--
 					if(theConditionalResult != "") {
 						if(StrContains(theConditionalResult, "[%%%IF:") == true) {
@@ -883,7 +971,7 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 
 func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, context string) string {
 	//--
-	defer PanicHandler()
+	defer PanicHandler() // regex compile
 	//--
 	if(template == "") {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is Empty")
@@ -895,7 +983,11 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 	var mKeyValue string = ""
 	var mKeyExists bool = false
 	//--
-	var regexMarkers = regexp.MustCompile(`\[\#\#\#([a-zA-Z0-9_\-\.]+)((\|[a-z0-9]+)*)\#\#\#\]`) // {{{SYNC-REGEX-MARKER-TEMPLATES}}} ; allow lowercase in golang, they can be json keys ; regex markers as in Javascript + lowercase
+	regexMarkers, errRx := regexp.Compile(`\[\#\#\#([a-zA-Z0-9_\-\.]+)((\|[a-z0-9]+)*)\#\#\#\]`) // {{{SYNC-REGEX-MARKER-TEMPLATES}}} ; allow lowercase in golang, they can be json keys ; regex markers as in Javascript + lowercase
+	if((errRx != nil) || (regexMarkers == nil)) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Regex Failed", errRx)
+		return template
+	} //end if
 	//--
 	for i, match := range regexMarkers.FindAllStringSubmatch(template, -1) {
 		//--
@@ -906,9 +998,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 		//--
 		if(context != "") {
 			if(StrContains(tmp_marker_key, ".") == true) {
-				if(StrStartsWith(tmp_marker_key, context)) {
-					tmp_marker_key = StrReplaceWithLimit(tmp_marker_key, context, "", 1)
-					tmp_marker_key = StrTrimLeft(tmp_marker_key, ".")
+				if(StrStartsWith(tmp_marker_key, context + ".")) {
+					tmp_marker_key = StrReplaceWithLimit(tmp_marker_key, context + ".", "", 1)
 					tmp_marker_key = StrTrimWhitespaces(tmp_marker_key) // leave keys as they are, CASE SENSITIVE, can be upper or lower or camer case {{{SYNC-GO-TPL-LOWER-UPPER-CAMELCASE-KEYS}}} ; the If syntax also uses like this
 				} //end if
 			} //end if
@@ -960,6 +1051,7 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 		if(tmp_marker_key != "") {
 			mKeyValue, mKeyExists = arrobj[tmp_marker_key]
 		} //end if
+		//log.Println("[DEBUG]", CurrentFunctionName(), "Context:", context, "Key:", tmp_marker_key, "Exists:", mKeyExists)
 		//--
 		if(mKeyExists == true) {
 			//--
@@ -999,12 +1091,12 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							} else if(escaping == "|num") { // Number (Float / Decimal / Integer)
 								tmp_marker_val = ParseStrAsFloat64StrFixedPrecision(tmp_marker_val)
 							//--
-						//	} else if(escaping == "|date") { // Expects Unix Epoch Time to format as YYYY-MM-DD
-							// TODO
-						//	} else if(escaping == "|datetime") { // Expects Unix Epoch Time to format as YYYY-MM-DD HH:II:SS
-							// TODO
-						//	} else if(escaping == "|datetimez") { // Expects Unix Epoch Time to format as YYYY-MM-DD HH:II:SS +0000
-							// TODO
+							} else if(escaping == "|date") { // Expects Unix Epoch Time to format as YYYY-MM-DD
+								tmp_marker_val = DateNoTimeFromUnixTimeLocal(ParseStrAsInt64(tmp_marker_val))
+							} else if(escaping == "|datetime") { // Expects Unix Epoch Time to format as YYYY-MM-DD HH:II:SS
+								tmp_marker_val = DateIsoFromUnixTimeLocal(ParseStrAsInt64(tmp_marker_val))
+							} else if(escaping == "|datetimez") { // Expects Unix Epoch Time to format as YYYY-MM-DD HH:II:SS +0000
+								tmp_marker_val = DateFromUnixTimeLocal(ParseStrAsInt64(tmp_marker_val))
 							//--
 							} else if(escaping == "|url") { // escape URL
 								tmp_marker_val = EscapeUrl(tmp_marker_val)
@@ -1036,8 +1128,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							} else if(escaping == "|nbsp") { // Transform Spaces and Tabs to nbsp;
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, " ", "&nbsp;")
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\t", "&nbsp;")
-						//	} else if(escaping == "|striptags") { // Apply Strip Tags
-								// TODO # https://github.com/grokify/html-strip-tags-go/blob/master/strip.go
+							} else if(escaping == "|striptags") { // Apply Strip Tags
+								tmp_marker_val = HTMLCodeStripTags(tmp_marker_val)
 							} else if(escaping == "|emptye") { // if empty, display [EMPTY]
 								if(StrTrimWhitespaces(tmp_marker_val) == "") {
 									tmp_marker_val = "[EMPTY]"
@@ -1232,19 +1324,29 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 		return ""
 	} //end if
 	//-- process loop (conditionals)
-	var rExp string = `(?s)\[%%%LOOP\:([a-zA-Z0-9_\-\.]+?)((\([0-9]+?\))??%)%%\](.*?)??\[%%%\/LOOP\:\1\2%%\]` // {{{SYNC-TPL-EXPR-LOOP}}}
-	re, matches := StrRegex2FindAllStringMatches("PERL", rExp, template, 0, 0)
+//	var rExp string = `(?s)\[%%%LOOP\:([a-zA-Z0-9_\-\.]+?)((\([0-9]+?\))??%)%%\](.*?)??\[%%%\/LOOP\:\1\2%%\]` // {{{SYNC-TPL-EXPR-LOOP}}}
+	var rExp string = `(?s)\[%%%LOOP\:([a-zA-Z0-9_\-\.]+?)((\([0-9]+?\))??%)%%\](.*?)??\[%%%\/LOOP\:\1\2%%\]\n?` // {{{SYNC-TPL-EXPR-LOOP}}} ; {{{SYNC-TPL-FIX-TRIM-PARTS}}}
+	matches, errRx := StrRegex2FindAllMatches("PERL", rExp, template, 0, 0)
+	if(errRx != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Regex Failed", errRx)
+		return template
+	} //end if
 	for c := 0; c < len(matches); c++ {
 		//--
-		if m, e := re.FindStringMatch(matches[c]); m != nil && e == nil {
+		g := matches[c]
+		//--
+		if(len(g) != 5) { // expects 5 regex groups
 			//--
-			g := m.Groups()
+			log.Println("[WARNING]", CurrentFunctionName(), "Regex Group Size Error, Expected is # 5 but having #", len(g))
+			return template
 			//--
-			var part_orig string 	= string(g[0].String())
-			var part_var string 	= string(g[1].String())
-		//	var part_uniqid string 	= string(g[2].String()) // not used ; ex: `%` or `(1)%` as starting uid
-		//	var part_uniqix string 	= string(g[3].String()) // not used ; ex: ``  or `(1)` as ending uid
-			var part_loop string 	= string(g[4].String())
+		} else {
+			//--
+			var part_orig string 	= g[0]
+			var part_var string 	= g[1]
+		//	var part_uniqid string 	= g[2] // not used ; ex: `%` or `(1)%` as starting uid
+		//	var part_uniqix string 	= g[3] // not used ; ex: ``  or `(1)` as ending uid
+			var part_loop string 	= g[4]
 			//--
 	//		log.Println("[DEBUG]", CurrentFunctionName(), "---------- : `" + part_orig + "`")
 	//		log.Println("[DEBUG]", CurrentFunctionName(), "[LOOP] VAR : `" + part_var + "`")
@@ -1252,7 +1354,7 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 	//	//	log.Println("[DEBUG]", CurrentFunctionName(), "[LOOP] UNIQIX : `" + part_uniqix + "`")
 	//		log.Println("[DEBUG]", CurrentFunctionName(), "[LOOP] LOOP : `" + part_loop + "`")
 			//--
-			if((part_orig != "") && (StrPos(part_orig, "[%%%LOOP:") == 0) && (StrContains(template, part_orig) == true)) { // check ; is possible that an identical loop to be present more than once, and if identical was replaced at a previous step ...
+			if((part_orig != "") && (StrStartsWith(part_orig, "[%%%LOOP:") == true) && (StrContains(template, part_orig) == true)) { // check ; is possible that an identical loop to be present more than once, and if identical was replaced at a previous step ...
 				//--
 			//	log.Println("[DEBUG]", CurrentFunctionName(), "---- Processing ---- : `" + part_orig + "`")
 				//--
@@ -1289,31 +1391,55 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 						dataReaderL := strings.NewReader(mKeyValue)
 						decoderL := json.NewDecoder(dataReaderL)
 						errL := decoderL.Decode(&arrL)
+						//--
 						if(errL != nil) {
+							//--
 							if(isLoopBlockERR == "") {
 								isLoopBlockERR = "LOOP var name `" + part_var + "` JSON Parse Error: `" + errL.Error() + "`"
 							} //end if
+							//--
 						} else if(arrL == nil) {
+							//--
 							template = StrReplaceAll(template, part_orig, "") // array contains no elements, perhaps an empty array as: []
+							//--
 						} else {
+							//--
 							var stpl string = ""
+							//--
 							var maxx int = len(arrL)
 							for d := 0; d < maxx; d++ {
+								//--
 								var ttpl string = ""
+								if(arrL[d] == nil) {
+									arrL[d] = map[string]string{}
+								} //end if
+								//-- prepare loop internal vars for markers and/or ifs
+								arrL[d]["_-ITERATOR-_"] = ConvertUInt64ToStr(uint64(d))
+								arrL[d]["-_INDEX_-"]    = ConvertUInt64ToStr(uint64(d) + 1)
+								arrL[d]["-_MAXSIZE_-"]  = ConvertUInt64ToStr(uint64(maxx))
+								arrL[d]["_-MAXCOUNT-_"] = ConvertUInt64ToStr(uint64(maxx) - 1)
+								//-- prepare loop internal vars for ifs, also add separate loop data to root to speedup accessing it without . (dot) context
 								var arrJ map[string]string = map[string]string{
 									loopContext: 		JsonNoErrChkEncode(arrL[d], false, false),
-									"_-ITERATOR-_": 	ConvertUInt64ToStr(uint64(d)),
-									"-_INDEX_-": 		ConvertUInt64ToStr(uint64(d) + 1),
-									"-_MAXSIZE_-": 		ConvertUInt64ToStr(uint64(maxx)),
-									"_-MAXCOUNT-_": 	ConvertUInt64ToStr(uint64(maxx) - 1),
+									"_-ITERATOR-_": 	arrL[d]["_-ITERATOR-_"],
+									"-_INDEX_-": 		arrL[d]["-_INDEX_-"],
+									"-_MAXSIZE_-": 		arrL[d]["-_MAXSIZE_-"],
+									"_-MAXCOUNT-_": 	arrL[d]["_-MAXCOUNT-_"],
 								}
+								//--
 							//	log.Println("[DEBUG]", CurrentFunctionName(), "loopContext", loopContext, arrJ)
-								ttpl = part_loop
+								//--
+							//	ttpl = part_loop
+								ttpl = StrTrim(part_loop, SPECIAL_TRIM) // special trim ; {{{SYNC-TPL-FIX-TRIM-PARTS}}}
 								ttpl = markersTplProcessIfSyntax(ttpl, arrJ)
 								ttpl = markersTplProcessMarkerSyntax(ttpl, arrL[d], loopContext)
-								stpl += ttpl
+								//--
+								stpl += ttpl // add each loop part
+								//--
 							} //end for
+							//--
 							template = StrReplaceAll(template, part_orig, stpl)
+							//--
 						} //end if else
 						//--
 					} //end if
@@ -1350,9 +1476,18 @@ func readTPLFile(mtplFile string) (string, error) {
 	if(!StrEndsWith(mtplFile, MTPL_FILE_EXTENSION)) {
 		return "", NewError("Invalid TPL File Extension")
 	} //end if
-	template, err := SafePathFileRead(mtplFile, false)
-	if(err != nil) {
-		return "", err
+	//--
+	fileSize, errSize := SafePathFileGetSize(mtplFile, false)
+	if(errSize != nil) {
+		return "", errSize
+	} //end if
+	if(uint64(fileSize) > MAX_DOC_SIZE_TPL) {
+		return "", NewError("TPL is OverSized")
+	} //end if
+	//--
+	template, errRd := SafePathFileRead(mtplFile, false)
+	if(errRd != nil) {
+		return "", errRd
 	} //end if
 	if(template == "") {
 		return "", NewError("TPL File is Unreadable or Empty")

@@ -12,10 +12,53 @@ import (
 	"context"
 	"database/sql/driver"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 )
 
 type connector struct {
-	cfg *Config // immutable private copy.
+	cfg               *Config // immutable private copy.
+	encodedAttributes string  // Encoded connection attributes.
+}
+
+func encodeConnectionAttributes(cfg *Config) string {
+	connAttrsBuf := make([]byte, 0)
+
+	// default connection attributes
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrClientName)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrClientNameValue)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrOS)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrOSValue)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrPlatform)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrPlatformValue)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrPid)
+	connAttrsBuf = appendLengthEncodedString(connAttrsBuf, strconv.Itoa(os.Getpid()))
+	serverHost, _, _ := net.SplitHostPort(cfg.Addr)
+	if serverHost != "" {
+		connAttrsBuf = appendLengthEncodedString(connAttrsBuf, connAttrServerHost)
+		connAttrsBuf = appendLengthEncodedString(connAttrsBuf, serverHost)
+	}
+
+	// user-defined connection attributes
+	for _, connAttr := range strings.Split(cfg.ConnectionAttributes, ",") {
+		k, v, found := strings.Cut(connAttr, ":")
+		if !found {
+			continue
+		}
+		connAttrsBuf = appendLengthEncodedString(connAttrsBuf, k)
+		connAttrsBuf = appendLengthEncodedString(connAttrsBuf, v)
+	}
+
+	return string(connAttrsBuf)
+}
+
+func newConnector(cfg *Config) *connector {
+	encodedAttributes := encodeConnectionAttributes(cfg)
+	return &connector{
+		cfg:               cfg,
+		encodedAttributes: encodedAttributes,
+	}
 }
 
 // Connect implements driver.Connector interface.
@@ -23,43 +66,56 @@ type connector struct {
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	var err error
 
+	// Invoke beforeConnect if present, with a copy of the configuration
+	cfg := c.cfg
+	if c.cfg.beforeConnect != nil {
+		cfg = c.cfg.Clone()
+		err = c.cfg.beforeConnect(ctx, cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// New mysqlConn
 	mc := &mysqlConn{
 		maxAllowedPacket: maxPacketSize,
 		maxWriteSize:     maxPacketSize - 1,
 		closech:          make(chan struct{}),
-		cfg:              c.cfg,
+		cfg:              cfg,
+		connector:        c,
 	}
 	mc.parseTime = mc.cfg.ParseTime
 
 	// Connect to Server
-	dialsLock.RLock()
-	dial, ok := dials[mc.cfg.Net]
-	dialsLock.RUnlock()
-	if ok {
-		dctx := ctx
-		if mc.cfg.Timeout > 0 {
-			var cancel context.CancelFunc
-			dctx, cancel = context.WithTimeout(ctx, c.cfg.Timeout)
-			defer cancel()
-		}
-		mc.netConn, err = dial(dctx, mc.cfg.Addr)
-	} else {
-		nd := net.Dialer{Timeout: mc.cfg.Timeout}
-		mc.netConn, err = nd.DialContext(ctx, mc.cfg.Net, mc.cfg.Addr)
+	dctx := ctx
+	if mc.cfg.Timeout > 0 {
+		var cancel context.CancelFunc
+		dctx, cancel = context.WithTimeout(ctx, c.cfg.Timeout)
+		defer cancel()
 	}
 
+	if c.cfg.DialFunc != nil {
+		mc.netConn, err = c.cfg.DialFunc(dctx, mc.cfg.Net, mc.cfg.Addr)
+	} else {
+		dialsLock.RLock()
+		dial, ok := dials[mc.cfg.Net]
+		dialsLock.RUnlock()
+		if ok {
+			mc.netConn, err = dial(dctx, mc.cfg.Addr)
+		} else {
+			nd := net.Dialer{}
+			mc.netConn, err = nd.DialContext(dctx, mc.cfg.Net, mc.cfg.Addr)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
+	mc.rawConn = mc.netConn
 
 	// Enable TCP Keepalives on TCP connections
 	if tc, ok := mc.netConn.(*net.TCPConn); ok {
 		if err := tc.SetKeepAlive(true); err != nil {
-			// Don't send COM_QUIT before handshake.
-			mc.netConn.Close()
-			mc.netConn = nil
-			return nil, err
+			c.cfg.Logger.Print(err)
 		}
 	}
 
@@ -92,7 +148,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	authResp, err := mc.auth(authData, plugin)
 	if err != nil {
 		// try the default auth plugin, if using the requested plugin failed
-		errLog.Print("could not use requested auth plugin '"+plugin+"': ", err.Error())
+		c.cfg.Logger.Print("could not use requested auth plugin '"+plugin+"': ", err.Error())
 		plugin = defaultAuthPlugin
 		authResp, err = mc.auth(authData, plugin)
 		if err != nil {
@@ -127,6 +183,25 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 	if mc.maxAllowedPacket < maxPacketSize {
 		mc.maxWriteSize = mc.maxAllowedPacket
+	}
+
+	// Charset: character_set_connection, character_set_client, character_set_results
+	if len(mc.cfg.charsets) > 0 {
+		for _, cs := range mc.cfg.charsets {
+			// ignore errors here - a charset may not exist
+			if mc.cfg.Collation != "" {
+				err = mc.exec("SET NAMES " + cs + " COLLATE " + mc.cfg.Collation)
+			} else {
+				err = mc.exec("SET NAMES " + cs)
+			}
+			if err == nil {
+				break
+			}
+		}
+		if err != nil {
+			mc.Close()
+			return nil, err
+		}
 	}
 
 	// Handle DSN Params

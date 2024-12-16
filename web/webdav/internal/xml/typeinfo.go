@@ -1,7 +1,7 @@
 
 // SmartGo :: WebDAV / XML :: TypeInfo
-// r.20241125.2358 :: STABLE
-// (c) 2024 unix-world.org
+// r.20241216.2358 :: STABLE
+// (c) 2024-present unix-world.org
 
 // Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style

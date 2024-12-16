@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ STRINGS ]
 
 // REQUIRE: go 1.19 or later
@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	REGEXP2_DEFAULT_MAX_RECURSION uint32 = 800000 	// Default REGEXP2 Recursion Limit: 800K
-	REGEXP2_DEFAULT_MAX_TIMEOUT uint8 = 1			// Default REGEXP2 Max Timeout 1 Second(s)
+	REGEXP2_DEFAULT_MAX_RECURSION uint32 	= 1000000 	// Default REGEXP2 Recursion Limit: 1 million
+	REGEXP2_DEFAULT_MAX_TIMEOUT uint8 		=       1	// Default REGEXP2 Max Timeout 1 Second(s)
 )
 
 
@@ -129,9 +129,14 @@ func Implode(glue string, pieces []string) string {
 //-----
 
 
-// case sensitive, find position of first occurrence of string in a string ; multi-byte safe
+// case sensitive, find position of first occurrence of string in a string
 // return -1 if can not find the substring or the position of needle in haystack
-func StrPos(haystack string, needle string) int {
+func StrPos(haystack string, needle string, binary bool) int {
+	//--
+	// for PHP compatibility (multi-byte safe), use: binary = false
+	//--
+	// Benchmark: using this to test if a string starts with some part is slow 218.542µs vs StrStartsWith 35.542µs for a loop of 10000 test cycles
+	// even if the rune part was not used it was still slow, 175.792µs vs 37.833µs
 	//--
 	if((haystack == "") || (needle == "")) {
 		return -1
@@ -143,6 +148,10 @@ func StrPos(haystack string, needle string) int {
 		return -1 // make it standard return
 	} //end if
 	//--
+	if(binary == true) {
+		return pos
+	} //end if
+	//--
 	rs := []rune(haystack[0:pos])
 	//--
 	return len(rs)
@@ -150,18 +159,26 @@ func StrPos(haystack string, needle string) int {
 } //END FUNCTION
 
 
-// case insensitive, find position of first occurrence of string in a string ; multi-byte safe
+// case insensitive, find position of first occurrence of string in a string ; PHP compatible
 // return -1 if can not find the substring or the position of needle in haystack
-func StrIPos(haystack, needle string) int {
+func StrIPos(haystack string, needle string, binary bool) int {
 	//--
-	return StrPos(StrToLower(haystack), StrToLower(needle))
+	// for PHP compatibility (multi-byte safe), use: binary = false
+	//--
+	// Benchmark: use StrIStartsWith() which is much faster instead of this to test if a string starts with some part
+	//--
+	return StrPos(StrToLower(haystack), StrToLower(needle), binary)
 	//--
 } //END FUNCTION
 
 
-// case sensitive, find position of last occurrence of string in a string ; multi-byte safe
+// case sensitive, find position of last occurrence of string in a string ; PHP compatible
 // return -1 if can not find the substring or the position of needle in haystack
-func StrRPos(haystack string, needle string) int {
+func StrRPos(haystack string, needle string, binary bool) int {
+	//--
+	// for PHP compatibility (multi-byte safe), use: binary = false
+	//--
+	// Benchmark: use StrEndsWith() which is much faster instead of this to test if a string ends with some part
 	//--
 	if((haystack == "") || (needle == "")) {
 		return -1
@@ -173,6 +190,10 @@ func StrRPos(haystack string, needle string) int {
 		return -1 // make it standard return
 	} //end if
 	//--
+	if(binary == true) {
+		return pos
+	} //end if
+	//--
 	rs := []rune(haystack[0:pos])
 	//--
 	return len(rs)
@@ -180,11 +201,15 @@ func StrRPos(haystack string, needle string) int {
 } //END FUNCTION
 
 
-// case insensitive, find position of last occurrence of string in a string ; multi-byte safe
+// case insensitive, find position of last occurrence of string in a string ; PHP compatible
 // return -1 if can not find the substring or the position of needle in haystack
-func StrRIPos(haystack, needle string) int {
+func StrRIPos(haystack string, needle string, binary bool) int {
 	//--
-	return StrRPos(StrToLower(haystack), StrToLower(needle))
+	// for PHP compatibility (multi-byte safe), use: binary = false
+	//--
+	// Benchmark: use StrIEndsWith() which is much faster instead of this to test if a string ends with some part
+	//--
+	return StrRPos(StrToLower(haystack), StrToLower(needle), binary)
 	//--
 } //END FUNCTION
 
@@ -246,9 +271,7 @@ func StrTrim(s string, cutset string) string {
 		return ""
 	} //end if
 	//--
-	s = strings.Trim(s, cutset)
-	//--
-	return s
+	return strings.Trim(s, cutset)
 	//--
 } //END FUNCTION
 
@@ -259,9 +282,7 @@ func StrTrimLeft(s string, cutset string) string {
 		return ""
 	} //end if
 	//--
-	s = strings.TrimLeft(s, cutset)
-	//--
-	return s
+	return strings.TrimLeft(s, cutset)
 	//--
 } //END FUNCTION
 
@@ -272,9 +293,7 @@ func StrTrimRight(s string, cutset string) string {
 		return ""
 	} //end if
 	//--
-	s = strings.TrimRight(s, cutset)
-	//--
-	return s
+	return strings.TrimRight(s, cutset)
 	//--
 } //END FUNCTION
 
@@ -318,6 +337,9 @@ func StrMBSubstr(s string, start int, stop int) string {
 	if((stop <= 0) || (stop > max)) {
 		stop = max
 	} //end if
+	if(stop <= start) {
+		return ""
+	} //end if
 	//--
 	return string(runes[start:stop])
 	//--
@@ -338,8 +360,11 @@ func StrSubstr(s string, start int, stop int) string {
 	if((stop <= 0) || (stop > max)) {
 		stop = max
 	} //end if
+	if(stop <= start) {
+		return ""
+	} //end if
 	//--
-	return string(s[start:stop])
+	return s[start:stop]
 	//--
 } //END FUNCTION
 
@@ -348,6 +373,10 @@ func StrSubstr(s string, start int, stop int) string {
 
 
 func StrNormalizeSpaces(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
 	//--
 	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, " ")
 	s = StrReplaceAll(s, CARRIAGE_RETURN, " ")
@@ -365,7 +394,70 @@ func StrNormalizeSpaces(s string) string {
 } //END FUNCTION
 
 
+func StrToValidUTF8Fix(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	return strings.ToValidUTF8(s, INVALID_CHARACTER)
+	//--
+} //END FUNCTION
+
+
 //-----
+
+
+func StrSpnChr(s string, c rune, ofs uint32, length uint32) uint32 {
+	//--
+	var max uint32 = uint32(len(s))
+	if(max <= 0) {
+		return 0
+	} //end if
+	if(ofs >= max) {
+		return 0
+	} //end if
+	//--
+	if(length <= 0) {
+		length = max
+	} //end if
+	//--
+	var i uint32 = 0
+	var cnt uint32 = 0
+	for i=ofs; i<max; i++ {
+		if(string(s[i]) == string(c)) {
+			cnt++
+		} else {
+			break
+		} //end if
+		if(cnt >= length) {
+			break
+		} //end if
+	} //end for
+	//--
+	return cnt
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func StrTr(str string, replace map[string]string) string { // php2golang.com # function.strtr
+	//--
+	// IMPORTANT: use this *ONLY* if the replacements order does not matter ; golang have only UNORDERED MAPS ; {{{SYNC-GOLANG-UNORDERED-MAP}}}
+	//--
+	if((len(replace) <= 0) || (len(str) <= 0)) {
+		return str
+	} //end if
+	//--
+	for old, new := range replace {
+		str = strings.ReplaceAll(str, old, new)
+	} //end for
+	//--
+	return str
+	//--
+} //END FUNCTION
 
 
 // case sensitive replacer
@@ -386,9 +478,12 @@ func StrReplaceAll(s string, part string, replacement string) string {
 
 
 // case insensitive replacer
-func StrIReplaceWithLimit(s, part, replacement string, limit int) string {
+func StrIReplaceWithLimit(s string, part string, replacement string, limit int) string {
 	//--
-	if((part == replacement) || (part == "")) {
+	if(s == "") {
+		return ""
+	} //end if
+	if((part == "") || (part == replacement)) {
 		return s // avoid allocation
 	} //end if
 	//--
@@ -443,6 +538,10 @@ func StrIReplaceAll(s string, part string, replacement string) string {
 
 func StrToLower(str string) string {
 	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
 	return strings.ToLower(str)
 	//--
 } //END FUNCTION
@@ -450,19 +549,31 @@ func StrToLower(str string) string {
 
 func StrToUpper(str string) string {
 	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
 	return strings.ToUpper(str)
 	//--
 } //END FUNCTION
 
 
+//-----
+
+
 func StrUcFirst(s string) string {
-	//-- the previous approach was to take the first character from string, make it upper using strings and append the rest ; this appear a better approach
+	//--
+	// the 1st approach was to take the first character from string, make it upper using strings and append the rest ; this appear a better approach
+	// the 2nd approach is without unicode which is slow and unicode.ToUpper is differen than strings.ToUpper, so now is using strings.ToUpper
+	//--
 	if(s == "") {
 		return ""
 	} //end if
 	//--
 	runes := []rune(s)
-	runes[0] = unicode.ToUpper(runes[0])
+//	runes[0] = unicode.ToUpper(runes[0])
+	cRune := []rune(strings.ToUpper(string(runes[0])))
+	runes[0] = cRune[0]
 	//--
 	return string(runes)
 	//--
@@ -562,15 +673,7 @@ func StrChunkSplit(body string, chunklen uint, end string) string { // github.co
 //-----
 
 
-// StrWordCount str_word_count()
-func StrWordCount(str string) []string { // github.com/syyongx/php2go/blob/master/php.go
-	//--
-	return strings.Fields(str)
-	//--
-} //END FUNCTION
-
-
-// Strlen strlen()
+// PHP strlen()
 func StrLen(str string) int {
 	//--
 	return len(str)
@@ -578,10 +681,18 @@ func StrLen(str string) int {
 } //END FUNCTION
 
 
-// MbStrlen mb_strlen()
+// PHP mb_strlen()
 func StrUnicodeLen(str string) int { // github.com/syyongx/php2go/blob/master/php.go
 	//-- alias: StrMBLen()
 	return utf8.RuneCountInString(str)
+	//--
+} //END FUNCTION
+
+
+// PHP str_word_count()
+func StrWordCount(str string) []string { // github.com/syyongx/php2go/blob/master/php.go
+	//--
+	return strings.Fields(str)
 	//--
 } //END FUNCTION
 
@@ -631,7 +742,7 @@ func StrDeaccent(s string) string {
 	//--
 	result, _, _ := transform.String(t, s)
 	//--
-	return string(result)
+	return result
 	//--
 } //END FUNCTION
 
@@ -639,43 +750,173 @@ func StrDeaccent(s string) string {
 //-----
 
 
+func StrRegexCallbackReplaceWithLimit(rexpr string, str string, replFx func(mgroups []string) string, limit int) string {
+	//--
+	defer PanicHandler() // regex compile
+	//--
+	// this method is a modified blend, inspired from the following source code:
+	// https://github.com/agext/regexp # License: Apache 2.0
+	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
+	re, errRx := regexp.Compile(rexpr)
+	if((errRx != nil) || (re == nil)) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp Expression", rexpr, errRx)
+		return ""
+	} //end if
+	//--
+	if(replFx == nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Regexp Replace Function is Null", rexpr)
+		return str
+	} //end if
+	//--
+	result := ""
+	lastIndex := 0
+	matches := re.FindAllSubmatchIndex([]byte(str), limit)
+	for _, v := range matches {
+		var groups []string
+		for i := 0; i < len(v); i += 2 {
+			if v[i] == -1 || v[i+1] == -1 {
+				groups = append(groups, "")
+			} else {
+				groups = append(groups, str[v[i]:v[i+1]])
+			} //end if else
+		} //end for
+		result += str[lastIndex:v[0]] + replFx(groups)
+		lastIndex = v[1]
+	} //end for
+	//--
+	return result + str[lastIndex:]
+	//--
+} //END FUNCTION
+
+
+func StrRegexCallbackReplaceAll(rexpr string, str string, replFx func(mgroups []string) string) string {
+	//--
+	defer PanicHandler() // regex compile
+	//--
+	return StrRegexCallbackReplaceWithLimit(rexpr, str, replFx, -1)
+	//--
+} //END FUNCTION
+
+
 func StrRegexReplaceAll(rexpr string, s string, repl string) string {
+	//--
+	defer PanicHandler() // regex compile
 	//--
 	if(s == "") {
 		return ""
 	} //end if
 	//--
-	re := regexp.MustCompile(rexpr)
-	return string(re.ReplaceAllString(s, repl))
+	re, errRx := regexp.Compile(rexpr)
+	if((errRx != nil) || (re == nil)) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp Expression", rexpr, errRx)
+		return ""
+	} //end if
+	//--
+	return re.ReplaceAllString(s, repl)
 	//--
 } //END FUNCTION
 
 
-func StrRegexMatchString(rexpr string, s string) bool {
+func StrRegexReplaceFirst(rexpr string, s string, repl string) string {
 	//--
-	if((StrTrimWhitespaces(rexpr) == "") || (s == "")) { // s must NOT be trimmed
+	defer PanicHandler() // regex compile
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	matches, err := StrRegexFindFirstMatch(rexpr, s)
+	if(err != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "ERR:", rexpr, err)
+		return ""
+	} //end if
+	//--
+	if(len(matches) > 0) {
+		s = StrReplaceWithLimit(s, matches[0], repl, 1)
+	} //end if
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func StrRegexMatch(rexpr string, s string) bool {
+	//--
+	defer PanicHandler() // regex compile
+	//--
+	if(s == "") {
 		return false
 	} //end if
 	//--
-	matched, _ := regexp.MatchString(rexpr, s)
+	matched, errRx := regexp.MatchString(rexpr, s)
+	if(errRx != nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp Expression", rexpr, errRx)
+		return false
+	} //end if
 	//--
 	return matched
 	//--
 } //END FUNCTION
 
 
-func StrRegex2FindAllStringMatches(mode string, rexp string, s string, maxRecursion uint32, maxTimeOut uint8) (rx *regexp2.Regexp, mh []string) {
+func StrRegexFindFirstMatch(rexp string, s string) ([]string, error) {
 	//--
-	// mode: "ECMA" | "RE2" | "PERL"
+	defer PanicHandler() // regex compile
 	//--
-	var flags regexp2.RegexOptions = 0 // the default flag is: 0 (.NET / Perl compatibility mode)
-	mode = StrToUpper(StrTrimWhitespaces(mode))
-	if(mode == "ECMA") {
-		flags = regexp2.ECMAScript
-	} else if(mode == "RE2") {
-		flags = regexp2.RE2
-	} else { // default Perl / .Net
-		mode = "PERL"
+	var match []string = []string{}
+	//--
+	if(s == "") {
+		return match, nil
+	} //end if
+	//--
+	matches, err := StrRegexFindAllMatches(rexp, s, 1)
+	if(err != nil) {
+		return match, err
+	} //end if
+	if(len(matches) != 1) {
+		return match, nil
+	} //end if
+	//--
+	return matches[0], nil
+	//--
+} //END FUNCTION
+
+
+func StrRegex2FindFirstMatch(mode string, rexp string, s string, maxTimeOut uint8) ([]string, error) {
+	//--
+	defer PanicHandler() // regex compile
+	//--
+	var match []string = []string{}
+	//--
+	if(s == "") {
+		return match, nil
+	} //end if
+	//--
+	matches, err := StrRegex2FindAllMatches(mode, rexp, s, 1, maxTimeOut)
+	if(err != nil) {
+		return match, err
+	} //end if
+	if(len(matches) != 1) {
+		return match, nil
+	} //end if
+	//--
+	return matches[0], nil
+	//--
+} //END FUNCTION
+
+
+func StrRegexFindAllMatches(rexp string, s string, maxRecursion uint32) ([][]string, error) {
+	//--
+	defer PanicHandler() // regex compile
+	//--
+	var matches [][]string = [][]string{}
+	//--
+	if(s == "") {
+		return matches, nil
 	} //end if
 	//--
 	var max int = int(maxRecursion) // max recursion
@@ -683,37 +924,128 @@ func StrRegex2FindAllStringMatches(mode string, rexp string, s string, maxRecurs
 		max = int(REGEXP2_DEFAULT_MAX_RECURSION)
 	} //end if
 	//--
-	var timeout int = int(maxTimeOut) // max timeout
+	re, errRx := regexp.Compile(rexp)
+	if((errRx != nil) || (re == nil)) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp Expression, Error:", rexp, errRx)
+		return matches, NewError("Invalid Regexp Expression, Error")
+	} //end if
+	if(re == nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp2 Expression, Null:", rexp)
+		return matches, NewError("Invalid Regexp Expression, Null")
+	} //end if
+	matches = re.FindAllStringSubmatch(s, max)
+	if(matches == nil) {
+		matches = [][]string{}
+	} //end if
+	//--
+	return matches, nil
+	//--
+} //END FUNCTION
+
+
+func StrRegex2FindAllMatches(mode string, rexp string, s string, maxRecursion uint32, maxTimeOut uint8) ([][]string, error) {
+	//--
+	// mode: "ECMA" | "RE2" | "PERL" (default)
+	//--
+	defer PanicHandler() // regex compile
+	//--
+	var matches [][]string = [][]string{}
+	//--
+	mode = StrToUpper(StrTrimWhitespaces(mode))
+	var flags regexp2.RegexOptions
+	if(mode == "PERL") {
+		flags = 0 // the default flag is: 0 (.NET / Perl compatibility mode)
+	} else if(mode == "ECMA") {
+		flags = regexp2.ECMAScript // Javascript compatibility mode
+	} else if(mode == "RE2") {
+		flags = regexp2.RE2 // RE2 (regexp package) compatibility mode
+	} else {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp2 Mode:", rexp, mode)
+		return matches, NewError("Invalid Regexp2 Mode: `" + mode + "`")
+	} //end if
+	//--
+	if(s == "") {
+		return matches, nil
+	} //end if
+	//--
+	var max int64 = int64(maxRecursion) // max recursion
+	var isNotLimited bool = false
+	if(max <= 0) {
+		max = int64(REGEXP2_DEFAULT_MAX_RECURSION)
+		isNotLimited = true
+	} //end if
+	//--
+	var timeout int64 = int64(maxTimeOut) // max timeout
 	if(timeout <= 0) {
-		timeout = int(REGEXP2_DEFAULT_MAX_TIMEOUT)
+		timeout = int64(REGEXP2_DEFAULT_MAX_TIMEOUT)
 	} else if(timeout > 60) {
 		timeout = 60
 	} //end if
 	//--
-	var matches []string
-	re := regexp2.MustCompile(rexp, flags)
+	re, errRx := regexp2.Compile(rexp, flags)
+	if((errRx != nil) || (re == nil)) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp2 Expression, ERR:", rexp, errRx)
+		return matches, NewError("Invalid Regexp2 Expression, Error")
+	} //end if
+	if(re == nil) {
+		log.Println("[WARNING]", CurrentFunctionName(), "Invalid Regexp2 Expression, Null:", rexp)
+		return matches, NewError("Invalid Regexp2 Expression, Null")
+	} //end if
 	re.MatchTimeout = time.Duration(timeout) * time.Second
-	m, _ := re.FindStringMatch(s)
-	for m != nil {
-		matches = append(matches, m.String())
-		m, _ = re.FindNextMatch(m)
-		max--
-		if(max <= 0) {
-			log.Println("[WARNING] " + CurrentFunctionName() + ": Regexp2 max recursion limit ...")
+	//--
+	m, errFind := re.FindStringMatch(s)
+	var step uint64 = 0
+	for {
+		//--
+		if(errFind != nil) {
+			log.Println("[WARNING]", CurrentFunctionName(), "Regexp2 Find Failed:", rexp, errFind, "at step:", step)
+			return matches, NewError("Regexp2 Find Failed")
+		} //end if
+		if(m == nil) {
 			break
 		} //end if
+		//--
+		g := m.Groups()
+		if(g == nil) {
+			log.Println("[WARNING]", CurrentFunctionName(), "Regexp2 Find Group Failed (Null):", rexp, "at step:", step)
+			return matches, NewError("Regexp2 Find Group Failed, Null")
+		} //end if
+		if(len(g) <= 0) { // at least group 0 and group 1 should exist if is a regex match
+			log.Println("[WARNING]", CurrentFunctionName(), "Regexp2 Find Group Failed (Empty):", rexp, "at step:", step)
+			return matches, NewError("Regexp2 Find Group Failed, Empty")
+		} //end if
+		//--
+		var match []string
+		for i:=0; i<len(g); i++ {
+			match = append(match, g[i].String())
+		} //end for
+		if(len(match) != len(g)) {
+			log.Println("[WARNING]", CurrentFunctionName(), "Regexp2 Find Group Failed (Sync):", rexp, "at step:", step)
+			return matches, NewError("Regexp2 Find Group Failed, Sync")
+		} //end if
+		matches = append(matches, match)
+		//--
+		m, errFind = re.FindNextMatch(m)
+		step++
+		//--
+		max--
+		if(max <= 0) {
+			if(isNotLimited) { // if not express limited, this is an error
+				log.Println("[WARNING]", CurrentFunctionName(), "Regexp2 max recursion limit forced stop ... on Expression:", rexp, "at step:", step)
+				return matches, NewError("Regexp2 Max Recursion Limit")
+			} else {
+				return matches, nil // no error, if express limited, to emulate the exact behaviour of StrRegexFindAllMatches()
+			} //end if else
+			break
+		} //end if
+		//--
 	} //end for
 	//--
-	return re, matches
+	if(matches == nil) {
+		matches = [][]string{}
+	} //end if
 	//--
-//	// SAMPLE USAGE:
-//	re, matches := StrRegex2FindAllStringMatches("PERL", `[a-z]+`, `Something to match`, 0, 0)
-//	for c := 0; c < len(matches); c++ {
-//		if m, e := re.FindStringMatch(matches[c]); m != nil && e == nil {
-//			g := m.Groups()
-//			log.Println(g[0].String(), g[1].String(), "...")
-//		} //end if
-//	} //end for
+	return matches, nil
 	//--
 } //END FUNCTION
 

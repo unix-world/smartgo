@@ -15,7 +15,7 @@ import (
 	"net"
 	"os"
 	"os/user"
-	"path"
+//	"path" //-- unixman: fix from upstream
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -233,7 +233,11 @@ func (cn *conn) handlePgpass(o values) {
 	if _, ok := o["password"]; ok {
 		return
 	}
-	filename := os.Getenv("PGPASSFILE")
+	//-- unixman: fix from upstream
+//	filename := os.Getenv("PGPASSFILE")
+	// Get passfile from the options
+	filename := o["passfile"]
+	//-- #
 	if filename == "" {
 		// XXX this code doesn't work on Windows where the default filename is
 		// XXX %APPDATA%\postgresql\pgpass.conf
@@ -436,8 +440,14 @@ func dial(ctx context.Context, d Dialer, o values) (net.Conn, error) {
 func network(o values) (string, string) {
 	host := o["host"]
 
-	if strings.HasPrefix(host, "/") {
-		sockPath := path.Join(host, ".s.PGSQL."+o["port"])
+	//-- unixman: fix from upstream
+//	if strings.HasPrefix(host, "/") {
+//		sockPath := path.Join(host, ".s.PGSQL."+o["port"])
+	// UNIX domain sockets are either represented by an (absolute) file system
+	// path or they live in the abstract name space (starting with an @).
+	if filepath.IsAbs(host) || strings.HasPrefix(host, "@") {
+		sockPath := filepath.Join(host, ".s.PGSQL."+o["port"])
+	//--#
 		return "unix", sockPath
 	}
 
@@ -2038,6 +2048,10 @@ func parseEnviron(env []string) (out map[string]string) {
 			accrue("user")
 		case "PGPASSWORD":
 			accrue("password")
+		//-- unixman: fix from upstream
+		case "PGPASSFILE":
+			accrue("passfile")
+		//-- #
 		case "PGSERVICE", "PGSERVICEFILE", "PGREALM":
 			unsupported()
 		case "PGOPTIONS":

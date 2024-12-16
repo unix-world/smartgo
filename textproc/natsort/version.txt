@@ -1,0 +1,4 @@
+github.com/maruel/natural @ head.20241210
+
+go 1.21
+

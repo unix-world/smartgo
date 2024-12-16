@@ -1,6 +1,8 @@
 package parser
 
-import "github.com/unix-world/smartgo/markup/markdown/ast"
+import (
+	"github.com/unix-world/smartgo/markup/markdown/ast"
+)
 
 // check if the specified position is preceded by an odd number of backslashes
 func isBackslashEscaped(data []byte, i int) bool {

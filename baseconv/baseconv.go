@@ -1,7 +1,7 @@
 
 // Go Lang Base Conv
-// (c) 2021-2023 unix-world.org # inspired from github.com/akamensky/base58 # adapted to support any base
-// v.20231129.2358
+// (c) 2021-present unix-world.org # inspired from github.com/akamensky/base58 # adapted to support any base
+// v.20241216.2358
 // License: BSD
 
 package baseconv

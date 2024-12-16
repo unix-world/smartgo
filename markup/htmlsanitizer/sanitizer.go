@@ -1,7 +1,10 @@
 package htmlsanitizer
 
+// modified by unixman
+
 import (
 	"bytes"
+	"strings"
 	"io"
 	"net/url"
 )
@@ -12,6 +15,14 @@ import (
 //  * relative URL, such as abc, abc?xxx=1, abc#123
 //  * absolute URL, such as /abc, /abc?xxx=1, /abc#123
 func DefaultURLSanitizer(rawURL string) (sanitzed string, ok bool) {
+	//-- unixman
+	if(strings.HasPrefix(rawURL, "data:")) {
+		ok = true
+		sanitzed = rawURL
+		return
+	} //end if
+	//-- #
+
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return

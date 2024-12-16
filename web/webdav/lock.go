@@ -1,7 +1,7 @@
 
 // SmartGo :: WebDAV :: Lock
-// r.20241125.2358 :: STABLE
-// (c) 2024 unix-world.org
+// r.20241216.2358 :: STABLE
+// (c) 2024-present unix-world.org
 
 // custom locking system (unixman)
 // this is intended to run over SimpleCache or similar AutoManaged cleanup expiring entries !

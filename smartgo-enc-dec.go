@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ ENCODERS / DECODERS ]
 
 // REQUIRE: go 1.19 or later
@@ -10,8 +10,6 @@ package smartgo
 import (
 	"log"
 	"fmt"
-
-	"strings"
 
 	"encoding/hex"
 	"encoding/base64"
@@ -30,6 +28,8 @@ import (
 func BaseEncode(data []byte, toBase string) string {
 	//--
 	defer PanicHandler()
+	//--
+	toBase = StrToLower(toBase)
 	//--
 	if(toBase == "b92") {
 		return base92.Encode(data)
@@ -59,7 +59,9 @@ func BaseEncode(data []byte, toBase string) string {
 
 func BaseDecode(data string, fromBase string) []byte {
 	//--
-	defer PanicHandler() // req. by hex2bin
+	defer PanicHandler() // req. by hex2bin and base64
+	//--
+	fromBase = StrToLower(fromBase)
 	//--
 	var decoded []byte = nil
 	var err error = nil
@@ -99,7 +101,118 @@ func BaseDecode(data string, fromBase string) []byte {
 //-----
 
 
+func Base64BytEncode(data []byte) []byte {
+	//--
+	defer PanicHandler() // req. by base64 enc
+	//--
+	var dst []byte = make([]byte, base64.StdEncoding.EncodedLen(len(data)))
+	base64.StdEncoding.Encode(dst, data)
+	//--
+	return dst
+	//--
+} //END FUNCTION
+
+
+func Base64BytDecode(data []byte) []byte {
+	//--
+	defer PanicHandler() // req. by base64 decode panic handler with malformed data
+	//--
+	data = BytTrimWhitespaces(data) // required, to remove extra space like characters, go b64dec is strict !
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	if l := len(data) % 4; l > 0 {
+		data = append(data, BytRepeat([]byte("="), 4-l)...) // fix missing padding
+	} //end if
+	//--
+	var dst []byte = make([]byte, base64.StdEncoding.DecodedLen(len(data)))
+	n, err := base64.StdEncoding.Decode(dst, data)
+	if(err != nil) { // be flexible, don't return, try to decode as much as possible, just notice
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": ", err)
+		return nil
+	} //end if
+	dst = dst[:n]
+	//--
+	return dst
+	//--
+} //END FUNCTION
+
+
+func Base64sBytEncode(data []byte) []byte {
+	//--
+	defer PanicHandler() // req. by base64 enc
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	data = Base64BytEncode(data)
+	//--
+	data = BytReplaceAll(data, []byte("+"), []byte("-"))
+	data = BytReplaceAll(data, []byte("/"), []byte("_"))
+	data = BytReplaceAll(data, []byte("="), []byte("."))
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+func Base64sBytDecode(data []byte) []byte {
+	//--
+	defer PanicHandler() // req. by base64 decode panic handler with malformed data
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	data = BytReplaceAll(data, []byte("."), []byte("="))
+	data = BytReplaceAll(data, []byte("_"), []byte("/"))
+	data = BytReplaceAll(data, []byte("-"), []byte("+"))
+	//--
+	data = Base64BytDecode(data)
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+func Base64BytToBase64s(data []byte) []byte {
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	data = BytReplaceAll(data, []byte("+"), []byte("-"))
+	data = BytReplaceAll(data, []byte("/"), []byte("_"))
+	data = BytReplaceAll(data, []byte("="), []byte("."))
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+func Base64sBytToBase64(data []byte) []byte {
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	data = BytReplaceAll(data, []byte("."), []byte("="))
+	data = BytReplaceAll(data, []byte("_"), []byte("/"))
+	data = BytReplaceAll(data, []byte("-"), []byte("+"))
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func Base64Encode(data string) string {
+	//--
+	defer PanicHandler() // req. by base64 enc
 	//--
 	return base64.StdEncoding.EncodeToString([]byte(data))
 	//--
@@ -116,12 +229,13 @@ func Base64Decode(data string) string {
 	} //end if
 	//--
 	if l := len(data) % 4; l > 0 {
-		data += strings.Repeat("=", 4-l) // fix missing padding
+		data += StrRepeat("=", 4-l) // fix missing padding
 	} //end if
 	//--
 	decoded, err := base64.StdEncoding.DecodeString(data)
-	if(err != nil) { // be flexible, don't return, try to decode as much as possible, just notice
+	if(err != nil) {
 		log.Println("[NOTICE] " + CurrentFunctionName() + ": ", err)
+		return ""
 	} //end if
 	//--
 	return string(decoded)
@@ -130,6 +244,12 @@ func Base64Decode(data string) string {
 
 
 func Base64sEncode(data string) string {
+	//--
+	defer PanicHandler() // req. by base64 enc
+	//--
+	if(data == "") {
+		return ""
+	} //end if
 	//--
 	data = Base64Encode(data)
 	//--
@@ -146,6 +266,10 @@ func Base64sDecode(data string) string {
 	//--
 	defer PanicHandler() // req. by base64 decode panic handler with malformed data
 	//--
+	if(data == "") {
+		return ""
+	} //end if
+	//--
 	data = StrReplaceAll(data, ".", "=")
 	data = StrReplaceAll(data, "_", "/")
 	data = StrReplaceAll(data, "-", "+")
@@ -159,6 +283,10 @@ func Base64sDecode(data string) string {
 
 func Base64ToBase64s(data string) string {
 	//--
+	if(data == "") {
+		return ""
+	} //end if
+	//--
 	data = StrReplaceAll(data, "+", "-")
 	data = StrReplaceAll(data, "/", "_")
 	data = StrReplaceAll(data, "=", ".")
@@ -169,6 +297,10 @@ func Base64ToBase64s(data string) string {
 
 
 func Base64sToBase64(data string) string {
+	//--
+	if(data == "") {
+		return ""
+	} //end if
 	//--
 	data = StrReplaceAll(data, ".", "=")
 	data = StrReplaceAll(data, "_", "/")
@@ -194,10 +326,9 @@ func UInt64ToHex(num uint64) string {
 
 func Bin2Hex(str string) string { // inspired from: https://www.php2golang.com/
 	//--
-	src := []byte(str)
-	encodedStr := hex.EncodeToString(src)
+	defer PanicHandler() // req. by hex2bin
 	//--
-	return encodedStr
+	return hex.EncodeToString([]byte(str))
 	//--
 } //END FUNCTION
 
@@ -211,13 +342,57 @@ func Hex2Bin(str string) string { // inspired from: https://www.php2golang.com/
 		return ""
 	} //end if
 	//--
+	if((len(str) % 2) > 0) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + " Failed: odd length, not even:", len(str))
+		return ""
+	} //end if
+	//--
 	decoded, err := hex.DecodeString(str)
 	if(err != nil) {
 		log.Println("[NOTICE] " + CurrentFunctionName() + " Failed:", err)
-		//return "" // be flexible, don't return, try to decode as much as possible ...
+		return ""
 	} //end if
 	//--
 	return string(decoded)
+	//--
+} //END FUNCTION
+
+
+func Bin2BytHex(src []byte) []byte {
+	//--
+	defer PanicHandler() // req. by hex2bin
+	//--
+	var dst []byte = make([]byte, hex.EncodedLen(len(src)))
+	hex.Encode(dst, src)
+	//--
+	return dst
+	//--
+} //END FUNCTION
+
+
+func Hex2BytBin(src []byte) []byte {
+	//--
+	defer PanicHandler() // req. by hex2bin panic handler with malformed data
+	//--
+	src = BytTrimWhitespaces(src) // required, to remove extra space like characters, go hex2bin is strict !
+	if(src == nil) {
+		return nil
+	} //end if
+	//--
+	if((len(src) % 2) > 0) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + " Failed: odd length, not even:", len(src))
+		return nil
+	} //end if
+	//--
+	var dst []byte = make([]byte, hex.DecodedLen(len(src)))
+	n, err := hex.Decode(dst, src)
+	if(err != nil) {
+		log.Println("[NOTICE] " + CurrentFunctionName() + " Failed:", err)
+		return nil
+	} //end if
+	dst = dst[:n]
+	//--
+	return dst
 	//--
 } //END FUNCTION
 

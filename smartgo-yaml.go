@@ -1,8 +1,8 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
-// [ YAML ]
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
+// [ YAML (PARSE, COMPOSE) ]
 
 // REQUIRE: go 1.19 or later
 package smartgo

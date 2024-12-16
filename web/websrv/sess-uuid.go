@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Session-UUID :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241128.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -56,7 +56,7 @@ func GetUuidCookieValue(r *http.Request) string {
 
 func IsSessUUIDCookieValid(crrUUIDCookieVal string) bool {
 	//--
-	if((smart.StrTrimWhitespaces(crrUUIDCookieVal) == "") || (len(crrUUIDCookieVal) < 34) || (len(crrUUIDCookieVal) > 52) || (!smart.StrRegexMatchString(REGEX_SESS_UUID_COOKIE_VALID_VALUE, crrUUIDCookieVal))) { // if sh3a224 (b62) is mostly ~ 38 characters ; be flexible as +/- 4 characters (34..52 bytes)
+	if((smart.StrTrimWhitespaces(crrUUIDCookieVal) == "") || (len(crrUUIDCookieVal) < 34) || (len(crrUUIDCookieVal) > 52) || (!smart.StrRegexMatch(REGEX_SESS_UUID_COOKIE_VALID_VALUE, crrUUIDCookieVal))) { // if sh3a224 (b62) is mostly ~ 38 characters ; be flexible as +/- 4 characters (34..52 bytes)
 		return false
 	} //end if
 	//--

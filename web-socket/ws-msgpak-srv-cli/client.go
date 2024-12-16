@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Client :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241121.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -59,7 +59,7 @@ func MsgPakSetClientTaskCmd(cmd string, data string) string {
 	cmd = smart.StrTrimWhitespaces(smart.StrTrim(smart.StrTrimWhitespaces(cmd), "<>"))
 	data = smart.StrTrimWhitespaces(data)
 	//--
-	if((len(cmd) < 1) || (len(cmd) > 255) || (cmd == "") || (!smart.StrRegexMatchString(`^[a-zA-Z0-9\-\.\:]+$`, cmd))) { // {{{SYNC-MSGPAK-CMD-CHECKS-FORMAT}}}
+	if((len(cmd) < 1) || (len(cmd) > 255) || (cmd == "") || (!smart.StrRegexMatch(`^[a-zA-Z0-9\-\.\:]+$`, cmd))) { // {{{SYNC-MSGPAK-CMD-CHECKS-FORMAT}}}
 		return "Format is Invalid `" + cmd + "`"
 	} //end if
 //	if(smart.StrContains(cmd, ":")) { // indirect commands are dissalowed ... (must not contain `:`) // {{{SYNC-MSGPAK-CMD-CHECKS-SPECIALS}}}

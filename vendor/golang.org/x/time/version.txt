@@ -1,4 +1,4 @@
-v.20241123
+v.20241212
 Go 1.18 or later
 
 golang.org/x/time v0.8.0

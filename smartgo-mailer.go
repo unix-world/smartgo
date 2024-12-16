@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ MAILER ]
 
 // REQUIRE: go 1.19 or later
@@ -167,7 +167,7 @@ func SendSmtpEmail(smtpConf SmtpConfig, mailMsgStruct MailMessageStruct) error {
 			if(len(smtpConf.AuthUser) > 127) { // allow: 63 + 1 + 63 as in the REGEX_SMART_SAFE_EMAIL_ADDRESS regex limits
 				NewError("SMTP Auth User is too long")
 			} //end if
-			if(!StrRegexMatchString(REGEX_SMART_SAFE_NET_USERNAME, smtpConf.AuthUser)) {
+			if(!StrRegexMatch(REGEX_SMART_SAFE_NET_USERNAME, smtpConf.AuthUser)) {
 				NewError("SMTP Auth User contains invalid characters")
 			} //end if
 			if(smtpConf.AuthPass == "") {
@@ -190,7 +190,7 @@ func SendSmtpEmail(smtpConf SmtpConfig, mailMsgStruct MailMessageStruct) error {
 	if(mailMsgStruct.FromAddress == "") {
 		return NewError("From Address is Empty")
 	} //end if
-	if(!StrRegexMatchString(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.FromAddress)) {
+	if(!StrRegexMatch(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.FromAddress)) {
 		return NewError("From Address is Invalid")
 	} //end if
 	//-- From Name
@@ -210,7 +210,7 @@ func SendSmtpEmail(smtpConf SmtpConfig, mailMsgStruct MailMessageStruct) error {
 		if(mailMsgStruct.ToAddresses[i] == "") {
 			return NewError("Empty Email Address, To #" + ConvertIntToStr(i))
 		} //end if
-		if(!StrRegexMatchString(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.ToAddresses[i])) {
+		if(!StrRegexMatch(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.ToAddresses[i])) {
 			return NewError("Invalid Email Address, To #" + ConvertIntToStr(i))
 		} //end if
 	} //end for
@@ -221,7 +221,7 @@ func SendSmtpEmail(smtpConf SmtpConfig, mailMsgStruct MailMessageStruct) error {
 			if(mailMsgStruct.CcAddresses[i] == "") {
 				return NewError("Empty Email Address, Cc #" + ConvertIntToStr(i))
 			} //end if
-			if(!StrRegexMatchString(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.CcAddresses[i])) {
+			if(!StrRegexMatch(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.CcAddresses[i])) {
 				return NewError("Invalid Email Address, Cc #" + ConvertIntToStr(i))
 			} //end if
 		} //end for
@@ -233,7 +233,7 @@ func SendSmtpEmail(smtpConf SmtpConfig, mailMsgStruct MailMessageStruct) error {
 			if(mailMsgStruct.BccAddresses[i] == "") {
 				return NewError("Empty Email Address, Cc #" + ConvertIntToStr(i))
 			} //end if
-			if(!StrRegexMatchString(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.BccAddresses[i])) {
+			if(!StrRegexMatch(REGEX_SMART_SAFE_EMAIL_ADDRESS, mailMsgStruct.BccAddresses[i])) {
 				return NewError("Invalid Email Address, Cc #" + ConvertIntToStr(i))
 			} //end if
 		} //end for

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241121.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -233,7 +233,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		theMsgCmd = smart.StrTrimWhitespaces(smart.StrTrim(smart.StrTrimWhitespaces(theMsgCmd), "<>")) // min 1 char ; max 255 chars ; must contain only a-z A-Z 0-9 - . :
 		theMsgData = smart.StrTrimWhitespaces(theMsgData)
 		//--
-		if((len(theMsgCmd) < 1) || (len(theMsgCmd) > 255) || (theMsgCmd == "") || (!smart.StrRegexMatchString(`^[a-zA-Z0-9\-\.\:]+$`, theMsgCmd))) { // {{{SYNC-MSGPAK-CMD-CHECKS-FORMAT}}}
+		if((len(theMsgCmd) < 1) || (len(theMsgCmd) > 255) || (theMsgCmd == "") || (!smart.StrRegexMatch(`^[a-zA-Z0-9\-\.\:]+$`, theMsgCmd))) { // {{{SYNC-MSGPAK-CMD-CHECKS-FORMAT}}}
 			err = "Failed to Register new Task Command # Format is Invalid `" + theMsgCmd + "`"
 			log.Println("[WARNING] !!!!!!! " + err)
 			return

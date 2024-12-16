@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241104.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -151,7 +151,7 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (DbSqlConnector, error) {
 					return emtyDbConn, smart.NewError("Invalid DB Connection URL Path with Trailing Slash: " + dir)
 			} //end if
 			if(len(file) < 10) { // {{{SYNC-DB-SQLITE-FNAME-MIN-LEN}}}
-				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Length (must be at least 10 characters): " + file)
+				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Length (Must be at least 10 characters): " + file)
 			} //end if
 			if(smart.StrStartsWith(file, ".")) {
 				return emtyDbConn, smart.NewError("Invalid DB Connection URL File Name Prefix (Must NOT start with a dot): " + file)
@@ -195,12 +195,12 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (DbSqlConnector, error) {
 			break
 		case DB_SQL_TYPE_PGSQL:
 			if((dbUrl == "") || (!smart.StrStartsWith(dbUrl, "postgres://"))) {
-				return emtyDbConn, smart.NewError("PostgreSQL Connection String is empty or invalid, must be such as (example): `postgres://user:pass@host:port/db_name?sslmode=disable` and is: `" + dbUrl + "")
+				return emtyDbConn, smart.NewError("PostgreSQL Connection String is empty or invalid, Must be such as (example): `postgres://user:pass@host:port/db_name?sslmode=disable` and is: `" + dbUrl + "")
 			} //end if
 			break
 		case DB_SQL_TYPE_MYSQL:
 			if((dbUrl == "") || (!smart.StrContains(dbUrl, "multiStatements=true"))) {
-				return emtyDbConn, smart.NewError("MySQL Connection String is empty or invalid, must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
+				return emtyDbConn, smart.NewError("MySQL Connection String is empty or invalid, Must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
 			} //end if
 			break
 		default:

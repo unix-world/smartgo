@@ -1,5 +1,7 @@
 package parser
 
+// modified by unixman
+
 import (
 	"bytes"
 	"html"
@@ -123,32 +125,34 @@ func (p *Parser) Block(data []byte) {
 			data = p.attribute(data)
 		}
 
-		if p.extensions&Includes != 0 {
-			f := p.readInclude
-			path, address, consumed := p.isInclude(data)
-			if consumed == 0 {
-				path, address, consumed = p.isCodeInclude(data)
-				f = p.readCodeInclude
-			}
-			if consumed > 0 {
-				included := f(p.includeStack.Last(), path, address)
-
-				// if we find a caption below this, we need to include it in 'included', so
-				// that the caption will be part of the include text. (+1 to skip newline)
-				for _, caption := range []string{captionFigure, captionTable, captionQuote} {
-					if _, _, capcon := p.caption(data[consumed+1:], []byte(caption)); capcon > 0 {
-						included = append(included, data[consumed+1:consumed+1+capcon]...)
-						consumed += 1 + capcon
-						break // there can only be 1 caption.
-					}
-				}
-				p.includeStack.Push(path)
-				p.Block(included)
-				p.includeStack.Pop()
-				data = data[consumed:]
-				continue
-			}
-		}
+	//-- unixman: includes removed
+	//	if p.extensions&Includes != 0 {
+	//		f := p.readInclude
+	//		path, address, consumed := p.isInclude(data)
+	//		if consumed == 0 {
+	//			path, address, consumed = p.isCodeInclude(data)
+	//			f = p.readCodeInclude
+	//		}
+	//		if consumed > 0 {
+	//			included := f(p.includeStack.Last(), path, address)
+	//
+	//			// if we find a caption below this, we need to include it in 'included', so
+	//			// that the caption will be part of the include text. (+1 to skip newline)
+	//			for _, caption := range []string{captionFigure, captionTable, captionQuote} {
+	//				if _, _, capcon := p.caption(data[consumed+1:], []byte(caption)); capcon > 0 {
+	//					included = append(included, data[consumed+1:consumed+1+capcon]...)
+	//					consumed += 1 + capcon
+	//					break // there can only be 1 caption.
+	//				}
+	//			}
+	//			p.includeStack.Push(path)
+	//			p.Block(included)
+	//			p.includeStack.Pop()
+	//			data = data[consumed:]
+	//			continue
+	//		}
+	//	}
+	//-- #
 
 		// user supplied parser function
 		if p.Opts.ParserHook != nil {
@@ -951,8 +955,6 @@ func (p *Parser) fencedCodeBlock(data []byte, doRender bool) int {
 	work.WriteByte('\n')
 
 	for {
-		// safe to assume beg < len(data)
-
 		// check for the end of the code block
 		fenceEnd, _ := isFenceLine(data[beg:], nil, marker)
 		if fenceEnd != 0 {
@@ -969,47 +971,46 @@ func (p *Parser) fencedCodeBlock(data []byte, doRender bool) int {
 		}
 
 		// verbatim copy to the working buffer
-		if doRender {
-			work.Write(data[beg:end])
-		}
+		work.Write(data[beg:end])
 		beg = end
 	}
 
-	if doRender {
-		codeBlock := &ast.CodeBlock{
-			IsFenced: true,
-		}
-		codeBlock.Content = work.Bytes() // TODO: get rid of temp buffer
+	if !doRender {
+		return beg
+	}
+	codeBlock := &ast.CodeBlock{
+		IsFenced: true,
+	}
+	codeBlock.Content = work.Bytes() // TODO: get rid of temp buffer
 
-		if p.extensions&Mmark == 0 {
-			p.AddBlock(codeBlock)
-			finalizeCodeBlock(codeBlock)
-			return beg
-		}
-
-		// Check for caption and if found make it a figure.
-		if captionContent, id, consumed := p.caption(data[beg:], []byte(captionFigure)); consumed > 0 {
-			figure := &ast.CaptionFigure{}
-			caption := &ast.Caption{}
-			figure.HeadingID = id
-			p.Inline(caption, captionContent)
-
-			p.AddBlock(figure)
-			codeBlock.AsLeaf().Attribute = figure.AsContainer().Attribute
-			p.addChild(codeBlock)
-			finalizeCodeBlock(codeBlock)
-			p.addChild(caption)
-			p.Finalize(figure)
-
-			beg += consumed
-
-			return beg
-		}
-
-		// Still here, normal block
+	if p.extensions&Mmark == 0 {
 		p.AddBlock(codeBlock)
 		finalizeCodeBlock(codeBlock)
+		return beg
 	}
+
+	// Check for caption and if found make it a figure.
+	if captionContent, id, consumed := p.caption(data[beg:], []byte(captionFigure)); consumed > 0 {
+		figure := &ast.CaptionFigure{}
+		caption := &ast.Caption{}
+		figure.HeadingID = id
+		p.Inline(caption, captionContent)
+
+		p.AddBlock(figure)
+		codeBlock.AsLeaf().Attribute = figure.AsContainer().Attribute
+		p.addChild(codeBlock)
+		finalizeCodeBlock(codeBlock)
+		p.addChild(caption)
+		p.Finalize(figure)
+
+		beg += consumed
+
+		return beg
+	}
+
+	// Still here, normal block
+	p.AddBlock(codeBlock)
+	finalizeCodeBlock(codeBlock)
 
 	return beg
 }
@@ -1080,13 +1081,15 @@ func (p *Parser) quote(data []byte) int {
 		// fenced code and if one's found, incorporate it altogether,
 		// irregardless of any contents inside it
 		for end < len(data) && data[end] != '\n' {
-			if p.extensions&FencedCode != 0 {
-				if i := p.fencedCodeBlock(data[end:], false); i > 0 {
-					// -1 to compensate for the extra end++ after the loop:
-					end += i - 1
-					break
-				}
-			}
+			//-- fix by unixman: this portion of the code is breaking the fenced code inside blockquote with another fenced code after the entire bockquote
+		//	if p.extensions&FencedCode != 0 {
+		//		if i := p.fencedCodeBlock(data[end:], false); i > 0 {
+		//			// -1 to compensate for the extra end++ after the loop:
+		//			end += i - 1
+		//			break
+		//		}
+		//	}
+			//-- #end fix: https://github.com/gomarkdown/markdown/issues/325#issuecomment-2516332756
 			end++
 		}
 		end = skipCharN(data, end, '\n', 1)
@@ -1353,6 +1356,7 @@ func finalizeList(list *ast.List) {
 // Parse a single list item.
 // Assumes initial prefix is already removed if this is a sublist.
 func (p *Parser) listItem(data []byte, flags *ast.ListType) int {
+	isDefinitionList := *flags&ast.ListTypeDefinition != 0
 	// keep track of the indentation of the first line
 	itemIndent := 0
 	if data[0] == '\t' {
@@ -1385,7 +1389,7 @@ func (p *Parser) listItem(data []byte, flags *ast.ListType) int {
 	}
 	if i == 0 {
 		// if in definition list, set term flag and continue
-		if *flags&ast.ListTypeDefinition != 0 {
+		if isDefinitionList {
 			*flags |= ast.ListTypeTerm
 		} else {
 			return 0
@@ -1446,7 +1450,14 @@ gatherlines:
 
 		// If there is a fence line (marking starting of a code block)
 		// without indent do not process it as part of the list.
-		if p.extensions&FencedCode != 0 {
+		//
+		// does not apply for definition lists because it causes infinite
+		// loop if text before defintion term is fenced code block start
+		// marker but not part of actual fenced code block
+		// for defnition lists we're called after parsing fence code blocks
+		// so we kno this cannot be a fenced block
+		// https://github.com/gomarkdown/markdown/issues/326
+		if !isDefinitionList && p.extensions&FencedCode != 0 {
 			fenceLineEnd, _ := isFenceLine(chunk, nil, "")
 			if fenceLineEnd > 0 && indent == 0 {
 				*flags |= ast.ListItemEndOfList

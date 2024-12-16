@@ -1,6 +1,13 @@
 package htmlsanitizer
 
-import "bytes"
+// modified by unixman
+
+// r.20241212.2358
+
+import (
+	"bytes"
+	"strings"
+)
 
 // Tag with its attributes.
 type Tag struct {
@@ -72,7 +79,8 @@ func (l *AllowList) attrExists(p []byte) bool {
 
 	name := string(p)
 	for _, attr := range l.GlobalAttr {
-		if attr == name {
+	//	if attr == name { // unixman: add support for wildcard attributes ; ex: data-* ; a wildcard attribute is only valid if ending with a wildcard
+		if (!strings.Contains(attr, "*") && (attr == name)) || (strings.HasSuffix(attr, "*") && strings.HasPrefix(name, strings.TrimRight(attr, "*"))) { // unixman
 			return true
 		}
 	}
@@ -174,7 +182,7 @@ var DefaultAllowList = &AllowList{
 		{"section", []string{}, []string{}},
 		{"blockquote", []string{}, []string{"cite"}},
 		{"dd", []string{}, []string{}},
-		{"div", []string{}, []string{}},
+		{"div", []string{"align"}, []string{}},
 		{"dl", []string{}, []string{}},
 		{"dt", []string{}, []string{}},
 		{"figcaption", []string{}, []string{}},
@@ -186,8 +194,8 @@ var DefaultAllowList = &AllowList{
 		{"p", []string{}, []string{}},
 		{"pre", []string{}, []string{}},
 		{"ul", []string{}, []string{}},
-		{"a", []string{"rel", "target", "referrerpolicy"}, []string{"href"}},
-		{"abbr", []string{"title"}, []string{}},
+		{"a", []string{"rel", "target", "referrerpolicy", "data-smart"}, []string{"href"}},
+		{"abbr", []string{}, []string{}},
 		{"b", []string{}, []string{}},
 		{"bdi", []string{}, []string{}},
 		{"bdo", []string{}, []string{}},
@@ -199,6 +207,8 @@ var DefaultAllowList = &AllowList{
 		{"i", []string{}, []string{}},
 		{"kbd", []string{}, []string{}},
 		{"mark", []string{}, []string{}},
+		{"var", []string{}, []string{}},
+		{"dfn", []string{}, []string{}},
 		{"q", []string{}, []string{"cite"}},
 		{"s", []string{}, []string{}},
 		{"small", []string{}, []string{}},
@@ -208,18 +218,18 @@ var DefaultAllowList = &AllowList{
 		{"sup", []string{}, []string{}},
 		{"time", []string{"datetime"}, []string{}},
 		{"u", []string{}, []string{}},
-		{"area", []string{"alt", "coords", "shape", "target", "rel", "referrerpolicy"}, []string{"href"}},
-		{"audio", []string{"autoplay", "controls", "crossorigin", "duration", "loop", "muted", "preload"}, []string{"src"}},
-		{"img", []string{"alt", "crossorigin", "height", "width", "loading", "referrerpolicy"}, []string{"src"}},
 		{"map", []string{"name"}, []string{}},
-		{"track", []string{"default", "kind", "label", "srclang"}, []string{"src"}},
+		{"area", []string{"alt", "coords", "shape", "target", "rel", "referrerpolicy"}, []string{"href"}},
+		{"img", []string{"alt", "height", "width", "align", "loading", "crossorigin", "referrerpolicy", "longdesc", "srcset", "sizes", "ismap", "usemap"}, []string{"src"}},
+		{"picture", []string{}, []string{}},
+		{"source", []string{"type"}, []string{"src"}},
 		{"video", []string{"autoplay", "buffered", "controls", "crossorigin", "duration", "loop", "muted", "preload", "height", "width"}, []string{"src", "poster"}},
+		{"track", []string{"default", "kind", "label", "srclang"}, []string{"src"}},
+		{"audio", []string{"autoplay", "controls", "crossorigin", "duration", "loop", "muted", "preload"}, []string{"src"}},
 		// no embed
 		// no iframe
 		// no object
 		// no param
-		{"picture", []string{}, []string{}},
-		{"source", []string{"type"}, []string{"src"}},
 		// no canvas
 		// no script
 		{"del", []string{}, []string{}},
@@ -234,14 +244,23 @@ var DefaultAllowList = &AllowList{
 		{"th", []string{"colspan", "rowspan", "scope"}, []string{}},
 		{"thead", []string{}, []string{}},
 		{"tr", []string{}, []string{}},
-		// no Forms
 		{"details", []string{"open"}, []string{}},
 		{"summary", []string{}, []string{}},
-		// no Web Components
+		// no web-components
+		// no button
+		{"input", []string{"type", "name", "value", "required", "readonly", "disabled", "autocomplete", "placeholder", "size", "minlength", "maxlength", "min", "max", "step", "pattern", "multiple", "checked", "autofocus", "list"}, []string{}},
+		{"textarea", []string{"name", "maxlength", "cols", "rows", "wrap", "required", "readonly", "disabled", "autocomplete", "placeholder", "autofocus", "form"}, []string{}},
 	},
 	GlobalAttr: []string{
-		"class",
 		"id",
+		"title",
+		"class",
+		"style",
+		"role",
+		"itemscope",
+		"itemtype",
+		"itemprop",
+		"data-*", // wildcard, allow all atributes that start with: "data-"
 	},
 	NonHTMLTags: []*Tag{
 		{Name: "script"},

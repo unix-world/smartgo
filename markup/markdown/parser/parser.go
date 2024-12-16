@@ -3,6 +3,8 @@ Package parser implements parser for markdown text that generates AST (abstract 
 */
 package parser
 
+// modified by unixman
+
 import (
 	"bytes"
 	"fmt"
@@ -43,7 +45,7 @@ const (
 	Attributes                                    // Block Attributes
 	SuperSubscript                                // Super- and subscript support: 2^10^, H~2~O.
 	EmptyLinesBreakList                           // 2 empty lines break out of list
-	Includes                                      // Support including other files.
+//	Includes                                      // Support including other files. // unixman
 	Mmark                                         // Support Mmark syntax, see https://mmark.miek.nl/post/syntax/
 
 	CommonExtensions Extensions = NoIntraEmphasis | Tables | FencedCode |
@@ -119,7 +121,7 @@ type Parser struct {
 	// Attributes are attached to block level elements.
 	attr *ast.Attribute
 
-	includeStack *incStack
+//	includeStack *incStack // unixman
 
 	// collect headings where we auto-generated id so that we can
 	// ensure they are unique at the end
@@ -147,7 +149,7 @@ func NewWithExtensions(extension Extensions) *Parser {
 		Doc:          &ast.Document{},
 		extensions:   extension,
 		allClosed:    true,
-		includeStack: newIncStack(),
+	//	includeStack: newIncStack(), // unixman
 	}
 	p.tip = p.Doc
 	p.oldTip = p.Doc

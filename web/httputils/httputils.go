@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241128.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -39,13 +39,14 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20241128.2358"
+	VERSION string = "r.20241216.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
 	//--
 	HTTP_CLI_DEF_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M 		//  16MB
-	HTTP_CLI_MAX_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M * 32 	// 512MB
+//	HTTP_CLI_MAX_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M * 32 	// 512MB
+	HTTP_CLI_MAX_BODY_READ_SIZE uint64 = smart.SIZE_BYTES_16M * 48 	// 768MB ; allow to download ~ the size of a CD by max default
 	//--
 	HTTP_CLI_MAX_POST_VAL_SIZE  uint64 = smart.SIZE_BYTES_16M 		//  16MB
 	HTTP_CLI_MAX_POST_FILE_SIZE uint64 = smart.SIZE_BYTES_16M * 16 	// 256MB
@@ -334,6 +335,10 @@ func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVeri
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	//--
+	if(maxBytesRead <= 0) {
+		maxBytesRead = HTTP_CLI_MAX_BODY_READ_SIZE
+	} //end if
+	//--
 	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
@@ -344,6 +349,10 @@ func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVer
 	var method string = "POST"
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
+	//--
+	if(maxBytesRead <= 0) {
+		maxBytesRead = HTTP_CLI_DEF_BODY_READ_SIZE
+	} //end if
 	//--
 	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
@@ -528,7 +537,7 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData byte
 	for key, val := range reqArr {
 		key = smart.StrTrimWhitespaces(key)
 		if(key != "") {
-			if(smart.StrRegexMatchString(REGEX_SAFE_HTTP_FORM_VAR_NAME, key)) { // form field
+			if(smart.StrRegexMatch(REGEX_SAFE_HTTP_FORM_VAR_NAME, key)) { // form field
 				for z:=0; z<len(val); z++ {
 					if(int64(len(val[z])) > int64(HTTP_CLI_MAX_POST_VAL_SIZE)) {
 						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + smart.ConvertIntToStr(len(val[z])) + "` bytes ; Oversized #" + smart.ConvertIntToStr(z), emptyData, ""
@@ -1073,10 +1082,12 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			pbar.OptionSetDescription("[SmartHttpCli:PostData]"),
 			pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
 		)
-		obar.RenderBlank()
+		if(formDataLen > 0) {
+			obar.RenderBlank()
+		} //end if
 		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(&formData))
 		blackholePBar = bytes.Buffer{} // free
-		log.Println("[INFO] " + smart.CurrentFunctionName() + ": Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(formDataLen)) + ")")
+		log.Println("[INFO]", smart.CurrentFunctionName(), ": Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(formDataLen)) + ")")
 	} else if(isPut == true) {
 		var ubar *pbar.ProgressBar
 		if(isFilePut == true) { // file
@@ -1095,7 +1106,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			defer file.Close()
 			putDataLen = stat.Size()
 			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Put File: `" + upldLocalFilePath + "` ; Size:", putDataLen, "bytes")
+				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Put File: `" + upldLocalFilePath + "` ; Size:", putDataLen, "bytes")
 			} //end if
 			ubar = pbar.NewOptions64(
 				putDataLen,
@@ -1105,10 +1116,12 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				pbar.OptionSetDescription("[SmartHttpCli:Uploading]"),
 				pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
 			)
-			ubar.RenderBlank()
+			if(putDataLen > 0) {
+				ubar.RenderBlank()
+			} //end if
 			req, errReq = http.NewRequest(method, uri, ubar.NewProxyReader(file))
 			blackholePBar = bytes.Buffer{} // free
-			log.Println("[INFO] " + smart.CurrentFunctionName() + ": Upload File [" + httpResult.UploadFileName + "]: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(putDataLen)) + ")")
+			log.Println("[INFO]", smart.CurrentFunctionName(), ": Upload File [" + httpResult.UploadFileName + "]: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(putDataLen)) + ")")
 		} else { // body
 			if(len(reqArr["@put:ctype"]) == 1) {
 				cTypeHdr = reqArr["@put:ctype"][0]
@@ -1121,7 +1134,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				} //end if
 			} //end if
 			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Body Data " + method + " ; Size:", putDataLen, "bytes")
+				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Body Data " + method + " ; Size:", putDataLen, "bytes")
 			} //end if
 			ubar = pbar.NewOptions64(
 				putDataLen,
@@ -1131,16 +1144,18 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				pbar.OptionSetDescription("[SmartHttpCli:WriteData]"),
 				pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
 			)
-			ubar.RenderBlank()
+			if(putDataLen > 0) {
+				ubar.RenderBlank()
+			} //end if
 			req, errReq = http.NewRequest(method, uri, ubar.NewProxyReader(res))
 			blackholePBar = bytes.Buffer{} // free
-			log.Println("[INFO] " + smart.CurrentFunctionName() + ": Upload Data: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(putDataLen)) + ")")
+			log.Println("[INFO]", smart.CurrentFunctionName(), ": Upload Data: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(putDataLen)) + ")")
 		} //end if else
 	} else if(isPatch == true) { // body only, no file implementation
 		res := bytes.NewBuffer([]byte(reqArr["@patch:data"][0]))
 		patchDataLen = int64(len(reqArr["@patch:data"][0]))
 		if(DEBUG == true) {
-			log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": PATCH Data ; Size:", patchDataLen, "bytes")
+			log.Println("[DEBUG]", smart.CurrentFunctionName(), ": PATCH Data ; Size:", patchDataLen, "bytes")
 		} //end if
 		ubar := pbar.NewOptions64(
 			patchDataLen,
@@ -1150,10 +1165,12 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			pbar.OptionSetDescription("[SmartHttpCli:WriteData]"),
 			pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
 		)
-		ubar.RenderBlank()
+		if(patchDataLen > 0) {
+			ubar.RenderBlank()
+		} //end if
 		req, errReq = http.NewRequest(method, uri, ubar.NewProxyReader(res))
 		blackholePBar = bytes.Buffer{} // free
-		log.Println("[INFO] " + smart.CurrentFunctionName() + ": Upload Data: `" + httpResult.LastUri + "` @ Size:", patchDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(patchDataLen)) + ")")
+		log.Println("[INFO]", smart.CurrentFunctionName(), ": Upload Data: `" + httpResult.LastUri + "` @ Size:", patchDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(patchDataLen)) + ")")
 	} else {
 		req, errReq = http.NewRequest(method, uri, nil)
 	} //end if else
@@ -1189,7 +1206,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 					Value: cV,
 				})
 				if(DEBUG == true) {
-					log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Set Cookie: `" + cK + "`: `" + cV + "`")
+					log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Set Cookie: `" + cK + "`: `" + cV + "`")
 				} //end if
 			} //end if
 		} //end for
@@ -1228,7 +1245,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			var aHdrVal string = HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN + " " + HttpSafeHeaderValue(authPassword)
 			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, aHdrVal)
 			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Add Token Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
+				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Add Token Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
 			} //end if
 		} //end if
 	} else if(useAuth == smart.HTTP_AUTH_MODE_BEARER) { // only for Bearer Auth ; Example: `authorization: Bearer *****` ; the expected aHdrVal = `*****`
@@ -1236,7 +1253,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			var aHdrVal string = HTTP_HEADER_VALUE_AUTH_TYPE_BEARER + " " + HttpSafeHeaderValue(authPassword)
 			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, aHdrVal)
 			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Add Bearer Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
+				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Add Bearer Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
 			} //end if
 		} //end if
 	} else if(useAuth == smart.HTTP_AUTH_MODE_RAW) { // only for Raw Auth ; Example: `authorization: *****` or `authorization: Custom *****` ; the expected aHdrVal = `Custom *****`
@@ -1244,7 +1261,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			var aHdrVal string = HttpSafeHeaderValue(authPassword)
 			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, aHdrVal)
 			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Add Raw Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
+				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Add Raw Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
 			} //end if
 		} //end if
 	} //end if
@@ -1252,7 +1269,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	if(isPost == true) {
 		req.Header.Set(HTTP_HEADER_CONTENT_TYPE, multipartType)
 		if(DEBUG == true) {
-			log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Set POST Data Header : `" + HTTP_HEADER_CONTENT_TYPE + ": " + multipartType + "`")
+			log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Set POST Data Header : `" + HTTP_HEADER_CONTENT_TYPE + ": " + multipartType + "`")
 		} //end if
 	} //end if
 	//--
@@ -1274,6 +1291,10 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		httpResult.Errors = "ERR: Failed to Read Response Header: " + rdHeadErr.Error()
 		httpResult.HttpStatus = -107
 		return
+	} //end if
+	//--
+	if(resp.ContentLength < 0) {
+		resp.ContentLength = 0 // undefined ; avoid use default as -1 because conversion to uint64 for PrettyPrintBytes() ...
 	} //end if
 	//--
 	httpResult.HttpStatus = statusCode
@@ -1338,25 +1359,15 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		pbar.OptionSetBytes64(resp.ContentLength),
 		pbar.OptionThrottle(time.Duration(500) * time.Millisecond),
 		pbar.OptionSetDescription("[SmartHttpCli:" + actionDBar + "]"),
-		pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed") }),
+		pbar.OptionOnCompletion(func(){ fmt.Println(" ...Completed (" + httpResult.MimeType + ")") }),
 	)
-	dbar.RenderBlank()
+	if(resp.ContentLength > 0) {
+		dbar.RenderBlank()
+	} //end if
 	//--
 	bodyData := bytes.Buffer{}
 	var bytesCopied int64 = 0
 	var rdBodyErr error
-	//--
-	var useB64Encoding bool = true
-	if(
-		(httpResult.MimeType == MIME_TYPE_HTML) || (httpResult.MimeType == MIME_TYPE_CSS) ||
-		(httpResult.MimeType == MIME_TYPE_JS) || (httpResult.MimeType == MIME_TYPE_JSON) ||
-		(httpResult.MimeType == MIME_TYPE_XML) || (httpResult.MimeType == MIME_TYPE_SVG) ||
-		(httpResult.MimeType == MIME_TYPE_TEXT) || (httpResult.MimeType == MIME_TYPE_CSV) ||
-		(httpResult.MimeType == MIME_TYPE_EMAIL_MSG) || (httpResult.MimeType == MIME_TYPE_VCARD) ||
-		(httpResult.MimeType == MIME_TYPE_ICALENDAR) || (httpResult.MimeType == MIME_TYPE_SIG_GPG) ||
-		(smart.StrStartsWith(httpResult.MimeType, "text/"))) { // other text types
-			useB64Encoding = false
-	} //end if
 	//--
 	if(downloadBodyToFile == true) { // download body to a file ; bodyData will return the path to this file
 		//--
@@ -1444,7 +1455,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			smart.SafePathFileDelete(theDwnLockFile, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
 		}()
 		//--
-		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data to File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(uint64(resp.ContentLength)) + ")")
+		log.Println("[INFO]", smart.CurrentFunctionName(), ": [" + method + " / " + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data to File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(uint64(resp.ContentLength)) + ")")
 		//--
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
 		//--
@@ -1457,16 +1468,17 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		httpResult.BodyDataEncoding = "log"
 		httpResult.BodyData = "SmartHttpCli :: Saved to Local Downloads Folder as `" + dFullPath + "`"
 		httpResult.BodyDataSize = uint64(dwFSize)
+		blackholePBar = bytes.Buffer{} // free
 		return
 		//--
 	} else { // download in memory
 		//--
-		log.Println("[INFO] " + smart.CurrentFunctionName() + ": [" + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Read Data in Memory: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(uint64(resp.ContentLength)) + ")")
+		log.Println("[INFO]", smart.CurrentFunctionName(), ": [" + method + " / " + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Read Data in Memory: `" + httpResult.LastUri + "` @ Limit:", maxBytesRead, "bytes ; Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(uint64(resp.ContentLength)) + ")")
 		//--
 		limitedReader := io.LimitedReader{R: resp.Body, N: int64(maxBytesRead + 500)} // add extra 500 bytes to read to compare below if body size is higher than limit ; this works also in the case that resp.ContentLength is not reported or is zero ; below will check the size
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(&bodyData, dbar), &limitedReader)
 		if(rdBodyErr != nil) {
-			httpResult.Errors = "ERR: Failed to Read Response Body (" + smart.ConvertInt64ToStr(bytesCopied) + "bytes read): " + rdBodyErr.Error()
+			httpResult.Errors = "ERR: Timed Out (Max seconds: " + smart.ConvertUInt32ToStr(timeoutSec) + ") or Failed to Read Response Body (" + smart.ConvertInt64ToStr(bytesCopied) + " bytes read): " + rdBodyErr.Error()
 			httpResult.HttpStatus = -109
 			return
 		} //end if
@@ -1483,6 +1495,18 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		} //end if
 		//--
 	} //end if else
+	//--
+	var useB64Encoding bool = true
+	if(
+		(httpResult.MimeType == MIME_TYPE_HTML) || (httpResult.MimeType == MIME_TYPE_CSS) ||
+		(httpResult.MimeType == MIME_TYPE_JS) || (httpResult.MimeType == MIME_TYPE_JSON) ||
+		(httpResult.MimeType == MIME_TYPE_XML) || (httpResult.MimeType == MIME_TYPE_SVG) ||
+		(httpResult.MimeType == MIME_TYPE_TEXT) || (httpResult.MimeType == MIME_TYPE_CSV) ||
+		(httpResult.MimeType == MIME_TYPE_EMAIL_MSG) || (httpResult.MimeType == MIME_TYPE_VCARD) ||
+		(httpResult.MimeType == MIME_TYPE_ICALENDAR) || (httpResult.MimeType == MIME_TYPE_SIG_GPG) ||
+		(smart.StrStartsWith(httpResult.MimeType, "text/"))) { // other text types
+			useB64Encoding = false
+	} //end if
 	//--
 	httpResult.Errors = ""
 	httpResult.BodyData = string(bodyData.Bytes())
@@ -2333,10 +2357,10 @@ func getClientIdentSignature(r *http.Request) string {
 } //END FUNCTION
 
 
-func GetClientIdentAppSafeSignature(r *http.Request) string { // aaaaa: search for all occurences
+func GetClientIdentAppSafeSignature(r *http.Request) string { // used as base for generating derived client unique signature
 	//--
 	ns, _ := smart.AppGetNamespace()
-	sk, _ := smart.CryptoGetSecurityKey()
+	sk, _ := smart.AppGetSecurityKey()
 	//--
 	return getClientIdentSignature(r) + " [#] " + ns + "*" + smart.Base64ToBase64s(smart.Sh3a512B64(sk)) + "." // use a hash of security key to avoid expose by mistake !
 	//--
@@ -2855,7 +2879,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	// do not trim password !
 	allowedIPs = smart.StrTrimWhitespaces(allowedIPs)
 	//--
-	if((authRealm == "") || (len(authRealm) < 7) || (len(authRealm) > 50) || (!smart.StrRegexMatchString(`^[ _a-zA-Z0-9\-\.@\/\:]+$`, authRealm))) {
+	if((authRealm == "") || (len(authRealm) < 7) || (len(authRealm) > 50) || (!smart.StrRegexMatch(`^[ _a-zA-Z0-9\-\.@\/\:]+$`, authRealm))) {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: AUTH.FIX :: Invalid Realm `" + authRealm + "` ; The Realm was set to default: `" + DEFAULT_REALM + "`")
 		authRealm = DEFAULT_REALM
 	} //end if

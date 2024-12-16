@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -266,6 +266,52 @@ func DateTimeStructLocal(dateIsoStr string) uxmDateTimeStruct {
 } //END FUNCTION
 
 
+func DateFromStr(dateIsoStr string, withTime bool, withTzOffset bool, isUTC bool) string {
+	//-- if dateIsoStr is empty will return empty string
+	dateIsoStr = StrTrimWhitespaces(dateIsoStr)
+	if(dateIsoStr == "") {
+		return ""
+	} //end if
+	//--
+	var dts uxmDateTimeStruct
+	if(isUTC) {
+		dts = parseDateTimeAsStruct(TZ_MODE_UTC, dateIsoStr)
+	} else {
+		dts = parseDateTimeAsStruct(TZ_MODE_LOCAL, dateIsoStr)
+	} //end if else
+	//--
+	var dt string = dts.Years + "-" + dts.Months + "-" + dts.Days // YYYY-MM-DD
+	if(withTime) {
+		dt += " " + dts.Hours + ":" + dts.Minutes + ":" + dts.Seconds // YYYY-MM-DD HH:II:SS
+		if(withTzOffset == true) {
+			dt += " " + dts.TzOffset // YYYY-MM-DD HH:II:SS +0200
+		} //end if
+	} else if(withTzOffset == true) {
+		return "" // cannot use TZ Offset just with date, needs also time
+	} //end if
+	//--
+	return dt
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func DateNowNoTimeUtc() string { // YYYY-MM-DD
+	//--
+	return time.Now().UTC().Format(DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+func DateNowNoTimeLocal() string { // YYYY-MM-DD
+	//--
+	return time.Now().Format(DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
 func DateNowIsoUtc() string { // YYYY-MM-DD HH:II:SS
 	//--
 	return time.Now().UTC().Format(DATE_TIME_FMT_ISO_STD_GO_EPOCH)
@@ -295,6 +341,24 @@ func DateNowLocal() string { // YYYY-MM-DD HH:II:SS +ZZZZ
 
 
 //-----
+
+
+func DateNoTimeFromUnixTimeUtc(timestamp int64) string { // YYYY-MM-DD
+	//--
+	t := time.Unix(timestamp, 0)
+	//--
+	return t.UTC().Format(DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
+func DateNoTimeFromUnixTimeLocal(timestamp int64) string { // YYYY-MM-DD
+	//--
+	t := time.Unix(timestamp, 0)
+	//--
+	return t.Format(DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH)
+	//--
+} //END FUNCTION
 
 
 func DateIsoFromUnixTimeUtc(timestamp int64) string { // YYYY-MM-DD HH:II:SS
@@ -336,15 +400,22 @@ func DateFromUnixTimeLocal(timestamp int64) string { // YYYY-MM-DD HH:II:SS +ZZZ
 //-----
 
 
+func DateNoTimeFromTime(t time.Time) string { // YYYY-MM-DD
+	//--
+	return t.Format(DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH)
+	//--
+} //END FUNCTION
+
+
 func DateIsoFromTime(t time.Time) string { // YYYY-MM-DD HH:II:SS
-	//-- this already contains timezone embedded
+	//--
 	return t.Format(DATE_TIME_FMT_ISO_STD_GO_EPOCH)
 	//--
 } //END FUNCTION
 
 
 func DateFromTime(t time.Time) string { // YYYY-MM-DD HH:II:SS +ZZZZ
-	//-- this already contains timezone embedded
+	//--
 	return t.Format(DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH)
 	//--
 } //END FUNCTION

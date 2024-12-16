@@ -1,11 +1,11 @@
-@head.20241118
+@head.20241204.2358
 
 Go 1.12 or later
 
 module github.com/gomarkdown/markdown
 
 # refactored by unixman as:
-github.com/unix-world/smartgo/markdown
+github.com/unix-world/smartgo/markdown # r.20241215.2358
 
 # modified by unixman
-
+# removed Smartypants

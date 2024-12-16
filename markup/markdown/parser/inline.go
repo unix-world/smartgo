@@ -13,11 +13,18 @@ import (
 // Parsing of inline elements
 
 var (
-	urlRe    = `((https?|ftp):\/\/|\/)[-A-Za-z0-9+&@#\/%?=~_|!:,.;\(\)]+`
+	//-- unixman
+//	urlRe    = `((https?|ftp):\/\/|\/)[-A-Za-z0-9+&@#\/%?=~_|!:,.;\(\)]+`
+	urlRe    = `((http|https):\/\/|\/)[-A-Za-z0-9+&@#\/%?=~_|!:,.;\(\)]+`
+	//-- #
+
 	anchorRe = regexp.MustCompile(`^(<a\shref="` + urlRe + `"(\stitle="[^"<>]+")?\s?>` + urlRe + `<\/a>)`)
 
+	//-- unixman
 	// TODO: improve this regexp to catch all possible entities:
-	htmlEntityRe = regexp.MustCompile(`&[a-z]{2,5};`)
+//	htmlEntityRe = regexp.MustCompile(`&[a-z]{2,5};`)
+	htmlEntityRe = regexp.MustCompile(`&[0-9a-zA-Z\#]{2,32};`)
+	//-- #
 )
 
 // Inline parses text within a block.
@@ -364,25 +371,27 @@ func link(p *Parser, data []byte, offset int) (int, ast.Node) {
 		linkB := i
 		brace := 0
 
+		var c byte
 		// look for link end: ' " )
 	findlinkend:
 		for i < len(data) {
+			c = data[i]
 			switch {
-			case data[i] == '\\':
+			case c == '\\':
 				i += 2
 
-			case data[i] == '(':
+			case c == '(':
 				brace++
 				i++
 
-			case data[i] == ')':
+			case c == ')':
 				if brace <= 0 {
 					break findlinkend
 				}
 				brace--
 				i++
 
-			case data[i] == '\'' || data[i] == '"':
+			case c == '\'' || c == '"':
 				break findlinkend
 
 			default:
@@ -404,14 +413,15 @@ func link(p *Parser, data []byte, offset int) (int, ast.Node) {
 
 		findtitleend:
 			for i < len(data) {
+				c = data[i]
 				switch {
-				case data[i] == '\\':
+				case c == '\\':
 					i++
 
-				case data[i] == data[titleB-1]: // matching title delimiter
+				case c == data[titleB-1]: // matching title delimiter
 					titleEndCharFound = true
 
-				case titleEndCharFound && data[i] == ')':
+				case titleEndCharFound && c == ')':
 					break findtitleend
 				}
 				i++
@@ -855,8 +865,8 @@ func hasPrefixCaseInsensitive(s, prefix []byte) bool {
 var protocolPrefixes = [][]byte{
 	[]byte("http://"),
 	[]byte("https://"),
-	[]byte("ftp://"),
-	[]byte("file://"),
+//	[]byte("ftp://"),  // unixman
+//	[]byte("file://"), // unixman
 	[]byte("mailto:"),
 }
 

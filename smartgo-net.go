@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -79,7 +79,7 @@ func SetHttpProxyBasePath(pfx string) bool {
 	} //end if
 	//--
 	pfx = "/" + pfx + "/" // re-add prefix+suffix slashes
-	if(!StrRegexMatchString(REGEX_SMART_SAFE_BASE_PATH, pfx)) {
+	if(!StrRegexMatch(REGEX_SMART_SAFE_BASE_PATH, pfx)) {
 		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo HTML BasePath is Invalid: `" + pfx + "`")
 		return false
 	} //end if
@@ -243,7 +243,7 @@ func ValidateCookieName(cookieName string) bool {
 	if(StrTrimWhitespaces(cookieName) == "") {
 		return false // invalid, empty
 	} //end if
-	if(!StrRegexMatchString(REGEX_SAFE_VAR_NAME, cookieName)) {
+	if(!StrRegexMatch(REGEX_SAFE_VAR_NAME, cookieName)) {
 		return false // invalid, regex does not match
 	} //end if
 	if(len(cookieName) < 2) { // reasonable, min 2 characters
@@ -266,7 +266,7 @@ func IsValidHttpHeaderKey(hdrKey string) bool {
 	if(StrTrimWhitespaces(hdrKey) == "") {
 		return false
 	} //end if
-	if(!StrRegexMatchString(REGEX_SMART_SAFE_HTTP_HEADER_KEY, hdrKey)) {
+	if(!StrRegexMatch(REGEX_SMART_SAFE_HTTP_HEADER_KEY, hdrKey)) {
 		return false
 	} //end if
 	if(len(hdrKey) < 1) { // reasonable, min 1 characters
@@ -814,7 +814,7 @@ func IsNetValidHostName(s string) bool { // can contains only
 		return false
 	} //end if
 	//--
-	if(!StrRegexMatchString(REGEX_SMART_SAFE_NET_HOSTNAME, s)) {
+	if(!StrRegexMatch(REGEX_SMART_SAFE_NET_HOSTNAME, s)) {
 		return false
 	} //end if
 	//--

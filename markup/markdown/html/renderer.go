@@ -23,7 +23,7 @@ type Flags int
 // may wish to override this and use e.g. "anchor".
 var IDTag = "id"
 
-// HTML renderer configuration options.
+// HTML renderer configuration options ; unixman: removed Smartypants
 const (
 	FlagsNone               Flags = 0
 	SkipHTML                Flags = 1 << iota // Skip preformatted HTML blocks
@@ -35,42 +35,43 @@ const (
 	NoopenerLinks                             // Only link with rel="noopener"
 	HrefTargetBlank                           // Add a blank target
 	CompletePage                              // Generate a complete HTML page
-	UseXHTML                                  // Generate XHTML output instead of HTML
+//	UseXHTML                                  // Generate XHTML output instead of HTML ; unixman
 	FootnoteReturnLinks                       // Generate a link at the end of a footnote to return to the source
 	FootnoteNoHRTag                           // Do not output an HR after starting a footnote list.
-	Smartypants                               // Enable smart punctuation substitutions
-	SmartypantsFractions                      // Enable smart fractions (with Smartypants)
-	SmartypantsDashes                         // Enable smart dashes (with Smartypants)
-	SmartypantsLatexDashes                    // Enable LaTeX-style dashes (with Smartypants)
-	SmartypantsAngledQuotes                   // Enable angled double quotes (with Smartypants) for double quotes rendering
-	SmartypantsQuotesNBSP                     // Enable « French guillemets » (with Smartypants)
 	TOC                                       // Generate a table of contents
 	LazyLoadImages                            // Include loading="lazy" with images
 
-	CommonFlags Flags = Smartypants | SmartypantsFractions | SmartypantsDashes | SmartypantsLatexDashes
+	CommonFlags Flags = SkipHTML | LazyLoadImages
 )
 
 var (
 	htmlTagRe = regexp.MustCompile("(?i)^" + htmlTag)
 )
 
+//-- unixman: imported from SmartyPants
+var (
+	isSpace       = parser.IsSpace
+	isAlnum       = parser.IsAlnum
+	isPunctuation = parser.IsPunctuation
+)
+//-- #
+
 const (
-	htmlTag = "(?:" + openTag + "|" + closeTag + "|" + htmlComment + "|" +
-		processingInstruction + "|" + declaration + "|" + cdata + ")"
-	closeTag              = "</" + tagName + "\\s*[>]"
-	openTag               = "<" + tagName + attribute + "*" + "\\s*/?>"
-	attribute             = "(?:" + "\\s+" + attributeName + attributeValueSpec + "?)"
+	processingInstruction = "[<][?].*?[?][>]"
+	unquotedValue         = "[^\"'=<>`\\x00-\\x20]+"
+	singleQuotedValue     = "'[^']*'"
+	doubleQuotedValue     = "\"[^\"]*\""
+	attributeName         = "[a-zA-Z_:][a-zA-Z0-9:._-]*"
 	attributeValue        = "(?:" + unquotedValue + "|" + singleQuotedValue + "|" + doubleQuotedValue + ")"
 	attributeValueSpec    = "(?:" + "\\s*=" + "\\s*" + attributeValue + ")"
-	attributeName         = "[a-zA-Z_:][a-zA-Z0-9:._-]*"
-	cdata                 = "<!\\[CDATA\\[[\\s\\S]*?\\]\\]>"
-	declaration           = "<![A-Z]+" + "\\s+[^>]*>"
-	doubleQuotedValue     = "\"[^\"]*\""
-	htmlComment           = "<!---->|<!--(?:-?[^>-])(?:-?[^-])*-->"
-	processingInstruction = "[<][?].*?[?][>]"
-	singleQuotedValue     = "'[^']*'"
+	attribute             = "(?:" + "\\s+" + attributeName + attributeValueSpec + "?)"
 	tagName               = "[A-Za-z][A-Za-z0-9-]*"
-	unquotedValue         = "[^\"'=<>`\\x00-\\x20]+"
+	openTag               = "<" + tagName + attribute + "*" + "\\s*/?>"
+	closeTag              = "</" + tagName + "\\s*[>]"
+	declaration           = "<![A-Z]+" + "\\s+[^>]*>"
+	cdata                 = "<!\\[CDATA\\[[\\s\\S]*?\\]\\]>"
+	htmlComment           = "<!---->|<!--(?:-?[^>-])(?:-?[^-])*-->"
+	htmlTag               = "(?:" + openTag + "|" + closeTag + "|" + htmlComment + "|" + processingInstruction + "|" + declaration + "|" + cdata + ")"
 )
 
 // RenderNodeFunc allows reusing most of Renderer logic and replacing
@@ -97,7 +98,7 @@ type RendererOptions struct {
 	HeadingIDPrefix string
 	// If set, add this text to the back of each Heading ID, to ensure uniqueness.
 	HeadingIDSuffix string
-	// can over-write <p> for paragraph tag
+	// can over-write <span> for paragraph tag, ex using alternative: <p>
 	ParagraphTag string
 
 	Title string // Document title (used if CompletePage is set)
@@ -141,7 +142,7 @@ type Renderer struct {
 	// the default list of safe URLs.
 	IsSafeURLOverride func(url []byte) bool
 
-	sr *SPRenderer
+//	sr *SPRenderer
 
 	documentMatter ast.DocumentMatters // keep track of front/main/back matter.
 }
@@ -156,6 +157,10 @@ var Escaper = [256][]byte{
 
 // EscapeHTML writes html-escaped d to w. It escapes &, <, > and " characters.
 func EscapeHTML(w io.Writer, d []byte) {
+	//-- unixman: unescape HTML Entities
+	var s string = html.UnescapeString(string(d))
+	d = []byte(s)
+	//-- #
 	var start, end int
 	n := len(d)
 	for end < n {
@@ -196,9 +201,11 @@ func Escape(w io.Writer, text []byte) {
 func NewRenderer(opts RendererOptions) *Renderer {
 	// configure the rendering engine
 	closeTag := ">"
-	if opts.Flags&UseXHTML != 0 {
-		closeTag = " />"
-	}
+	//-- unixman
+//	if opts.Flags&UseXHTML != 0 {
+//		closeTag = " />"
+//	}
+	//-- #
 
 	if opts.FootnoteReturnLinkContents == "" {
 		opts.FootnoteReturnLinkContents = `<sup>[return]</sup>`
@@ -207,7 +214,7 @@ func NewRenderer(opts RendererOptions) *Renderer {
 		opts.CitationFormatString = `<sup>[%s]</sup>`
 	}
 	if opts.Generator == "" {
-		opts.Generator = `  <meta name="GENERATOR" content="github.com/unix-world/smartgo/markup/markdown markdown processor for Go`
+		opts.Generator = `  <meta name="GENERATOR" content="smartgoext/markup/markdown processor for Go`
 	}
 
 	return &Renderer{
@@ -216,7 +223,7 @@ func NewRenderer(opts RendererOptions) *Renderer {
 		closeTag:   closeTag,
 		headingIDs: make(map[string]int),
 
-		sr: NewSmartypantsRenderer(opts.Flags),
+	//	sr: NewSmartypantsRenderer(opts.Flags), // unixman
 	}
 }
 
@@ -317,7 +324,12 @@ func appendLanguageAttr(attrs []string, info []byte) []string {
 	if endOfLang < 0 {
 		endOfLang = len(info)
 	}
-	s := `class="language-` + string(info[:endOfLang]) + `"`
+	//-- unixman
+//	s := `class="language-` + string(info[:endOfLang]) + `"`
+	var tmp bytes.Buffer
+	EscapeHTML(&tmp, info[:endOfLang])
+	s := `class="mkdw-code syntax" data-syntax="` + tmp.String() + `"`
+	//-- #
 	return append(attrs, s)
 }
 
@@ -411,28 +423,35 @@ func HeadingCloseTagFromLevel(level int) string {
 
 func (r *Renderer) OutHRTag(w io.Writer, attrs []string) {
 	hr := TagWithAttributes("<hr", attrs)
-	r.OutOneOf(w, r.Opts.Flags&UseXHTML == 0, hr, "<hr />")
+	//-- unixman
+//	r.OutOneOf(w, r.Opts.Flags&UseXHTML == 0, hr, "<hr />")
+	r.Outs(w, hr)
+	//-- #
 }
 
 // Text writes ast.Text node
 func (r *Renderer) Text(w io.Writer, text *ast.Text) {
-	if r.Opts.Flags&Smartypants != 0 {
-		var tmp bytes.Buffer
-		EscapeHTML(&tmp, text.Literal)
-		r.sr.Process(w, tmp.Bytes())
-	} else {
+	//-- unixman
+//	if r.Opts.Flags&Smartypants != 0 {
+//		var tmp bytes.Buffer
+//		EscapeHTML(&tmp, text.Literal)
+//		r.sr.Process(w, tmp.Bytes())
+//	} else {
 		_, parentIsLink := text.Parent.(*ast.Link)
 		if parentIsLink {
 			EscLink(w, text.Literal)
 		} else {
 			EscapeHTML(w, text.Literal)
 		}
-	}
+//	}
 }
 
 // HardBreak writes ast.Hardbreak node
 func (r *Renderer) HardBreak(w io.Writer, node *ast.Hardbreak) {
-	r.OutOneOf(w, r.Opts.Flags&UseXHTML == 0, "<br>", "<br />")
+	//-- unixman
+//	r.OutOneOf(w, r.Opts.Flags&UseXHTML == 0, "<br>", "<br />")
+	r.Outs(w, "<br>")
+	//-- #
 	r.CR(w)
 }
 
@@ -465,6 +484,10 @@ func (r *Renderer) OutOneOfCr(w io.Writer, outFirst bool, first string, second s
 func (r *Renderer) HTMLSpan(w io.Writer, span *ast.HTMLSpan) {
 	if r.Opts.Flags&SkipHTML == 0 {
 		r.Out(w, span.Literal)
+	//-- unixman
+	} else {
+		EscapeHTML(w, span.Literal)
+	//-- #
 	}
 }
 
@@ -543,12 +566,12 @@ func (r *Renderer) imageExit(w io.Writer, image *ast.Image) {
 		EscapeHTML(w, image.Title)
 	}
 	//-- fix by unixman
-	//r.Outs(w, `" />`)
-	if(r.Opts.Flags&UseXHTML != 0) {
-		r.Outs(w, `" />`)
-	} else {
+//	//r.Outs(w, `" />`)
+//	if(r.Opts.Flags&UseXHTML != 0) {
+//		r.Outs(w, `" />`)
+//	} else {
 		r.Outs(w, `">`)
-	}
+//	}
 	//-- #end fix
 }
 
@@ -583,7 +606,10 @@ func (r *Renderer) paragraphEnter(w io.Writer, para *ast.Paragraph) {
 		}
 	}
 
-	ptag := "<p"
+	//-- unixman
+//	ptag := "<p"
+	ptag := "<span"
+	//-- #
 	if r.Opts.ParagraphTag != "" {
 		ptag = "<" + r.Opts.ParagraphTag
 	}
@@ -592,7 +618,10 @@ func (r *Renderer) paragraphEnter(w io.Writer, para *ast.Paragraph) {
 }
 
 func (r *Renderer) paragraphExit(w io.Writer, para *ast.Paragraph) {
-	ptag := "</p>"
+	//-- unixman
+//	ptag := "</p>"
+	ptag := "</span><br>"
+	//-- #
 	if r.Opts.ParagraphTag != "" {
 		ptag = "</" + r.Opts.ParagraphTag + ">"
 	}
@@ -623,12 +652,23 @@ func (r *Renderer) Code(w io.Writer, node *ast.Code) {
 
 // HTMLBlock write ast.HTMLBlock node
 func (r *Renderer) HTMLBlock(w io.Writer, node *ast.HTMLBlock) {
+	//-- unixman
+	/*
 	if r.Opts.Flags&SkipHTML != 0 {
 		return
 	}
 	r.CR(w)
 	r.Out(w, node.Literal)
 	r.CR(w)
+	*/
+	r.CR(w)
+	if r.Opts.Flags&SkipHTML == 0 {
+		r.Out(w, node.Literal)
+	} else {
+		EscapeHTML(w, node.Literal)
+	}
+	r.CR(w)
+	//-- #
 }
 
 func (r *Renderer) EnsureUniqueHeadingID(id string) string {
@@ -680,12 +720,22 @@ func (r *Renderer) HeadingEnter(w io.Writer, hdr *ast.Heading) {
 		}
 	}
 	if class != "" {
-		attrs = []string{`class="` + class + `"`}
+		//-- unixman
+	//	attrs = []string{`class="` + class + `"`}
+		var tmp bytes.Buffer
+		EscapeHTML(&tmp, []byte(class))
+		attrs = []string{`class="` + tmp.String() + `"`}
+		//-- #
 	}
 
 	if hdr.HeadingID != "" {
 		id := r.MakeUniqueHeadingID(hdr)
-		attrID := `id="` + id + `"`
+		//-- unixman
+	//	attrID := `id="` + id + `"`
+		var tmp bytes.Buffer
+		EscapeHTML(&tmp, []byte(id))
+		attrID := `id="` + tmp.String() + `"`
+		//-- #
 		attrs = append(attrs, attrID)
 	}
 	attrs = append(attrs, BlockAttrs(hdr)...)
@@ -875,19 +925,42 @@ func (r *Renderer) CodeBlock(w io.Writer, codeBlock *ast.CodeBlock) {
 	var attrs []string
 	// TODO(miek): this can add multiple class= attribute, they should be coalesced into one.
 	// This is probably true for some other elements as well
+	//-- unixman
+	var isCodePre bool = false
+	//-- #
 	attrs = appendLanguageAttr(attrs, codeBlock.Info)
+	//-- unixman
+	if(len(attrs) > 0) {
+		isCodePre = true
+	}
+	//-- #
 	attrs = append(attrs, BlockAttrs(codeBlock)...)
 	r.CR(w)
 
-	r.Outs(w, "<pre>")
-	code := TagWithAttributes("<code", attrs)
-	r.Outs(w, code)
+	//-- unixman
+//	r.Outs(w, "<pre>")
+//	code := TagWithAttributes("<code", attrs)
+//	r.Outs(w, code)
+	if(isCodePre) {
+		r.Outs(w, "<pre>")
+		code := TagWithAttributes("<code", attrs)
+		r.Outs(w, code)
+	} else {
+		pre := TagWithAttributes("<pre", attrs)
+		r.Outs(w, pre)
+	}
+	//-- #
 	if r.Opts.Comments != nil {
 		r.EscapeHTMLCallouts(w, codeBlock.Literal)
 	} else {
 		EscapeHTML(w, codeBlock.Literal)
 	}
-	r.Outs(w, "</code>")
+	//-- unixman
+//	r.Outs(w, "</code>")
+	if(isCodePre) {
+		r.Outs(w, "</code>")
+	}
+	//-- #
 	r.Outs(w, "</pre>")
 	if !IsListItem(codeBlock.Parent) {
 		r.CR(w)
@@ -908,7 +981,12 @@ func (r *Renderer) CaptionFigure(w io.Writer, figure *ast.CaptionFigure, enterin
 	// TODO(miek): copy more generic ways of mmark over to here.
 	fig := "<figure"
 	if figure.HeadingID != "" {
-		fig += ` id="` + figure.HeadingID + `">`
+		//-- unixman
+	//	fig += ` id="` + figure.HeadingID + `">`
+		var tmp bytes.Buffer
+		EscapeHTML(&tmp, []byte(figure.HeadingID))
+		fig += ` id="` + tmp.String() + `">`
+		//--
 	} else {
 		fig += ">"
 	}
@@ -1005,7 +1083,12 @@ func (r *Renderer) Callout(w io.Writer, node *ast.Callout) {
 // Index writes ast.Index node
 func (r *Renderer) Index(w io.Writer, node *ast.Index) {
 	// there is no in-text representation.
-	attr := []string{`class="index"`, fmt.Sprintf(`id="%s"`, node.ID)}
+	//-- unixman
+//	attr := []string{`class="index"`, fmt.Sprintf(`id="%s"`, node.ID)}
+	var tmp bytes.Buffer
+	EscapeHTML(&tmp, []byte(node.ID))
+	attr := []string{`class="index"`, fmt.Sprintf(`id="%s"`, tmp.String())}
+	//-- #
 	r.OutTag(w, "<span", attr)
 	r.Outs(w, "</span>")
 }
@@ -1149,22 +1232,26 @@ func (r *Renderer) writeDocumentHeader(w io.Writer) {
 		return
 	}
 	ending := ""
-	if r.Opts.Flags&UseXHTML != 0 {
-		io.WriteString(w, "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" ")
-		io.WriteString(w, "\"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n")
-		io.WriteString(w, "<html xmlns=\"http://www.w3.org/1999/xhtml\">\n")
-		ending = " /"
-	} else {
+	//-- fix by unixman
+//	if r.Opts.Flags&UseXHTML != 0 {
+//		io.WriteString(w, "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" ")
+//		io.WriteString(w, "\"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n")
+//		io.WriteString(w, "<html xmlns=\"http://www.w3.org/1999/xhtml\">\n")
+//		ending = " /"
+//	} else {
 		io.WriteString(w, "<!DOCTYPE html>\n")
 		io.WriteString(w, "<html>\n")
-	}
+//	}
+	//--
 	io.WriteString(w, "<head>\n")
 	io.WriteString(w, "  <title>")
-	if r.Opts.Flags&Smartypants != 0 {
-		r.sr.Process(w, []byte(r.Opts.Title))
-	} else {
+	//-- unixman
+//	if r.Opts.Flags&Smartypants != 0 {
+//		r.sr.Process(w, []byte(r.Opts.Title))
+//	} else {
 		EscapeHTML(w, []byte(r.Opts.Title))
-	}
+//	}
+	//--
 	io.WriteString(w, "</title>\n")
 	io.WriteString(w, r.Opts.Generator)
 	io.WriteString(w, "\"")
@@ -1331,7 +1418,12 @@ func BlockAttrs(node ast.Node) []string {
 		classes += " " + string(c)
 	}
 	if classes != "" {
-		s = append(s, fmt.Sprintf(`class="%s"`, classes[1:])) // skip space we added.
+		//-- unixman
+	//	s = append(s, fmt.Sprintf(`class="%s"`, classes[1:])) // skip space we added.
+		var tmp bytes.Buffer
+		EscapeHTML(&tmp, []byte(classes[1:]))
+		s = append(s, fmt.Sprintf(`class="%s"`, tmp.Bytes())) // skip space we added.
+		//-- #
 	}
 
 	// sort the attributes so it remain stable between runs
@@ -1355,3 +1447,10 @@ func TagWithAttributes(name string, attrs []string) string {
 	}
 	return s + ">"
 }
+
+//-- unixman: imported from smartypants
+func isdigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}
+//-- #
+

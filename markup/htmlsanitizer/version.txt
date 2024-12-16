@@ -5,7 +5,7 @@ Go 1.14 or later
 module github.com/sym01/htmlsanitizer
 
 # refactored by unixman as:
-github.com/unix-world/smartgo/htmlsanitizer
+github.com/unix-world/smartgo/htmlsanitizer # r.20241215.2358
 
 # modified by unixman
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Validations :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241128.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -48,7 +48,7 @@ func webUrlRouteIsValid(route string) bool { // just for URL Routes
 		return false
 	} //end if
 	//--
-	if(!smart.StrRegexMatchString(REGEX_SAFE_WEB_ROUTE, route)) {
+	if(!smart.StrRegexMatch(REGEX_SAFE_WEB_ROUTE, route)) {
 		return false
 	} //end if
 	//--

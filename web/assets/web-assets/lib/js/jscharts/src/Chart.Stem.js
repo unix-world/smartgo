@@ -1,3 +1,3 @@
-// JS-Script (UM): Chart.Stem.js @ 2024-09-27 15:57:30 +0000
+// JS-Script (UM): Chart.Stem.js @ 2024-12-16 18:40:28 +0000
 (function(){Chart.ErrorBar=Chart.Rectangle.extend({draw:function(){var t=this.ctx,i=this.width/2,e=this.x-i,s=this.x+i,h=this.base-(this.base-this.yUp),o=this.base-(this.base-this.yDown),r=this.base-(this.base-this.y);t.strokeStyle=this.errorStrokeColor;t.lineWidth=this.errorStrokeWidth;if(this.errorDir!="down"){t.beginPath();t.moveTo(this.x,r);t.lineTo(this.x,h);t.stroke();t.beginPath();t.moveTo(e,h);t.lineTo(s,h);t.stroke()}if(this.errorDir!="up"){t.beginPath();t.moveTo(this.x,r);t.lineTo(this.x,o);t.stroke();t.beginPath();t.moveTo(e,o);t.lineTo(s,o);t.stroke()}}})}).call(this);
 // #END

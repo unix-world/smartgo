@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ LOGGER ]
 
 // REQUIRE: go 1.19 or later
@@ -16,6 +16,10 @@ import (
 
 	logutils "github.com/unix-world/smartgo/utils/log-utils"
 	color    "github.com/unix-world/smartgo/ui/colorstring"
+)
+
+const (
+	LOG_MAX_MSG_LEN uint16 = 65535 // max log message length
 )
 
 //-----
@@ -114,30 +118,35 @@ var logUseLocalTime bool = false // default, logs will use UTC
 
 // PRIVATES
 type logWriterWithColors struct {}
-func (writer logWriterWithColors) Write(bytes []byte) (int, error) {
+func (writer logWriterWithColors) Write(bMsg []byte) (int, error) {
 	//--
-	var theMsg string = StrTrimWhitespaces(StrNormalizeSpaces(string(bytes)))
+	if(len(bMsg) > int(LOG_MAX_MSG_LEN)) {
+		bMsg = bMsg[0:LOG_MAX_MSG_LEN]
+	} //end if
+	//--
+	var theMsg string = StrTrimWhitespaces(StrNormalizeSpaces(string(bMsg)))
+	var hdrMsg string = StrToUpper(StrSubstr(theMsg, 0, 16))
 	//--
 	if(logColoredOnConsole) {
-		if(StrIPos(theMsg, "[PANIC]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
-			theMsg = color.MagentaString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
-		} else if(StrIPos(theMsg, "[ERROR]") == 0) {
+		if(StrStartsWith(hdrMsg, "[PANIC]") == true) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+			theMsg = color.MagentaString(StrTrimWhitespaces(string(bMsg))) // for data preserve the string how it is, except trim ! ; brown
+		} else if(StrStartsWith(hdrMsg, "[ERROR]") == true) {
 			theMsg = color.RedString(theMsg)
-		} else if(StrIPos(theMsg, "[WARNING]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[WARNING]") == true) {
 			theMsg = color.HiRedString(theMsg)
-		} else if(StrIPos(theMsg, "[OK]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[OK]") == true) {
 			theMsg = color.HiGreenString(theMsg)
-		} else if(StrIPos(theMsg, "[LOG]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[LOG]") == true) {
 			theMsg = color.WhiteString(theMsg)
-		} else if(StrIPos(theMsg, "[INFO]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[INFO]") == true) {
 			theMsg = color.HiYellowString(theMsg)
-		} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[NOTICE]") == true) {
 			theMsg = color.HiBlueString(theMsg)
-		} else if(StrIPos(theMsg, "[META]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[META]") == true) {
 			theMsg = color.HiCyanString(theMsg)
-		} else if(StrIPos(theMsg, "[DATA]") == 0) {
-			theMsg = color.YellowString(StrTrimWhitespaces(string(bytes))) // for data preserve the string how it is, except trim ! ; brown
-		} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
+		} else if(StrStartsWith(hdrMsg, "[DATA]") == true) {
+			theMsg = color.YellowString(StrTrimWhitespaces(string(bMsg))) // for data preserve the string how it is, except trim ! ; brown
+		} else if(StrStartsWith(hdrMsg, "[DEBUG]") == true) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
 			theMsg = color.HiGreyString(theMsg)
@@ -166,7 +175,11 @@ type logWriteJsonStruct struct {
 	DateTime string `json:"dateTime"`
 	Message  string `json:"message"`
 }
-func (writer logWriterFile) Write(bytes []byte) (int, error) {
+func (writer logWriterFile) Write(bMsg []byte) (int, error) {
+	//--
+	if(len(bMsg) > int(LOG_MAX_MSG_LEN)) {
+		bMsg = bMsg[0:LOG_MAX_MSG_LEN]
+	} //end if
 	//--
 	var dTime string = ""
 	if(logUseLocalTime) {
@@ -176,56 +189,57 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 	} //end if else
 	//--
 	var theErr string = ""
-	var theMsg string = StrTrimWhitespaces(string(bytes))
+	var theMsg string = StrTrimWhitespaces(string(bMsg))
+	var hdrMsg string = StrToUpper(StrSubstr(theMsg, 0, 16))
 	//--
 	var theType string = ""
 	var colorMsg string = theMsg
-	if(StrIPos(theMsg, "[PANIC]") == 0) {
+	if(StrStartsWith(hdrMsg, "[PANIC]") == true) {
 		theType = "panic"
 		if(logColoredOnConsole) {
 			colorMsg = color.MagentaString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[ERROR]") == 0) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+	} else if(StrStartsWith(hdrMsg, "[ERROR]") == true) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 		theType = "error"
 		if(logColoredOnConsole) {
 			colorMsg = color.RedString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[WARNING]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[WARNING]") == true) {
 		theType = "warning"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiRedString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[OK]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[OK]") == true) {
 		theType = "ok"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiGreenString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[LOG]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[LOG]") == true) {
 		theType = "log"
 		if(logColoredOnConsole) {
 			colorMsg = color.WhiteString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[INFO]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[INFO]") == true) {
 		theType = "info"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiYellowString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[NOTICE]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[NOTICE]") == true) {
 		theType = "notice"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiBlueString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[META]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[META]") == true) {
 		theType = "meta"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiCyanString(colorMsg)
 		} //end if
-	} else if(StrIPos(theMsg, "[DATA]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[DATA]") == true) {
 		theType = "data"
 		if(logColoredOnConsole) {
 			colorMsg = color.YellowString(colorMsg) // brown
 		} //end if
-	} else if(StrIPos(theMsg, "[DEBUG]") == 0) {
+	} else if(StrStartsWith(hdrMsg, "[DEBUG]") == true) {
 		theType = "debug"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiMagentaString(colorMsg)
@@ -308,7 +322,7 @@ func (writer logWriterFile) Write(bytes []byte) (int, error) {
 		} //end if else
 	} //end if
 	//--
-	return len(bytes), nil
+	return len(bMsg), nil
 	//--
 } //END FUNCTION
 

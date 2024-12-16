@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -43,7 +43,11 @@ const (
 	MAX_PATH_LENGTH int     = 1024 // path can be up to 4096 characters, safe is 1024 to be cross platform
 	MAX_FILENAME_LENGTH int =  255 // file can be up to  512 characters, safe is  255 to be cross platform
 
-	INVALID_ABSOLUTE_PATH string = "/tmp/err-absolute-path/invalid-path/"
+	FILE_WRITE_MODE_DEFAULT string = "w" // write
+	FILE_WRITE_MODE_APPEND  string = "a" // append
+
+	INVALID_ABSOLUTE_PATH string = "/tmp/go-invalid-path/err-absolute-path/"
+	INVALID_HOMEDIR_PATH  string = "/tmp/go-invalid-path/err-user-home-dir/"
 )
 
 
@@ -120,7 +124,7 @@ func PathIsSafeValidFileName(fileName string) bool {
 		return false
 	} //end if
 	//--
-	if(StrRegexMatchString(REGEX_SAFE_FILE_NAME, fileName) != true) {
+	if(StrRegexMatch(REGEX_SAFE_FILE_NAME, fileName) != true) {
 		return false
 	} //end if
 	//--
@@ -146,7 +150,7 @@ func PathIsSafeValidFileName(fileName string) bool {
 func PathIsSafeValidSafeFileName(fileName string) bool {
 	//--
 	if(PathIsSafeValidFileName(fileName)) {
-		if(StrRegexMatchString(REGEX_SMART_SAFE_FILE_NAME, fileName)) {
+		if(StrRegexMatch(REGEX_SMART_SAFE_FILE_NAME, fileName)) {
 			return true
 		} //end if
 	} //end if
@@ -159,7 +163,7 @@ func PathIsSafeValidSafeFileName(fileName string) bool {
 func PathIsSafeValidSafePath(filePath string) bool {
 	//--
 	if(PathIsSafeValidPath(filePath)) {
-		if(StrRegexMatchString(REGEX_SMART_SAFE_PATH_NAME, filePath)) {
+		if(StrRegexMatch(REGEX_SMART_SAFE_PATH_NAME, filePath)) {
 			return true
 		} //end if
 	} //end if
@@ -179,7 +183,7 @@ func PathIsSafeValidPath(filePath string) bool {
 		return false
 	} //end if
 	//--
-	if(StrRegexMatchString(REGEX_SAFE_PATH_NAME, filePath) != true) {
+	if(StrRegexMatch(REGEX_SAFE_PATH_NAME, filePath) != true) {
 		return false
 	} //end if
 	//--
@@ -980,7 +984,7 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 	//--
 	defer PanicHandler()
 	//--
-	// wrMode : "a" for append | "w" for write
+	// wrMode : "w" for write (FILE_WRITE_MODE_DEFAULT) | "a" for append (FILE_WRITE_MODE_APPEND)
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
 		return false, NewError("WARNING: File Path is Empty")
@@ -1010,7 +1014,7 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 		return false, NewError("WARNING: File Path is a Directory not a File")
 	} //end if
 	//--
-	if(wrMode == "a") { // append mode
+	if(wrMode == FILE_WRITE_MODE_APPEND) { // append mode
 		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, CHOWN_FILES)
 		if(err != nil) {
 			return false, err
@@ -1031,7 +1035,7 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 		} //end if
 		fClose()
 		return true, nil // must return here to avoid defered f to be out of scope
-	} else if(wrMode == "w") { // write mode
+	} else if(wrMode == FILE_WRITE_MODE_DEFAULT) { // write (default) mode
 		err := os.WriteFile(filePath, []byte(fileContent), CHOWN_FILES)
 		if(err != nil) {
 			return false, err
@@ -1398,6 +1402,44 @@ func SafePathGetMTime(thePath string, allowAbsolutePath bool) (mTime int64, errM
 	modifTime := fd.ModTime()
 	//--
 	return int64(modifTime.Unix()), nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func GetCurrentUserHomeDir() (string, error) {
+	//--
+	userDirHome, errHomeDir := os.UserHomeDir()
+	if(errHomeDir != nil) {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Failed to get the Current User Home Dir: " + errHomeDir.Error())
+	} //end if
+	//--
+	userDirHome = StrTrimWhitespaces(userDirHome)
+	if(userDirHome == "") {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Current User Home Dir is Empty")
+	} //end if
+	//--
+	if(PathIsEmptyOrRoot(userDirHome) == true) {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Current User Home Dir is Empty/Root")
+	} //end if
+	if(PathIsSafeValidPath(userDirHome) != true) {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Current User Home Dir is Invalid Unsafe")
+	} //end if
+	if(PathIsBackwardUnsafe(userDirHome) == true) {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Current User Home Dir is Backward Unsafe")
+	} //end if
+	if(PathIsAbsolute(userDirHome) != true) {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Current User Home Dir is Not an Absolute Path")
+	} //end if
+	//--
+	userDirHome = PathAddDirLastSlash(userDirHome)
+	if(PathIsDir(userDirHome) != true) {
+		return INVALID_HOMEDIR_PATH, NewError("ERR: Current User Home Dir does Not Exists")
+	} //end if
+	//--
+	return userDirHome, nil
 	//--
 } //END FUNCTION
 

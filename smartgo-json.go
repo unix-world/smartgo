@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ JSON ]
 
 // REQUIRE: go 1.19 or later
@@ -154,7 +154,7 @@ func JsonScalarDecodeToStr(data string) (string, error) { // can parse the follo
 			data = `"true"`
 			break
 		default:
-			if(StrRegexMatchString(REGEX_SMART_SAFE_NUMBER_FLOAT, data)) {
+			if(StrRegexMatch(REGEX_SMART_SAFE_NUMBER_FLOAT, data)) {
 				data = `"` + data + `"`
 			} //end if
 	} //end switch

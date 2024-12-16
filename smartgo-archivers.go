@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ ARCHIVERS ]
 
 // REQUIRE: go 1.19 or later
@@ -10,9 +10,8 @@ package smartgo
 import (
 	"log"
 
-	"bytes"
-
 	"io"
+	"bytes"
 
 	"compress/flate"
 	"compress/gzip"
@@ -154,7 +153,7 @@ func DataUnArchive(str string) string { // v3, v2, v1
 		if(
 			(lenSign < 2) ||
 			(arr[2] == "") ||
-			(StrPos(arr[2], "(") != 0) ||
+			(StrStartsWith(arr[2], "(") != true) ||
 			(StrSubstr(arr[2], lenSign-1, lenSign) != ")")) {
 				log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Package (version:", versionDetected, ") Empty or Malformed Package CheckSign", arr[2])
 				return ""

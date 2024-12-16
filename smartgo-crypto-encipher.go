@@ -1,8 +1,8 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
-// [ CRYPTO ]
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
+// [ CRYPTO / ENCIPHER ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
@@ -15,31 +15,23 @@ import (
 	"math"
 	"math/big"
 
-	"io"
-
-	"encoding/hex"
-	"encoding/base64"
-
-	"crypto/subtle"
 	cryptorand "crypto/rand"
+	"crypto/subtle"
 	"crypto/cipher"
 
-	"hash/crc32"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
-	"crypto/hmac"
+	"github.com/unix-world/smartgo/crypto/sha3" // {{{SYNC-SMARTGO-SHA3}}} ; this is a better version than golang.org/x/crypto/sha3, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
 
-	"golang.org/x/crypto/argon2"
-//	"golang.org/x/crypto/sha3"
-	"github.com/unix-world/smartgo/crypto/sha3" // this is a better version than above, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
-	"github.com/unix-world/smartgo/crypto/poly1305"
 	"github.com/unix-world/smartgo/crypto/pbkdf2"
 	"github.com/unix-world/smartgo/crypto/blowfish"
 	"github.com/unix-world/smartgo/crypto/twofish"
 	"github.com/unix-world/smartgo/crypto/threefish"
 	"github.com/unix-world/smartgo/crypto/bcrypt"
+
+	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -79,511 +71,6 @@ const (
 	PASSWORD_PREFIX_VERSION string 			= "$fPv3.7!" 									// {{{SYNC-AUTHADM-PASS-PREFIX}}}
 	PASSWORD_PREFIX_A2ID_VERSION string 	= "a2idP37!" 									// go lang only (no PHP), curent v3, argon2id password ; must be the same length as PASSWORD_PREFIX_VERSION
 )
-
-var (
-	ini_SMART_FRAMEWORK_SECURITY_KEY string = "Private-Key#0987654321" // set via CryptoSetSecurityKey ; 16..255 ; {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
-)
-
-//-----
-
-
-func CryptoSetSecurityKey(key string) bool {
-	//--
-	key = StrTrimWhitespaces(key)
-	//--
-	if(key == "") {
-		log.Println("[WARNING]", CurrentFunctionName(), "SmartGo Security Key is Empty, will use the Default Built-in Key ...")
-		return false
-	} //end if
-	//--
-	var kLen int = len(key)
-	if((kLen < 16) || (kLen > 255)) { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
-		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo Security Key must be between 16 and 255 caracters long ...")
-		return false
-	} //end if
-	//--
-	ini_SMART_FRAMEWORK_SECURITY_KEY = key
-	//--
-	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Security Key was Set (size is `" + ConvertIntToStr(len(ini_SMART_FRAMEWORK_SECURITY_KEY)) + "` bytes): Success")
-	//--
-	return true
-	//--
-} //END FUNCTION
-
-
-func CryptoGetSecurityKey() (string, error) {
-	//--
-	var key string = StrTrimWhitespaces(ini_SMART_FRAMEWORK_SECURITY_KEY)
-	//--
-	var kLen int = len(key)
-	if((kLen < 16) || (kLen > 255)) { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
-		return "", NewError("SmartGo Security Key must be between 16 and 255 caracters long")
-	} //end if
-	//--
-	return key, nil
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func byteRot13(b byte) byte { // https://go.googlesource.com/tour/+/release-branch.go1.2/solutions/rot13.go
-	//--
-	var a, z byte
-	//--
-	switch {
-		case 'a' <= b && b <= 'z':
-			a, z = 'a', 'z'
-		case 'A' <= b && b <= 'Z':
-			a, z = 'A', 'Z'
-		default:
-			return b
-	} //end switch
-	//--
-	return (b - a + 13) % (z - a + 1) + a
-	//--
-} //END FUNCTION
-
-
-func DataRot13(s string) string {
-	//--
-	if(s == "") {
-		return s
-	} //end if
-	//--
-	var b []byte = []byte(s)
-	var r []byte = nil
-	for i := 0; i < len(b); i++ {
-		r = append(r, byteRot13(b[i]))
-	} //end for
-	//--
-	return string(r)
-	//--
-} //END FUNCTION
-
-
-func DataRRot13(s string) string {
-	//--
-	if(s == "") {
-		return s
-	} //end if
-	//--
-	return StrRev(DataRot13(s))
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func HashHmac(algo string, key string, str string, b64 bool) (string, error) {
-	//--
-	algo = StrToLower(StrTrimWhitespaces(algo))
-	//--
-	var ok bool = false
-	var sum string = ""
-	//--
-	switch(algo) { // {{{SYNC-HASHING-ALGOS-LIST}}}
-		//--
-		case "sha3-512":
-			ok = true
-			hmac := hmac.New(sha3.New512, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha3-384":
-			ok = true
-			hmac := hmac.New(sha3.New384, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha3-256":
-			ok = true
-			hmac := hmac.New(sha3.New256, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha3-224":
-			ok = true
-			hmac := hmac.New(sha3.New224, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		//--
-		case "sha512":
-			ok = true
-			hmac := hmac.New(sha512.New, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha384":
-			ok = true
-			hmac := hmac.New(sha512.New384, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha256":
-			ok = true
-			hmac := hmac.New(sha256.New, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha224":
-			ok = true
-			hmac := hmac.New(sha256.New224, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "sha1":
-			ok = true
-			hmac := hmac.New(sha1.New, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		case "md5":
-			ok = true
-			hmac := hmac.New(md5.New, []byte(key))
-			hmac.Write([]byte(str))
-			if(b64 == true) {
-				sum = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
-			} else {
-				sum = hex.EncodeToString(hmac.Sum(nil))
-			} //end if
-			break
-		//--
-		default: // invalid
-			ok = false
-	} //end witch
-	//--
-	if(ok != true) {
-		return "", NewError(CurrentFunctionName() + " # " + "Invalid Algo: `" + algo + "`")
-	} //end if
-	//--
-	if(StrTrimWhitespaces(sum) == "") {
-		return "", NewError(CurrentFunctionName() + " # Failed to create a HMac Sum for Algo: `" + algo + "`")
-	} //end if
-	//--
-	if(b64 != true) {
-		sum = StrToLower(sum)
-	} //end if
-	//--
-	return sum, nil
-	//--
-} //END FUNCTION
-
-
-func Sh3a512(str string) string {
-	//--
-	hash := sha3.New512()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sh3a512B64(str string) string {
-	//--
-	hash := sha3.New512()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sh3a384(str string) string {
-	//--
-	hash := sha3.New384()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sh3a384B64(str string) string {
-	//--
-	hash := sha3.New384()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sh3a256(str string) string {
-	//--
-	hash := sha3.New256()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sh3a256B64(str string) string {
-	//--
-	hash := sha3.New256()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sh3a224(str string) string {
-	//--
-	hash := sha3.New224()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sh3a224B64(str string) string {
-	//--
-	hash := sha3.New224()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sha512(str string) string {
-	//--
-	hash := sha512.New()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sha512B64(str string) string {
-	//--
-	hash := sha512.New()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sha384(str string) string {
-	//--
-	hash := sha512.New384()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-//-#
-// SHA384 is roughly 50% faster than SHA-256 on 64-bit machines
-// SHA384 has resistances to length extension attack but SHA512 doesn't have
-// SHA384 128-bit resistance against the length extension attacks is because the attacker needs to guess the 128-bit to perform the attack, due to the truncation
-//-#
-
-func Sha384B64(str string) string {
-	//--
-	hash := sha512.New384()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sha256(str string) string {
-	//--
-	hash := sha256.New()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sha256B64(str string) string {
-	//--
-	hash := sha256.New()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sha224(str string) string {
-	//--
-	hash := sha256.New224()
-	//--
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sha224B64(str string) string {
-	//--
-	hash := sha256.New224()
-	//--
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Sha1(str string) string {
-	//--
-	hash := sha1.New()
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Sha1B64(str string) string {
-	//--
-	hash := sha1.New()
-	hash.Write([]byte(str))
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Md5(str string) string {
-	//--
-	hash := md5.New()
-	io.WriteString(hash, str)
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Md5B64(str string) string {
-	//--
-	hash := md5.New()
-	io.WriteString(hash, str)
-	//--
-	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	//--
-} //END FUNCTION
-
-
-func Crc32b(str string) string {
-	//--
-	hash := crc32.NewIEEE()
-	hash.Write([]byte(str))
-	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
-	//--
-} //END FUNCTION
-
-
-func Crc32bB36(str string) string {
-	//--
-	hash := crc32.NewIEEE()
-	hash.Write([]byte(str))
-	//--
-	return StrPad2LenLeft(StrToLower(BaseEncode(hash.Sum(nil), "b36")), "0", 7)
-	//--
-} //END FUNCTION
-
-
-func Poly1305(key string, str string, b64 bool) (string, error) {
-	//--
-	defer PanicHandler() // for: poly1305
-	//--
-	if(len(key) != 32) {
-		return "", NewError(CurrentFunctionName() + " # " + "Key length is invalid, must be 32 bytes !")
-	} //end if
-	//--
-	var pKey [32]byte
-	var bKey []byte = []byte(key)
-	copy(pKey[:], bKey[0:32])
-	//--
-	polySum := poly1305.GetSum(pKey, []byte(str))
-	//--
-	var sum string = string(polySum[:])
-	//--
-	if(b64 == true) {
-		return Base64Encode(sum), nil
-	} else { // Hex
-		return StrToLower(Bin2Hex(sum)), nil
-	} //end if else
-	//--
-} //END FUNCTION
 
 
 //-----
@@ -646,6 +133,55 @@ func GenerateRandomString(n int) (string, error) { // https://gist.github.com/do
 //-----
 
 
+func byteRot13(b byte) byte { // https://go.googlesource.com/tour/+/release-branch.go1.2/solutions/rot13.go
+	//--
+	var a, z byte
+	//--
+	switch {
+		case 'a' <= b && b <= 'z':
+			a, z = 'a', 'z'
+		case 'A' <= b && b <= 'Z':
+			a, z = 'A', 'Z'
+		default:
+			return b
+	} //end switch
+	//--
+	return (b - a + 13) % (z - a + 1) + a
+	//--
+} //END FUNCTION
+
+
+func DataRot13(s string) string {
+	//--
+	if(s == "") {
+		return s
+	} //end if
+	//--
+	var b []byte = []byte(s)
+	var r []byte = nil
+	for i := 0; i < len(b); i++ {
+		r = append(r, byteRot13(b[i]))
+	} //end for
+	//--
+	return string(r)
+	//--
+} //END FUNCTION
+
+
+func DataRRot13(s string) string {
+	//--
+	if(s == "") {
+		return s
+	} //end if
+	//--
+	return StrRev(DataRot13(s))
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, error) { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
 	//-- r.20231204
 	// Create a safe checksum of data
@@ -667,7 +203,7 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, err
 			return "", NewError("App Namespace value Error: " + errAppNs.Error())
 		} //end if
 		customSalt += " " + appNs
-		secKey, errSecKey := CryptoGetSecurityKey()
+		secKey, errSecKey := AppGetSecurityKey()
 		if(errSecKey != nil) {
 			return "", NewError("Security Key value Error: " + errSecKey.Error())
 		} //end if
@@ -700,7 +236,7 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, err
 	//--
 	var b64CkSum string = Sh3a384B64(ySalt + VERTICAL_TAB + plainTextData + HORIZONTAL_TAB + vSalt + LINE_FEED + customSalt + CARRIAGE_RETURN + xSalt + NULL_BYTE + zSalt) // SHA3-384 B64 of B64 derived salt (88 characters) + data + B92 derived salt (variable length ~ 72 characters)
 	//--
-	return DataRRot13(BaseEncode([]byte(Base64Decode(b64CkSum)), "b62")), nil // B62
+	return DataRRot13(BaseEncode(Base64BytDecode([]byte(b64CkSum)), "b62")), nil // B62
 	//--
 } //END FUNCTION
 
@@ -919,11 +455,11 @@ func Pbkdf2PreDerivedKey(key string) (string, error) {
 	//--
 	b64 := Sh3a384B64(key) // 64 chars fixed length, B64
 	hex := Sh3a512(key + VERTICAL_TAB + Crc32bB36(key) + VERTICAL_TAB + DataRRot13(b64)) // 128 chars fixed length, HEX
-	bin := Hex2Bin(hex)
-	if(bin == "") {
+	bin := Hex2BytBin([]byte(hex))
+	if(bin == nil) {
 		return "", NewError(CurrentFunctionName() + " # Hash Hex2Bin Error")
 	} //end if
-	b92 := BaseEncode([]byte(bin), "b92")
+	b92 := BaseEncode(bin, "b92")
 	//--
 	preKey := StrTrimWhitespaces(DataRRot13(StrSubstr(StrPad2LenRight(b92, "'", int(DERIVE_PREKEY_LEN)), 0, int(DERIVE_PREKEY_LEN))))
 	//--
@@ -944,6 +480,23 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 	defer PanicHandler() // for: pbkdf2.Key
 	//--
 	algo = StrToLower(algo)
+	switch(algo) { // {{{SYNC-HASHING-ALGOS-LIST}}}
+		//--
+		case "sha3-512": fallthrough
+		case "sha3-384": fallthrough
+		case "sha3-256": fallthrough
+		case "sha3-224": fallthrough
+		case "sha512":   fallthrough
+		case "sha384":   fallthrough
+		case "sha256":   fallthrough
+		case "sha224":   fallthrough
+		case "sha1":     fallthrough
+		case "md5":
+			break
+		//--
+		default: // invalid
+			return "", NewError(CurrentFunctionName() + " # " + "Invalid Algo: `" + algo + "`")
+	} //end witch
 	//--
 	var err error
 	//--
@@ -1246,18 +799,18 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 	ecbc := cipher.NewCBCEncrypter(bcipher, []byte(iv)) // create the encrypter: CBC
 	ecbc.CryptBlocks(ciphertext[bcipher.BlockSize():], []byte(str)) // encrypt the blocks
 	str = "" // free mem
-	var encrypted string = StrTrimWhitespaces(Bin2Hex(string(ciphertext))) // prepare output
+	var encrypted []byte = BytTrimWhitespaces(Bin2BytHex(ciphertext)) // prepare output
 	ciphertext = nil // free mem
 	//-- clear first header block ; will use BlockSize*2 because is operating over HEX data ; there are BlockSize*2 trailing zeroes that represent the HEX of BlockSize null bytes ; remove them
-	if(StrSubstr(encrypted, 0, bcipher.BlockSize()*2) != strings.Repeat("0", bcipher.BlockSize()*2)) { // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
+	if(BytesEqual(BytSubstr(encrypted, 0, bcipher.BlockSize()*2), BytRepeat([]byte("0"), bcipher.BlockSize()*2)) != true) { // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
 		return "", NewError("Invalid Hex Header")
 	} //end if
-	encrypted = StrTrimWhitespaces(StrSubstr(encrypted, bcipher.BlockSize()*2, 0)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
-	if(encrypted == "") { // must be some data after the first null header bytes
+	encrypted = BytTrimWhitespaces(BytSubstr(encrypted, bcipher.BlockSize()*2, 0)) // {{{FIX-GOLANG-CIPHER-1ST-NULL-BLOCK-HEADER}}}
+	if(encrypted == nil) { // must be some data after the first null header bytes
 		return "", NewError("Empty Hex Body")
 	} //end if
 	//--
-	return Hex2Bin(encrypted), nil // raw crypto data
+	return string(Hex2BytBin(encrypted)), nil // raw crypto data
 	//--
 } //END FUNCTION
 
@@ -1570,7 +1123,7 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 	//-- prepare string
 	var oStr string = str
 	str = Base64Encode(str)
-	cksum := BaseEncode([]byte(Base64Decode(Sh3a512B64(str))), "b62")
+	cksum := BaseEncode(Base64BytDecode(Sh3aByt512B64([]byte(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
 	//-- signature
@@ -1871,7 +1424,7 @@ func TwofishEncryptCBC(str string, key string) string {
 	//-- prepare string
 	var oStr string = str
 	str = Base64Encode(str)
-	cksum := BaseEncode([]byte(Base64Decode(Sh3a512B64(str))), "b62")
+	cksum := BaseEncode(Base64BytDecode(Sh3aByt512B64([]byte(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
 	//-- signature
@@ -2189,7 +1742,7 @@ func BlowfishEncryptCBC(str string, key string) string { // v3 only
 	//-- prepare string
 	var oStr string = str
 	str = Base64Encode(str)
-	cksum := BaseEncode([]byte(Base64Decode(Sh3a512B64(str))), "b62")
+	cksum := BaseEncode(Base64BytDecode(Sh3aByt512B64([]byte(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
 	//-- signature
@@ -2225,13 +1778,13 @@ func BlowfishDecryptCBC(str string, key string) string { // v1, v2, v3
 	//-- signature
 	var theSignature string = ""
 	var versionDetected uint8 = 0
-	if(StrPos(str, SIGNATURE_BFISH_V3) == 0) {
+	if(StrStartsWith(str, SIGNATURE_BFISH_V3) == true) {
 		versionDetected = 3
 		theSignature = SIGNATURE_BFISH_V3
-	} else if(StrPos(str, SIGNATURE_BFISH_V2) == 0) {
+	} else if(StrStartsWith(str, SIGNATURE_BFISH_V2) == true) {
 		versionDetected = 2
 		theSignature = SIGNATURE_BFISH_V2
-	} else if(StrPos(str, SIGNATURE_BFISH_V1) == 0) {
+	} else if(StrStartsWith(str, SIGNATURE_BFISH_V1) == true) {
 		versionDetected = 1
 		theSignature = SIGNATURE_BFISH_V1
 //	} else { // DISABLED, no more handle packages without a valid signature !

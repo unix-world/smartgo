@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
-// (c) 2020-2024 unix-world.org
-// r.20241129.2358 :: STABLE
+// (c) 2020-present unix-world.org
+// r.20241216.2358 :: STABLE
 // [ SMART.CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable only since go 1.19)
@@ -11,18 +11,21 @@ import (
 	"log"
 	"errors"
 
+	"strings"
+
 	"runtime"
 	"runtime/debug"
 )
 
 const (
-	VERSION string = "v.20241129.2358"
+	VERSION string = "v.20241216.2358"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
-	COPYRIGHT string = "(c) 2021-2024 unix-world.org"
+	COPYRIGHT string = "(c) 2021-present unix-world.org"
 
 	CHARSET string = "UTF-8" 						// DO NOT CHANGE !! This is mandatory ...
+	INVALID_CHARACTER string = "\uFFFD" 			// Invalid UTF-8 character that will be used for UTF-8 Valid Fix: �
 
 	NULL_BYTE string = "\x00" 						// THE NULL BYTE character \x00 or \000
 	BACK_SPACE string = "\b" 						// The Backspace Character \b
@@ -52,7 +55,7 @@ func CurrentRuntimeVersion() string {
 	//--
 	var rt string = runtime.Version() // ex: go1.22.8
 	//--
-	rt = StrToLower(StrTrimWhitespaces(rt))
+	rt = strings.ToLower(strings.TrimSpace(rt))
 	//--
 	if(rt == "") {
 		rt = "go0.0"
@@ -70,7 +73,7 @@ func CurrentOSName() string {
 	//--
 	var os string = runtime.GOOS // ex: openbsd
 	//--
-	os = StrToLower(StrTrimWhitespaces(os))
+	os = strings.ToLower(strings.TrimSpace(os))
 	//--
 	if(os == "") {
 		os = "unknown-os"
@@ -86,7 +89,7 @@ func CurrentOSArch() string {
 	//--
 	var arch string = runtime.GOARCH // ex: amd64
 	//--
-	arch = StrToLower(StrTrimWhitespaces(arch))
+	arch = strings.ToLower(strings.TrimSpace(arch))
 	//--
 	if(arch == "") {
 		arch = "unknown-arch"
@@ -110,8 +113,8 @@ func CurrentFunctionName() string {
 	//--
 	var name string = runtime.FuncForPC(counter).Name() // ex: `main.SomeMethod` or `github.com/unix-world/smartgo.CurrentFunctionName`
 	//--
-	if(StrContains(name, "/")) { // if similar ~ with `github.com/unix-world/smartgo.CurrentFunctionName`
-		arr := Explode("/", name)
+	if(strings.Contains(name, "/")) { // if similar ~ with `github.com/unix-world/smartgo.CurrentFunctionName`
+		arr := strings.Split(name, "/")
 		if(len(arr) > 0) {
 			name = arr[len(arr)-1] // get just the package.MethodName part if have more parts
 		} //end if
@@ -161,7 +164,14 @@ func MemoryStats() runtime.MemStats {
 //-----
 
 
-func InListArr[E comparable](v E, arr []E) bool { // depends on Go generics, Go 1.18 or later
+func InListArr[C comparable](v C, arr []C) bool { // depends on Go generics, Go 1.18 or later
+	//--
+	// supports the following simple list types such as []%scalar%:
+	// []string
+	// []int,  []int8,  []int16,  []int32,  []int64
+	// []uint, []uint8, []uint16, []uint32, []uint64
+	// []float32, []float64
+	// []bool
 	//--
 	if(arr == nil) {
 		return false
@@ -181,7 +191,9 @@ func InListArr[E comparable](v E, arr []E) bool { // depends on Go generics, Go 
 } //END FUNCTION
 
 
-func ArrMapKeyExists[E comparable](v E, arr map[E]E) bool { // depends on Go generics, Go 1.18 or later
+func ArrMapKeyExists[C comparable, A any](v C, arr map[C]A) bool { // depends on Go generics, Go 1.18 or later
+	//--
+	// supports any type of map[%scalar%]*
 	//--
 	if(arr == nil) {
 		return false
@@ -193,6 +205,26 @@ func ArrMapKeyExists[E comparable](v E, arr map[E]E) bool { // depends on Go gen
 	_, exists := arr[v]
 	//--
 	return exists
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ArrMapStrFlip(m map[string]string) map[string]string {
+	//--
+	if(len(m) <= 0) {
+		return m
+	} //end if
+	//--
+	n := make(map[string]string, len(m))
+	//--
+	for k, v := range m {
+		n[v] = k
+	} //end for
+	//--
+	return n
 	//--
 } //END FUNCTION
 
