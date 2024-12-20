@@ -21,7 +21,7 @@ var assets embed.FS
 const(
 	VERSION string = "r.20241216.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2024-12-16 17:08:17" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2024-12-20 17:08:17" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
