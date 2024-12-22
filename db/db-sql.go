@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241216.2358 :: STABLE
+// r.20241222.2358 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -97,7 +97,7 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (DbSqlConnector, error) {
 	//--
 	// Ex: dbType = "sqlite3"  ; dbUrl = "#db/sample.sqlite" |  dbUrl = "/path/to/#db/sample.sqlite"
 	// Ex: dbType = "postgres" ; dbUrl = "postgres://user:pass@host:port/db_name?sslmode=disable"
-	// Ex: dbType = "mysql"    ; dbUrl = "user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false"
+	// Ex: dbType = "mysql"    ; dbUrl = "user:pass@tcp(127.0.0.1:3306)/db_name?multiStatements=true&tls=false"
 	//--
 	dbUrl = smart.StrTrimWhitespaces(dbUrl)
 	//--
@@ -200,7 +200,7 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (DbSqlConnector, error) {
 			break
 		case DB_SQL_TYPE_MYSQL:
 			if((dbUrl == "") || (!smart.StrContains(dbUrl, "multiStatements=true"))) {
-				return emtyDbConn, smart.NewError("MySQL Connection String is empty or invalid, Must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?collation_connection=utf8mb4_bin&multiStatements=true&tls=false` and is: `" + dbUrl + "")
+				return emtyDbConn, smart.NewError("MySQL Connection String is empty or invalid, Must be such as (example): `user:pass@tcp(127.0.0.1:3306)/db_name?multiStatements=true&tls=false` and is: `" + dbUrl + "")
 			} //end if
 			break
 		default:
@@ -341,62 +341,85 @@ func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 			return nil, conn.dbErr
 		} //end if
 		libVersion, _, _ := sqlite3.Version()
-		log.Println("SQLite3 Version:", libVersion, connDescr)
+		log.Println("SQLite3 LIB Version: `" + libVersion + "`", connDescr)
 	} else if(conn.dbType == DB_SQL_TYPE_PGSQL) {
 		var pgVersion string = ""
 		var pgEncoding string = ""
 		var pgTimeZone string = ""
 		errVer := conn.dbConn.QueryRow("SHOW SERVER_VERSION").Scan(&pgVersion)
 		if(errVer != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server Version", errVer)
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server Version", errVer, connDescr)
 		} //end if else
 		errEnc := conn.dbConn.QueryRow("SHOW SERVER_ENCODING").Scan(&pgEncoding)
 		if(errEnc != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server Encoding", errEnc)
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server Encoding", errEnc, connDescr, pgVersion)
 		} //end if else
 		_, errSetTz := conn.dbConn.Exec("SET TIMEZONE TO " + pgsql.QuoteLiteral(smart.DateTimeGetLocation()))
 		if(errSetTz != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set PostgreSQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", errSetTz)
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set PostgreSQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", errSetTz, connDescr, pgVersion)
 		} //end if
 		errTz := conn.dbConn.QueryRow("SHOW TIMEZONE").Scan(&pgTimeZone)
 		if(errTz != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server TimeZone", errTz)
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get PostgreSQL Server TimeZone", errTz, connDescr, pgVersion)
 		} //end if else
-		log.Println("PostgreSQL Server", "Version: " + pgVersion + " ; Encoding: " + pgEncoding + " ; TimeZone: " + pgTimeZone, connDescr)
+		log.Println("PostgreSQL Server", "Version: `" + pgVersion + "` ; Encoding: `" + pgEncoding + "` ; TimeZone: `" + pgTimeZone + "`", connDescr)
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(pgTimeZone)) != smart.StrToUpper(smart.DateTimeGetLocation())) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set PostgreSQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", "Server=`" + pgTimeZone + "`", "Client=`" + smart.DateTimeGetLocation() + "`")
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set PostgreSQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", "Server=`" + pgTimeZone + "`", "Client=`" + smart.DateTimeGetLocation() + "`", connDescr, pgVersion)
 		} //end if
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(pgEncoding)) != ENCODING) {
-			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "PostgreSQL Server/Database Encoding is not `" + ENCODING + "` !", connDescr)
+			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "PostgreSQL Server/Database Encoding is not `" + ENCODING + "` ! It Is: `" + pgEncoding + "` ...", connDescr, pgVersion)
 			conn.dbConn = nil // reset
 			conn.dbErr = smart.NewError("PostgreSQL Server/Database Encoding must be `" + ENCODING + "` ! `" + connDescr + "`")
 			return nil, conn.dbErr
 		} //end if
 	} else if(conn.dbType == DB_SQL_TYPE_MYSQL) {
-		_, errSetCl := conn.dbConn.Exec("SET CHARACTER SET 'utf8mb4'; SET COLLATION_CONNECTION = 'utf8mb4_bin';")
+		var myVersion string = ""
+		var myTimeZone string = ""
+		var myEncoding string = ""
+		var myCollation string = ""
+		errVer := conn.dbConn.QueryRow("SELECT VERSION()").Scan(&myVersion)
+		if(errVer != nil) {
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server Version", errVer, connDescr)
+		} //end if else
+		_, errSetCl := conn.dbConn.Exec("SET CHARACTER SET 'utf8mb4'; SET COLLATION_CONNECTION = 'utf8mb4_bin';") // IMPORTANT: this is a test for multi-statements that must be enabled !
 		if(errSetCl != nil) {
-			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server Connection Collation to: `UTF8.MB4`", errSetCl)
+			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server Connection Collation to: `UTF8.MB4`", errSetCl, connDescr, myVersion)
 			conn.dbConn = nil // reset
 			conn.dbErr = smart.NewError("MySQL Server Connection Collation cannot be set to `UTF8.MB4` ! `" + connDescr + "`")
 			return nil, conn.dbErr
 		} //end if
-		var myVersion string = ""
-		var myTimeZone string = ""
-		errVer := conn.dbConn.QueryRow("SELECT VERSION()").Scan(&myVersion)
-		if(errVer != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server Version", errVer)
+	//	errEnc := conn.dbConn.QueryRow("SELECT @@character_set_client").Scan(&myEncoding)
+		errEnc := conn.dbConn.QueryRow("SELECT @@character_set_connection").Scan(&myEncoding)
+		if(errEnc != nil) {
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server Connection Encoding", errEnc, connDescr, myVersion)
 		} //end if else
+		if(smart.StrToLower(smart.StrTrimWhitespaces(myEncoding)) != "utf8mb4") {
+			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "MySQL Server/Database Connection Encoding is not `" + "utf8mb4" + "` ! It Is: `" + myEncoding + "` ...", connDescr, myVersion)
+			conn.dbConn = nil // reset
+			conn.dbErr = smart.NewError("MySQL Server/Database Connection Encoding must be `" + "utf8mb4" + "` ! `" + connDescr + "`")
+			return nil, conn.dbErr
+		} //end if
+		errCltn := conn.dbConn.QueryRow("SELECT @@collation_connection").Scan(&myCollation)
+		if(errCltn != nil) {
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server Connection Collation", errCltn, connDescr, myVersion)
+		} //end if else
+		if(smart.StrToLower(smart.StrTrimWhitespaces(myCollation)) != "utf8mb4_bin") {
+			log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "MySQL Server/Database Connection Collation is not `" + "utf8mb4_bin" + "` ! It Is: `" + myCollation + "` ...", connDescr, myVersion)
+			conn.dbConn = nil // reset
+			conn.dbErr = smart.NewError("MySQL Server/Database Connection Collation must be `" + "utf8mb4_bin" + "` ! `" + connDescr + "`")
+			return nil, conn.dbErr
+		} //end if
 		_, errSetTz := conn.dbConn.Exec("SET time_zone = ?", smart.DateTimeGetLocation())
 		if(errSetTz != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", errSetTz)
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", errSetTz, connDescr, myVersion)
 		} //end if
 		errTz := conn.dbConn.QueryRow("SELECT @@SESSION.time_zone").Scan(&myTimeZone)
 		if(errTz != nil) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server TimeZone", errTz)
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Get MySQL Server TimeZone", errTz, connDescr, myVersion)
 		} //end if else
-		log.Println("MySQL Server", "Version: " + myVersion + " ; Connection Collation: UTF8.MB4 ; TimeZone: " + myTimeZone, connDescr)
+		log.Println("MySQL Server", "Version: `" + myVersion + "` ; Connection Encoding: `" + myEncoding + "` / Collation: `" + myCollation + "` ; TimeZone: `" + myTimeZone + "`", connDescr)
 		if(smart.StrToUpper(smart.StrTrimWhitespaces(myTimeZone)) != smart.StrToUpper(smart.DateTimeGetLocation())) {
-			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", "Server=`" + myTimeZone + "`", "Client=`" + smart.DateTimeGetLocation() + "`")
+			log.Println("[WARNING]", NAME, smart.CurrentFunctionName(), "Failed to Set MySQL Server TimeZone to: `" + smart.DateTimeGetLocation() + "`", "Server=`" + myTimeZone + "`", "Client=`" + smart.DateTimeGetLocation() + "`", connDescr, myVersion)
 		} //end if
 	} //end if else
 	//--

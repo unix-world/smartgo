@@ -1,4 +1,7 @@
-github.com/gomodule/redigo @head.20240101
+github.com/gomodule/redigo @head.20241222
 
-go 1.16
+go 1.17
+
+refactored by unixman as:
+    github.com/unix-world/smartgo/db/redigo/redis
 

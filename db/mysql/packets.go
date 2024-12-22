@@ -28,9 +28,16 @@ import (
 // Read packet to buffer 'data'
 func (mc *mysqlConn) readPacket() ([]byte, error) {
 	var prevData []byte
+	invalidSequence := false
+
+	readNext := mc.buf.readNext
+	if mc.compress {
+		readNext = mc.compIO.readNext
+	}
+
 	for {
 		// read packet header
-		data, err := mc.buf.readNext(4)
+		data, err := readNext(4, mc.readWithTimeout)
 		if err != nil {
 			mc.close()
 			if cerr := mc.canceled.Value(); cerr != nil {
@@ -41,17 +48,29 @@ func (mc *mysqlConn) readPacket() ([]byte, error) {
 		}
 
 		// packet length [24 bit]
-		pktLen := int(uint32(data[0]) | uint32(data[1])<<8 | uint32(data[2])<<16)
+		pktLen := getUint24(data[:3])
+		seq := data[3]
 
-		// check packet sync [8 bit]
-		if data[3] != mc.sequence {
-			mc.close()
-			if data[3] > mc.sequence {
-				return nil, ErrPktSyncMul
+		if mc.compress {
+			// MySQL and MariaDB doesn't check packet nr in compressed packet.
+			if debug && seq != mc.compressSequence {
+				fmt.Printf("[debug] mismatched compression sequence nr: expected: %v, got %v",
+					mc.compressSequence, seq)
 			}
-			return nil, ErrPktSync
+			mc.compressSequence = seq + 1
+		} else {
+			// check packet sync [8 bit]
+			if seq != mc.sequence {
+				mc.log(fmt.Sprintf("[warn] unexpected seq nr: expected %v, got %v", mc.sequence, seq))
+				// For large packets, we stop reading as soon as sync error.
+				if len(prevData) > 0 {
+					mc.close()
+					return nil, ErrPktSyncMul
+				}
+				invalidSequence = true
+			}
+			mc.sequence++
 		}
-		mc.sequence++
 
 		// packets with length 0 terminate a previous packet which is a
 		// multiple of (2^24)-1 bytes long
@@ -62,12 +81,11 @@ func (mc *mysqlConn) readPacket() ([]byte, error) {
 				mc.close()
 				return nil, ErrInvalidConn
 			}
-
 			return prevData, nil
 		}
 
 		// read packet body [pktLen bytes]
-		data, err = mc.buf.readNext(pktLen)
+		data, err = readNext(pktLen, mc.readWithTimeout)
 		if err != nil {
 			mc.close()
 			if cerr := mc.canceled.Value(); cerr != nil {
@@ -80,11 +98,18 @@ func (mc *mysqlConn) readPacket() ([]byte, error) {
 		// return data if this was the last packet
 		if pktLen < maxPacketSize {
 			// zero allocations for non-split packets
-			if prevData == nil {
-				return data, nil
+			if prevData != nil {
+				data = append(prevData, data...)
 			}
-
-			return append(prevData, data...), nil
+			if invalidSequence {
+				mc.close()
+				// return sync error only for regular packet.
+				// error packets may have wrong sequence number.
+				if data[0] != iERR {
+					return nil, ErrPktSync
+				}
+			}
+			return data, nil
 		}
 
 		prevData = append(prevData, data...)
@@ -94,36 +119,26 @@ func (mc *mysqlConn) readPacket() ([]byte, error) {
 // Write packet buffer 'data'
 func (mc *mysqlConn) writePacket(data []byte) error {
 	pktLen := len(data) - 4
-
 	if pktLen > mc.maxAllowedPacket {
 		return ErrPktTooLarge
 	}
 
+	writeFunc := mc.writeWithTimeout
+	if mc.compress {
+		writeFunc = mc.compIO.writePackets
+	}
+
 	for {
-		var size int
-		if pktLen >= maxPacketSize {
-			data[0] = 0xff
-			data[1] = 0xff
-			data[2] = 0xff
-			size = maxPacketSize
-		} else {
-			data[0] = byte(pktLen)
-			data[1] = byte(pktLen >> 8)
-			data[2] = byte(pktLen >> 16)
-			size = pktLen
-		}
+		size := min(maxPacketSize, pktLen)
+		putUint24(data[:3], size)
 		data[3] = mc.sequence
 
 		// Write packet
-		if mc.writeTimeout > 0 {
-			if err := mc.netConn.SetWriteDeadline(time.Now().Add(mc.writeTimeout)); err != nil {
-				mc.cleanup()
-				mc.log(err)
-				return err
-			}
+		if debug {
+			fmt.Printf("writePacket: size=%v seq=%v", size, mc.sequence)
 		}
 
-		n, err := mc.netConn.Write(data[:4+size])
+		n, err := writeFunc(data[:4+size])
 		if err != nil {
 			mc.cleanup()
 			if cerr := mc.canceled.Value(); cerr != nil {
@@ -267,7 +282,9 @@ func (mc *mysqlConn) writeHandshakeResponsePacket(authResp []byte, plugin string
 	if mc.cfg.ClientFoundRows {
 		clientFlags |= clientFoundRows
 	}
-
+	if mc.cfg.compress && mc.flags&clientCompress == clientCompress {
+		clientFlags |= clientCompress
+	}
 	// To enable TLS / SSL
 	if mc.cfg.TLS != nil {
 		clientFlags |= clientSSL
@@ -312,16 +329,10 @@ func (mc *mysqlConn) writeHandshakeResponsePacket(authResp []byte, plugin string
 	}
 
 	// ClientFlags [32 bit]
-	data[4] = byte(clientFlags)
-	data[5] = byte(clientFlags >> 8)
-	data[6] = byte(clientFlags >> 16)
-	data[7] = byte(clientFlags >> 24)
+	binary.LittleEndian.PutUint32(data[4:], uint32(clientFlags))
 
 	// MaxPacketSize [32 bit] (none)
-	data[8] = 0x00
-	data[9] = 0x00
-	data[10] = 0x00
-	data[11] = 0x00
+	binary.LittleEndian.PutUint32(data[8:], 0)
 
 	// Collation ID [1 byte]
 	data[12] = defaultCollationID
@@ -358,7 +369,6 @@ func (mc *mysqlConn) writeHandshakeResponsePacket(authResp []byte, plugin string
 			return err
 		}
 		mc.netConn = tlsConn
-		mc.buf.nc = tlsConn
 	}
 
 	// User [null terminated string]
@@ -413,7 +423,7 @@ func (mc *mysqlConn) writeAuthSwitchPacket(authData []byte) error {
 
 func (mc *mysqlConn) writeCommandPacket(command byte) error {
 	// Reset Packet Sequence
-	mc.sequence = 0
+	mc.resetSequence()
 
 	data, err := mc.buf.takeSmallBuffer(4 + 1)
 	if err != nil {
@@ -429,7 +439,7 @@ func (mc *mysqlConn) writeCommandPacket(command byte) error {
 
 func (mc *mysqlConn) writeCommandPacketStr(command byte, arg string) error {
 	// Reset Packet Sequence
-	mc.sequence = 0
+	mc.resetSequence()
 
 	pktLen := 1 + len(arg)
 	data, err := mc.buf.takeBuffer(pktLen + 4)
@@ -444,12 +454,14 @@ func (mc *mysqlConn) writeCommandPacketStr(command byte, arg string) error {
 	copy(data[5:], arg)
 
 	// Send CMD packet
-	return mc.writePacket(data)
+	err = mc.writePacket(data)
+	mc.syncSequence()
+	return err
 }
 
 func (mc *mysqlConn) writeCommandPacketUint32(command byte, arg uint32) error {
 	// Reset Packet Sequence
-	mc.sequence = 0
+	mc.resetSequence()
 
 	data, err := mc.buf.takeSmallBuffer(4 + 1 + 4)
 	if err != nil {
@@ -460,10 +472,7 @@ func (mc *mysqlConn) writeCommandPacketUint32(command byte, arg uint32) error {
 	data[4] = command
 
 	// Add arg [32 bit]
-	data[5] = byte(arg)
-	data[6] = byte(arg >> 8)
-	data[7] = byte(arg >> 16)
-	data[8] = byte(arg >> 24)
+	binary.LittleEndian.PutUint32(data[5:], arg)
 
 	// Send CMD packet
 	return mc.writePacket(data)
@@ -932,19 +941,15 @@ func (stmt *mysqlStmt) writeCommandLongData(paramID int, arg []byte) error {
 			pktLen = dataOffset + argLen
 		}
 
-		stmt.mc.sequence = 0
+		stmt.mc.resetSequence()
 		// Add command byte [1 byte]
 		data[4] = comStmtSendLongData
 
 		// Add stmtID [32 bit]
-		data[5] = byte(stmt.id)
-		data[6] = byte(stmt.id >> 8)
-		data[7] = byte(stmt.id >> 16)
-		data[8] = byte(stmt.id >> 24)
+		binary.LittleEndian.PutUint32(data[5:], stmt.id)
 
 		// Add paramID [16 bit]
-		data[9] = byte(paramID)
-		data[10] = byte(paramID >> 8)
+		binary.LittleEndian.PutUint16(data[9:], uint16(paramID))
 
 		// Send CMD packet
 		err := stmt.mc.writePacket(data[:4+pktLen])
@@ -953,11 +958,10 @@ func (stmt *mysqlStmt) writeCommandLongData(paramID int, arg []byte) error {
 			continue
 		}
 		return err
-
 	}
 
 	// Reset Packet Sequence
-	stmt.mc.sequence = 0
+	stmt.mc.resetSequence()
 	return nil
 }
 
@@ -982,7 +986,7 @@ func (stmt *mysqlStmt) writeExecutePacket(args []driver.Value) error {
 	}
 
 	// Reset packet-sequence
-	mc.sequence = 0
+	mc.resetSequence()
 
 	var data []byte
 	var err error
@@ -1001,19 +1005,13 @@ func (stmt *mysqlStmt) writeExecutePacket(args []driver.Value) error {
 	data[4] = comStmtExecute
 
 	// statement_id [4 bytes]
-	data[5] = byte(stmt.id)
-	data[6] = byte(stmt.id >> 8)
-	data[7] = byte(stmt.id >> 16)
-	data[8] = byte(stmt.id >> 24)
+	binary.LittleEndian.PutUint32(data[5:], stmt.id)
 
 	// flags (0: CURSOR_TYPE_NO_CURSOR) [1 byte]
 	data[9] = 0x00
 
 	// iteration_count (uint32(1)) [4 bytes]
-	data[10] = 0x01
-	data[11] = 0x00
-	data[12] = 0x00
-	data[13] = 0x00
+	binary.LittleEndian.PutUint32(data[10:], 1)
 
 	if len(args) > 0 {
 		pos := minPktLen
@@ -1067,50 +1065,17 @@ func (stmt *mysqlStmt) writeExecutePacket(args []driver.Value) error {
 			case int64:
 				paramTypes[i+i] = byte(fieldTypeLongLong)
 				paramTypes[i+i+1] = 0x00
-
-				if cap(paramValues)-len(paramValues)-8 >= 0 {
-					paramValues = paramValues[:len(paramValues)+8]
-					binary.LittleEndian.PutUint64(
-						paramValues[len(paramValues)-8:],
-						uint64(v),
-					)
-				} else {
-					paramValues = append(paramValues,
-						uint64ToBytes(uint64(v))...,
-					)
-				}
+				paramValues = binary.LittleEndian.AppendUint64(paramValues, uint64(v))
 
 			case uint64:
 				paramTypes[i+i] = byte(fieldTypeLongLong)
 				paramTypes[i+i+1] = 0x80 // type is unsigned
-
-				if cap(paramValues)-len(paramValues)-8 >= 0 {
-					paramValues = paramValues[:len(paramValues)+8]
-					binary.LittleEndian.PutUint64(
-						paramValues[len(paramValues)-8:],
-						uint64(v),
-					)
-				} else {
-					paramValues = append(paramValues,
-						uint64ToBytes(uint64(v))...,
-					)
-				}
+				paramValues = binary.LittleEndian.AppendUint64(paramValues, uint64(v))
 
 			case float64:
 				paramTypes[i+i] = byte(fieldTypeDouble)
 				paramTypes[i+i+1] = 0x00
-
-				if cap(paramValues)-len(paramValues)-8 >= 0 {
-					paramValues = paramValues[:len(paramValues)+8]
-					binary.LittleEndian.PutUint64(
-						paramValues[len(paramValues)-8:],
-						math.Float64bits(v),
-					)
-				} else {
-					paramValues = append(paramValues,
-						uint64ToBytes(math.Float64bits(v))...,
-					)
-				}
+				paramValues = binary.LittleEndian.AppendUint64(paramValues, math.Float64bits(v))
 
 			case bool:
 				paramTypes[i+i] = byte(fieldTypeTiny)
@@ -1198,7 +1163,9 @@ func (stmt *mysqlStmt) writeExecutePacket(args []driver.Value) error {
 		data = data[:pos]
 	}
 
-	return mc.writePacket(data)
+	err = mc.writePacket(data)
+	mc.syncSequence()
+	return err
 }
 
 // For each remaining resultset in the stream, discards its rows and updates
