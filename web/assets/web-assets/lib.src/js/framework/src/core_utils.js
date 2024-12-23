@@ -19,7 +19,7 @@
  * @author unix-world.org
  * @license BSD
  * @file core_utils.js
- * @version 20241216
+ * @version 20241223
  * @class smartJ$Utils
  * @static
  * @frozen
@@ -166,6 +166,42 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	_C$.stringPureVal = stringPureVal; // export
 
 	/**
+	 * Trim a string for a given character
+	 *
+	 * @memberof smartJ$Utils
+	 * @method stringCharTrim
+	 * @static
+	 * @arrow
+	 *
+	 * @param 	{String} 	str 	The string to be trimmed
+	 * @param 	{String} 	char 	The char to be used for trim (must be a single character)
+	 * @return 	{String} 			The trimmed string by the given character
+	 */
+	const stringCharTrim = (str, char) => { // if more than one char need to be used for 2nd argument, it must be done in a loop for each one
+		//--
+		const _m$ = 'stringCharTrim';
+		//--
+		str = stringPureVal(str);
+		if(str == '') {
+			return '';
+		} //end if
+		//--
+		char = stringPureVal(char);
+		if(char == '') {
+			_p$.warn(_N$, _m$, 'Character is Empty');
+			return str;
+		} //end if
+		if(char.length != 1) {
+			_p$.warn(_N$, _m$, 'Character Size must be 1');
+			return str;
+		} //end if
+		//--
+		return String(str.split(char).filter(Boolean).join(char));
+		//--
+	};
+	_C$.stringCharTrim = stringCharTrim; // export
+
+	/**
 	 * Trim a string for whitespaces (at begining and/or end) ; whitespaces: space \ n \ r \ t)
 	 *
 	 * @memberof smartJ$Utils
@@ -174,7 +210,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @arrow
 	 *
 	 * @param 	{String} 	str 	The string to be trimmed
-	 * @return 	{String} 			The trimmed string
+	 * @return 	{String} 			The whitespaces trimmed string
 	 */
 	const stringTrim = (str) => { // ES6
 		//--
@@ -197,7 +233,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @arrow
 	 *
 	 * @param 	{String} 	str 	The string to be trimmed on Left
-	 * @return 	{String} 			The trimmed string (left only)
+	 * @return 	{String} 			The whitespaces trimmed string (left only)
 	 */
 	const stringLeftTrim = (str) => { // ES6
 		//--
@@ -220,7 +256,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @arrow
 	 *
 	 * @param 	{String} 	str 	The string to be trimmed on Right
-	 * @return 	{String} 			The trimmed string (right only)
+	 * @return 	{String} 			The whitespaces trimmed string (right only)
 	 */
 	const stringRightTrim = (str) => { // ES6
 		//--
@@ -1207,7 +1243,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	_C$.addcslashes = addcslashes; // export
 
 	/**
-	 * Convert special characters to HTML entities.
+	 * Convert special characters to HTML entities, compatible with Twig standard.
 	 * @hint It is like the Smart::escape_css() from the PHP Smart.Framework.
 	 *
 	 * @memberof smartJ$Utils
@@ -1225,7 +1261,20 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 			return '';
 		} //end if
 		//--
-		return String(addcslashes(String((str == undefined) ? '' : str), "\x00..\x1F!\"#$%&'()*+,./:;<=>?@[\\]^`{|}~"));
+	//	return String(addcslashes(String((str == undefined) ? '' : str), "\x00..\x1F!\"#$%&'()*+,./:;<=>?@[\\]^`{|}~")); // WD-CSS21-20060411 standard
+		//--
+		let out = '';
+		for(let i=0; i<str.length; i++) {
+			let c = str.substring(i, i + 1);
+			let code = c.charCodeAt(0);
+			if(((code >= 65) && (code <= 90)) || ((code >= 97) && (code <= 122)) || ((code >= 48) && (code <= 57))) {
+				out += String(c); // a-zA-Z0-9
+			} else {
+				out += '\\' + ('0000' + code.toString(16)).slice(-4).toUpperCase(); // UTF-8
+			} //end if else
+		} //end for
+		//--
+		return String(out);
 		//--
 	}; //END
 	_C$.escape_css = escape_css; // export
@@ -1465,6 +1514,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Utils
 	 * @method utf8Enc
 	 * @static
+	 * @arrow
 	 *
 	 * @param 	{String} 	str 			The string to be processed
 	 * @return 	{String} 					The processed string
@@ -1499,6 +1549,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Utils
 	 * @method utf8Dec
 	 * @static
+	 * @arrow
 	 *
 	 * @param 	{String} 	utftext 		The string to be processed
 	 * @return 	{String} 					The processed string
@@ -1724,6 +1775,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Utils
 	 * @method strRev
 	 * @static
+	 * @arrow
 	 *
 	 * @return 	{String} 			The reversed string
 	 */
@@ -1745,6 +1797,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Utils
 	 * @method strRot13
 	 * @static
+	 * @arrow
 	 *
 	 * @return 	{String} 			The ROT13 version of the given string
 	 */
@@ -1768,6 +1821,7 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Utils
 	 * @method strRRot13
 	 * @static
+	 * @arrow
 	 *
 	 * @return 	{String} 			The ROT13 version of the given reversed string
 	 */
@@ -1946,7 +2000,6 @@ const smartJ$Utils = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Utils
 	 * @method url_add_suffix
 	 * @static
-	 * @arrow
 	 *
 	 * @param 	{String} 	url 			The base URL to use as prefix like: script.php or script.php?a=b&c=d or empty
 	 * @param 	{String} 	suffix 			A RFC3986 URL segment like: a=b or E=%20d (without ? or not starting with & as they will be detected if need append ? or &; variable values must be encoded using escape_url() RFC3986)

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241221.2358 :: STABLE
+// r.20241223.2358 :: STABLE
 // [ ESCAPING ]
 
 // REQUIRE: go 1.19 or later
@@ -147,7 +147,7 @@ func EscapeJs(in string) string { // provides a Smart.Framework ~ EscapeJs
 //-----
 
 
-func EscapeCss(s string) string { // CSS provides a Twig-compatible CSS escaper
+func EscapeCss(s string) string { // provides a Twig-compatible CSS escaper
 	//--
 	// The following characters have a special meaning in CSS, in sensitive contexts they have to be escaped:
 	// !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, :, ;, <, =, >, ?, @, [, \, ], ^, `, {, |, }, ~

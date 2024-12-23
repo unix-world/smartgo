@@ -33,7 +33,7 @@
  * @author unix-world.org
  * @license BSD
  * @file browser_utils.js
- * @version 20241216
+ * @version 20241223
  * @class smartJ$Browser
  * @static
  * @frozen
@@ -1677,12 +1677,15 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Browser
 	 * @method MessageNotification
 	 * @static
+	 *
 	 * @param 	{String} 	ytitle 						The Title
 	 * @param 	{String} 	ymessage 					The Message (HTML code)
 	 * @param 	{String} 	yredirect 					*Optional* The URL to redirect
 	 * @param 	{Yes/No} 	growl 						*Optional* If 'yes' will use the Growl notifications otherwise (default: if 'no') will use Dialog notification
 	 * @param 	{Enum} 		class_growl 				*Optional* If Growl is used, a CSS class for Growl is required
 	 * @param 	{Integer} 	timeout 					*Optional* If Growl is used, the Growl timeout in milliseconds
+	 *
+	 * @fires open a Notification Message (custom or default, depends on settings)
 	 */
 	const MessageNotification = function(ytitle, ymessage, yredirect, growl, class_growl, timeout) { // ES6
 		//--
@@ -1725,6 +1728,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 
 	/**
 	 * Confirm a Form Submit by a confirm / Dialog, with OK and Cancel buttons.
+	 * To Submit the form to the Modal/iFrame, the target name should be: smart__iFModalBox__iFrame.
 	 * The form will be submitted just if OK button is clicked.
 	 * @hint The function is using ConfirmDialog() and will detect and prefer in the specific order if UIDialog / SimpleDialog or just confirm() are available in Browser.
 	 *
@@ -1780,6 +1784,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 
 	/**
 	 * Open a Modal/iFrame or PopUp child window with a new target to post a form within.
+	 * To POST to the Modal/iFrame, the target name should be: smart__iFModalBox__iFrame.
 	 * It will get the form URL and form method GET/POST directly from the objForm.
 	 * The function must be called by a form button onClick followed by 'return false;' not by classic submit to avoid fire the form send twice 1st before (in a _blank window) and 2nd after opening the child popup/modal.
 	 * @hint The function if used in a button with 'return false;' will catch the form send behaviour and will trigger it just after the child modal/iFrame or PopUp child window (new) target is opened and available.
@@ -2349,6 +2354,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Browser
 	 * @method SerializeFormAsObject
 	 * @static
+	 * @arrow
 	 *
 	 * @param 	{String} 	formID 					The element ID of the Form to be serialized
 	 * @param 	{String} 	rKey 					The object root key ; Optional ; if not specified will be set as 'data' ; '#' is the object metainfo
@@ -3049,7 +3055,6 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 	 * @memberof smartJ$Browser
 	 * @method windwScrollDown
 	 * @static
-	 * @arrow
 	 *
 	 * @param 	{Object} 	wnd 		The window (reference) object
 	 * @param 	{Integer} 	offset 		The offset in pixels to scroll down ; use -1 to scroll to the end of document
@@ -3537,6 +3542,87 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 	_C$.VirtualImageUploadHandler = VirtualImageUploadHandler; // export
 
 
+	/**
+	 * Converts a Date Field to a Smart Date Field
+	 * Requires in HTML: an input type date that will display ISO yyyy-mm-dd date instead as browser locales as mm/dd/yyyy.
+	 *
+	 * @memberof smartJ$Browser
+	 * @method DateSmartField
+	 * @static
+	 * @arrow
+	 *
+	 * @param 	{String} 	elem 						The jQuery element selector to apply this method to ; expects: `<input type="date">`
+	 */
+	const DateSmartField = (elem) => {
+		//--
+		const _m$ = 'DateSmartField';
+		//--
+		if(elem.length <= 0) {
+			_p$.warn(_N$, _m$, 'Element is Empty');
+			return;
+		} //end if
+		try {
+			const $elem = $(elem);
+			if(($elem.length <= 0) || ($elem.is('input') != true) || ($elem.attr('type') != 'date')) {
+				_p$.warn(_N$, _m$, 'Element is Not an Input type Date');
+				return;
+			} //end if
+			//--
+			const min = _Utils$.stringPureVal($elem.attr('min'), true);
+			const max = _Utils$.stringPureVal($elem.attr('max'), true);
+			const step = _Utils$.stringPureVal($elem.attr('step'), true);
+			$elem.attr('data-min', min).attr('data-max', max).attr('data-step', step).attr('placeholder', 'yyyy-mm-dd');
+			$elem.removeAttr('step').removeAttr('max').removeAttr('min').attr('type', 'text');
+			$elem.prop('readonly', true);
+			//--
+			$elem.on('click', (evt) => {
+				const $tgt = $(evt.currentTarget);
+				const dataMin = _Utils$.stringPureVal($tgt.attr('data-min'), true);
+				const dataMax = _Utils$.stringPureVal($tgt.attr('data-max'), true);
+				const dataStep = _Utils$.stringPureVal($tgt.attr('data-step'), true);
+				$tgt.prop('readonly', false);
+				$tgt.attr('type', 'date').attr('min', dataMin).attr('max', dataMax).attr('step', dataStep);
+			}).on('blur', (evt) => {
+				const $tgt = $(evt.currentTarget);
+				$tgt.removeAttr('step').removeAttr('max').removeAttr('min').attr('type', 'text');
+				$tgt.prop('readonly', true);
+			});
+		} catch(err) {
+			_p$.error(_N$, _m$, 'ERR:', err);
+		} //end try catch
+		//--
+	};
+	_C$.DateSmartField = DateSmartField; // export
+
+
+	/**
+	 * Converts all Text Fields of type .ux-date-field to Date Fields
+	 * See: DateSmartField()
+	 *
+	 * @memberof smartJ$Browser
+	 * @method DateSmartsFields
+	 * @static
+	 * @arrow
+	 *
+	 */
+	const DateSmartsFields = (className) => {
+		//--
+		const _m$ = 'DateSmartsFields';
+		//--
+		className = _Utils$.stringTrim(_Utils$.create_htmid(_Utils$.stringPureVal(className, true)));
+		if(className == '') {
+			_p$.warn(_N$, _m$, 'ClassName is Empty or Invalid');
+			return '';
+		} //end if
+		//--
+		$('input[type=date].' + className).each((idx, elem) => {
+			DateSmartField(elem);
+		});
+		//--
+	};
+	_C$.DateSmartsFields = DateSmartsFields; // export
+
+
 	// ========== PRIVATES
 
 
@@ -3547,7 +3633,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 	 * @private
 	 *
 	 * @memberof smartJ$Browser
-	 * @method allowModalCascading
+	 * @method allowModalBox
 	 * @static
 	 *
 	 * @return 	{Boolean} 		Will return FALSE if modal cascading is enabled for every situation when a ModalBox will open another ModalBox thus will force PopUp and will return TRUE for the rest of situations
@@ -3564,6 +3650,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 		return !! isActive; // bool
 		//--
 	}; //END
+	// no export
 
 
 	/*
@@ -3645,6 +3732,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 		return String(overlay_id);
 		//--
 	}; //END
+	// no export
 
 
 	/*
