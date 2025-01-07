@@ -2,7 +2,9 @@ package jwt
 
 import (
 	"errors"
+
 	crand "crypto/rand"
+
 	ed448 "github.com/unix-world/smartgo/crypto/eddsa/ed448"
 )
 

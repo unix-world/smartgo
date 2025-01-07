@@ -1,4 +1,4 @@
-package ed25519
+package edx448
 
 import (
 	"crypto/rand"
@@ -14,15 +14,15 @@ func Scheme() sign.Scheme { return sch }
 
 type scheme struct{}
 
-func (*scheme) Name() string          { return "Ed25519" }
+func (*scheme) Name() string          { return "Edx448" }
 func (*scheme) PublicKeySize() int    { return PublicKeySize }
 func (*scheme) PrivateKeySize() int   { return PrivateKeySize }
 func (*scheme) SignatureSize() int    { return SignatureSize }
 func (*scheme) SeedSize() int         { return SeedSize }
-func (*scheme) TLSIdentifier() uint   { return 0x0807 }
-func (*scheme) SupportsContext() bool { return false }
+func (*scheme) TLSIdentifier() uint   { return 0x080878 }
+func (*scheme) SupportsContext() bool { return true }
 func (*scheme) Oid() asn1.ObjectIdentifier {
-	return asn1.ObjectIdentifier{1, 3, 101, 112}
+	return asn1.ObjectIdentifier{1, 3, 101, 113}
 }
 
 func (*scheme) GenerateKey() (sign.PublicKey, sign.PrivateKey, error) {
@@ -38,10 +38,11 @@ func (*scheme) Sign(
 	if !ok {
 		panic(sign.ErrTypeMismatch)
 	}
-	if opts != nil && opts.Context != "" {
-		panic(sign.ErrContextNotSupported)
+	ctx := ""
+	if opts != nil {
+		ctx = opts.Context
 	}
-	return Sign(priv, message)
+	return Sign(priv, message, ctx)
 }
 
 func (*scheme) Verify(
@@ -53,12 +54,11 @@ func (*scheme) Verify(
 	if !ok {
 		panic(sign.ErrTypeMismatch)
 	}
+	ctx := ""
 	if opts != nil {
-		if opts.Context != "" {
-			panic(sign.ErrContextNotSupported)
-		}
+		ctx = opts.Context
 	}
-	return Verify(pub, message, signature)
+	return Verify(pub, message, signature, ctx)
 }
 
 func (*scheme) DeriveKey(seed []byte) (sign.PublicKey, sign.PrivateKey) {

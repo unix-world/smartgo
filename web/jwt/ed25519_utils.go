@@ -2,7 +2,9 @@ package jwt
 
 import (
 	"errors"
+
 	crand "crypto/rand"
+
 	ed25519 "crypto/ed25519"
 )
 

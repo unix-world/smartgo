@@ -5,7 +5,8 @@ import (
 
 	"crypto"
 	crand "crypto/rand"
-	edx25519 "github.com/unix-world/smartgo/crypto/eddsa/ed25519-sha3"
+
+	edx25519 "github.com/unix-world/smartgo/crypto/eddsa/edx25519"
 )
 
 var (

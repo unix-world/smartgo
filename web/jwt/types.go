@@ -1,12 +1,12 @@
 package jwt
 
 import (
-	"encoding/json"
 	"fmt"
-	"math"
 	"reflect"
 	"strconv"
 	"time"
+	"math"
+	"encoding/json"
 )
 
 // TimePrecision sets the precision of times and dates within this library.

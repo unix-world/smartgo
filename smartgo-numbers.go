@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ NUMBERS ]
 
 // REQUIRE: go 1.19 or later
@@ -15,12 +15,30 @@ import (
 )
 
 const (
+	REGEX_STR_IS_NUMERIC_UINTEGER  = `[0-9]+`
+	REGEX_STR_IS_NUMERIC_INTEGER   = `[0-9\-]+`
+
 	REGEX_STR_IS_NUMERIC_DEFAULT  = `[0-9\.\-]+`
 	REGEX_STR_IS_NUMERIC_EXTENDED = `[0-9\.\-, ]+` // includes decimal separators: , or space
 )
 
 
 //----- IMPORTANT: never use string(number) ... it will lead to strange situations ... use the convert methods from below
+
+
+func IsInteger(s string, allowNegatives bool) bool {
+	//--
+	if(s == "") {
+		return false
+	} //end if
+	//--
+	if(allowNegatives) {
+		return StrRegexMatch(REGEX_STR_IS_NUMERIC_INTEGER, s)
+	} //end if
+	//--
+	return StrRegexMatch(REGEX_STR_IS_NUMERIC_UINTEGER, s)
+	//--
+} //END FUNCTION
 
 
 func IsNumeric(s string, extended bool) bool {

@@ -1,10 +1,10 @@
 package jwt
 
 import (
-	"encoding/json"
+	// "fmt"
 	"errors"
 	"time"
-	// "fmt"
+	"encoding/json"
 )
 
 // MapClaims is a claims type that uses the map[string]interface{} for JSON decoding.

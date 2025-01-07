@@ -1,9 +1,9 @@
 package jwt
 
 import (
-	"crypto/subtle"
 	"fmt"
 	"time"
+	"crypto/subtle"
 )
 
 // Claims must just have a Valid method that determines
@@ -127,7 +127,7 @@ func (c *RegisteredClaims) VerifyIssuer(cmp string, req bool) bool {
 // incompatibilities with other JWT implementations. The use of this is discouraged, instead
 // the newer RegisteredClaims struct should be used.
 //
-// Deprecated: Use RegisteredClaims instead for a forward-compatible way to access registered claims in a struct.
+// Use RegisteredClaims instead for a forward-compatible way to access registered claims in a struct.
 type StandardClaims struct {
 	Audience  string `json:"aud,omitempty"`
 	ExpiresAt int64  `json:"exp,omitempty"`

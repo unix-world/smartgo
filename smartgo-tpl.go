@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ TPL (MARKERS-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -1119,8 +1119,10 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 								tmp_marker_val = EscapeJs(tmp_marker_val)
 							} else if(escaping == "|html") { // Escape HTML
 								tmp_marker_val = EscapeHtml(tmp_marker_val)
-							} else if(escaping == "|xml") { // Escape XML
-								tmp_marker_val = EscapeXml(tmp_marker_val)
+							} else if(escaping == "|xml") { // Escape XML (default)
+								tmp_marker_val = EscapeXml(tmp_marker_val, false)
+							} else if(escaping == "|exml") { // Escape XML (extra)
+								tmp_marker_val = EscapeXml(tmp_marker_val, true)
 							} else if(escaping == "|css") { // Escape CSS
 								tmp_marker_val = EscapeCss(tmp_marker_val)
 							} else if(escaping == "|nl2br") { // Format NL2BR

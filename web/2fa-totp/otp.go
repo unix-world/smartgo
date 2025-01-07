@@ -1,6 +1,6 @@
 
 // (c) 2024-present unix-world.org
-// v.20241216.2358
+// v.20250103.2358
 // license: BSD
 
 // based on: github.com/xlzd/gotp # license: MIT
@@ -23,9 +23,11 @@ import (
 
 const (
 	DEFAULT_LENGTH uint8 = 256 / 8
-	DEFAULT_ALGO string = "sha384"
+//	DEFAULT_ALGO string = "sha384"
+	DEFAULT_ALGO string = "sha512" // changed to SHA512 from SHA384 to support also Google Authenticator
 	DEFAULT_DIGITS uint8 = 8
 	DEFAULT_INTERVAL uint16 = 30
+	DEFAULT_ISSUER string = "SmartGoTOTP2FA"
 
 	URL_OTPAUTH string = "otpauth://totp/" // just for TOTP ...
 )
@@ -87,8 +89,8 @@ func buildUri(secret string, accountName string, issuerName string, algorithm st
 	algorithm = smart.StrToUpper(smart.StrTrimWhitespaces(algorithm))
 	//--
 	issuerName = smart.StrTrimWhitespaces(issuerName) // camelcase
-	if(issuerName != "") {
-		issuerName = "SmartGoTwoFactorAuthTOTP"
+	if(issuerName == "") {
+		issuerName = DEFAULT_ISSUER
 	} //end if
 	//--
 	appNs, errNs := smart.AppGetNamespace()

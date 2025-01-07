@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / API :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241221.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -34,7 +34,7 @@ func ResponseApiJsonERR(errCode uint16, errMsg string, data any) string {
 		Data:    data,
 	}
 	//--
-	return smart.JsonNoErrChkEncode(resp, false, false)
+	return smart.JsonNoErrChkEncode(resp, true, false) // pretty format when err, for better readability
 	//--
 } //END FUNCTION
 
@@ -47,7 +47,7 @@ func ResponseApiJsonOK(data any) string {
 		Data:    data,
 	}
 	//--
-	return smart.JsonNoErrChkEncode(resp, false, false)
+	return smart.JsonNoErrChkEncode(resp, false, false) // do not format on OK answer to preserve bandwidth, these may be much longer answers than err above
 	//--
 } //END FUNCTION
 

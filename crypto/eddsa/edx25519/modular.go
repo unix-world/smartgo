@@ -1,4 +1,4 @@
-package ed25519
+package edx25519
 
 import (
 	"encoding/binary"

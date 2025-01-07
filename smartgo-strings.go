@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ STRINGS ]
 
 // REQUIRE: go 1.19 or later
@@ -120,6 +120,13 @@ func Explode(delimiter string, text string) []string {
 
 
 func Implode(glue string, pieces []string) string {
+	//--
+	if(pieces == nil) {
+		return ""
+	} //end if
+	if(len(pieces) <= 0) {
+		return ""
+	} //end if
 	//--
 	return strings.Join(pieces, glue)
 	//--

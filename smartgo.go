@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ SMART.CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable only since go 1.19)
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20241223.2358"
+	VERSION string = "v.20250107.2358"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -225,6 +225,92 @@ func ArrMapStrFlip(m map[string]string) map[string]string {
 	} //end for
 	//--
 	return n
+	//--
+} //END FUNCTION
+
+
+//-----
+
+// converts list `<one>, <two>` to arr['one', 'two']
+func SmartListToArr(list string, noSpaces bool) []string {
+	//--
+	var arr []string = []string{}
+	//--
+	list = strings.Trim(list, TRIM_WHITESPACES)
+	if(list == "") {
+		return arr
+	} //end if
+	//--
+	exArr := strings.Split(list, ",") // explode
+	if(len(exArr) <= 0) {
+		return arr
+	} //end if
+	//--
+	for i:=0; i<len(exArr); i++ {
+		//--
+		var val string = exArr[i]
+		//--
+		val = strings.Trim(val, TRIM_WHITESPACES) // must trim outside <> entries because was exploded by ',' and list can be also ', '
+		//--
+		val = strings.ReplaceAll(val, "<", "")
+		val = strings.ReplaceAll(val, ">", "")
+		//--
+		if(noSpaces != false) {
+			val = strings.Trim(val, TRIM_WHITESPACES) // trim <> inside values only if explicit required (otherwise preserve inside spaces)
+		} //end if
+		//--
+		if(strings.Trim(val, TRIM_WHITESPACES) != "") {
+			if(!InListArr(val, arr)) {
+				arr = append(arr, val)
+			} //end if
+		} //end if
+		//--
+	} //end for
+	//--
+	return arr
+	//--
+} //END FUNCTION
+
+
+// converts arr['one', 'two'] to list `<one>, <two>`
+func SmartArrToList(arr []string, sepSpaces bool) string {
+	//--
+	if(arr == nil) {
+		return ""
+	} //end if
+	if(len(arr) <= 0) {
+		return ""
+	} //end if
+	//--
+	var safeArr []string = []string{}
+	for i:=0; i<len(arr); i++ {
+		//--
+		var val string = arr[i]
+		//-- must not do strtolower as it is used to store both cases
+		val = strings.Trim(val, TRIM_WHITESPACES)
+		//-- {{{SYNC-SMARTLIST-BRACKET-REPLACEMENTS}}}
+		val = strings.ReplaceAll(val, "<", "‹")
+		val = strings.ReplaceAll(val, ">", "›")
+		//-- fix just on value
+		val = strings.ReplaceAll(val, ",", ";")
+		//--
+		var listVal string = "<" + val + ">"
+		if(!InListArr(listVal, safeArr)) {
+			safeArr = append(safeArr, listVal)
+		} //end if
+		//--
+	} //end for
+	//--
+	if(len(safeArr) <= 0) {
+		return ""
+	} //end if
+	//--
+	var glue string = ","
+	if(sepSpaces) {
+		glue = ", "
+	} //end if
+	//--
+	return strings.Join(safeArr, glue) // implode
 	//--
 } //END FUNCTION
 

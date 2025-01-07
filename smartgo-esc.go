@@ -1,8 +1,8 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
-// [ ESCAPING ]
+// r.20250107.2358 :: STABLE
+// [ ESCAPERS ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
@@ -49,8 +49,8 @@ func AddCSlashes(s string, c string) string {
 //-----
 
 
-func EscapeXml(s string) string { // provides a Smart.Framework ~ EscapeXml
-	//--
+func EscapeXml(s string, extraEscapings bool) string { // provides a Smart.Framework ~ EscapeXml
+	//-- v.20241228
 	if(s == "") {
 		return ""
 	} //end if
@@ -61,7 +61,18 @@ func EscapeXml(s string) string { // provides a Smart.Framework ~ EscapeXml
 		return ""
 	} //end if
 	//--
-	return buf.String()
+	s = buf.String()
+	//--
+	if(extraEscapings == true) { // as oposite to php, golang (by default) escapes the \r \n \t so it is actually operating in extra escaping mode
+		return s // exml
+	} //end if
+	//--
+	xmlExtraEscaper := strings.NewReplacer( // fix back already escaped special entities
+		`&#xD;`, "\r", // `&#13;`
+		`&#xA;`, "\n", // `&#10;`,
+		`&#x9;`, "\t", // `&#09;`,
+	)
+	return xmlExtraEscaper.Replace(s) // xml
 	//--
 } //END FUNCTION
 

@@ -1,4 +1,4 @@
-// Package ed25519 implements Ed25519 signature scheme as described in RFC-8032.
+// Package edx25519 implements Ed25519 signature scheme as described in RFC-8032.
 //
 // This package provides optimized implementations of the three signature
 // variants and maintaining closer compatibility with crypto/ed25519.
@@ -20,7 +20,7 @@
 // in this package. While Ed25519Ph accepts an empty context, Ed25519Ctx
 // enforces non-empty context strings.
 //
-// # Compatibility with crypto.ed25519
+// # Not Compatible with crypto.ed25519
 //
 // These functions are compatible with the “Ed25519” function defined in
 // RFC-8032. However, unlike RFC 8032's formulation, this package's private
@@ -33,9 +33,9 @@
 //   - RFC-8032: https://rfc-editor.org/rfc/rfc8032.txt
 //   - Ed25519: https://ed25519.cr.yp.to/
 //   - EdDSA: High-speed high-security signatures. https://doi.org/10.1007/s13389-012-0027-1
-package ed25519
+package edx25519
 
-// modified by unixman: use sha3-512 instead of sha512
+// modified by unixman r.20250106: use sha3-512 instead of sha512
 
 import (
 	"fmt"
@@ -144,7 +144,7 @@ func (pub PublicKey) Equal(x crypto.PublicKey) bool {
 }
 
 // Sign creates a signature of a message with priv key.
-// This function is compatible with crypto.ed25519 and also supports the
+// This function is derived from crypto.ed25519 and also supports the
 // three signature variants defined in RFC-8032, namely Ed25519 (or pure
 // EdDSA), Ed25519Ph, and Ed25519Ctx.
 // The opts.HashFunc() must return zero to specify either Ed25519 or Ed25519Ctx
@@ -175,7 +175,7 @@ func (priv PrivateKey) Sign(
 	case scheme == ED25519Ctx && opts.HashFunc() == crypto.Hash(0) && len(ctx) > 0:
 		return SignWithCtx(priv, message, ctx), nil
 	default:
-		return nil, errors.New("ed25519: bad hash algorithm")
+		return nil, errors.New("edx25519: bad hash algorithm")
 	}
 }
 
@@ -210,7 +210,7 @@ func NewKeyFromSeed(seed []byte) PrivateKey {
 
 func newKeyFromSeed(privateKey, seed []byte) {
 	if l := len(seed); l != SeedSize {
-		panic("ed25519: bad seed length: " + strconv.Itoa(l))
+		panic("edx25519: bad seed length: " + strconv.Itoa(l))
 	}
 	var P pointR1
 //	k := sha512.Sum512(seed)
@@ -224,7 +224,7 @@ func newKeyFromSeed(privateKey, seed []byte) {
 
 func signAll(signature []byte, privateKey PrivateKey, message, ctx []byte, preHash bool) {
 	if l := len(privateKey); l != PrivateKeySize {
-		panic("ed25519: bad private key length: " + strconv.Itoa(l))
+		panic("edx25519: bad private key length: " + strconv.Itoa(l))
 	}
 
 //	H := sha512.New()
@@ -303,7 +303,7 @@ func Sign(privateKey PrivateKey, message []byte) []byte {
 // ContextMaxSize=255. It can be empty.
 func SignPh(privateKey PrivateKey, message []byte, ctx string) []byte {
 	if len(ctx) > ContextMaxSize {
-		panic(fmt.Errorf("ed25519: bad context length: %v", len(ctx)))
+		panic(fmt.Errorf("edx25519: bad context length: %v", len(ctx)))
 	}
 
 	signature := make([]byte, SignatureSize)
@@ -319,7 +319,7 @@ func SignPh(privateKey PrivateKey, message []byte, ctx string) []byte {
 // ContextMaxSize=255 and cannot be empty.
 func SignWithCtx(privateKey PrivateKey, message []byte, ctx string) []byte {
 	if len(ctx) == 0 || len(ctx) > ContextMaxSize {
-		panic(fmt.Errorf("ed25519: bad context length: %v > %v", len(ctx), ContextMaxSize))
+		panic(fmt.Errorf("edx25519: bad context length: %v > %v", len(ctx), ContextMaxSize))
 	}
 
 	signature := make([]byte, SignatureSize)
@@ -389,7 +389,8 @@ func VerifyAny(public PublicKey, message, signature []byte, opts crypto.SignerOp
 	switch true {
 	case scheme == ED25519 && opts.HashFunc() == crypto.Hash(0):
 		return Verify(public, message, signature)
-	case scheme == ED25519Ph && opts.HashFunc() == crypto.SHA512:
+//	case scheme == ED25519Ph && opts.HashFunc() == crypto.SHA512:
+	case scheme == ED25519Ph && opts.HashFunc() == crypto.SHA3_512:
 		return VerifyPh(public, message, signature, ctx)
 	case scheme == ED25519Ctx && opts.HashFunc() == crypto.Hash(0) && len(ctx) > 0:
 		return VerifyWithCtx(public, message, signature, ctx)
@@ -445,7 +446,7 @@ func isLessThanOrder(x []byte) bool {
 }
 
 func writeDom(h io.Writer, ctx []byte, preHash bool) {
-	dom2 := "SigEd25519 no Ed25519 collisions"
+	dom2 := "SigEdx25519 no Edx25519 collisions"
 
 	if len(ctx) > 0 {
 		_, _ = h.Write([]byte(dom2))

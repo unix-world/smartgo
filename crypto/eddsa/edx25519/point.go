@@ -1,4 +1,4 @@
-package ed25519
+package edx25519
 
 import (
 	fp "github.com/unix-world/smartgo/crypto/eddsa/internal/math/fp25519"

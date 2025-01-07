@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241221.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -39,7 +39,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20241221.2358"
+	VERSION string = "r.20250107.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -117,6 +117,7 @@ const (
 
 	//--
 	HTTP_STATUS_200 string = "200 OK"
+	HTTP_STATUS_201 string = "201 Created"
 	HTTP_STATUS_202 string = "202 Accepted"
 	HTTP_STATUS_203 string = "203 Non-Authoritative Information"
 	HTTP_STATUS_204 string = "204 No Content"
@@ -128,11 +129,18 @@ const (
 	//--
 	HTTP_STATUS_400 string = "400 Bad Request"
 	HTTP_STATUS_401 string = "401 Unauthorized"
+	HTTP_STATUS_402 string = "402 Subscription Required" // 402 Payment Required
 	HTTP_STATUS_403 string = "403 Forbidden"
 	HTTP_STATUS_404 string = "404 Not Found"
 	HTTP_STATUS_405 string = "405 Method Not Allowed"
-	HTTP_STATUS_410 string = "410 Gone"
+	HTTP_STATUS_406 string = "406 Not Acceptable"
+	HTTP_STATUS_408 string = "408 Request Timeout"
+	HTTP_STATUS_409 string = "409 Conflict" // example: conflicts occur if a request to create collection /a/b/c/d/ is made, and /a/b/c/ does not exist
+	HTTP_STATUS_410 string = "410 Gone" // a more permanent 404 like status, ex: if a page was available just for a period of time
+	HTTP_STATUS_415 string = "415 Unsupported Media Type"
 	HTTP_STATUS_422 string = "422 Unprocessable Content" // 422 Unprocessable Entity
+	HTTP_STATUS_423 string = "423 Locked"
+	HTTP_STATUS_424 string = "424 Dependency Failed" // 424 Failed Dependency ; the request failed because it depended on another request
 	HTTP_STATUS_429 string = "429 Too Many Requests"
 	//--
 	HTTP_STATUS_500 string = "500 Internal Server Error"
@@ -140,6 +148,7 @@ const (
 	HTTP_STATUS_502 string = "502 Bad Gateway"
 	HTTP_STATUS_503 string = "503 Service Unavailable"
 	HTTP_STATUS_504 string = "504 Gateway Timeout"
+	HTTP_STATUS_507 string = "507 Insufficient Storage"
 	//--
 
 	//--
@@ -177,8 +186,9 @@ const (
 	HTTP_HEADER_AUTH_AUTHENTICATE string = "www-authenticate"
 	HTTP_HEADER_AUTH_AUTHORIZATION string = "authorization"
 	HTTP_HEADER_VALUE_AUTH_TYPE_BASIC string = "Basic" // keep camel case
+	HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN string = "Token" // keep camel case
 	HTTP_HEADER_VALUE_AUTH_TYPE_BEARER string = "Bearer" // keep camel case
-	HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN string = "Apikey" // keep camel case
+	HTTP_HEADER_VALUE_AUTH_TYPE_APIKEY string = "ApiKey" // keep camel case
 	//--
 	HTTP_HEADER_DAV_DESTINATION string = "destination"
 	HTTP_HEADER_DAV_OVERWRITE string = "overwrite"
@@ -1009,6 +1019,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	if(authUsername != "") {
 		if(authUsername == smart.HTTP_AUTH_USER_RAW) {
 			useAuth = smart.HTTP_AUTH_MODE_RAW
+		} else if(authUsername == smart.HTTP_AUTH_USER_APIKEY) {
+			useAuth = smart.HTTP_AUTH_MODE_APIKEY
 		} else if(authUsername == smart.HTTP_AUTH_USER_BEARER) {
 			useAuth = smart.HTTP_AUTH_MODE_BEARER
 		} else if(authUsername == smart.HTTP_AUTH_USER_TOKEN) {
@@ -1240,7 +1252,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				} //end if
 			} //end if
 		} //endfor
-	} else if(useAuth == smart.HTTP_AUTH_MODE_TOKEN) { // only for Token Auth ; Example: `authorization: Apikey *****` ; the expected aHdrVal = `*****`
+	} else if(useAuth == smart.HTTP_AUTH_MODE_TOKEN) { // only for Token Auth ; Example: `authorization: Token *****` ; the expected aHdrVal = `*****`
 		if(authPassword != "") {
 			var aHdrVal string = HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN + " " + HttpSafeHeaderValue(authPassword)
 			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, aHdrVal)
@@ -1254,6 +1266,14 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, aHdrVal)
 			if(DEBUG == true) {
 				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Add Bearer Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
+			} //end if
+		} //end if
+	} else if(useAuth == smart.HTTP_AUTH_MODE_APIKEY) { // only for ApiKey Auth ; Example: `authorization: ApiKey *****` ; the expected aHdrVal = `*****`
+		if(authPassword != "") {
+			var aHdrVal string = HTTP_HEADER_VALUE_AUTH_TYPE_APIKEY + " " + HttpSafeHeaderValue(authPassword)
+			req.Header.Add(HTTP_HEADER_AUTH_AUTHORIZATION, aHdrVal)
+			if(DEBUG == true) {
+				log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Add ApiKey Auth Header: `" + HTTP_HEADER_AUTH_AUTHORIZATION + ": " + aHdrVal + "`")
 			} //end if
 		} //end if
 	} else if(useAuth == smart.HTTP_AUTH_MODE_RAW) { // only for Raw Auth ; Example: `authorization: *****` or `authorization: Custom *****` ; the expected aHdrVal = `Custom *****`
@@ -1791,7 +1811,7 @@ func HttpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 
 type HttpStreamerFunc func() (ioReadStream io.Reader)
 
-// valid code: 200 ; 202 ; 203 ; 208
+// valid code: 200 ; 201 ; 202 ; 203 ; 208
 // contentFnameOrPath: stream.ext (will get extension .ext and serve mime type by this extension) ; default, fallback to .stream
 // contentDisposition: DISP_TYPE_INLINE | DISP_TYPE_ATTACHMENT
 // headers: see httpOKXWriteAllowedHeaders()
@@ -1817,6 +1837,8 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 	//--
 	switch(code) { // {{{SMARTGO-HTTP-UTILS-STATUS-2xx-CODES}}}
 		case 200:
+			break
+		case 201:
 			break
 		case 202:
 			break
@@ -1941,7 +1963,7 @@ func httpOKXWriteAllowedHeaders(w http.ResponseWriter, headers map[string]string
 //-----
 
 
-// valid code: 200 ; 202 ; 203 ; 204 ; 208
+// valid code: 200 ; 201 ; 202 ; 203 ; 204 ; 208
 // contentFnameOrPath: file.html (will get extension .html and serve mime type by this extension) ; default, fallback to .txt
 // contentDisposition: DISP_TYPE_INLINE | DISP_TYPE_ATTACHMENT
 // for no cache: cacheExpiration = -1 ; cacheLastModified = "" ; cacheControl = "no-cache"
@@ -1956,6 +1978,8 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	var skipContent bool = false
 	switch(code) { // {{{SMARTGO-HTTP-UTILS-STATUS-2xx-CODES}}}
 		case 200:
+			break
+		case 201:
 			break
 		case 202:
 			break
@@ -2062,6 +2086,12 @@ func HttpStatus200(w http.ResponseWriter, r *http.Request, content string, conte
 	//--
 } //END FUNCTION
 
+// @params description: see httpStatusOKX()
+func HttpStatus201(w http.ResponseWriter, r *http.Request, content string, contentFnameOrPath string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
+	//--
+	httpStatusOKX(w, r, 201, content, contentFnameOrPath, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
+	//--
+} //END FUNCTION
 
 // @params description: see httpStatusOKX()
 func HttpStatus202(w http.ResponseWriter, r *http.Request, content string, contentFnameOrPath string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
@@ -2069,7 +2099,6 @@ func HttpStatus202(w http.ResponseWriter, r *http.Request, content string, conte
 	httpStatusOKX(w, r, 202, content, contentFnameOrPath, contentDisposition, cacheExpiration, cacheLastModified, cacheControl, headers)
 	//--
 } //END FUNCTION
-
 
 // @params description: see httpStatusOKX()
 func HttpStatus203(w http.ResponseWriter, r *http.Request, content string, contentFnameOrPath string, contentDisposition string, cacheExpiration int, cacheLastModified string, cacheControl string, headers map[string]string) {
@@ -2171,7 +2200,7 @@ func HttpStatus302(w http.ResponseWriter, r *http.Request, redirectUrl string, o
 //-----
 
 
-// valid code: 400 ; 401 ; 403 ; 404 ; 405 ; 410 ; 422 ; 429 ; 500 ; 501 ; 502 ; 503 ; 504
+// valid code: 400 ; 401 ; 402 ; 403 ; 404 ; 405 ; 406 ; 408 ; 409 ; 410 ; 415 ; 422 ; 423 ; 424 ; 429 ; 500 ; 501 ; 502 ; 503 ; 504 ; 507
 func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageText string, outputHtml bool, isMessageTextHtmlPage bool, displayCaptcha bool) {
 	//--
 	defer smart.PanicHandler()
@@ -2188,6 +2217,11 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			displayAuthLogo = true
 			displayCaptcha = false
 			break
+		case 402:
+			title = HTTP_STATUS_402
+			displayAuthLogo = true
+			displayCaptcha = false
+			break
 		case 403:
 			title = HTTP_STATUS_403
 			displayAuthLogo = true
@@ -2201,12 +2235,36 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			title = HTTP_STATUS_405
 			displayCaptcha = false
 			break
+		case 406:
+			title = HTTP_STATUS_406
+			displayCaptcha = false
+			break
+		case 408:
+			title = HTTP_STATUS_408
+			displayCaptcha = false
+			break
+		case 409:
+			title = HTTP_STATUS_409
+			displayCaptcha = false
+			break
 		case 410:
 			title = HTTP_STATUS_410
 			displayCaptcha = false
 			break
+		case 415:
+			title = HTTP_STATUS_415
+			displayCaptcha = false
+			break
 		case 422:
 			title = HTTP_STATUS_422
+			displayCaptcha = false
+			break
+		case 423:
+			title = HTTP_STATUS_423
+			displayCaptcha = false
+			break
+		case 424:
+			title = HTTP_STATUS_424
 			displayCaptcha = false
 			break
 		case 429: // allow: displayCaptcha
@@ -2233,6 +2291,10 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			break
 		case 504:
 			title = HTTP_STATUS_504
+			displayCaptcha = false
+			break
+		case 507:
+			title = HTTP_STATUS_507
 			displayCaptcha = false
 			break
 		default:
@@ -2410,6 +2472,12 @@ func HttpStatus401(w http.ResponseWriter, r *http.Request, messageText string, o
 	//--
 } //END FUNCTION
 
+func HttpStatus402(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 402, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
 func HttpStatus403(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 403, messageText, outputHtml, false, false)
@@ -2428,15 +2496,51 @@ func HttpStatus405(w http.ResponseWriter, r *http.Request, messageText string, o
 	//--
 } //END FUNCTION
 
+func HttpStatus406(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 406, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
+func HttpStatus408(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 408, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
+func HttpStatus409(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 409, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
 func HttpStatus410(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 410, messageText, outputHtml, false, false)
 	//--
 } //END FUNCTION
 
+func HttpStatus415(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 415, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
 func HttpStatus422(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 422, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
+func HttpStatus423(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 423, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
+func HttpStatus424(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 424, messageText, outputHtml, false, false)
 	//--
 } //END FUNCTION
 
@@ -2474,6 +2578,12 @@ func HttpStatus503(w http.ResponseWriter, r *http.Request, messageText string, o
 func HttpStatus504(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 504, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
+func HttpStatus507(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 507, messageText, outputHtml, false, false)
 	//--
 } //END FUNCTION
 
@@ -2835,9 +2945,23 @@ func HttpClientAuthBasicHeader(authUsername string, authPassword string) http.He
 } //END FUNCTION
 
 
+//------
+
+
+func IsValidHttpAuthRealm(authRealm string) bool {
+	//--
+	if((smart.StrTrimWhitespaces(authRealm) == "") || (len(smart.StrTrimWhitespaces(authRealm)) < 7) || (len(authRealm) > 50) || (!smart.StrRegexMatch(`^[ _a-zA-Z0-9\-\.@\/\:]+$`, authRealm))) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
 //-----
 
-// modes: 1 = Basic Auth ; 2 = Token ; 3 = Bearer ; 4 = Cookie
+// modes: 1 = Basic Auth ; 28 = Token ; 29 = Bearer ; 129 = Cookie ; 229 = ApiKey
 type HttpAuthCheckFunc func(string, uint8, string, map[string]string, string, string, string, *http.Request) (bool, smart.AuthDataStruct, []CookieData) // (authRealm, authMode, realClientIp, arrCookies, user, pass, token) : true if OK / false if NOT, authData, arrSetCookies
 
 // if returns a non empty string there is an error ; if error it already outputs the 401 headers and content so there is nothing more to do ...
@@ -2851,11 +2975,19 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	//--
 	const errTxtProvider string = "Either must supply a fixed username/password and/or username/token, either an auth method."
 	//--
-	if(smart.AuthAnyIsEnabled() != true) { // {{{SYNC-AUTH-CHECK-ANY}}} ; will check if any auth is available: basic, bearer, token, cookie
-		err = "All Authentication Modes (Basic, Token, Bearer, Cookie) are Disabled"
-		HttpStatus500(w, r, err, outputHtml)
-		return smart.NewError(err), aData
-	} //end if
+	if(customAuthCheck == nil) {
+		if((smart.AuthBasicIsEnabled() != true) && (smart.AuthTokenIsEnabled() != true)) {
+			err = "All Supported Authentication Modes (Basic, Token) are Disabled"
+			HttpStatus500(w, r, err, outputHtml)
+			return smart.NewError(err), aData
+		} //end if
+	} else {
+		if(smart.AuthAnyIsEnabled() != true) { // will check if any auth is available: basic, bearer, token, cookie, apikey
+			err = "All Supported Authentication Modes (Basic, Token, Bearer, Cookie, ApiKey) are Disabled"
+			HttpStatus500(w, r, err, outputHtml)
+			return smart.NewError(err), aData
+		} //end if
+	} //end if else
 	//--
 	if( // use a fixed user/pass with the default authCheck (HTTP Basic Only)
 		(smart.StrTrimWhitespaces(authUsername) == "") &&
@@ -2879,7 +3011,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	// do not trim password !
 	allowedIPs = smart.StrTrimWhitespaces(allowedIPs)
 	//--
-	if((authRealm == "") || (len(authRealm) < 7) || (len(authRealm) > 50) || (!smart.StrRegexMatch(`^[ _a-zA-Z0-9\-\.@\/\:]+$`, authRealm))) {
+	if(IsValidHttpAuthRealm(authRealm) != true) {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: AUTH.FIX :: Invalid Realm `" + authRealm + "` ; The Realm was set to default: `" + DEFAULT_REALM + "`")
 		authRealm = DEFAULT_REALM
 	} //end if
@@ -2988,7 +3120,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	var user string = ""
 	var pass string = ""
 	var ok bool = false
-	if((smart.AuthBasicIsEnabled() == true) || (smart.AuthBearerIsEnabled() == true) || (smart.AuthTokenIsEnabled() == true)) {
+	if((smart.AuthBasicIsEnabled() == true) || (smart.AuthTokenIsEnabled() == true) || (smart.AuthBearerIsEnabled() == true) || (smart.AuthApikeyIsEnabled() == true)) {
 		authHeader = smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_AUTH_AUTHORIZATION)) // prefer authorization first
 	} //end if
 	//-- order to check: Cookie, Bearer, Token, Basic
@@ -3000,20 +3132,8 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 				httpAuthMode = smart.HTTP_AUTH_MODE_COOKIE
 				ok = true
 			} //end if
-	} else if(smart.StrTrimWhitespaces(authHeader) != "") { // if not cookie, check in this order: bearer, token, basic
-		if((smart.AuthBearerIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_BEARER + " "))) { // Bearer Auth
-			httpAuthMode = smart.HTTP_AUTH_MODE_BEARER
-			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
-			if(token != "") {
-				ok = true
-			} //end if
-		} else if((smart.AuthTokenIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN + " "))) { // Token Auth
-			httpAuthMode = smart.HTTP_AUTH_MODE_TOKEN
-			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
-			if(token != "") {
-				ok = true
-			} //end if
-		} else if((smart.AuthBasicIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + " "))) { // Basic Auth ; must be checked last if enabled, as a fallback ; reason: if enabled the Auth Basic Prompt (Header) will be enabled
+	} else if(smart.StrTrimWhitespaces(authHeader) != "") { // if not cookie, check in this order: basic, token, bearer, apikey
+		if((smart.AuthBasicIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_BASIC + " "))) { // Basic Auth ; must be checked last if enabled, as a fallback ; reason: if enabled the Auth Basic Prompt (Header) will be enabled
 			httpAuthMode = smart.HTTP_AUTH_MODE_BASIC
 			user, pass, ok = r.BasicAuth() // do not trim password
 			user = smart.StrTrimWhitespaces(user)
@@ -3021,20 +3141,33 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 				ok = false
 			} //end if
 			// DO NOT MANUALLY SET ok TO TRUE, must be preserved as is above comming from r.BasicAuth()
+		} else if((smart.AuthTokenIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_TOKEN + " "))) { // Token Auth
+			httpAuthMode = smart.HTTP_AUTH_MODE_TOKEN
+			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 6, 0))
+			if(token != "") {
+				ok = true
+			} //end if
+		} else if((smart.AuthBearerIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_BEARER + " "))) { // Bearer Auth
+			httpAuthMode = smart.HTTP_AUTH_MODE_BEARER
+			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
+			if(token != "") {
+				ok = true
+			} //end if
+		} else if((smart.AuthApikeyIsEnabled() == true) && (smart.StrIStartsWith(authHeader, HTTP_HEADER_VALUE_AUTH_TYPE_APIKEY + " "))) { // ApiKey Auth
+			httpAuthMode = smart.HTTP_AUTH_MODE_APIKEY
+			token = smart.StrTrimWhitespaces(smart.StrSubstr(authHeader, 7, 0))
+			if(token != "") {
+				ok = true
+			} //end if
 		} //end if else
 	} //end if
 	//--
 	var aUser string = user // for logging purposes
 	//--
 	if(!ok) {
-		if(smart.AuthAnyIsEnabled() != true) { // {{{SYNC-AUTH-CHECK-ANY}}} ; will check if any auth is available: basic, bearer, token, cookie
-			err = "All Authentication Modes (Basic, Token, Bearer, Cookie) are Disabled"
-			log.Println("[ERROR] " + smart.CurrentFunctionName() + ":", err)
-		} else {
-			err = "Authentication is Required"
-		} //end if
+		err = "Authentication is Required"
 	} else {
-		if(customAuthCheck != nil) { // custom auth provider check ; should manage also 2FA if enabled ; can implement other modes: HTTP_AUTH_MODE_BEARER, HTTP_AUTH_MODE_TOKEN, HTTP_AUTH_MODE_COOKIE
+		if(customAuthCheck != nil) { // custom auth provider check ; should manage also 2FA if enabled ; can implement any of these modes: HTTP_AUTH_MODE_BASIC, HTTP_AUTH_MODE_TOKEN, HTTP_AUTH_MODE_BEARER, HTTP_AUTH_MODE_COOKIE, HTTP_AUTH_MODE_APIKEY
 			var authCustomOk bool = false
 			var arrStCookies []CookieData = nil
 			authCustomOk, aData, arrStCookies = customAuthCheck(authRealm, httpAuthMode, realClientIp, cookies, user, pass, token, r)
@@ -3058,7 +3191,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 			if(errTokenSepare != nil) {
 				err = "Auth.Default: [Token:Opaque:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: " + errTokenSepare.Error()
 			} else {
-				tokenAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, smart.HTTP_AUTH_DEFAULT_PRIVS, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only opaque tokens are supported
+				tokenAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only opaque tokens are supported
 				if(tokenAuthOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 					aData.OK = false // make sure to set to false, it was not OK
 					err = "Auth.Default: [Token:Opaque:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
@@ -3067,7 +3200,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only, no 2FA (2FA req. custom implementation)
 			if(smart.Auth2FACookieIsEnabled() != true) {
 				var authBasicOk bool = false
-				authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, user, pass, httpAuthMode, authUsername, authPassword, smart.ALGO_PASS_PLAIN, smart.HTTP_AUTH_DEFAULT_PRIVS, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only plain type password can be provided in the default mode ; to use hashed passwords needs custom auth check implementation
+				authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, user, pass, httpAuthMode, authUsername, authPassword, smart.ALGO_PASS_PLAIN, smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only plain type password can be provided in the default mode ; to use hashed passwords needs custom auth check implementation
 				if(authBasicOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 					aData.OK = false // make sure to set to false, it was not OK
 					err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
@@ -3092,7 +3225,7 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 		log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Set-In-Cache: AUTH.FAILED [" + authRealm + "] :: [Auth:" + smart.AuthMethodGetNameById(httpAuthMode) + "] :: Client: `" + cachedObj.Id + "` # `" + cachedObj.Data + "` @", len(cachedObj.Data))
 		//--
 		if(smart.AuthBasicIsEnabled() == true) { // show Auth Basic Prompt (Header) ONLY if Auth Basic is Enabled, otherwise does not make sense ...
-		//	if((httpAuthMode != smart.HTTP_AUTH_MODE_COOKIE) && (httpAuthMode != smart.HTTP_AUTH_MODE_BEARER) && (httpAuthMode != smart.HTTP_AUTH_MODE_TOKEN)) {
+		//	if((httpAuthMode != smart.HTTP_AUTH_MODE_COOKIE) && (httpAuthMode != smart.HTTP_AUTH_MODE_TOKEN) && (httpAuthMode != smart.HTTP_AUTH_MODE_BEARER) && (httpAuthMode != smart.HTTP_AUTH_MODE_APIKEY)) {
 			if((httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) || (httpAuthMode == smart.HTTP_AUTH_MODE_NONE)) { // this condition is better than above ; needs to include also auth none because prior the browser will authenticate is actually Auth None instead of Auth Basic
 				var authDisableHeader string = ""
 				if(IsAjaxRequest(r) == true) {

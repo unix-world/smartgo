@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ BYTES ]
 
 // REQUIRE: go 1.19 or later
@@ -52,6 +52,13 @@ func BExplode(delimiter []byte, src []byte) [][]byte {
 
 
 func BImplode(glue []byte, pieces [][]byte) []byte {
+	//--
+	if(pieces == nil) {
+		return nil
+	} //end if
+	if(len(pieces) <= 0) {
+		return nil
+	} //end if
 	//--
 	return bytes.Join(pieces, glue)
 	//--

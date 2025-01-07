@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ TEXT / HTML ]
 
 // REQUIRE: go 1.19 or later
@@ -76,6 +76,24 @@ func StrCreateStdVarName(s string) string {
 //-----
 
 
+func Nl2Br(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
+	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, "<br>")
+	s = StrReplaceAll(s, CARRIAGE_RETURN, "<br>")
+	s = StrReplaceAll(s, LINE_FEED, "<br>")
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func TextCutByLimit(s string, length int) string {
 	//--
 	if(s == "") {
@@ -94,24 +112,6 @@ func TextCutByLimit(s string, length int) string {
 	s = StrMBSubstr(s, 0, length - 3) // substract -3 because of the trailing dots ...
 	s = StrRegexReplaceAll(`\s+?(\S+)?$`, s, "") // {{{SYNC-REGEX-TEXT-CUTOFF}}}
 	s = s + "..." // add trailing dots
-	//--
-	return s
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func Nl2Br(s string) string {
-	//--
-	if(s == "") {
-		return ""
-	} //end if
-	//--
-	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, "<br>")
-	s = StrReplaceAll(s, CARRIAGE_RETURN, "<br>")
-	s = StrReplaceAll(s, LINE_FEED, "<br>")
 	//--
 	return s
 	//--

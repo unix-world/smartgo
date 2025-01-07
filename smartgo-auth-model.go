@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ AUTH / MODEL:YAML ]
 
 // REQUIRE: go 1.19 or later
@@ -31,6 +31,10 @@ type AuthUserToken struct {
 	IsValid       bool // exists and is valid
 	TokenHash     string
 	UserName      string
+	Privileges    string
+	Restrictions  string
+	Expiration    string
+	IsExpired     bool
 }
 
 type AuthProvider interface {
@@ -119,7 +123,36 @@ func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, e
 	record.UserName = authUserName
 	record.PassHash = StrTrimWhitespaces(arrRecord.Get("passhash").String())
 	record.PassAlgo = uint8(arrRecord.Get("passalgo").Uint())
-	if((record.PassAlgo < 0) || (record.PassAlgo > 4)) {
+	var isPassAlgoValid bool = false
+	switch(record.PassAlgo) { // {{{SYNC-AUTH-PASS-ALGOS}}}
+		case ALGO_PASS_NONE:
+			break
+		case ALGO_PASS_PLAIN:
+			isPassAlgoValid = true
+			break
+		case ALGO_PASS_SMART_SAFE_SF_PASS:
+			isPassAlgoValid = true
+			break
+		case ALGO_PASS_SMART_SAFE_ARGON_PASS:
+			isPassAlgoValid = true
+			break
+		case ALGO_PASS_SMART_SAFE_BCRYPT:
+			isPassAlgoValid = true
+			break
+		case ALGO_PASS_SMART_SAFE_OPQ_TOKEN:
+			// invalid, the user account can't have this kind of password hash
+			break
+		case ALGO_PASS_SMART_SAFE_WEB_TOKEN:
+			// invalid, the user account can't have this kind of password hash
+			break
+		case ALGO_PASS_CUSTOM_TOKEN:
+			// invalid, the user account can't have this kind of password hash
+			break
+		case ALGO_PASS_CUSTOM_HASH_PASS:
+			isPassAlgoValid = true // valid, for custom pass hash implementations
+			break
+	} //end if
+	if(isPassAlgoValid != true) {
 		return defRecord, NewError("Invalid Pass Algo")
 	} //end if
 	record.Totp2FASecret = StrTrimWhitespaces(arrRecord.Get("secret2fa").String())
@@ -127,7 +160,13 @@ func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, e
 	record.EmailAddr = StrTrimWhitespaces(arrRecord.Get("email").String())
 	record.FullName = StrTrimWhitespaces(arrRecord.Get("name").String())
 	record.Privileges = StrTrimWhitespaces(arrRecord.Get("privileges").String())
+	if(record.Privileges == "") {
+		record.Privileges = HTTP_AUTH_DEFAULT_PRIV // {{{SYNC-AUTH-RECORD-FALLBACK-PRIV}}}
+	} //end if
 	record.Restrictions = StrTrimWhitespaces(arrRecord.Get("restrictions").String())
+	if(record.Restrictions == "") {
+		record.Restrictions = HTTP_AUTH_DEFAULT_RESTR // {{{SYNC-AUTH-RECORD-FALLBACK-RESTR}}}
+	} //end if
 	record.Quota = arrRecord.Get("quota").Uint()
 	record.MetaData = map[string]string{}
 	metaData := arrRecord.Get("metainfo").Map()
@@ -174,12 +213,54 @@ func (p *AuthProviderYaml) VerifyUserTokenByRecord(authUserName string, authUser
 	} //end if
 	//--
 	jsonRecord := JsonNoErrChkEncode(ymlRecord, false, false)
-	var token string = StrTrimWhitespaces(JsonGetValueByKeyPath(jsonRecord, "token").String())
-	if((token == "") || (token != authUserToken)) { // check if is valid
-		return defToken, NewError("No Valid Token Found")
+	//--
+	theTokens := JsonGetValueByKeyPath(jsonRecord, "tokens")
+	if(!theTokens.Exists()) {
+		return defToken, NewError("No Tokens Defined")
+	} //end if
+	if(!theTokens.IsArray()) {
+		return defToken, NewError("Invalid Tokens Definition")
+	} //end if
+	tokens := JsonGetValueByKeyPath(jsonRecord, "tokens").Array()
+	if((tokens == nil) || (len(tokens) <= 0)) {
+		return defToken, NewError("No Tokens Found")
 	} //end if
 	//--
-	theToken := AuthUserToken{IsValid:true, TokenHash:token, UserName:authUserName}
+	theToken := AuthUserToken{IsValid:false, UserName:authUserName}
+	for i:=0; i<len(tokens); i++ {
+		token := tokens[i]
+		if(tokens[i].IsObject()) {
+			var id string = StrTrimWhitespaces(token.Get("id").String())
+			if((id != "") && (id == authUserToken)) {
+				var isExpired bool = false
+				var expiration string = StrToUpper(token.Get("expiration").String()) // may be as: `yyyy-mm-dd hh:ii:ss` or if not encosed in quotes, yaml will parse as `yyyy-mm-ddThh:ii:ssZ`
+				expiration = StrReplaceAll(expiration, "T", " ")
+				expiration = StrReplaceAll(expiration, "Z", " ")
+				expiration = StrTrimWhitespaces(expiration)
+				if(expiration != "") {
+					dt := DateTimeStructUtc(expiration)
+					if(dt.Time < TimeNowUtc()) {
+						isExpired = true
+					} //end if
+				} //end if
+				if(isExpired != true) {
+					theToken.IsValid = true
+				} //end if
+				theToken.IsExpired = isExpired
+				theToken.TokenHash = id
+				theToken.Expiration = expiration
+				theToken.Privileges = StrTrimWhitespaces(token.Get("privileges").String())
+				if(theToken.Privileges == "") {
+					theToken.Privileges = HTTP_AUTH_DEFAULT_PRIV // {{{SYNC-AUTH-RECORD-FALLBACK-PRIV}}}
+				} //end if
+				theToken.Restrictions = StrTrimWhitespaces(token.Get("restrictions").String())
+				if(theToken.Restrictions == "") {
+					theToken.Restrictions = HTTP_AUTH_DEFAULT_RESTR // {{{SYNC-AUTH-RECORD-FALLBACK-RESTR}}}
+				} //end if
+				break
+			} //end if
+		} //end if
+	} //end for
 	//--
 	return theToken, nil
 	//--

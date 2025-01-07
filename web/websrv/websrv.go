@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241221.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -21,10 +21,12 @@ import (
 
 var (
 	DEBUG bool = smart.DEBUG
+
+	httpAuthRealm string = "SmartGo.Web.Server: Auth Area"
 )
 
 const (
-	VERSION string = "r.20241221.2358"
+	VERSION string = "r.20250107.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -44,8 +46,6 @@ const (
 	CERTIFICATES_DEFAULT_PATH string = "./ssl/"
 	CERTIFICATE_PEM_CRT string = "cert.crt"
 	CERTIFICATE_PEM_KEY string = "cert.key"
-
-	HTTP_AUTH_REALM string = "Smart.Web Server: Auth Area"
 )
 
 const TheStrName string = "SmartGO Web Server"
@@ -98,7 +98,7 @@ type WebdavRunOptions struct {
 
 
 // IMPORTANT: If using Proxy with different PROXY_HTTP_BASE_PATH than "/" (ex: "/api/") the Proxy MUST strip back PROXY_HTTP_BASE_PATH to "/" for this backend
-func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
+func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
 
 	//--
 	// this method should return (error codes) just int16 positive values and zero if ok ; negative values are reserved for outsite managers
@@ -146,6 +146,15 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 
 	if(isAuthActive) {
 		//--
+		if(authRealm != "") {
+			if(smarthttputils.IsValidHttpAuthRealm(authRealm) != true) {
+				log.Println("[ERROR]", "Web Server: Authentication Realm is Invalid: `" + authRealm + "`")
+				return 1103
+			} //end if
+			httpAuthRealm = authRealm
+		} //end if
+		log.Println("[INFO]", "Web Server: Authentication Realm is: `" + httpAuthRealm + "`")
+		//--
 		authProviders := listActiveWebAuthProviders()
 		//--
 		var authDescr string = "Default.Handler"
@@ -157,7 +166,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			log.Println("[OK]", "Web Server: Authentication [" + authDescr + "] is ENABLED using the following Auth Providers: [ " + smart.Implode(", ", authProviders) + " ]")
 		} else {
 			log.Println("[ERROR]", "Web Server: Authentication [" + authDescr + "] is ENABLED but there are no active Auth Providers")
-			return 1103
+			return 1104
 		} //end if else
 		//--
 		if(smart.Auth2FACookieIsEnabled() == true) {
@@ -455,7 +464,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		var authErr error = nil
 		var authData smart.AuthDataStruct
 		if((isAuthActive == true) && (sr.AuthSkip != true)) { // this check must be before executing fx below
-			authErr, authData = smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, authToken, allowedIPs, customAuthCheck, true) // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
+			authErr, authData = smarthttputils.HttpAuthCheck(w, r, httpAuthRealm, authUser, authPass, authToken, allowedIPs, customAuthCheck, true) // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
 			if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
 				log.Println("[LOG]", "Web Server: Authentication Failed:", "authData: OK [", authData.OK, "] ; ErrMsg: `" + authData.ErrMsg + "` ; UserName: `" + authData.UserName + "` ; Error:", authErr)
 				// MUST NOT WRITE ANY ANSWER HERE ON FAIL: smarthttputils.HttpStatusXXX() as 401, 403, 429 because the smarthttputils.HttpAuthCheck() method manages 4xx-5xx codes directly if not success
@@ -543,6 +552,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			case 200:
 				smarthttputils.HttpStatus200(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
+			case 201:
+				smarthttputils.HttpStatus201(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
+				break
 			case 202:
 				smarthttputils.HttpStatus202(w, r, response.ContentBody, response.ContentFileName, response.ContentDisposition, response.CacheExpiration, response.CacheLastModified, response.CacheControl, response.Headers)
 				break
@@ -562,17 +574,21 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			case 302:
 				smarthttputils.HttpStatus302(w, r, response.ContentBody, isHtmlAnswer) // for 3xx the content is the redirect URL
 				break
+			// case 304 canno be handled here, this is a special case
 			//-- client errors
 			case 400:
 				smarthttputils.HttpStatus400(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 401:
 				if(response.ContentFileName == "@401.html") { // if the content filename is this, will reply with a custom HTML 401 Html Page ; ex: this is used for logout
-					smarthttputils.HttpHeaderAuthBasic(w, HTTP_AUTH_REALM)
+					smarthttputils.HttpHeaderAuthBasic(w, httpAuthRealm)
 					smarthttputils.HttpStatus401(w, r, response.ContentBody, isHtmlAnswer, true) // custom 401.html
 				} else {
 					smarthttputils.HttpStatus401(w, r, response.ContentBody, isHtmlAnswer, false)
 				} //end if else
+				break
+			case 402:
+				smarthttputils.HttpStatus402(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 403:
 				smarthttputils.HttpStatus403(w, r, response.ContentBody, isHtmlAnswer)
@@ -583,11 +599,29 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			case 405:
 				smarthttputils.HttpStatus405(w, r, response.ContentBody, isHtmlAnswer)
 				break
+			case 406:
+				smarthttputils.HttpStatus406(w, r, response.ContentBody, isHtmlAnswer)
+				break
+			case 408:
+				smarthttputils.HttpStatus408(w, r, response.ContentBody, isHtmlAnswer)
+				break
+			case 409:
+				smarthttputils.HttpStatus409(w, r, response.ContentBody, isHtmlAnswer)
+				break
 			case 410:
 				smarthttputils.HttpStatus410(w, r, response.ContentBody, isHtmlAnswer)
 				break
+			case 415:
+				smarthttputils.HttpStatus415(w, r, response.ContentBody, isHtmlAnswer)
+				break
 			case 422:
 				smarthttputils.HttpStatus422(w, r, response.ContentBody, isHtmlAnswer)
+				break
+			case 423:
+				smarthttputils.HttpStatus423(w, r, response.ContentBody, isHtmlAnswer)
+				break
+			case 424:
+				smarthttputils.HttpStatus424(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 429:
 				smarthttputils.HttpStatus429(w, r, response.ContentBody, isHtmlAnswer, false) // do not display captcha
@@ -607,6 +641,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				break
 			case 504:
 				smarthttputils.HttpStatus504(w, r, response.ContentBody, isHtmlAnswer)
+				break
+			case 507:
+				smarthttputils.HttpStatus507(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			//--
 			default: // fallback to 500

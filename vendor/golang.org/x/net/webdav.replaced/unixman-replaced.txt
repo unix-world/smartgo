@@ -1,4 +1,4 @@
-v.20241126
+v.20250105
 unixman:
     * replaced with: github.com/unix-world/smartgo/web/webdav
 

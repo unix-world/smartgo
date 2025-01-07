@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241221.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -244,7 +244,7 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 		if((crrRoute == webDavUrlPath()) || (crrRoute == webDavUrlPath()+"/")) {
 			auth401IsHtml = true // outputs HTML just for the entry route on WebDAV, otherwise outputs Text
 		} //end if
-		authErr, authData := smarthttputils.HttpAuthCheck(w, r, HTTP_AUTH_REALM, authUser, authPass, authToken, allowedIPs, customAuthCheck, auth401IsHtml) // {{{SMARTGO-WEB-SERVER-AUTH-SYNC}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
+		authErr, authData := smarthttputils.HttpAuthCheck(w, r, httpAuthRealm, authUser, authPass, authToken, allowedIPs, customAuthCheck, auth401IsHtml) // {{{SMARTGO-WEB-SERVER-AUTH-SYNC}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
 		if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
 			log.Println("[WARNING]", smart.CurrentFunctionName(), "WebDAV Service / Storage Area :: Authentication Failed:", "authData.OK:", authData.OK, "authData.ErrMsg:", authData.ErrMsg, "Error:", authErr)
 			// MUST NOT WRITE ANY ANSWER HERE ON FAIL: smarthttputils.HttpStatusXXX() as 401, 403, 429 because the smarthttputils.HttpAuthCheck() method manages 4xx-5xx codes directly if not success

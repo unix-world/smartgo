@@ -1,10 +1,10 @@
 package jwt
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"strings"
 	"time"
+	"encoding/base64"
+	"encoding/json"
 )
 
 // DecodePaddingAllowed will switch the codec used for decoding JWTs respectively. Note that the JWS RFC7515
@@ -115,17 +115,11 @@ func ParseWithClaims(tokenString string, claims Claims, keyFunc Keyfunc, options
 }
 
 // EncodeSegment encodes a JWT specific base64url encoding with padding stripped
-//
-// Deprecated: In a future release, we will demote this function to a non-exported function, since it
-// should only be used internally
 func EncodeSegment(seg []byte) string {
 	return base64.RawURLEncoding.EncodeToString(seg)
 }
 
 // DecodeSegment decodes a JWT specific base64url encoding with padding stripped
-//
-// Deprecated: In a future release, we will demote this function to a non-exported function, since it
-// should only be used internally
 func DecodeSegment(seg string) ([]byte, error) {
 	encoding := base64.RawURLEncoding
 

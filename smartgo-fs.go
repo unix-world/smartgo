@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241223.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -31,8 +31,8 @@ const (
 	CHOWN_FILES os.FileMode = 0644
 
 	//-- Cross Platform Safe Paths ; The following are disallowed in Windows paths: `< > : " / \ | ? *` ; also disallow SPACE because of the web context
-	REGEX_SAFE_PATH_NAME string 			= `^[_a-zA-Z0-9\-\.@#\/`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect)
-	REGEX_SAFE_FILE_NAME string 			= `^[_a-zA-Z0-9\-\.@#`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect) ; like above, just missing slash /
+	REGEX_SAFE_PATH_NAME string 			= `^[_a-zA-Z0-9\-\.@#\/`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect)
+	REGEX_SAFE_FILE_NAME string 			= `^[_a-zA-Z0-9\-\.@#`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect) ; like above, just missing slash /
 	//-- allow just: "_ a-z A-Z 0-9 - . @ # ` ~ ! $ % & ( ) ^ { } ' [ ] , ; +" ; for dir paths also allow "/"
 
 	//-- Web Ultra-Safe Paths (Smart)

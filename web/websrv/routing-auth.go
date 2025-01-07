@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Auth :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241221.2358 :: STABLE
+// r.20250107.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -26,8 +26,8 @@ type authStatusNfo struct {
 	AuthErrors 			string 				`json:"authErrors"`
 	AuthMethodID 		uint8  				`json:"authMethodId"`
 	AuthMethodName 		string 				`json:"authMethodName"`
-	AuthArea 			string 				`json:"authArea"`
 	AuthRealm 			string 				`json:"authRealm"`
+	AuthArea 			string 				`json:"authArea"`
 	AuthUserName 		string 				`json:"authUserName"`
 	AuthUserID 			string 				`json:"authUserId"`
 	AuthPassHash 		string              `json:"authPassHash"`
@@ -47,11 +47,12 @@ type authStatusNfo struct {
 type authMetaNfo struct {
 	Auth2FAEnabled 			bool   `json:"auth2FAEnabled"`
 	AuthBasicEnabled 		bool   `json:"authBasicEnabled"`
+	AuthTokenEnabled 		bool   `json:"authTokenEnabled"`
 	AuthCookieEnabled 		bool   `json:"authCookieEnabled"`
 	AuthBearerEnabled 		bool   `json:"authBearerEnabled"`
-	AuthTokenEnabled 		bool   `json:"authTokenEnabled"`
-	AuthSignedTokensType 	string `json:"authSignedTokensType,omitempty"`
-	AuthOpaqueTokensType 	string `json:"authOpaqueTokensType,omitempty"`
+	AuthApiKeyEnabled 		bool   `json:"authApikeyEnabled"`
+	AuthSignedTokensDefAlgo string `json:"authSignedTokensDefAlgo,omitempty"`
+	AuthOpaqueTokensDefAlgo string `json:"authOpaqueTokensDefAlgo,omitempty"`
 }
 
 type authNfo struct {
@@ -65,8 +66,8 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 	//--
 	// routes:
 	// 			/auth
-	// 			/auth/2fatotp
-	// 			/auth/jwt
+	// 			/auth/2fatotp 	; req. Area=DEFAULT
+	// 			/auth/jwt 		; req. Area=DEFAULT
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
@@ -87,7 +88,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 	//--
 	var jwtSignMethod string = AuthTokenJwtAlgoGet()
 	//--
-	switch(subRoute) { // must be as: `/auth` | `/auth/2fatotp` | `auth/jwt` | `auth/jwt?expMinutes=2880`
+	switch(subRoute) { // must be as: `/auth` | `/auth/2fatotp` | `auth/jwt` ; `auth/jwt?expMinutes=2880`
 		case "": // OK: handle: `/auth`
 			if((!IsAjaxRequest(r)) && (RequestHaveQueryString(r))) { // dissalow query string, except ajax requests (ex: jQuery) which are appending a query string like `?12345` (timestamp) to the url get redirected with 302 before going to the route ...
 				response.StatusCode = 302
@@ -112,7 +113,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				tkOpqTyp = smart.OPAQUE_TOKEN_FULL_NAME
 			} //end if
 			var errUserAuth string = authData.ErrMsg
-			if(smart.AuthIsValidUserName(authData.UserName) != true) {
+			if(smart.AuthIsValidExtUserName(authData.UserName) != true) { // must validate also extended usernames
 				errUserAuth = smart.StrTrimWhitespaces("ERR: UserName is Empty ; " + errUserAuth)
 			} //end if
 			var thePassHash string = authData.PassHash
@@ -124,21 +125,22 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				} //end if
 			} //end if
 			metaInfo := authMetaNfo{
-				Auth2FAEnabled: 		smart.Auth2FACookieIsEnabled(),
-				AuthBasicEnabled: 		smart.AuthBasicIsEnabled(),
-				AuthCookieEnabled: 		smart.AuthCookieIsEnabled(),
-				AuthBearerEnabled: 		smart.AuthBearerIsEnabled(),
-				AuthTokenEnabled: 		smart.AuthTokenIsEnabled(),
-				AuthSignedTokensType: 	tkTyp,
-				AuthOpaqueTokensType: 	tkOpqTyp,
+				Auth2FAEnabled: 			smart.Auth2FACookieIsEnabled(),
+				AuthBasicEnabled: 			smart.AuthBasicIsEnabled(),
+				AuthTokenEnabled: 			smart.AuthTokenIsEnabled(),
+				AuthCookieEnabled: 			smart.AuthCookieIsEnabled(),
+				AuthBearerEnabled: 			smart.AuthBearerIsEnabled(),
+				AuthApiKeyEnabled: 			smart.AuthApikeyIsEnabled(),
+				AuthSignedTokensDefAlgo: 	tkTyp,
+				AuthOpaqueTokensDefAlgo: 	tkOpqTyp,
 			}
 			status := authStatusNfo{
 				Authenticated: authData.OK,
 				AuthErrors: errUserAuth,
 				AuthMethodID: authData.Method,
 				AuthMethodName: "Auth:" + smart.AuthMethodGetNameById(authData.Method),
-				AuthArea: authData.Area,
 				AuthRealm: authData.Realm,
+				AuthArea: authData.Area,
 				AuthUserName: authData.UserName,
 				AuthUserID: authData.UserID,
 				AuthPassHash: thePassHash,
@@ -203,7 +205,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			} //end if
 			if(authData.OK != true) {
 				response.StatusCode = 403
-				response.LogMessage = "Authentication is Required for this Area"
+				response.LogMessage = "Authentication is Required for this URL"
 				response.ContentBody = response.LogMessage
 				response.ContentFileName = "403.html"
 				return
@@ -217,8 +219,20 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			} //end if
 		//	if(authData.Method < 1) { // req. at least one valid auth method (min 1) ; see smart.see: HTTP_AUTH_MODE_*
 			if((authData.Method != smart.HTTP_AUTH_MODE_BASIC) && (authData.Method != smart.HTTP_AUTH_MODE_COOKIE)) { // alow just Auth Basic and Cookie, they have also 2FA if enabled
+				response.StatusCode = 406
+				response.ContentBody = "Authentication Method is Not Accepted for this URL: [" + smart.ConvertUInt8ToStr(authData.Method) + "] / [Auth:" + smart.AuthMethodGetNameById(authData.Method) + "]"
+				response.ContentFileName = "406.html"
+				return
+			} //end if
+			if(authData.Area != smart.HTTP_AUTH_DEFAULT_AREA) {
+				response.StatusCode = 424
+				response.ContentBody = "Authentication Area is Not Accepted for this URL"
+				response.ContentFileName = "424.html"
+				return
+			} //end if
+			if(smart.AuthSafeTestPrivsRestr(authData.Privileges, smart.HTTP_AUTH_ADMIN_PRIV) != true) {
 				response.StatusCode = 403
-				response.ContentBody = "Authentication Method is Not Accepted for this Area: [" + smart.ConvertUInt8ToStr(authData.Method) + "] / [Auth:" + smart.AuthMethodGetNameById(authData.Method) + "]"
+				response.ContentBody = "Authentication Privileges are Not Accepted for this URL"
 				response.ContentFileName = "403.html"
 				return
 			} //end if
@@ -234,6 +248,19 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "422.html"
 				return
 			} //end if
+			basedom, dom, port, errDomPort := GetBaseDomainDomainPort(r)
+			if(errDomPort != nil) {
+				response.StatusCode = 502
+				response.ContentBody = "Authentication Domain:Port Failed: `" + errDomPort.Error() +  "`"
+				response.ContentFileName = "502.html"
+				return
+			} //end if
+			if((basedom == "") || (dom == "") || (port == "")) {
+				response.StatusCode = 502
+				response.ContentBody = "Authentication Domain:Port is Invalid: `" + dom + ":" + port + "` ; base domain is: `" + basedom + "`"
+				response.ContentFileName = "502.html"
+				return
+			} //end if
 			rndSecret, totp, errTotp := Get2FATotp("") // random secret
 			if((totp == nil) || (errTotp != nil)) {
 				response.StatusCode = 500
@@ -244,7 +271,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "500.html"
 				return
 			} //end if
-			var qrUrl string = totp.GenerateBarcodeUrl(authData.UserName, "SmartGoOTP2FA")
+			var qrUrl string = totp.GenerateBarcodeUrl(authData.UserName, basedom)
 			//totpNum := totp.Now() // totp.At(time.Now().Unix())
 			//var totpVfy bool = totp.Verify(totpNum, time.Now().Unix())
 			svgQR, errSvgQR := qrsvg.New(qrUrl, "M", "#685A8B", "none", true, 4, 2) // use `none` instead of `#FFFFFF` for transparent background
@@ -279,7 +306,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				return
 			} //end if
 			if(authData.OK != true) {
-				response.LogMessage = "Authentication is Required for this Area"
+				response.LogMessage = "Authentication is Required for this URL"
 				response.ContentBody = ResponseApiJsonERR(403, response.LogMessage, nil)
 				return
 			} //end if
@@ -290,7 +317,15 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			} //end if
 		//	if(authData.Method < 1) { // req. at least one valid auth method (min 1) ; see smart.see: HTTP_AUTH_MODE_*
 			if((authData.Method != smart.HTTP_AUTH_MODE_BASIC) && (authData.Method != smart.HTTP_AUTH_MODE_COOKIE) && (authData.Method != smart.HTTP_AUTH_MODE_BEARER)) { // alow just: Auth Basic, Cookie, Bearer ; the first two may have also 2FA if enabled, and the last one must be able to re-generate the token before expiration
-				response.ContentBody = ResponseApiJsonERR(403, "Authentication Method is Not Accepted for this Area: [" + smart.ConvertUInt8ToStr(authData.Method) + "] / [Auth:" + smart.AuthMethodGetNameById(authData.Method) + "]", nil)
+				response.ContentBody = ResponseApiJsonERR(406, "Authentication Method is Not Accepted for this URL: [" + smart.ConvertUInt8ToStr(authData.Method) + "] / [Auth:" + smart.AuthMethodGetNameById(authData.Method) + "]", nil)
+				return
+			} //end if
+			if(authData.Area != smart.HTTP_AUTH_DEFAULT_AREA) {
+				response.ContentBody = ResponseApiJsonERR(424, "Authentication Area is Not Accepted for this URL", nil)
+				return
+			} //end if
+			if(smart.AuthSafeTestPrivsRestr(authData.Privileges, smart.HTTP_AUTH_DEFAULT_PRIV) != true) {
+				response.ContentBody = ResponseApiJsonERR(403, "Authentication Privileges are Not Accepted for this URL", nil)
 				return
 			} //end if
 			if(AuthTokenJwtIsEnabled() != true) {
@@ -306,7 +341,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				return
 			} //end if
 			if(smart.AuthIsValidPrivKey(authData.PrivKey) != true) {
-				response.ContentBody = ResponseApiJsonERR(422, "Authenticated User`s Private Key is Empty or Invalid: [" + smart.ConvertIntToStr(len(authData.PrivKey)) + " bytes]", nil)
+				response.ContentBody = ResponseApiJsonERR(409, "Authenticated User`s Private Key is Empty or Invalid: [" + smart.ConvertIntToStr(len(authData.PrivKey)) + " bytes]", nil)
 				return
 			} //end if
 			//--
@@ -329,7 +364,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				return
 			} //end if
 			//--
-			data, errData := JwtNew(jwtSignMethod, expMinutes, dom, port, authData.UserName, authData.PrivKey)
+			data, errData := JwtNew(jwtSignMethod, expMinutes, dom, port, authData.UserName, authData.PrivKey, nil)
 			if(errData != nil) {
 				response.ContentBody = ResponseApiJsonERR(500, "JWT ERR: " + errData.Error(), nil)
 				return
