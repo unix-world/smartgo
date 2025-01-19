@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / JWT :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -17,14 +17,14 @@ import (
 
 
 const (
-	JwtDefaultExpirationMinutes int64 = 60 * 24
-	JwtMaxExpirationMinutes 	int64 = 60 * 24 * 365
-	JwtMinExpirationMinutes 	int64 = 1
+	JwtDefaultExpirationMinutes int64 = 60 * 24 		//   1440 m =   1 d
+	JwtMaxExpirationMinutes 	int64 = 60 * 24 * 360 	// 518400 m = 360 d
+	JwtMinExpirationMinutes 	int64 = 1 				//      1 m
 
-	JwtMinLength 				uint16 = 128
-	JwtMaxLength 				uint16 = 768
+	JwtMinLength 				uint16 =  128 			// {{{SYNC-AUTH-JWT-MIN-ALLOWED-LEN}}}
+	JwtMaxLength 				uint16 = 1280 			// {{{SYNC-AUTH-JWT-MAX-ALLOWED-LEN}}}
 
-	JwtRegexSerial 				string = `^[A-Z0-9]{10}$`
+	JwtRegexSerial 				string = `^[A-Z0-9]{10}\-[A-Z0-9]{10}$`
 )
 
 var (
@@ -47,14 +47,27 @@ type JwtData struct {
 	MetaInfo 	JwtClaims 	`json:"metaInfo"`
 }
 
-
 type JwtTokenData struct {
-	Error       error
-	Type       string
-	Algo       string
-	ID         string
-	UserName   string
-	Audience []string
+	Error      error  `json:"error,omitempty"`
+	Type       string `json:"-"`
+	Algo       string `json:"algo"`
+	ID         string `json:"serial,omitempty"`
+	Issuer     string `json:"issuer,omitempty"`
+	Created    string `json:"created,omitempty"`
+	ICreated   int64  `json:"-"`
+	IExpires   int64  `json:"-"`
+	Expires    string `json:"expires,omitempty"`
+	UserName   string `json:"userName"`
+	Audience []string `json:"audience"`
+}
+
+type JwtAudience struct {
+	Error        error
+	IpList       string
+	Area         string
+	Privileges   string
+	Restrictions string
+	Xtras        string
 }
 
 //-----
@@ -78,6 +91,10 @@ func JwtExtractData(tokenString string) JwtTokenData {
 	} //end if
 	if(len(tokenString) > int(JwtMaxLength)) {
 		jwtData.Error = smart.NewError("Token is Too Long")
+		return jwtData
+	} //end if
+	if(!smart.StrRegexMatch(smart.REGEX_SAFE_B64S_STR, tokenString)) {
+		jwtData.Error = smart.NewError("Token Contains Invalid Characters")
 		return jwtData
 	} //end if
 	//--
@@ -139,7 +156,7 @@ func JwtExtractData(tokenString string) JwtTokenData {
 	gjsonObj := smart.JsonGetValueByKeyPath(jsonPartTxt, "")
 	//--
 	var serial string = smart.StrTrimWhitespaces(gjsonObj.Get("jti").String())
-	if((serial == "") || (len(serial) != 10) || (!smart.StrRegexMatch(JwtRegexSerial, serial))) {
+	if((serial == "") || (len(serial) != 21) || (!smart.StrRegexMatch(JwtRegexSerial, serial))) { // {{{SYNC-JWT-SMART-SERIAL-VALIDATION}}}
 		jwtData.Error = smart.NewError("Token Data contains an Invalid Serial")
 		return jwtData
 	} //end if
@@ -151,33 +168,29 @@ func JwtExtractData(tokenString string) JwtTokenData {
 			audience = append(audience, arrAudience[i].String())
 		} //end for
 	} //end if
-	if(len(audience) != 3) {
-		jwtData.Error = smart.NewError("Token Data contains an Invalid Audience")
+	jwtAudience := JwtParseAudience(audience)
+	if(jwtAudience.Error != nil) {
+		jwtData.Error = smart.NewError("Token Data contains an Invalid Audience: " + jwtAudience.Error.Error())
 		return jwtData
 	} //end if
-	if((!smart.StrStartsWith(audience[0], "A:")) || (len(audience[0]) < 3)) { // area
-		jwtData.Error = smart.NewError("Token Data contains Invalid Audience Area")
+	var isDefaultArea bool = JwtAudienceIsDefaultArea(jwtAudience)
+	//--
+	var issuer string = smart.StrTrimWhitespaces(gjsonObj.Get("iss").String())
+	if(issuer == "") {
+		jwtData.Error = smart.NewError("Token Data contains an Empty Issuer")
 		return jwtData
 	} //end if
-	if((!smart.StrStartsWith(audience[1], "P:")) || (len(audience[1]) < 3)) { // privileges
-		jwtData.Error = smart.NewError("Token Data contains Invalid Audience Privileges")
-		return jwtData
+	//--
+	var created string = ""
+	var createdAt int64 = gjsonObj.Get("iat").Int()
+	if(createdAt > 0) {
+		created = smart.DateFromUnixTimeUtc(createdAt)
 	} //end if
-	if((!smart.StrStartsWith(audience[2], "R:")) || (len(audience[2]) < 3)) { // restrictions
-		jwtData.Error = smart.NewError("Token Data contains Invalid Audience Restrictions")
-		return jwtData
-	} //end if
-	var isDefaultArea bool = false
-	if(audience[0] == "A:@") {
-		if(audience[1] != "P:@") {
-			jwtData.Error = smart.NewError("Token Data contains Wrong Audience Privileges")
-			return jwtData
-		} //end if
-		if(audience[2] != "R:@") {
-			jwtData.Error = smart.NewError("Token Data contains Wrong Audience Restrictions")
-			return jwtData
-		} //end if
-		isDefaultArea = true
+	//--
+	var expires string = ""
+	var expireAt int64 = gjsonObj.Get("exp").Int()
+	if(expireAt > 0) {
+		expires = smart.DateFromUnixTimeUtc(expireAt)
 	} //end if
 	//--
 	var userName string = smart.StrTrimWhitespaces(gjsonObj.Get("usr").String())
@@ -194,6 +207,11 @@ func JwtExtractData(tokenString string) JwtTokenData {
 	//--
 	jwtData.Error = nil
 	jwtData.ID = serial
+	jwtData.Issuer = issuer
+	jwtData.Created = created
+	jwtData.ICreated = createdAt
+	jwtData.IExpires = expireAt
+	jwtData.Expires = expires
 	jwtData.UserName = userName
 	jwtData.Audience = audience
 	//--
@@ -204,20 +222,20 @@ func JwtExtractData(tokenString string) JwtTokenData {
 } //END FUNCTION
 
 
-func JwtVerifyWithUserPrivKey(tokenString string, jwtSignMethod string, dom string, port string, userName string, userPrivKey string) error {
+func JwtVerifyWithUserPrivKey(tokenString string, jwtSignMethod string, clientIP string, dom string, port string, userName string, userPrivKey string) error {
 	//--
 	defer smart.PanicHandler() // req. by base64 decode, inside JWT with malformed data
 	//-- works for both: Ed* and HS*
-	return jwtVerify(tokenString, jwtSignMethod, dom, port, userName, userPrivKey, "")
+	return jwtVerify(tokenString, jwtSignMethod, clientIP, dom, port, userName, userPrivKey, "")
 	//--
 } //END FUNCTION
 
 
-func JwtVerifyWithPublicKey(tokenString string, jwtSignMethod string, dom string, port string, userName string, publicKey string) error {
+func JwtVerifyWithPublicKey(tokenString string, jwtSignMethod string, clientIP string, dom string, port string, userName string, publicKey string) error {
 	//--
 	defer smart.PanicHandler() // req. by base64 decode, inside JWT with malformed data
 	//-- works just for: Ed*
-	return jwtVerify(tokenString, jwtSignMethod, dom, port, userName, "", publicKey)
+	return jwtVerify(tokenString, jwtSignMethod, clientIP, dom, port, userName, "", publicKey)
 	//--
 } //END FUNCTION
 
@@ -229,17 +247,168 @@ func JwtGetFullNameSigningAlgo(jwtSignMethod string) string {
 } //END FUNCTION
 
 
-func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port string, userName string, userPrivKey string, audience []string) (JwtData, error) {
+func JwtNewAudience(ipList string, area string, privs string, restr string, cliSign string) []string {
+	//--
+	ipList = smart.StrTrimWhitespaces(ipList)
+	if(ipList != "") {
+		if(ipList != "*") { // validate, except wildcard
+			errValidateAllowedIpList := smart.ValidateIPAddrList(ipList) // verify the IP list and if invalid make it empty as invalid !
+			if(errValidateAllowedIpList != nil) {
+				ipList = "" // set to empty, as invalid !
+			} //end if
+		} //end if
+	} //end if
+	//--
+	area = smart.StrTrimWhitespaces(area)
+	privs = smart.StrTrimWhitespaces(privs)
+	restr = smart.StrTrimWhitespaces(restr)
+	cliSign = smart.StrTrimWhitespaces(cliSign)
+	//--
+	audience := []string{
+		"I:" + ipList,  // ip address (list): any = * ; or: <127.0.0.1>,<::1>
+		"A:" + area,    // area: default = @
+		"P:" + privs,   // privileges: default = @
+		"R:" + restr,   // restrictions: default = @
+		"X:" + cliSign, // xtras: none = - ; this is a custom field to be used for external validations (ex: cookie bind to cli/browser signature)
+	}
+	//--
+	return audience
+	//--
+} //END FUNCTION
+
+
+func JwtParseAudience(audience []string) JwtAudience {
+	//--
+	jwtAudience := JwtAudience{}
+	//--
+	if(audience == nil) {
+		jwtAudience.Error = smart.NewError("Is Null")
+		return jwtAudience
+	} //end if
+	if(len(audience) != 5) {
+		jwtAudience.Error = smart.NewError("Size is Invalid")
+		return jwtAudience
+	} //end if
+	//--
+	if((!smart.StrStartsWith(audience[0], "I:")) || (len(audience[0]) < 3)) { // ip list
+		jwtAudience.Error = smart.NewError("IP List is Invalid")
+		return jwtAudience
+	} //end if
+	if((!smart.StrStartsWith(audience[1], "A:")) || (len(audience[1]) < 3)) { // area
+		jwtAudience.Error = smart.NewError("Area is Invalid")
+		return jwtAudience
+	} //end if
+	if((!smart.StrStartsWith(audience[2], "P:")) || (len(audience[2]) < 3)) { // privileges
+		jwtAudience.Error = smart.NewError("Privileges are Invalid")
+		return jwtAudience
+	} //end if
+	if((!smart.StrStartsWith(audience[3], "R:")) || (len(audience[3]) < 3)) { // restrictions
+		jwtAudience.Error = smart.NewError("Restrictions are Invalid")
+		return jwtAudience
+	} //end if
+	if((!smart.StrStartsWith(audience[4], "X:")) || (len(audience[4]) < 3)) { // xtras
+		jwtAudience.Error = smart.NewError("Xtras are Invalid")
+		return jwtAudience
+	} //end if
+	//--
+	jwtAudience.IpList       = smart.StrTrimWhitespaces(smart.StrSubstr(audience[0], 2, 0))
+	jwtAudience.Area         = smart.StrTrimWhitespaces(smart.StrSubstr(audience[1], 2, 0))
+	jwtAudience.Privileges   = smart.StrTrimWhitespaces(smart.StrSubstr(audience[2], 2, 0))
+	jwtAudience.Restrictions = smart.StrTrimWhitespaces(smart.StrSubstr(audience[3], 2, 0))
+	jwtAudience.Xtras        = smart.StrTrimWhitespaces(smart.StrSubstr(audience[4], 2, 0))
+	//--
+	if(jwtAudience.IpList == "") {
+		jwtAudience.Error = smart.NewError("IP List is Empty")
+		return jwtAudience
+	} //end if
+	if(jwtAudience.Area == "") {
+		jwtAudience.Error = smart.NewError("Area is Empty")
+		return jwtAudience
+	} //end if
+	if(jwtAudience.Privileges == "") {
+		jwtAudience.Error = smart.NewError("Privileges are Empty")
+		return jwtAudience
+	} //end if
+	if(jwtAudience.Restrictions == "") {
+		jwtAudience.Error = smart.NewError("Restrictions are Empty")
+		return jwtAudience
+	} //end if
+	if(jwtAudience.Xtras == "") {
+		jwtAudience.Error = smart.NewError("Xtras are Empty")
+		return jwtAudience
+	} //end if
+	//--
+	if((len(jwtAudience.IpList) == 1) && (jwtAudience.IpList != "*")) {
+		jwtAudience.Error = smart.NewError("IP List Def. is Invalid")
+		return jwtAudience
+	} //end if
+	if((len(jwtAudience.Area) == 1) && (jwtAudience.Area != "@")) {
+		jwtAudience.Error = smart.NewError("Area Def. is Invalid")
+		return jwtAudience
+	} //end if
+	if((len(jwtAudience.Privileges) == 1) && (jwtAudience.Privileges != "@")) {
+		jwtAudience.Error = smart.NewError("Privileges Def. are Invalid")
+		return jwtAudience
+	} //end if
+	if((len(jwtAudience.Restrictions) == 1) && (jwtAudience.Restrictions != "@")) {
+		jwtAudience.Error = smart.NewError("Restrictions Def. are Invalid")
+		return jwtAudience
+	} //end if
+	// do not check for jwtAudience.Xtras ; may contain: - / + ...
+	//--
+	return jwtAudience
+	//--
+} //END FUNCTION
+
+
+func JwtAudienceIsDefaultArea(jwtAudience JwtAudience) bool {
+	//--
+	var isDefaultArea bool = false
+	if(jwtAudience.Area == "@") { // for default area
+		isDefaultArea = true
+	} //end if
+	//--
+	return isDefaultArea
+	//--
+} //END FUNCTION
+
+
+func JwtAudienceIsDefaultPrivs(jwtAudience JwtAudience) bool {
+	//--
+	var isDefaultPrivs bool = false
+	if(jwtAudience.Privileges == "@") { // for default privileges
+		isDefaultPrivs = true
+	} //end if
+	//--
+	return isDefaultPrivs
+	//--
+} //END FUNCTION
+
+
+func JwtAudienceIsDefaultRestr(jwtAudience JwtAudience) bool {
+	//--
+	var isDefaultRestr bool = false
+	if(jwtAudience.Restrictions == "@") { // for default restrictions
+		isDefaultRestr = true
+	} //end if
+	//--
+	return isDefaultRestr
+	//--
+} //END FUNCTION
+
+
+func JwtNew(jwtSignMethod string, expirationMinutes int64, clientIP string, dom string, port string, userName string, userPrivKey string, audience []string) (JwtData, error) {
 	//--
 	defer smart.PanicHandler() // req. by base64 decode, inside JWT with malformed data
 	//--
-	if(expirationMinutes < JwtMinExpirationMinutes) {
-		expirationMinutes = JwtMinExpirationMinutes // disallow no-expiration JWT Tokens, where expire is zero
-	} else if(expirationMinutes > JwtMaxExpirationMinutes) {
-		expirationMinutes = JwtMaxExpirationMinutes
-	} //end if
-	//--
 	noData := JwtData{}
+	//--
+	if(expirationMinutes < JwtMinExpirationMinutes) {
+		return noData, smart.NewError("Expiration Minutes is Lower than Minimum Allowed")
+	} //end if
+	if(expirationMinutes > JwtMaxExpirationMinutes) {
+		return noData, smart.NewError("Expiration Minutes is Higher than Maximum Allowed")
+	} //end if
 	//--
 	secKey, secErr := smart.AppGetSecurityKey()
 	if(secErr != nil) {
@@ -247,6 +416,13 @@ func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port stri
 	} //end if
 	if(smart.StrTrimWhitespaces(secKey) == "") {
 		return noData, smart.NewError("App Security Key is Empty")
+	} //end if
+	//--
+	clientIP = smart.StrTrimWhitespaces(clientIP)
+	if(clientIP != "*") { // {{{SYNC-JWT-CLIENT-IP-WILDCARD}}} ; if wildcard, it is mandatory below the audience to be wildcard, else error
+		if((clientIP == "") || (!smart.IsNetValidIpAddr(clientIP))) {
+			return noData, smart.NewError("Invalid Client IP Address (required for the JWT verification process, after the JWT token is created)")
+		} //end if
 	} //end if
 	//--
 	dom = smart.StrTrimWhitespaces(dom)
@@ -263,34 +439,31 @@ func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port stri
 	} //end if
 	//--
 	if((audience == nil) || (len(audience) <= 0)) {
-		audience = []string{
-			"A:@", // area
-			"P:@", // privileges
-			"R:@", // restrictions
-		}
+		audience = JwtNewAudience("*", "@", "@", "@", "-")
 	} //end if
-	if(len(audience) != 3) {
-		return noData, smart.NewError("Audience Size is Invalid")
+	jwtAudience := JwtParseAudience(audience)
+	if(jwtAudience.Error != nil) {
+		return noData, smart.NewError("Audience ERR: " + jwtAudience.Error.Error())
 	} //end if
-	if((!smart.StrStartsWith(audience[0], "A:")) || (len(audience[0]) < 3)) { // area
-		return noData, smart.NewError("Audience Area is Invalid")
-	} //end if
-	if((!smart.StrStartsWith(audience[1], "P:")) || (len(audience[1]) < 3)) { // privileges
-		return noData, smart.NewError("Audience Privileges are Invalid")
-	} //end if
-	if((!smart.StrStartsWith(audience[2], "R:")) || (len(audience[2]) < 3)) { // restrictions
-		return noData, smart.NewError("Audience Restrictions are Invalid")
-	} //end if
-	var isDefaultArea bool = false
-	if(audience[0] == "A:@") {
-		if(audience[1] != "P:@") {
-			return noData, smart.NewError("Audience Privileges are Wrong")
+	if(clientIP == "*") { // {{{SYNC-JWT-CLIENT-IP-WILDCARD}}}
+		if(jwtAudience.IpList != "*") {
+			return noData, smart.NewError("If the client IP is wildcard, the Audience IP List must be wildcard")
 		} //end if
-		if(audience[2] != "R:@") {
-			return noData, smart.NewError("Audience Restrictions are Wrong")
-		} //end if
-		isDefaultArea = true
 	} //end if
+	if(smart.StrTrimWhitespaces(jwtAudience.IpList) == "") {
+		return noData, smart.NewError("The Audience IP List is Empty")
+	} //end if
+	if(jwtAudience.IpList != "*") {
+		errValidateAllowedIpList := smart.ValidateIPAddrList(jwtAudience.IpList) // {{{SYNC-VALIDATE-IP-LIST-BEFORE-VERIFY-IP}}}
+		if(errValidateAllowedIpList != nil) {
+			return noData, smart.NewError("The Audience IP List is Invalid, ERR: " + errValidateAllowedIpList.Error())
+		} //end if
+		if(!smart.StrIContains(jwtAudience.IpList, "<"+clientIP+">")) { // {{{SYNC-VALIDATE-IP-IN-A-LIST}}} ; case insensitive to cover also all Ipv4 and IPv6 (upper or lowercase)
+			//log.Println("[DEBUG]", smart.CurrentFunctionName(), "#", "IP List:", jwtAudience.IpList, "does not contain:", clientIP)
+			return noData, smart.NewError("Audience IP List is Invalid, does not contain the given IP Address")
+		} //end if
+	} //end if
+	var isDefaultArea bool = JwtAudienceIsDefaultArea(jwtAudience)
 	//--
 	userName = smart.StrTrimWhitespaces(userName)
 	if(userName == "") {
@@ -324,7 +497,7 @@ func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port stri
 	timeNow := time.Now().UTC() // {{{SYNC-SMART-JWT-UTC-TIME}}}
 	expirationTime := timeNow.Add(time.Duration(expirationMinutes) * time.Minute)
 	//--
-	var serial string = uid.Uuid10Seq()
+	var serial string = smart.StrRev(uid.Uuid10Seq()) + "-" + uid.Uuid10Num()
 	//--
 	var chksum string = smart.Base64sEncode(smart.NULL_BYTE + userName + smart.BACK_SPACE + serial + smart.ASCII_BELL + smart.ConvertInt64ToStr(expirationTime.Unix()) + smart.VERTICAL_TAB + smart.ConvertInt64ToStr(timeNow.Unix()) + smart.FORM_FEED + issuer + smart.NULL_BYTE + smart.Implode(smart.INVALID_CHARACTER, audience) + smart.BACK_SPACE + secKey + smart.NULL_BYTE)
 	var subject string = smart.Crc32bB36(chksum) + "-" + smart.Crc32bB36(smart.StrRev(chksum))
@@ -457,13 +630,13 @@ func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port stri
 	} //end if
 	//--
 	if(havePublicKey == true) {
-		errVfyWithPubKey := JwtVerifyWithPublicKey(tokenString, jwtSignMethod, dom, port, userName, publicKey) // verify using the current Public Key
+		errVfyWithPubKey := JwtVerifyWithPublicKey(tokenString, jwtSignMethod, clientIP, dom, port, userName, publicKey) // verify using the current Public Key
 		if(errVfyWithPubKey != nil) {
 			return noData, errVfyWithPubKey
 		} //end if
 	} //end if
 	//--
-	errVfyWithoutPubKey := JwtVerifyWithUserPrivKey(tokenString, jwtSignMethod, dom, port, userName, userPrivKey) // verify only by secret, Public Key will be derived
+	errVfyWithoutPubKey := JwtVerifyWithUserPrivKey(tokenString, jwtSignMethod, clientIP, dom, port, userName, userPrivKey) // verify only by secret, Public Key will be derived
 	if(errVfyWithoutPubKey != nil) {
 		return noData, errVfyWithoutPubKey
 	} //end if
@@ -484,7 +657,7 @@ func JwtNew(jwtSignMethod string, expirationMinutes int64, dom string, port stri
 } //END FUNCTION
 
 
-func jwtVerify(tokenString string, jwtSignMethod string, dom string, port string, userName string, userPrivKey string, publicKey string) error {
+func jwtVerify(tokenString string, jwtSignMethod string, clientIP string, dom string, port string, userName string, userPrivKey string, publicKey string) error {
 	//--
 	// publicKey is required just for Ed* ; should be empty for HS*
 	//--
@@ -507,6 +680,16 @@ func jwtVerify(tokenString string, jwtSignMethod string, dom string, port string
 	} //end if
 	if(len(tokenString) > int(JwtMaxLength)) {
 		return smart.NewError("Token is Too Long")
+	} //end if
+	if(!smart.StrRegexMatch(smart.REGEX_SAFE_B64S_STR, tokenString)) {
+		return smart.NewError("Token Contains Invalid Characters")
+	} //end if
+	//--
+	clientIP = smart.StrTrimWhitespaces(clientIP)
+	if(clientIP != "*") { // {{{SYNC-JWT-CLIENT-IP-WILDCARD}}} ; if wildcard, it is mandatory below the audience to be wildcard, else error
+		if((clientIP == "") || (!smart.IsNetValidIpAddr(clientIP))) {
+			return smart.NewError("Invalid Client IP Address for Verification")
+		} //end if
 	} //end if
 	//--
 	dom = smart.StrTrimWhitespaces(dom)
@@ -715,28 +898,31 @@ func jwtVerify(tokenString string, jwtSignMethod string, dom string, port string
 	} //end if
 	//--
 	var audience []string = clms.RegisteredClaims.Audience
-	if(len(audience) != 3) {
-		return smart.NewError("Token Audience is Invalid")
+	//log.Println("[DEBUG]", smart.CurrentFunctionName(), "#", "audience:", audience, "clientIP:", clientIP, "user:", clms.Username)
+	jwtAudience := JwtParseAudience(audience)
+	if(jwtAudience.Error != nil) {
+		return smart.NewError("Token Audience ERR: " + jwtAudience.Error.Error())
 	} //end if
-	if((!smart.StrStartsWith(audience[0], "A:")) || (len(audience[0]) < 3)) { // area
-		return smart.NewError("Token Audience Area is Invalid")
-	} //end if
-	if((!smart.StrStartsWith(audience[1], "P:")) || (len(audience[1]) < 3)) { // privileges
-		return smart.NewError("Token Audience Privileges are Invalid")
-	} //end if
-	if((!smart.StrStartsWith(audience[2], "R:")) || (len(audience[2]) < 3)) { // restrictions
-		return smart.NewError("Token Audience Restrictions are Invalid")
-	} //end if
-	var isDefaultArea bool = false
-	if(audience[0] == "A:@") {
-		if(audience[1] != "P:@") {
-			return smart.NewError("Token Audience Privileges are Wrong")
+	if(clientIP == "*") { // {{{SYNC-JWT-CLIENT-IP-WILDCARD}}}
+		if(jwtAudience.IpList != "*") {
+			return smart.NewError("If the client IP is wildcard, the Audience IP List must be wildcard")
 		} //end if
-		if(audience[2] != "R:@") {
-			return smart.NewError("Token Audience Restrictions are Wrong")
-		} //end if
-		isDefaultArea = true
 	} //end if
+	if(smart.StrTrimWhitespaces(jwtAudience.IpList) == "") {
+		return smart.NewError("The Audience IP List is Empty")
+	} //end if
+	if(jwtAudience.IpList != "*") {
+		errValidateAllowedIpList := smart.ValidateIPAddrList(jwtAudience.IpList) // {{{SYNC-VALIDATE-IP-LIST-BEFORE-VERIFY-IP}}}
+		if(errValidateAllowedIpList != nil) {
+			return smart.NewError("The Audience IP List is Invalid, ERR: " + errValidateAllowedIpList.Error())
+		} //end if
+		if(!smart.StrIContains(jwtAudience.IpList, "<"+clientIP+">")) { // {{{SYNC-VALIDATE-IP-IN-A-LIST}}} ; case insensitive to cover also all Ipv4 and IPv6 (upper or lowercase)
+			//log.Println("[DEBUG]", smart.CurrentFunctionName(), "#", "IP List:", jwtAudience.IpList, "does not contain:", clientIP)
+			return smart.NewError("Token is Invalid, does not contain the required Client IP Address")
+		} //end if
+		log.Println("[NOTICE]", smart.CurrentFunctionName(), "# IP Restricted JWT [VALID:IP] #", "audience:", audience, "clientIP:", clientIP, "user:", clms.Username)
+	} //end if
+	var isDefaultArea bool = JwtAudienceIsDefaultArea(jwtAudience)
 	//--
 	if(smart.AuthSafeCompare(clms.Username, userName) != true) { // {{{SYNC-HTTP-AUTH-CHECKS-GO-SMART}}}
 		return smart.NewError("Token UserName MisMatch: `" + clms.Username + "` ; `" + userName + "`")
@@ -750,7 +936,7 @@ func jwtVerify(tokenString string, jwtSignMethod string, dom string, port string
 		} //end if
 	} //end if
 	//--
-	if((clms.RegisteredClaims.ID == "") || (len(clms.RegisteredClaims.ID) != 10) || (!smart.StrRegexMatch(JwtRegexSerial, clms.RegisteredClaims.ID))) {
+	if((clms.RegisteredClaims.ID == "") || (len(clms.RegisteredClaims.ID) != 21) || (!smart.StrRegexMatch(JwtRegexSerial, clms.RegisteredClaims.ID))) { // {{{SYNC-JWT-SMART-SERIAL-VALIDATION}}}
 		return smart.NewError("Token have an Invalid Serial")
 	} //end if
 	//--

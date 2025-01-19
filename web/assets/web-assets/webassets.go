@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20250107.2358"
+	VERSION string = "r.20250118.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2025-01-07 00:07:28" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2025-01-18 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
@@ -285,45 +285,45 @@ func ReadWebAsset(path string) string { // OK
 	defer smart.PanicHandler()
 	//--
 	if(DEBUG == true) {
-		log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Trying to Read the Asset: `" + path + "` ...")
+		log.Println("[DEBUG]", smart.CurrentFunctionName(), "# Trying to Read the Asset: `" + path + "` ...")
 	} //end if
 	//--
 	if(smart.PathIsBackwardUnsafe(path) == true) {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsafe backward path")
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # unsafe backward path")
 		return ""
 	} //end if
 	path = smart.SafePathFixSeparator(path) // do always, not os context ToSlash !
 	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/ ")) // remove `/` and space + all whitespaces
 	if(path == "") {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # empty path")
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # empty path")
 		return ""
 	} //end if
 	if(!smart.StrStartsWith(path, "lib/")) {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # path must start with `lib/`")
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # path must start with `lib/`")
 		return ""
 	} //end if
 	path = smart.StrTrimWhitespaces(smart.StrTrim(path, "/ ")) // remove `/` and space + all whitespaces
 	if((path == "") || (path == ".") || (path == "..") || (path == "/")) {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsupported path")
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # unsupported path")
 		return ""
 	} //end if
 	if(smart.PathIsAbsolute(path) == true) {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # not a relative path")
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # not a relative path")
 		return ""
 	} //end if
 	if(smart.PathIsSafeValidSafePath(path) != true) {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` # unsafe path")
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # unsafe path")
 		return ""
 	} //end if
 	//--
 	content, err := assets.ReadFile(path)
 	if(err != nil) {
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": Failed to Read Asset: `" + path + "` #", err) // mostly will cover 404
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` #", err) // mostly will cover 404
 		return ""
 	} //end if
 	//--
 	if(DEBUG == true) {
-		log.Println("[DATA] " + smart.CurrentFunctionName() + ": Reading Asset: `" + path + "` [DONE] :: ContentLength=", len(content), "bytes")
+		log.Println("[DATA]", smart.CurrentFunctionName(), "# Reading Asset: `" + path + "` [DONE] :: ContentLength=", len(content), "bytes")
 	} //end if
 	//--
 	return string(content)
@@ -344,7 +344,7 @@ func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool, 
 	//--
 	if(titleText == "") {
 		titleText = "Untitled"
-		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": requires a non-empty Title !")
+		log.Println("[WARNING]", smart.CurrentFunctionName(), "# requires a non-empty Title !")
 	} //end if
 	if(messageText == "") {
 		messageText = "Unknown Error ..."
@@ -363,6 +363,7 @@ func HtmlStatusPage(titleText string, messageText string, displayAuthLogo bool, 
 	arr := map[string]string{ // no server content (all embedded) to avoid loops 9ex: 404 loop
 		"TITLE-TEXT": 	titleText,
 		"MESSAGE-TEXT": messageText,
+		"URL-HOMEPAGE": smart.GetHttpProxyBasePath(),
 		"FOOTER-HTML": 	`<img alt="logo-server" title="Go Standalone Web Server" style="cursor:help;" width="64" height="64" src="` + smart.EscapeHtml(GetServerLogo(false)) + `">` + " &nbsp;\n" +
 						`<img alt="logo-runtime" title="Built with Go Lang" style="cursor:help;" width="64" height="64" src="` + smart.EscapeHtml(GetGolangLogo(false)) + `">` + " &nbsp;\n" +
 						authLogo +
@@ -504,8 +505,9 @@ const (
 ` + HTML_META_VIEWPORT + `
 <style>
 * { font-family: 'IBM Plex Sans', 'Noto Sans', arial, sans-serif; font-smooth: always; }
+body { background-color: #FFFFFF; color: #333333; }
+a { color:#333333; }
 hr { height:1px; border:none 0; border-top:1px solid #CCCCCC; }
-h1, h2, h3, h4, h5, h6 { color:#333333; }
 div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weight: bold; font-style: normal; padding-left: 16px; padding-right: 16px; padding-top: 12px; padding-bottom: 8px; margin-top: 8px; margin-bottom: 8px; max-width: calc(100% - 10px) !important; min-width: 100px; min-height: 40px; height: auto !important; border-radius: 5px; box-sizing: content-box !important; opacity: 1 !important; background-color: #C62828 !important; color: #FFFFFF !important; }
 </style>
 [:::HEAD-EXT-HTML:::]
@@ -518,7 +520,9 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <div class="message">[###MESSAGE-TEXT|html|nl2br###]</div>
 [:::BODY-EXT-HTML:::]
 <hr>
-<small id="server-signature"><b>Smart.Framework.Go</b> :: WebApp</small>
+<div align="left">&nbsp;<b><a href="[###URL-HOMEPAGE|html###]">Return to HomePage</a></b>&nbsp;</div>
+<div align="right">&nbsp;<small id="server-signature"><b>Smart.Framework.Go</b> :: WebApp</small>&nbsp;</div>
+<br>
 <div align="right" title="` + smart.COPYRIGHT + `">[###FOOTER-HTML###]</div>
 <br>
 </body>
@@ -562,7 +566,13 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <!-- #end TPL -->
 `
 
-	HTML_CSS_STYLE_PREFER_COLOR_DARK string = `<style>@media (prefers-color-scheme: dark) { body { background-color: #2E2E2E; color: #F8F8F8; } h1, h2, h3, h4, h5, h6 { color: #F8F8F8; } hr { height:1px; border:none 0; border-top:1px dashed #888888; } }</style>`
+	HTML_CSS_STYLE_PREFER_COLOR_DARK string = `<style>@media (prefers-color-scheme: dark) { body { background-color: #2E2E2E; color: #F8F8F8; } a { color: #F8F8F8; } hr { height:1px; border:none 0; border-top:1px dashed #888888; } }</style>`
+
+	HTML_META_ROBOTS_NOINDEX 			string = `<meta name="robots" content="noindex">`
+	HTML_META_ROBOTS_NOINDEX_NOFOLLOW 	string = `<meta name="robots" content="noindex, nofollow">`
+
+	HTML_META_ROBOTS_INDEX 				string = `<meta name="robots" content="index">`
+	HTML_META_ROBOTS_INDEX_FOLLOW 		string = `<meta name="robots" content="index, follow">`
 )
 
 

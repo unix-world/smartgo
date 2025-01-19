@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ CRYPTO / ENCIPHER ]
 
 // REQUIRE: go 1.19 or later
@@ -32,25 +32,31 @@ import (
 	"github.com/unix-world/smartgo/crypto/bcrypt"
 
 	"golang.org/x/crypto/argon2"
+
+	uid "github.com/unix-world/smartgo/crypto/uuid"
 )
 
+// Max allowed packet to encrypt is 16MB theoretical from memory point of view, ... but may depend by many factors ...
+// Max allowed packet to decrypt is 64MB theoretical from memory point of view, ... but may depend by algo ...
+
 const (
-	SEPARATOR_CRYPTO_CHECKSUM_V1 string 	= "#CHECKSUM-SHA1#" 							// compatibility, v1 ; blowfish only
-	SEPARATOR_CRYPTO_CHECKSUM_V2 string 	= "#CKSUM256#" 									// compatibility, v2 ; blowfish only
-	SEPARATOR_CRYPTO_CHECKSUM_V3 string 	= "#CKSUM512V3#" 								// current, v3 ; threefish, twofish, blowfish
+	SIGNATURE_3FISH_1K_V1_DEFAULT string 	= "3f1kD.v1!" 									// 3F ; current,       v1 1024 (default)                           ; encrypt + decrypt
+	SIGNATURE_3FISH_1K_V1_ARGON2ID string 	= "3f1kA.v1!" 									// 3F ; current,       v1 1024 (argon2id)                          ; encrypt + decrypt
+	SIGNATURE_3FISH_1K_V1_2FBF_D string 	= "3ffb2kD.v1!" 								// 3F ; current,       v1 1024 (default+twofish/256+blowfish/448)  ; encrypt + decrypt
+	SIGNATURE_3FISH_1K_V1_2FBF_A string 	= "3ffb2kA.v1!" 								// 3F ; current,       v1 1024 (argon2id+twofish/256+blowfish/448) ; encrypt + decrypt
 
-	SIGNATURE_BFISH_V1 string 				= "bf384.v1!" 									// compatibility, v1 ; decrypt only
-	SIGNATURE_BFISH_V2 string 				= "bf448.v2!" 									// compatibility, v2 ; decrypt only
-	SIGNATURE_BFISH_V3 string 				= "bf448.v3!" 									// current, v3 ; encrypt + decrypt
+	SIGNATURE_2FISH_V1_DEFAULT string 		= "2f256.v1!" 									// 2F ; current,       v1  256 (default)              ; encrypt + decrypt
+	SIGNATURE_2FISH_V1_BF_DEFAULT string 	= "2fb88.v1!" 									// 2F ; current,       v1  256 (default+blowfish/448) ; encrypt + decrypt ; Blowfish 56 (448) + TwoFish 32 (256) = 88 (704)
 
-	SIGNATURE_2FISH_V1_DEFAULT string 		= "2f256.v1!" 									// current, v1 (default)   ; encrypt + decrypt
-	SIGNATURE_2FISH_V1_BF_DEFAULT string 	= "2fb88.v1!" 									// current, v1 (default+blowfish) ; encrypt + decrypt ; Blowfish 56 (448) + TwoFish 32 (256) = 88 (704)
+	SIGNATURE_BFISH_V3 string 				= "bf448.v3!" 									// BF ; current,       v3  448 ; encrypt + decrypt
+	SIGNATURE_BFISH_V2 string 				= "bf448.v2!" 									// BF ; compatibility, v2  448 ; decrypt only
+	SIGNATURE_BFISH_V1 string 				= "bf384.v1!" 									// BF ; compatibility, v1  384 ; decrypt only
 
-	SIGNATURE_3FISH_1K_V1_DEFAULT string  	= "3f1kD.v1!" 									// current, v1 1024 (default)  ; encrypt + decrypt
-	SIGNATURE_3FISH_1K_V1_ARGON2ID string 	= "3f1kA.v1!" 									// current, v1 1024 (argon2id) ; encrypt + decrypt
+	SEPARATOR_CRYPTO_CHECKSUM_V3 string 	= "#CKSUM512V3#" 								// current,            v3 ; threefish, twofish, blowfish (v3)
+	SEPARATOR_CRYPTO_CHECKSUM_V2 string 	= "#CKSUM256#" 									// compatibility,      v2 ; blowfish v2 only
+	SEPARATOR_CRYPTO_CHECKSUM_V1 string 	= "#CHECKSUM-SHA1#" 							// compatibility,      v1 ; blowfish v1 only
 
-	SIGNATURE_3FISH_1K_V1_2FBF_D string  	= "3ffb2kD.v1!" 								// current, v1 1024 (default+twofish/256+blowfish/448)  ; encrypt + decrypt
-	SIGNATURE_3FISH_1K_V1_2FBF_A string 	= "3ffb2kA.v1!" 								// current, v1 1024 (argon2id+twofish/256+blowfish/448) ; encrypt + decrypt
+	REGEX_SAFE_CRYPTO_PACKAGE_STR string 	= `^[a-zA-Z0-9\-_\.;\!]+$` 						// must allow characters and exclamation sign from the signature: B64s ; !
 
 	SALT_PREFIX string 						= "Smart Framework" 							// fixed salt prefix
 	SALT_SEPARATOR string 					= "#" 											// fixed salt separator
@@ -184,7 +190,7 @@ func DataRRot13(s string) string {
 
 func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, error) { // {{{SYNC-HASH-SAFE-CHECKSUM}}} [PHP]
 	//-- r.20231204
-	// Create a safe checksum of data
+	// Create a safe checksum of data ; ~ 65 characters ± 2
 	// It will append the salt to the end of data to avoid the length extension attack # https://en.wikipedia.org/wiki/Length_extension_attack
 	// Protected by SHA3-384 that has 128-bit resistance against the length extension attacks since the attacker needs to guess the 128-bit to perform the attack, due to the truncation
 	// Now includes also a Poly1305 custom derivation ... adds 10x more resistence against length extension attacks ; increases exponential chances for rainbow attacks
@@ -234,9 +240,9 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, err
 		return "", NewError("Poly Checksum Failed: " + errOSalt.Error())
 	} //end if
 	//--
-	var b64CkSum string = Sh3a384B64(ySalt + VERTICAL_TAB + plainTextData + HORIZONTAL_TAB + vSalt + LINE_FEED + customSalt + CARRIAGE_RETURN + xSalt + NULL_BYTE + zSalt) // SHA3-384 B64 of B64 derived salt (88 characters) + data + B92 derived salt (variable length ~ 72 characters)
+	var b64CkSum string = Sh3a384B64(ySalt + VERTICAL_TAB + plainTextData + HORIZONTAL_TAB + vSalt + LINE_FEED + customSalt + CARRIAGE_RETURN + xSalt + NULL_BYTE + zSalt) // SHA3-384 B64 (64 characters) of B64 derived salt (88 characters) + data + B92 derived salt (variable length ~ 72 characters)
 	//--
-	return DataRRot13(BaseEncode(Base64BytDecode([]byte(b64CkSum)), "b62")), nil // B62
+	return DataRRot13(BaseEncode(Base64BytDecode([]byte(b64CkSum)), "b62")), nil // B62 ~ 65 characters ± 2
 	//--
 } //END FUNCTION
 
@@ -245,11 +251,11 @@ func SafeChecksumHashSmart(plainTextData string, customSalt string) (string, err
 
 
 func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) (string, error) { // {{{SYNC-HASH-PASSWORD}}} [PHP]
-	//-- r.20231204 + Argon2Id
+	//-- r.20231204 + Argon2Id r.20250115
 	defer PanicHandler() // for: Hex2Bin ; Argon2Id
 	//--
 	// V2 was a bit unsecure..., was deprecated a long time, now is no more supported !
-	// V3 is the current version: 20231028, using PBKDF2 + derivations, SHA3-512 and SHA3-384
+	// V3 is the current version, using PBKDF2 + derivations (or Argon2Id + derivations), SHA3-512 and SHA3-384
 	//--
 	// the password salt must not be too complex related to the password itself # http://stackoverflow.com/questions/5482437/md5-hashing-using-password-as-salt
 	// an extraordinary good salt + a weak password may increase the risk of colissions
@@ -298,7 +304,7 @@ func SafePassHashSmart(plainPass string, theSalt string, useArgon2id bool) (stri
 	var sSalt string = ""
 	var errSSalt error = nil
 	if(useArgon2id == true) {
-		sSalt = string(argon2.IDKey([]byte(key), []byte(pbkdf2Salt + VERTICAL_TAB + DataRot13(BaseEncode([]byte(pbkdf2Salt), "b32"))), uint32(math.Floor((float64(DERIVE_CENTITER_PW) / 2) - 1)), 64*1024, 1, uint32(reqLen))) // Argon2id resources: 37 cycles, 64MB memory, 1 thread, 34 bytes = 272 bits
+		sSalt = string(argon2.IDKey([]byte(key), []byte(pbkdf2Salt + VERTICAL_TAB + DataRot13(BaseEncode([]byte(pbkdf2Salt), "b32"))), uint32(math.Floor(float64(DERIVE_CENTITER_PW) / 12.5)), 17*1024, 1, uint32(reqLen))) // Argon2id resources: 77/12.5=6 cycles, 17MB memory, 1 thread, 34 bytes = 272 bits
 		sSalt = StrSubstr(StrPad2LenRight(BaseEncode([]byte(sSalt), "b92"), "'", int(reqLen)), 0, int(reqLen))
 	} else {
 		sSalt, errSSalt = Pbkdf2DerivedKey("sha3-384", key, pbkdf2Salt, reqLen, DERIVE_CENTITER_PW, true) // B92
@@ -628,7 +634,8 @@ func Pbkdf2DerivedKey(algo string, key string, salt string, klen uint16, iterati
 
 //-----
 
-func cipherCBC(algo string, str string, key string, iv string, tweak string) (cipher.Block, error) {
+
+func cipherCBC(algo string, key string, iv string, tweak string) (cipher.Block, error) {
 	//-- safety
 	defer PanicHandler() // for: ciphers ...
 	//-- conformance
@@ -771,7 +778,7 @@ func CipherEncryptCBC(algo string, str string, key string, iv string, tweak stri
 	//-- conformance
 	algo = StrToLower(StrTrimWhitespaces(algo))
 	//-- process
-	bcipher, errCipher := cipherCBC(algo, str, key, iv, tweak)
+	bcipher, errCipher := cipherCBC(algo, key, iv, tweak)
 	//-- checks
 	if(errCipher != nil) {
 		return "", NewError("Cipher ERR for Algo `" + algo + "`: " + errCipher.Error())
@@ -822,7 +829,7 @@ func CipherDecryptCBC(algo string, str string, key string, iv string, tweak stri
 	//-- conformance
 	algo = StrToLower(StrTrimWhitespaces(algo))
 	//-- process
-	bcipher, errCipher := cipherCBC(algo, str, key, iv, tweak)
+	bcipher, errCipher := cipherCBC(algo, key, iv, tweak)
 	//-- checks
 	if(errCipher != nil) {
 		return "", NewError("Cipher ERR for Algo `" + algo + "`: " + errCipher.Error())
@@ -961,6 +968,30 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 			return "", NewError("Invalid Data Packet, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
 	} //end switch
 	//--
+	if(StrContains(darr[0], "$")) { // if contain randomization prefix/suffix and crc, remove them
+		rndArr := ExplodeWithLimit("$", darr[0], 5)
+		if(len(rndArr) != 4) {
+			return "", NewError("Invalid Data Packet RND Segments, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+		} //end if
+		rndArr[0] = StrTrimWhitespaces(rndArr[0]) // random prefix
+		rndArr[1] = StrTrimWhitespaces(rndArr[1]) // data
+		rndArr[2] = StrTrimWhitespaces(rndArr[2]) // crc32b26
+		rndArr[3] = StrTrimWhitespaces(rndArr[3]) // random suffix
+		if((rndArr[0] == "") || (len(rndArr[0]) != 10)) {
+			return "", NewError("Invalid Data Packet RND Prefix, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+		} //end if
+		if((rndArr[1] == "") || (!StrRegexMatch(REGEX_SAFE_B64_STR, rndArr[1]))) {
+			return "", NewError("Invalid Data Packet RND Data, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+		} //end if
+		if((rndArr[2] == "") || (Crc32bB36(rndArr[1]) != rndArr[2])) {
+			return "", NewError("Invalid Data Packet RND Checksum, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+		} //end if
+		if((rndArr[3] == "") || (len(rndArr[3]) != 10)) {
+			return "", NewError("Invalid Data Packet RND Suffix, Algo: `" + algo + "` ; Version, v: " + ConvertUInt8ToStr(ver))
+		} //end if
+		darr[0] = rndArr[1]
+	} //end if
+	//--
 	return Base64Decode(darr[0]), nil
 	//--
 } //END FUNCTION
@@ -970,8 +1001,8 @@ func cryptoContainerUnpack(algo string, ver uint8, str string) (string, error) {
 
 
 func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC-CRYPTO-KEY-DERIVE}}}
-	//-- r.20231203 + Argon2Id
-	// B92 ; (128 bytes)
+	//-- r.20231203 + Argon2Id r.20250115
+	// B92 ; (128 bytes / 1024 bit)
 	//--
 	defer PanicHandler() // for: Argon2Id
 	//--
@@ -991,7 +1022,7 @@ func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC
 	var safeKey string = ""
 	var errSafeKey error = nil
 	if(useArgon2id == true) {
-		safeKey = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(DERIVE_CENTITER_EK), 96*1024, 1, uint32(klen))) // Argon2id resources: 87 cycles, 80MB memory, 1 thread, 128 bytes = 1024 bits
+		safeKey = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(math.Floor(float64(DERIVE_CENTITER_EK) / 10)), 18*1024, 1, uint32(klen))) // Argon2id resources: 87/10=8 cycles, 18MB memory, 1 thread, 128 bytes = 1024 bits
 		safeKey = BaseEncode([]byte(safeKey), "b92") // b92
 	} else {
 		safeKey, errSafeKey = Pbkdf2DerivedKey("sha3-512", plainTextKey, salt, klen, DERIVE_CENTITER_EK, true) // b92
@@ -1013,8 +1044,8 @@ func threefishSafeKey(plainTextKey string, useArgon2id bool) string { // {{{SYNC
 
 
 func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-CRYPTO-IV-DERIVE}}}
-	//-- r.20231203 + Argon2Id
-	// B85 ; (128 bytes)
+	//-- r.20231203 + Argon2Id r.20250115
+	// B85 ; (128 bytes / 1024 bit)
 	//--
 	defer PanicHandler() // for: Argon2Id
 	//--
@@ -1034,7 +1065,7 @@ func threefishSafeIv(plainTextKey string, useArgon2id bool) string { // {{{SYNC-
 	var safeIv string = ""
 	var errSafeIv error = nil
 	if(useArgon2id == true) {
-		safeIv = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(DERIVE_CENTITER_EV), 64*1024, 1, uint32(ivlen))) // Argon2id resources: 78 cycles, 64MB memory, 1 thread, 128 bytes = 1024 bits
+		safeIv = string(argon2.IDKey([]byte(plainTextKey), []byte(salt), uint32(math.Floor(float64(DERIVE_CENTITER_EV) / 10)), 18*1024, 1, uint32(ivlen))) // Argon2id resources: 78/10=7 cycles, 18MB memory, 1 thread, 128 bytes = 1024 bits
 		safeIv = BaseEncode([]byte(safeIv), "b85") // b85
 	} else {
 		safeIv, errSafeIv = Pbkdf2DerivedKey("sha3-384", plainTextKey, salt, ivlen * 2, DERIVE_CENTITER_EV, false) // hex
@@ -1113,16 +1144,25 @@ func threefishSafeTweak(plainTextKey string) string {
 } //END FUNCTION
 
 
-func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
+func ThreefishEncryptCBC(str string, key string, useArgon2id bool, randomize bool) string { // v3
 	//-- safety
 	defer PanicHandler() // for: encrypt
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
+	if(uint64(len(str)) > SIZE_BYTES_16M) { // max 16M ; {{{SYNC-MAX-DATA-ENCRYPT}}}
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Cannot Encrypt, Data is OverSized")
+		return ""
+	} //end if
 	//-- prepare string
 	var oStr string = str
-	str = Base64Encode(str)
+	str = StrTrimWhitespaces(Base64Encode(str))
+	//-- add randomization if set so
+	if(randomize) { // randomize encryption which results always in a different encrypted string
+		str = uid.Uuid10Str() + "$" + str + "$" + Crc32bB36(str) + "$" + uid.Uuid10Num() // because the prefix is random and CBC is sequential (first block will be always different) will results in a completely different string with every encryption ; also add a suffix because data may be reversed
+	} //end if
+	//-- add checksum
 	cksum := BaseEncode(Base64BytDecode(Sh3aByt512B64([]byte(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
@@ -1144,7 +1184,7 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Encrypt Error:", encErr)
 		return ""
 	} //end if
-	encStr = Base64sEncode(encStr) // b64s
+	encStr = Base64ToBase64u(Base64Encode(encStr)) // b64u
 	//--
 	var ckSum string = BaseEncode([]byte(Hex2Bin(Sh3a224(encStr + NULL_BYTE + oStr))), "b62")
 	oStr = ""
@@ -1154,12 +1194,20 @@ func ThreefishEncryptCBC(str string, key string, useArgon2id bool) string {
 } //END FUNCTION
 
 
-func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
+func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string { // v3
 	//-- safety
 	defer PanicHandler() // for: b64Dec
 	//-- check
+	if(uint64(len(str)) > (SIZE_BYTES_16M * 4)) { // {{{SYNC-MAX-DATA-DECRYPT-3F}}} ; max 64M because the max size of data to encrypt is 16M, may have inside 2F + BF
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Cannot Decrypt, Package is OverSized")
+		return ""
+	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
+		return ""
+	} //end if
+	//-- safe characters
+	if(!StrRegexMatch(REGEX_SAFE_CRYPTO_PACKAGE_STR, str)) { // safety
 		return ""
 	} //end if
 	//-- signature
@@ -1252,11 +1300,15 @@ func ThreefishDecryptCBC(str string, key string, useArgon2id bool) string {
 //-----
 
 
-func ThreefishEncryptTwofishBlowfishCBC(str string, key string, useArgon2id bool) string {
+func ThreefishEncryptTwofishBlowfishCBC(str string, key string, useArgon2id bool, randomize bool) string { // v3
 	//-- safety
 	defer PanicHandler()
 	//-- check
 	if(str == "") {
+		return ""
+	} //end if
+	if(uint64(len(str)) > (SIZE_BYTES_16M / 2)) { // {{{SYNC-MAX-DATA-ENCRYPT-3F-2F-BF}}} ; max 8M because will be re-encrypted to TF and/or BF which are limited on input to 16M
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Cannot Encrypt, Data is OverSized")
 		return ""
 	} //end if
 	//--
@@ -1267,7 +1319,7 @@ func ThreefishEncryptTwofishBlowfishCBC(str string, key string, useArgon2id bool
 		sign3xF = SIGNATURE_3FISH_1K_V1_2FBF_A
 	} //end if
 	//--
-	str = StrTrimWhitespaces(TwofishEncryptBlowfishCBC(str, key))
+	str = StrTrimWhitespaces(TwofishEncryptBlowfishCBC(str, key, randomize))
 	if((str == "") || (!StrStartsWith(str, SIGNATURE_2FISH_V1_BF_DEFAULT)) || (len(str) <= len(SIGNATURE_2FISH_V1_BF_DEFAULT))) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to BF Pre-Encrypt Data")
 		return ""
@@ -1279,7 +1331,7 @@ func ThreefishEncryptTwofishBlowfishCBC(str string, key string, useArgon2id bool
 		return ""
 	} //end if
 	//--
-	str = StrTrimWhitespaces(ThreefishEncryptCBC(DataRRot13(str), key, useArgon2id))
+	str = StrTrimWhitespaces(ThreefishEncryptCBC(DataRRot13(str), key, useArgon2id, randomize))
 	if((str == "") || (!StrStartsWith(str, sign3F)) || (len(str) <= len(sign3F))) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to TF Encrypt Data")
 		return ""
@@ -1295,12 +1347,20 @@ func ThreefishEncryptTwofishBlowfishCBC(str string, key string, useArgon2id bool
 } //END FUNCTION
 
 
-func ThreefishDecryptTwofishBlowfishCBC(str string, key string, useArgon2id bool) string {
+func ThreefishDecryptTwofishBlowfishCBC(str string, key string, useArgon2id bool) string { // v3
 	//-- safety
 	defer PanicHandler()
 	//-- check
+	if(uint64(len(str)) > (SIZE_BYTES_16M * 4)) { // {{{SYNC-MAX-DATA-DECRYPT-3F}}} ; max 64M because the max size of data to encrypt is 16M, may have inside 2F + BF
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Cannot Decrypt, Package is OverSized")
+		return ""
+	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
+		return ""
+	} //end if
+	//-- safe characters
+	if(!StrRegexMatch(REGEX_SAFE_CRYPTO_PACKAGE_STR, str)) { // safety
 		return ""
 	} //end if
 	//--
@@ -1414,16 +1474,25 @@ func twofishSafeKeyIv(plainTextKey string) (string, string) { // {{{SYNC-CRYPTO-
 } //END FUNCTION
 
 
-func TwofishEncryptCBC(str string, key string) string {
+func TwofishEncryptCBC(str string, key string, randomize bool) string { // v3
 	//-- safety
 	defer PanicHandler() // for: hex2bin ; encrypt
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
+	if(uint64(len(str)) > SIZE_BYTES_16M) { // max 16M ; {{{SYNC-MAX-DATA-ENCRYPT}}}
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Cannot Encrypt, Data is OverSized")
+		return ""
+	} //end if
 	//-- prepare string
 	var oStr string = str
-	str = Base64Encode(str)
+	str = StrTrimWhitespaces(Base64Encode(str))
+	//-- add randomization if set so
+	if(randomize) { // randomize encryption which results always in a different encrypted string
+		str = uid.Uuid10Str() + "$" + str + "$" + Crc32bB36(str) + "$" + uid.Uuid10Num() // because the prefix is random and CBC is sequential (first block will be always different) will results in a completely different string with every encryption ; also add a suffix because data may be reversed
+	} //end if
+	//-- add checksum
 	cksum := BaseEncode(Base64BytDecode(Sh3aByt512B64([]byte(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
@@ -1438,7 +1507,7 @@ func TwofishEncryptCBC(str string, key string) string {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Encrypt Error:", encErr)
 		return ""
 	} //end if
-	encStr = Base64sEncode(encStr) // b64s
+	encStr = Base64ToBase64u(Base64Encode(encStr)) // b64u
 	//--
 	var ckSum string = BaseEncode([]byte(Hex2Bin(Sh3a224(encStr + NULL_BYTE + oStr))), "b62")
 	oStr = ""
@@ -1448,12 +1517,20 @@ func TwofishEncryptCBC(str string, key string) string {
 } //END FUNCTION
 
 
-func TwofishDecryptCBC(str string, key string) string {
+func TwofishDecryptCBC(str string, key string) string { // v3
 	//-- safety
 	defer PanicHandler() // for: b64Dec
 	//-- check
+	if(uint64(len(str)) > (SIZE_BYTES_16M * 3)) { // {{{SYNC-MAX-DATA-DECRYPT-2F}}} ; max 48M because the max size of data to encrypt is 16M, may have inside BF
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Cannot Decrypt, Package is OverSized")
+		return ""
+	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
+		return ""
+	} //end if
+	//-- safe characters
+	if(!StrRegexMatch(REGEX_SAFE_CRYPTO_PACKAGE_STR, str)) { // safety
 		return ""
 	} //end if
 	//-- signature
@@ -1539,15 +1616,19 @@ func TwofishDecryptCBC(str string, key string) string {
 //-----
 
 
-func TwofishEncryptBlowfishCBC(str string, key string) string {
+func TwofishEncryptBlowfishCBC(str string, key string, randomize bool) string { // v3
 	//-- safety
 	defer PanicHandler()
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
+	if(uint64(len(str)) > (SIZE_BYTES_16M / 2)) { // {{{SYNC-MAX-DATA-ENCRYPT-2F-BF}}} ; max 8M because will be re-encrypted to BF which are limited on input to 16M
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Cannot Encrypt, Data is OverSized")
+		return ""
+	} //end if
 	//--
-	str = StrTrimWhitespaces(BlowfishEncryptCBC(str, key))
+	str = StrTrimWhitespaces(BlowfishEncryptCBC(str, key, randomize))
 	if((str == "") || (!StrStartsWith(str, SIGNATURE_BFISH_V3)) || (len(str) <= len(SIGNATURE_BFISH_V3))) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to BF Pre-Encrypt Data")
 		return ""
@@ -1559,7 +1640,7 @@ func TwofishEncryptBlowfishCBC(str string, key string) string {
 		return ""
 	} //end if
 	//--
-	str = StrTrimWhitespaces(TwofishEncryptCBC(DataRRot13(str), key))
+	str = StrTrimWhitespaces(TwofishEncryptCBC(DataRRot13(str), key, randomize))
 	if((str == "") || (!StrStartsWith(str, SIGNATURE_2FISH_V1_DEFAULT)) || (len(str) <= len(SIGNATURE_2FISH_V1_DEFAULT))) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to TF Encrypt Data")
 		return ""
@@ -1575,12 +1656,20 @@ func TwofishEncryptBlowfishCBC(str string, key string) string {
 } //END FUNCTION
 
 
-func TwofishDecryptBlowfishCBC(str string, key string) string {
+func TwofishDecryptBlowfishCBC(str string, key string) string { // v3
 	//-- safety
 	defer PanicHandler()
 	//-- check
+	if(uint64(len(str)) > (SIZE_BYTES_16M * 3)) { // {{{SYNC-MAX-DATA-DECRYPT-2F}}} ; max 48M because the max size of data to encrypt is 16M, may have inside BF
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Cannot Decrypt, Package is OverSized")
+		return ""
+	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
+		return ""
+	} //end if
+	//-- safe characters
+	if(!StrRegexMatch(REGEX_SAFE_CRYPTO_PACKAGE_STR, str)) { // safety
 		return ""
 	} //end if
 	//--
@@ -1732,16 +1821,25 @@ func blowfishSafeIv(plainTextKey string) string { // v2, v3
 } //END FUNCTION
 
 
-func BlowfishEncryptCBC(str string, key string) string { // v3 only
+func BlowfishEncryptCBC(str string, key string, randomize bool) string { // v3 only
 	//-- safety
 	defer PanicHandler() // for: hex2bin ; encrypt
 	//-- check
 	if(str == "") {
 		return ""
 	} //end if
+	if(uint64(len(str)) > SIZE_BYTES_16M) { // max 16M ; {{{SYNC-MAX-DATA-ENCRYPT}}}
+		log.Println("[WARNING] " + CurrentFunctionName() + ": Cannot Encrypt, Data is OverSized")
+		return ""
+	} //end if
 	//-- prepare string
 	var oStr string = str
-	str = Base64Encode(str)
+	str = StrTrimWhitespaces(Base64Encode(str))
+	//-- add randomization if set so
+	if(randomize) { // randomize encryption which results always in a different encrypted string
+		str = uid.Uuid10Str() + "$" + str + "$" + Crc32bB36(str) + "$" + uid.Uuid10Num() // because the prefix is random and CBC is sequential (first block will be always different) will results in a completely different string with every encryption ; also add a suffix because data may be reversed
+	} //end if
+	//-- add checksum
 	cksum := BaseEncode(Base64BytDecode(Sh3aByt512B64([]byte(str))), "b62")
 	str = str + SEPARATOR_CRYPTO_CHECKSUM_V3 + cksum
 	//log.Println("[DEBUG] " + CurrentFunctionName() + ":", str)
@@ -1757,7 +1855,7 @@ func BlowfishEncryptCBC(str string, key string) string { // v3 only
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Encrypt Error:", encErr)
 		return ""
 	} //end if
-	encStr = Base64sEncode(encStr) // b64s
+	encStr = Base64ToBase64u(Base64Encode(encStr)) // b64u
 	//--
 	var ckSum string = BaseEncode([]byte(Hex2Bin(Sh3a224(encStr + NULL_BYTE + oStr))), "b62")
 	oStr = ""
@@ -1771,8 +1869,16 @@ func BlowfishDecryptCBC(str string, key string) string { // v1, v2, v3
 	//-- safety
 	defer PanicHandler() // for: hex2bin ; b64Dec ; decrypt
 	//-- check
+	if(uint64(len(str)) > (SIZE_BYTES_16M * 2)) { // {{{SYNC-MAX-DATA-DECRYPT-BF}}} ; max 32M because the max size of data to encrypt is 16M
+		log.Println("[NOTICE] " + CurrentFunctionName() + ": Cannot Decrypt, Package is OverSized")
+		return ""
+	} //end if
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
+		return ""
+	} //end if
+	//-- safe characters
+	if(!StrRegexMatch(REGEX_SAFE_CRYPTO_PACKAGE_STR, str)) { // safety
 		return ""
 	} //end if
 	//-- signature

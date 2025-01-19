@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo DB :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20241222.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // REQUIRE: go 1.19 or later
 package smartdb
@@ -191,7 +191,7 @@ func NewSqlDb(dbType string, dbUrl string, debug bool) (DbSqlConnector, error) {
 			if(!smart.PathExists(dbUrl)) {
 				log.Println("[NOTICE]", NAME, smart.CurrentFunctionName(), "DB File does not exists, will be initialized on first connection:", dbUrl)
 			} //end if
-			log.Println("[INFO]", NAME, smart.CurrentFunctionName(), "Driver is ready, using SQlite DB:", dbUrl)
+			log.Println("[INFO]", NAME, smart.CurrentFunctionName(), "DB File as SQlite DB:", dbUrl)
 			break
 		case DB_SQL_TYPE_PGSQL:
 			if((dbUrl == "") || (!smart.StrStartsWith(dbUrl, "postgres://"))) {
@@ -258,6 +258,8 @@ func (conn *DbSqlConnector) CheckConnection() bool {
 func (conn *DbSqlConnector) OpenConnection() (*sql.DB, error) {
 	//--
 	defer smart.PanicHandler()
+	//--
+	log.Println("[META]", NAME, "Version:", VERSION, "# DataBaseType:", conn.dbType)
 	//--
 	connDescr := conn.GetConnectionInfo()
 	//--
@@ -893,6 +895,10 @@ func getArrDataFromSQLRows(rows *sql.Rows, hLimit uint64) (arr []map[string]stri
 	err = nil
 	//--
 	if(rows == nil) {
+		return
+	} //end if
+	if(hLimit <= 0) {
+		log.Println("[ERROR]", NAME, smart.CurrentFunctionName(), "Get Columns", "hLimit is zero")
 		return
 	} //end if
 	//--

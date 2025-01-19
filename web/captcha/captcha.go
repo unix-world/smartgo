@@ -1,7 +1,7 @@
 
 // SmartGo Captcha
 // (c) 2024-present unix-world.org
-// v.20241216.2358
+// v.20250108.2358
 // license: BSD
 
 package captcha

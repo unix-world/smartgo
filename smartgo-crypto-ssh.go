@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ CRYPTO / SSH ]
 
 // REQUIRE: go 1.19 or later
@@ -23,6 +23,8 @@ import (
 
 // return: err, pubKeyPEM, privKeyPEM
 func GenerateSSHKeyPairEd25519(comment string, password string) (error, string, string) {
+	//--
+	defer PanicHandler()
 	//-- info
 	// the comment is expected to be an email address or a slug
 	//-- trim, normalize spaces, replace spaces with -, and allow max 255 chars

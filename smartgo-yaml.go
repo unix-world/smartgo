@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ YAML (PARSE, COMPOSE) ]
 
 // REQUIRE: go 1.19 or later
@@ -41,6 +41,8 @@ func YamlDataParse(yamlData string) (yamlMap map[string]interface{}, errMsg erro
 
 
 func YamlDataCompose(yamlMap map[string]interface{}) (yamlData string, errMsg error) {
+	//--
+	defer PanicHandler() // for YAML Parser
 	//--
 	if(yamlMap == nil) {
 		errMsg = NewError("YAML Compose # Object is Empty")

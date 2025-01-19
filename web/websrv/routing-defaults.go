@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -104,7 +104,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	} //end if
 	response.StatusCode = 208
 	const title string = "Service Info"
-	var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK
+	var headHtml string = assets.HTML_META_ROBOTS_NOINDEX + "\n" + assets.HTML_CSS_STYLE_PREFER_COLOR_DARK
 	var bodyHtml string = `<h1 style="display:inline-block;">`
 //	bodyHtml += `<i class="sfi sfi-info sfi-3x" style="color:#DDDDDD!important;"></i>` // Sfi Font is N/A on standalone assets template
 //	bodyHtml += "&nbsp;"
@@ -127,6 +127,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	bodyHtml += "Server BaseDomain: `" + smart.EscapeHtml(basedom) + "`" + "<br>"
 	bodyHtml += "Server Domain: <b>`" + smart.EscapeHtml(dom) + "`</b>" + "<br>"
 	bodyHtml += "Server Port: `" + smart.EscapeHtml(port) + "`" + "<br>"
+	bodyHtml += "Server Base Path: <b>`" + smart.EscapeHtml(GetBaseBrowserPath()) + "`</b>" + " ; Internal Route Base Path: `" + smart.EscapeHtml(GetBasePath()) + "`" + "<br>" // under proxy may differ
 	bodyHtml += "Server Path: <b>`" + smart.EscapeHtml(GetCurrentBrowserPath(r)) + "`</b>" + " ; Internal Route Path: `" + smart.EscapeHtml(GetCurrentPath(r)) + "`" + "<br>" // under proxy may differ
 	bodyHtml += "Server QueryString: `" + smart.EscapeHtml(smart.GetHttpQueryStringFromRequest(r)) + "`" + "<br>"
 	bodyHtml += `<div style="margin-top:4px; margin-bottom:12px;">`
@@ -168,7 +169,7 @@ var RouteHandlerStatusPage HttpHandlerFunc = func(r *http.Request, headPath stri
 	//--
 	response.StatusCode = 202
 	const title string = "Service Status: Up and Running ..."
-	var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
+	var headHtml string = assets.HTML_META_ROBOTS_NOINDEX + "\n" + assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 	var bodyHtml string = `<div class="status"><img alt="status:svg" title="` + smart.EscapeHtml(title) + `" width="48" height="48" src="` + smart.EscapeHtml(assets.GetSvgAsset("lib/framework/img/loading-spin.svg", false)) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + `<i class="sfi sfi-info"></i> &nbsp; ` + smart.EscapeHtml(TheStrSignature) + " ... is running" + "\n" + smart.EscapeHtml(smart.DateNowUtc()) + "</pre>" + "\n" + "</div>"
 	response.ContentBody = srvassets.HtmlServerTemplate(title, headHtml, bodyHtml, false) // skip js ; contains SFI Icons
 	response.ContentFileName = "status.html"

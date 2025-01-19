@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -32,7 +32,7 @@ func UrlHandlerRegisterRoute(route string, skipAuth bool, methods []string, maxT
 		return false
 	} //end if
 	//--
-	if(!webUrlRouteIsValid(route)) {
+	if(!WebUrlRouteIsValid(route)) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Route: Contains Invalid or Unsafe Characters: `" + route + "`")
 		return false
 	} //end if

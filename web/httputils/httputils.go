@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -39,7 +39,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20250107.2358"
+	VERSION string = "r.20250118.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -2975,6 +2975,16 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	//--
 	const errTxtProvider string = "Either must supply a fixed username/password and/or username/token, either an auth method."
 	//--
+	allowedIPs = smart.StrTrimWhitespaces(allowedIPs)
+	if(allowedIPs != "") {
+		errValidateAllowedIpList := smart.ValidateIPAddrList(allowedIPs)
+		if(errValidateAllowedIpList != nil) {
+			err = "IP Restrictions List is Invalid: " + errValidateAllowedIpList.Error()
+			HttpStatus500(w, r, err, outputHtml)
+			return smart.NewError(err), aData
+		} //end if
+	} //end if
+	//--
 	if(customAuthCheck == nil) {
 		if((smart.AuthBasicIsEnabled() != true) && (smart.AuthTokenIsEnabled() != true)) {
 			err = "All Supported Authentication Modes (Basic, Token) are Disabled"
@@ -3009,7 +3019,6 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	authRealm = smart.StrTrimWhitespaces(smart.StrReplaceAll(authRealm, `"`, `'`))
 	authUsername = smart.StrTrimWhitespaces(authUsername)
 	// do not trim password !
-	allowedIPs = smart.StrTrimWhitespaces(allowedIPs)
 	//--
 	if(IsValidHttpAuthRealm(authRealm) != true) {
 		log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: AUTH.FIX :: Invalid Realm `" + authRealm + "` ; The Realm was set to default: `" + DEFAULT_REALM + "`")
@@ -3030,20 +3039,20 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 	} //end if
 	//--
 	if(allowedIPs != "") {
-		if((ip == "") || (!smart.StrContains(allowedIPs, "<" + ip + ">"))) {
+		if((ip == "") || (!smart.StrContains(allowedIPs, "<"+ip+">"))) { // {{{SYNC-VALIDATE-IP-IN-A-LIST}}}
 			err = "The access to this service is disabled. The IP: `" + ip + "` is not allowed by current IP Address list ..."
 		} //end if
 		if(isOkClientRealIp == true) {
-			if((realClientIp == "") || (!smart.StrContains(allowedIPs, "<" + realClientIp + ">"))) {
+			if((realClientIp == "") || (!smart.StrContains(allowedIPs, "<"+realClientIp+">"))) { // {{{SYNC-VALIDATE-IP-IN-A-LIST}}}
 				err = "The access to this service is disabled. The Client IP: `" + realClientIp + "` is not allowed by current IP Address list ..."
 			} //end if
 		} //end if
 		if(err != "") {
-			log.Println("[WARNING] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
+			log.Println("[WARNING]", smart.CurrentFunctionName(), ": HTTP(S) Server :: AUTH.IP.DENY [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 			HttpStatus403(w, r, err, outputHtml)
 			return smart.NewError(err), aData
 		} //end if
-		log.Println("[OK] " + smart.CurrentFunctionName() + ": HTTP(S) Server :: AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
+		log.Println("[OK]", smart.CurrentFunctionName(), ": HTTP(S) Server :: AUTH.IP.ALLOW [" + authRealm + "] :: Client: `<" + ip + ">` / `<" + realClientIp + ">` is matching the IP Addr Allowed List: `" + allowedIPs + "`")
 	} //end if
 	//--
 	var cacheKeyCliIpAddr string = ip
@@ -3182,32 +3191,72 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 			if(aData.UserName != "") {
 				aUser = aData.UserName
 			} //end if
-		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_TOKEN) { // token auth only
+		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_TOKEN) { // token (opaque) auth only
 			var tokenAuthOk bool = false
 			tkUserName, tokenHash, errTokenSepare := smart.AuthUserTokenDefaultSepareParts(token)
 			if(tkUserName != "") {
 				aUser = tkUserName // for logging purposes
 			} //end if
 			if(errTokenSepare != nil) {
-				err = "Auth.Default: [Token:Opaque:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: " + errTokenSepare.Error()
-			} else {
-				tokenAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only opaque tokens are supported
+				err = "Auth.Default: [Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: " + errTokenSepare.Error()
+			} else if((smart.StrTrimWhitespaces(tkUserName) != "") && (smart.AuthIsValidUserName(tkUserName) == true) && (smart.StrTrimWhitespaces(tokenHash) != "")) {
+				tokenAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, "", "", smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetUserDefaultPrivKey(tkUserName), "", smart.AuthGetUserDefaultSecurityKey(tkUserName), 0, nil) // only opaque tokens are supported
 				if(tokenAuthOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 					aData.OK = false // make sure to set to false, it was not OK
-					err = "Auth.Default: [Token:Opaque:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
-				} //end if
-			} //end if else
-		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only, no 2FA (2FA req. custom implementation)
-			if(smart.Auth2FACookieIsEnabled() != true) {
-				var authBasicOk bool = false
-				authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, user, pass, httpAuthMode, authUsername, authPassword, smart.ALGO_PASS_PLAIN, smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetDefaultUserPrivKey()) // only plain type password can be provided in the default mode ; to use hashed passwords needs custom auth check implementation
-				if(authBasicOk != true) { // default check: user, pass, requiredUsername, requiredPassword
-					aData.OK = false // make sure to set to false, it was not OK
-					err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+					err = "Auth.Default: [Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 				} //end if
 			} else {
-				err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: 2FA is Unsupported with the Default Provider"
+				err = "Auth.Default: [Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Token Hash"
 			} //end if else
+		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only, no 2FA (2FA req. custom implementation)
+
+
+			if((smart.StrTrimWhitespaces(user) != "") && (smart.StrTrimWhitespaces(pass) != "")) {
+
+				if((smart.StrTrimWhitespaces(user) != "") && (smart.StrContains(user, "#") != false) && (smart.StrTrimWhitespaces(pass) != "")) { // Auth Basic.Token
+
+
+					var tokenBasicAuthOk bool = false
+					tkUserName, tokenHash, errTokenSepare := smart.AuthUserTokenBasicSepareParts(user, pass)
+					if(tkUserName != "") {
+						aUser = tkUserName // for logging purposes
+					} //end if
+					if(errTokenSepare != nil) { // expects: username=user#token ; pass=Token-Hash
+						err = "Auth.Default: [Basic.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: " + errTokenSepare.Error()
+					} else if((smart.StrTrimWhitespaces(tkUserName) != "") && (smart.AuthIsValidUserName(tkUserName) == true) && (smart.StrTrimWhitespaces(tokenHash) != "")) {
+
+						tokenBasicAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, "", "", smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetUserDefaultPrivKey(tkUserName), "", smart.AuthGetUserDefaultSecurityKey(tkUserName), 0, nil) // only opaque tokens are supported with the auth basic mode
+						if(tokenBasicAuthOk != true) { // default check: user, pass, requiredUsername, requiredPassword
+							aData.OK = false // make sure to set to false, it was not OK
+							err = "Auth.Default: [Basic.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+						} //end if
+
+
+					} else {
+						err = "Auth.Default: [Basic.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Token Hash"
+					} //end if else
+
+
+				} else if((smart.StrTrimWhitespaces(user) != "") && (smart.AuthIsValidUserName(user) == true) && (smart.StrTrimWhitespaces(pass) != "")) { // Auth Basic
+					if(smart.Auth2FACookieIsEnabled() != true) {
+						var authBasicOk bool = false
+						authBasicOk, aData = smart.AuthUserPassDefaultCheck(authRealm, user, pass, httpAuthMode, authUsername, authPassword, smart.ALGO_PASS_PLAIN, "", "", smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetUserDefaultPrivKey(user), "", smart.AuthGetUserDefaultSecurityKey(user), 0, nil) // only plain type password can be provided in the default mode ; to use hashed passwords needs custom auth check implementation
+						if(authBasicOk != true) { // default check: user, pass, requiredUsername, requiredPassword
+							aData.OK = false // make sure to set to false, it was not OK
+							err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
+						} //end if
+					} else {
+						err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: 2FA is Unsupported by the Default Provider"
+					} //end if else
+				} else {
+					err = "Auth.Default: [Basic/Basic.Token:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Password"
+				} //end if else
+
+			} else {
+				err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Password"
+			} //end if else
+
+
 		} else { // except HTTP_AUTH_MODE_BASIC without 2FA, supported as default implementation, other modes (incl. 2FA) requires custom implementation, via custom auth provider, see above: customAuthCheck
 			err = "Auth Mode NOT Supported: [" + smart.ConvertUInt8ToStr(httpAuthMode) + "] / [Auth:" + smart.AuthMethodGetNameById(httpAuthMode) + "]"
 		} //end if else

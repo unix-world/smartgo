@@ -1,5 +1,8 @@
 package jwt
 
+// modified by unixman: expired since error message to avoid display sub-seconds
+// r.20250115.2358
+
 import (
 	"fmt"
 	"time"
@@ -56,7 +59,8 @@ func (c RegisteredClaims) Valid() error {
 	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now, false) {
 		delta := now.Sub(c.ExpiresAt.Time)
-		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
+	//	vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
+		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta.Round(time.Second)) // unixman fix: don't use sub-seconds
 		vErr.Errors |= ValidationErrorExpired
 	}
 
@@ -149,7 +153,8 @@ func (c StandardClaims) Valid() error {
 	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now, false) {
 		delta := time.Unix(now, 0).Sub(time.Unix(c.ExpiresAt, 0))
-		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
+	//	vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
+		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta.Round(time.Second)) // unixman fix: don't use sub-seconds
 		vErr.Errors |= ValidationErrorExpired
 	}
 

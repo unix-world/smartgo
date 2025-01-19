@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -648,6 +648,29 @@ func GetHttpPathFromRequest(r *http.Request) (path string) { // BACKEND Request 
 } //END FUNCTION
 
 
+func GetHttpBaseUrlFromRequest(r *http.Request) string { // FRONTEND Base URL ; this includes the proxy prefix/domain/port, it is the browser external url as seen in browser
+	//--
+	dom, port, _ := GetHttpDomainAndPortFromRequest(r)
+	//--
+	return GetHttpProtocolFromRequest(r) + dom + ":" + port + GetHttpProxyBasePath()
+	//--
+} //END FUNCTION
+
+
+func GetHttpUrlFromRequest(r *http.Request, withUrlQuery bool) string { // FRONTEND URL w/o query string ; this includes the proxy prefix/domain/port, it is the browser external url as seen in browser
+	//--
+	var urlQuery = ""
+	if(withUrlQuery) {
+		urlQuery = GetHttpQueryStringFromRequest(r)
+	} //end if
+	//--
+	dom, port, _ := GetHttpDomainAndPortFromRequest(r)
+	//--
+	return GetHttpProtocolFromRequest(r) + dom + ":" + port + GetHttpBrowserPathFromRequest(r) + urlQuery
+	//--
+} //END FUNCTION
+
+
 // returns: `` or `?` or `?a` or `?a=` or `?a=b` or `?a=b&` or `?a=b&c` or `?a=b&c=` or `?a=b&c=d`
 func GetHttpQueryStringFromRequest(r *http.Request) (query string) {
 	//--
@@ -834,6 +857,48 @@ func IsNetValidIpAddr(s string) bool { // can be IPV4 or IPV6 but non-empty or z
 	} //end if
 	//--
 	return true
+	//--
+} //END FUNCTION
+
+
+func ValidateIPAddrList(ipList string) error {
+	//--
+	ipList = StrTrimWhitespaces(ipList)
+	if(ipList == "") {
+		return nil
+	} //end if
+	//--
+	arrIpList := Explode(",", ipList)
+	if((arrIpList == nil) || (len(arrIpList) <= 0)) {
+		return NewError("The IP List have a wrong format")
+	} //end if
+	//--
+	for i:=0; i<len(arrIpList); i++ {
+		//--
+		arrIpList[i] = StrTrimWhitespaces(arrIpList[i])
+		//--
+		if(!StrStartsWith(arrIpList[i], "<")) {
+			return NewError("The IP List have a wrong value, must start with `<`, at entry #" + ConvertIntToStr(i))
+		} //end if
+		if(!StrEndsWith(arrIpList[i], ">")) {
+			return NewError("The IP List have a wrong value, must end with `>`, at entry #" + ConvertIntToStr(i))
+		} //end if
+		//--
+		arrIpList[i] = StrTrim(arrIpList[i], "<>") // do not trim ; must not have spaces inside brackets because matching is made by if StrContains <ip> to be fast and avoid re-parsing address list for each request
+		if(StrTrimWhitespaces(arrIpList[i]) == "") {
+			return NewError("The IP List have an empty IP Address value at entry #" + ConvertIntToStr(i))
+		} //end if
+		if(StrTrimWhitespaces(arrIpList[i]) != arrIpList[i]) { // must not contain any trailing spaces between brackets
+			return NewError("The IP List have an wrong IP Address value at entry #" + ConvertIntToStr(i))
+		} //end if
+		//--
+		if(IsNetValidIpAddr(arrIpList[i]) != true) {
+			return NewError("The IP List have an invalid IP Address value at entry #" + ConvertIntToStr(i))
+		} //end if
+		//--
+	} //end for
+	//--
+	return nil
 	//--
 } //END FUNCTION
 

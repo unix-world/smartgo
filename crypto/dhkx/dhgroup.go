@@ -2,8 +2,8 @@
  * Copyright 2012 Nan Deng
  * modified by unixman
  *
- * (c) 2022-2024 unix-world.org
- * r.20240112.1858
+ * (c) 2021-present unix-world.org
+ * r.20250118.2358
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

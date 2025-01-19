@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -39,14 +39,14 @@ const (
 	HTTP_AUTH_ADMIN_PRIV    string = "<admin>"   // must include only (one) the admin privilege     for a valid user,     admin ; NOT FOR external JWT Auth
 	HTTP_AUTH_DEFAULT_RESTR string = "<none>"    // must include only (one) the default restriction for a valid user, not admin ; NOT FOR external JWT Auth
 
-	REGEX_SAFE_AUTH_AREA string 		= `^[A-Z0-9\-]{3,18}` 							// this must not allow [] to conflict with the default area ; {{{SYNC-AUTH-EXT-AREA-REGEX}}}
-	REGEX_VALID_PRIV_RESTR_KEY string 	= `^([a-z]{1}[a-z0-9\-\:]{0,20}[a-z0-9]{1})$` 	// valid name for one privilege key from list of privileges ; a valid privilege key can have 2..22 characters and can contain only: `a-z`, `0-9`, `:` and `-` ; must start with `a-z` only ; must not end with `:` or `-`
+	REGEX_SAFE_AUTH_AREA string 		= `^[A-Z0-9\-\.]{4,48}` 							// this must not allow [] to conflict with the default area ; {{{SYNC-AUTH-EXT-AREA-REGEX}}}
+	REGEX_VALID_PRIV_RESTR_KEY string 	= `^([a-z]{1}[a-z0-9\-\:]{0,20}[a-z0-9]{1})$` 		// valid name for one privilege key from list of privileges ; a valid privilege key can have 2..22 characters and can contain only: `a-z`, `0-9`, `:` and `-` ; must start with `a-z` only ; must not end with `:` or `-`
 
 	REGEX_SAFE_HTTP_USER_NAME 		string = `^[a-z0-9\.]{5,25}$` 							// Safe HTTP Auth UserName Regex ; intended as a safe user ID for all cases
 	REGEX_SAFE_AUTH_EMAIL_ADDRESS 	string = `^[_a-z0-9\-\.]{1,41}@[a-z0-9\-\.]{3,30}$` 	// Safe Auth Email regex ; internet email@(subdomain.)domain.name ; max 72 ; practical
 	REGEX_SAFE_AUTH_USER_NAME 		string = `^[_a-z0-9\-\.@]{5,72}$` 						// Safe Auth Username Regex ; cover boths above
 
-	REGEX_SAFE_AUTH_OPAQUE_TOKEN 	string = `^[a-zA-Z0-9\-]{48,128}$` 	// Safe (Opaque) Token Regex
+	REGEX_SAFE_AUTH_OPAQUE_TOKEN 	string = `^[a-zA-Z0-9\-]{44,126}$` 	// Safe (Opaque) Token Regex ; {{{SYNC-MAX-AUTH-TOKEN-LENGTH}}}
 	REGEX_SAFE_AUTH_2FA_CODE 		string = `^[0-9]{6,8}$` 			// Safe 2FA Regex 6..8 digits
 
 	OPAQUE_TOKEN_FULL_NAME string = "Opaque:UUID"
@@ -304,12 +304,14 @@ type AuthDataStruct struct {
 	RawAuthData  string             `json:"-"` 				// Auth Raw Data, reserved for special usage, ex: auth cookie pre-auth
 	TokenData    string             `json:"-"` 				// Auth Token Data (Ex: JWT Token)
 	TokenAlgo    string             `json:"-"` 				// Token Algo (Ex: `JWT:Ed448`)
+	SecurityKey  string             `json:"-"` 				// Security Key
+	PubKey       string             `json:"pubKey"` 		// Public Key
 	PrivKey      string             `json:"-"` 				// Private Key
 	Privileges   string             `json:"privileges"` 	// Privileges: <priv1>,<priv2>,...
 	Restrictions string             `json:"restrictions"` 	// Restrictions: <restr1>,<restr2>,...
 	EmailAddr    string             `json:"emailAddr"` 		// User Email Address
 	FullName     string             `json:"fullName"` 		// Full Name
-	Quota        uint64             `json:"quota"` 			// Quota
+	Quota        int64              `json:"quota"` 			// Quota: -1 no quota ; 0 unlimited ; > 1 MB
 	MetaData     map[string]string  `json:"metaData"` 		// MetaData ... Associative Array {"key1":"Val1", "key2":"Val2", ...}
 }
 
@@ -317,9 +319,32 @@ type AuthDataStruct struct {
 //-----
 
 
-func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string, userID string, userName string, passHash string, passAlgo uint8, tokenData string, tokenAlgo string, emailAddr string, fullName string, privileges string, restrictions string, privKey string, quota uint64, metaData map[string]string) AuthDataStruct {
+func AuthGetMetaData(authData AuthDataStruct, key string) (string, error) {
 	//--
-	// TODO: validate privileges and restrictions
+	if(authData.MetaData == nil) {
+		return "", NewError("Auth MetaData is Null")
+	} //end if
+	if(len(authData.MetaData) <= 0) {
+		return "", NewError("Auth MetaData is Empty")
+	} //end if
+	//--
+	key = StrToLower(StrTrimWhitespaces(key))
+	if(key == "") {
+		return "", NewError("Auth MetaData Key is Empty")
+	} //end if
+	//--
+	val, ok := authData.MetaData[key]
+	if(!ok) {
+		return "", NewError("Auth MetaData Key is Missing")
+	} //end if
+	//--
+	return val, nil
+	//--
+} //END FUNCTION
+
+
+func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm string, userID string, userName string, passHash string, passAlgo uint8, tokenData string, tokenAlgo string, emailAddr string, fullName string, privileges string, restrictions string, privKey string, pubKey string, secKey string, quota int64, metaData map[string]string) AuthDataStruct {
+	//--
 	// {{{SYNC-AUTH-PASS-ALGOS}}}
 	//--
 	errMsg 			= StrTrimWhitespaces(errMsg)
@@ -335,13 +360,15 @@ func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string
 	privileges 		= AuthSafeListPrivsRestr(privileges)
 	restrictions 	= AuthSafeListPrivsRestr(restrictions)
 	privKey 		= StrTrimWhitespaces(privKey)
+	pubKey 			= StrTrimWhitespaces(pubKey)
+	secKey 			= StrTrimWhitespaces(secKey)
 	//--
 	if(userID == "") { // fix if username or id is missing
 		userID = userName
 	} else if(userName == "") {
 		userName = userID
 	} //end if
-	//-- can be empty: emailAddr, fullName, privileges, restrictions, privKey
+	//-- can be empty: emailAddr, fullName, privileges, restrictions, privKey, pubKey, secKey
 	if(errMsg != "") {
 		ok = false
 	} //end if
@@ -458,6 +485,89 @@ func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string
 		} //end if
 	} //end if
 	//--
+	//
+	if(privKey != "") {
+		if(!AuthIsValidPrivKey(privKey)) {
+			ok = false
+			if(errMsg == "") {
+				errMsg = "The Private Key is Invalid"
+			} //end if
+		} //end if
+	} //end if
+	if(pubKey != "") {
+		if(!AuthIsValidPubKey(pubKey)) {
+			ok = false
+			if(errMsg == "") {
+				errMsg = "The Public Key is Invalid"
+			} //end if
+		} //end if
+	} //end if
+	if(secKey != "") {
+		if(!AuthIsValidSecurityKey(secKey)) {
+			ok = false
+			if(errMsg == "") {
+				errMsg = "The Security Key is Invalid"
+			} //end if
+		} //end if
+	} //end if
+	//--
+	if(quota < -1) {
+		ok = false
+		if(errMsg == "") {
+			errMsg = "The Quota is Invalid"
+		} //end if
+	} //end if
+	//--
+	var safeMetaData map[string]string = map[string]string{}
+	if(metaData != nil) {
+		if(len(metaData) > 0) {
+			if(len(metaData) < 16) {
+				for kk,vv := range metaData {
+					kk = StrToLower(StrTrimWhitespaces(kk))
+					if(kk == "") {
+						safeMetaData = nil
+						ok = false
+						if(errMsg == "") {
+							errMsg = "MetaData contains an Empty Key"
+						} //end if
+						break
+					} //end if
+					if(len(kk) > 64) {
+						safeMetaData = nil
+						ok = false
+						if(errMsg == "") {
+							errMsg = "MetaData contains an OverSized Key"
+						} //end if
+						break
+					} //end if
+					if(!StrRegexMatch(REGEX_SAFE_VAR_NAME, kk)) {
+						safeMetaData = nil
+						ok = false
+						if(errMsg == "") {
+							errMsg = "MetaData contains an Invalid Key"
+						} //end if
+						break
+					} //end if
+					if(len(vv) > 4096) {
+						safeMetaData = nil
+						ok = false
+						if(errMsg == "") {
+							errMsg = "MetaData contains an OverSized Value"
+						} //end if
+						break
+					} //end if
+					safeMetaData[kk] = vv
+				} //end for
+			} else {
+				safeMetaData = nil
+				ok = false
+				if(errMsg == "") {
+					errMsg = "MetaData contains too many keys"
+				} //end if
+			} //end if
+		} //end if
+	} //end if
+	//--
 	privAuthData := AuthDataStruct {
 		OK:           ok,
 		ErrMsg:       errMsg,
@@ -470,13 +580,15 @@ func AuthDataGet(ok bool, errMsg string, method uint8, area string, realm string
 		PassAlgo:     passAlgo,
 		TokenData:    tokenData,
 		TokenAlgo:    tokenAlgo,
-		EmailAddr:    emailAddr,
-		FullName:     fullName,
+		SecurityKey:  secKey,
+		PrivKey:      privKey,
+		PubKey:       pubKey,
 		Privileges:   privileges,
 		Restrictions: restrictions,
-		PrivKey:      privKey,
+		EmailAddr:    emailAddr,
+		FullName:     fullName,
 		Quota:        quota,
-		MetaData:     metaData,
+		MetaData:     safeMetaData,
 	}
 	//--
 	return privAuthData
@@ -503,7 +615,7 @@ func AuthIsValidExtArea(area string) bool {
 		return false
 	} //end if
 	//--
-	if((len(area) < 3) || (len(area) > 18) || (!StrRegexMatch(REGEX_SAFE_AUTH_AREA, area))) { // {{{SYNC-AUTH-EXT-AREA-CHECK}}}
+	if((len(area) < 4) || (len(area) > 48) || (!StrRegexMatch(REGEX_SAFE_AUTH_AREA, area))) { // {{{SYNC-AUTH-EXT-AREA-CHECK}}}
 		return false
 	} //end if
 	//--
@@ -667,7 +779,7 @@ func AuthIsValidTokenOpaque(token string) bool {
 	if(StrLen(token) != StrLen(StrTrimWhitespaces(token))) {
 		return false
 	} //end if
-	if((StrLen(token) < 48) || (StrLen(token) > 128)) { // {{{SYNC-MAX-AUTH-TOKEN-LENGTH}}}
+	if((StrLen(token) < 44) || (StrLen(token) > 126)) { // {{{SYNC-MAX-AUTH-TOKEN-LENGTH}}} ; 44 is in SF ; allow just 126 do not encourage sha hex
 		return false
 	} //end if
 	if(!StrRegexMatch(REGEX_SAFE_AUTH_OPAQUE_TOKEN, token)) { // {{{SYNC-SF:REGEX_SAFE_AUTH_OPAQUE_TOKEN}}}
@@ -709,15 +821,49 @@ func AuthIsValid2FACode(code string) bool {
 } //END FUNCTION
 
 
-func AuthIsValidPrivKey(pkey string) bool { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
+func AuthIsValidSecurityKey(key string) bool { // {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}}
 	//--
-	if(StrTrimWhitespaces(pkey) == "") {
+	if(StrTrimWhitespaces(key) == "") {
 		return false
 	} //end if
-	if(StrLen(pkey) != StrLen(StrTrimWhitespaces(pkey))) {
+	if(StrLen(key) != StrLen(StrTrimWhitespaces(key))) {
 		return false
 	} //end if
-	if((StrLen(pkey) < 16) || (StrLen(pkey) > 256)) {
+	if((StrLen(key) < 16) || (StrLen(key) > 256)) { // 256 is req. by the msgpak server ...
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func AuthIsValidPrivKey(key string) bool {
+	//--
+	if(StrTrimWhitespaces(key) == "") {
+		return false
+	} //end if
+	if(StrLen(key) != StrLen(StrTrimWhitespaces(key))) {
+		return false
+	} //end if
+	if((StrLen(key) < 64) || (StrLen(key) > 512)) { // 64 B = 512 b ; 512 B = 4096 b ; ex: Ed448 / Edx448 Pub: # 152 bytes ; Ed25519 / Edx25519 Pub: 88 bytes
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func AuthIsValidPubKey(key string) bool {
+	//--
+	if(StrTrimWhitespaces(key) == "") {
+		return false
+	} //end if
+	if(StrLen(key) != StrLen(StrTrimWhitespaces(key))) {
+		return false
+	} //end if
+	if((StrLen(key) < 32) || (StrLen(key) > 256)) { // 64 B = 256 b ; 256 B = 2048 b ; ex: Ed448 / Edx448 Pub: # 76 bytes ; Ed25519 / Edx25519 Pub: 44 bytes
 		return false
 	} //end if
 	//--
@@ -771,7 +917,7 @@ func AuthSafeCompare(val1 string, val2 string) bool {
 //-----
 
 
-func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMode uint8, requiredUsername string, requiredPassword string, passHashAlgo uint8, privileges string, restrictions string, privKey string) (bool, AuthDataStruct) {
+func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMode uint8, requiredUsername string, requiredPassword string, passHashAlgo uint8, emailAddr string, fullName string, privileges string, restrictions string, privKey string, pubKey string, secKey string, quota int64, metaData map[string]string) (bool, AuthDataStruct) {
 	//--
 	// the requiredPassword must be the plain password just if passHashAlgo = ALGO_PASS_PLAIN
 	// otherwise must be the already hashed password as:
@@ -827,8 +973,13 @@ func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMo
 			hashedPass = requiredPassword // bcrypt hashes are never are the same, keep the entry value ...
 			break
 		case ALGO_PASS_PLAIN: // encode as Blowfish using the app secret key, to avoid display plain password accidentally
-			sKey, _ := AppGetSecurityKey()
-			hashedPass = BlowfishEncryptCBC(pass, sKey)
+			sKey, errSKey := AppGetSecurityKey()
+			if(errSKey != nil) {
+				log.Println("[ERROR]", CurrentFunctionName(), ": Algo: Pass Plain: App Security Key ERR:", errSKey)
+				authData.ErrMsg = "Password Internal Encryption is Unavailable"
+				return false, authData
+			} //end if
+			hashedPass = BlowfishEncryptCBC(pass, sKey, true) // randomize
 			break
 		default:
 			authData.ErrMsg = "Invalid Pass Hashing Algo: [" + ConvertUInt8ToStr(passHashAlgo) + "]"
@@ -860,7 +1011,7 @@ func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMo
 		} //end if
 	} //end if else
 	//-- #end: sync
-	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, hashedPass, passHashAlgo, "", "", "", "", privileges, restrictions, privKey, 0, nil)
+	authChkData := AuthDataInit(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, hashedPass, passHashAlgo, "", "", emailAddr, fullName, privileges, restrictions, privKey, pubKey, secKey, quota, metaData)
 	if(authChkData.ErrMsg != "") {
 		return false, authChkData
 	} //end if
@@ -874,7 +1025,7 @@ func AuthUserPassDefaultCheck(authRealm string, user string, pass string, authMo
 } //END FUNCTION
 
 
-func AuthUserTokenDefaultCheck(authRealm string, user string, token string, authMode uint8, requiredUsername string, requiredToken string, privileges string, restrictions string, privKey string) (bool, AuthDataStruct) {
+func AuthUserTokenDefaultCheck(authRealm string, user string, token string, authMode uint8, requiredUsername string, requiredToken string, emailAddr string, fullName string, privileges string, restrictions string, privKey string, pubKey string, secKey string, quota int64, metaData map[string]string) (bool, AuthDataStruct) {
 	//--
 	authData := AuthDataStruct{
 		OK: false,
@@ -888,7 +1039,7 @@ func AuthUserTokenDefaultCheck(authRealm string, user string, token string, auth
 		return false, authData
 	} //end if
 	//-- {{{SYNC-AUTH-MODES}}}
-	if((authMode != HTTP_AUTH_MODE_TOKEN) && (authMode != HTTP_AUTH_MODE_BEARER)) {
+	if((authMode != HTTP_AUTH_MODE_BASIC) && (authMode != HTTP_AUTH_MODE_TOKEN) && (authMode != HTTP_AUTH_MODE_BEARER)) {
 		authData.ErrMsg = "Unsupported Auth Mode: " + ConvertUInt8ToStr(authMode)
 		return false, authData
 	} //end if
@@ -919,7 +1070,7 @@ func AuthUserTokenDefaultCheck(authRealm string, user string, token string, auth
 		return false, authData
 	} //end if
 	//-- #end: sync
-	authChkData := AuthDataGet(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, "", ALGO_PASS_SMART_SAFE_OPQ_TOKEN, token, OPAQUE_TOKEN_FULL_NAME, "", "", privileges, restrictions, privKey, 0, nil)
+	authChkData := AuthDataInit(true, "", authMode, HTTP_AUTH_DEFAULT_AREA, authRealm, user, user, "", ALGO_PASS_SMART_SAFE_OPQ_TOKEN, token, OPAQUE_TOKEN_FULL_NAME, emailAddr, fullName, privileges, restrictions, privKey, pubKey, secKey, quota, metaData)
 	if(authChkData.ErrMsg != "") {
 		return false, authChkData
 	} //end if
@@ -935,27 +1086,70 @@ func AuthUserTokenDefaultCheck(authRealm string, user string, token string, auth
 
 func AuthUserTokenDefaultSepareParts(token string) (string, string, error) { // returns: userName, tokenHash, errTokenSepare
 	//--
-	// expects: user@token-hash
+	// expects: `user#token-hash` ; to be used with HTTP Headers as: `Authorization: Token user#token-hash`
 	//--
 	token = StrTrimWhitespaces(token)
 	if(token == "") {
 		return "", "", NewError("Token is Empty")
 	} //end if
 	//--
-	if(!StrContains(token, "@")) {
+	if(!StrContains(token, "#")) {
 		return "", "", NewError("Token is Malformed")
 	} //end if
-	tokenParts := ExplodeWithLimit("@", token, 2)
-	if(len(tokenParts) != 2) {
+	arrParts := ExplodeWithLimit("#", token, 3)
+	if(len(arrParts) != 2) {
 		return "", "", NewError("Invalid Token Format")
 	} //end if
-	var userName string = StrTrimWhitespaces(tokenParts[0]) // username part
+	//--
+	var userName string = StrTrimWhitespaces(arrParts[0]) // username part
 	if((userName == "") || (AuthIsValidUserName(userName) != true)) {
 		return userName, "", NewError("Invalid Token UserName Format")
 	} //end if
-	var tokenHash string = StrTrimWhitespaces(tokenParts[1]) // hash (uuid) part, the real token
+	//--
+	var tokenHash string = StrTrimWhitespaces(arrParts[1]) // hash (uuid) part, the real token
 	if((tokenHash == "") || (AuthIsValidTokenOpaque(tokenHash) != true)) {
 		return userName, tokenHash, NewError("Invalid Token Hash Format")
+	} //end if
+	//--
+	return userName, tokenHash, nil
+	//--
+} //END FUNCTION
+
+
+func AuthUserTokenBasicSepareParts(usernameWithTokenSuffix string, passAsTokenHash string) (string, string, error) { // returns: userName, suffix, errTokenSepare
+	//--
+	// expects `user#token` ; to be used via Auth Basic as the userName part ; the password will be the token hash, but is not managed in this method
+	//--
+	usernameWithTokenSuffix = StrTrimWhitespaces(usernameWithTokenSuffix)
+	if(usernameWithTokenSuffix == "") {
+		return "", "", NewError("Raw UserName is Empty")
+	} //end if
+	//--
+	passAsTokenHash = StrTrimWhitespaces(passAsTokenHash)
+	if(passAsTokenHash == "") {
+		return "", "", NewError("Token is Empty")
+	} //end if
+	if(AuthIsValidTokenOpaque(passAsTokenHash) != true) {
+		return "", "", NewError("Invalid Token Format")
+	} //end if
+	var tokenHash string = passAsTokenHash
+	//--
+	if(!StrContains(usernameWithTokenSuffix, "#")) {
+		return "", "", NewError("Raw UserName is Malformed")
+	} //end if
+	arrParts := ExplodeWithLimit("#", usernameWithTokenSuffix, 3)
+	if(len(arrParts) != 2) {
+		return "", "", NewError("Invalid Raw UserName Format")
+	} //end if
+	//--
+	var userName string = StrTrimWhitespaces(arrParts[0]) // username part
+	if((userName == "") || (AuthIsValidUserName(userName) != true)) {
+		return userName, "", NewError("Invalid Raw UserName Format: UserName")
+	} //end if
+	//--
+	var suffix string = StrTrimWhitespaces(arrParts[1]) // hash (uuid) part, the real token
+	if((suffix == "") || (suffix != "token")) {
+		return userName, suffix, NewError("Invalid Raw UserName Format: Suffix")
 	} //end if
 	//--
 	return userName, tokenHash, nil
@@ -966,14 +1160,50 @@ func AuthUserTokenDefaultSepareParts(token string) (string, string, error) { // 
 //-----
 
 
-func AuthGetDefaultUserPrivKey() string { // for internal use only !
+func AuthGetUserDefaultPrivKey(username string) string { // for internal use only ! for default auth or when a user does not have a private key, compose one by secure hashing the username and the default app key
 	//--
-	pkey, err := AppGetSecurityKey()
-	if(err != nil) {
+	username = StrTrimWhitespaces(username)
+	if((username == "") || (AuthIsValidExtUserName(username) != true)) {
 		return ""
 	} //end if
 	//--
-	return BaseEncode([]byte(Sh3a512(pkey)), "b85") // use this when not having per/user security key
+	pkey, err := AppGetSecurityKey()
+	if(err != nil) {
+		log.Println("[ERROR]", CurrentFunctionName(), ": App Security Key ERR:", err)
+		return ""
+	} //end if
+	//--
+	key := BaseEncode([]byte(Sha512(username + NULL_BYTE + pkey)), "b85") // use this when not having per/user security key
+	if(!AuthIsValidPrivKey(key)) {
+		log.Println("[ERROR]", CurrentFunctionName(), ": Key is Invalid")
+		return ""
+	} //end if
+	//--
+	return key // valid: 64..512
+	//--
+} //END FUNCTION
+
+
+func AuthGetUserDefaultSecurityKey(username string) string { // for internal use only ! for default auth or when a user does not have a security key, compose one by secure hashing the username and the default app key
+	//--
+	username = StrTrimWhitespaces(username)
+	if((username == "") || (AuthIsValidExtUserName(username) != true)) {
+		return ""
+	} //end if
+	//--
+	pkey, err := AppGetSecurityKey()
+	if(err != nil) {
+		log.Println("[ERROR]", CurrentFunctionName(), ": App Security Key ERR:", err)
+		return ""
+	} //end if
+	//--
+	key := BaseEncode([]byte(Sha256(username + FORM_FEED + pkey)), "b92") // use this when not having per/user security key
+	if(!AuthIsValidSecurityKey(key)) {
+		log.Println("[ERROR]", CurrentFunctionName(), ": Key is Invalid")
+		return ""
+	} //end if
+	//--
+	return key // valid: 16..256
 	//--
 } //END FUNCTION
 

@@ -1,8 +1,8 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
-// [ AUTH / MODEL:YAML ]
+// r.20250118.2358 :: STABLE
+// [ AUTH / MODEL ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
@@ -13,22 +13,26 @@ package smartgo
 
 type AuthUserRecord struct {
 	Exists        bool
+	IsValid       bool
 	UserID        string
 	UserName      string
 	PassHash      string
 	PassAlgo      uint8
 	Totp2FASecret string
+	SecurityKey   string
 	PrivKey       string
+	PubKey        string
 	EmailAddr     string
 	FullName      string
 	Privileges    string
 	Restrictions  string
-	Quota         uint64
+	Quota         int64
 	MetaData      map[string]string
 }
 
 type AuthUserToken struct {
-	IsValid       bool // exists and is valid
+	Exists        bool
+	IsValid       bool
 	TokenHash     string
 	UserName      string
 	Privileges    string
@@ -38,20 +42,50 @@ type AuthUserToken struct {
 }
 
 type AuthProvider interface {
-	Init(name string, dataYaml string) error
-	GetUserRecord(authUserName string) (AuthUserRecord, error)
-	VerifyUserTokenByRecord(authUserName string, authUserToken string) (AuthUserToken, error)
+	IsInitialized() (bool, error)
+	SetError(err error) bool
+	Init(name string) error
+	ParseAndValidateAuthUserRecord(authUserName string, arrUserRecord map[string]interface{}) (AuthUserRecord, error)
+	ParseAndValidateAuthTokenRecord(authUserName string, authUserToken string, arrTokenRecord map[string]interface{}) (AuthUserToken, error)
 }
 
-type AuthProviderYaml struct {
+type AuthDataProvider struct {
 	name     string
 	init     bool
 	err      error
-	yamlData string
-	yamlMap  map[string]interface{}
 }
 
-func (p *AuthProviderYaml) Init(name string, dataYaml string) error {
+
+//-----
+
+
+func (p *AuthDataProvider) IsInitialized() (bool, error) {
+	//--
+	return p.init, p.err
+	//--
+} //END FUNCTION
+
+
+func (p *AuthDataProvider) SetError(err error) bool {
+	//--
+	if(err == nil) { // avoid set if nil to disallow clear the error by mistake
+		return false
+	} //end if
+	//--
+	p.err = err
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func (p *AuthDataProvider) Init(name string) error {
+	//--
+	defer PanicHandler() // safe recovery handler
+	//--
+	if(p.err != nil) { // check for external pre-init error that can be set via SetEror() above
+		return p.err
+	} //end if
 	//--
 	if(p.init == true) {
 		return p.err
@@ -65,53 +99,39 @@ func (p *AuthProviderYaml) Init(name string, dataYaml string) error {
 		return p.err
 	} //end if
 	//--
-	p.yamlData = StrTrimWhitespaces(dataYaml)
-	if(p.yamlData == "") {
-		p.err = NewError("YAML Data is Empty")
-		return p.err
-	} //end if
-	//--
-	ym, yErr := YamlDataParse(p.yamlData)
-	if(yErr != nil) {
-		p.err = NewError("YAML Parsed Data ERR: " + yErr.Error())
-		return p.err
-	} //end if
-	if(ym == nil) {
-		p.err = NewError("YAML Parsed Data is Empty")
-		return p.err
-	} //end if
-	p.yamlMap = ym
-	//--
 	return nil
 	//--
 } //END FUNCTION
 
-func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, error) {
+
+func (p *AuthDataProvider) ParseAndValidateAuthUserRecord(authUserName string, arrUserRecord map[string]interface{}) (AuthUserRecord, error) {
 	//--
-	defRecord := AuthUserRecord{Exists:false}
+	defer PanicHandler() // safe recovery handler
 	//--
-	//log.Println("[DEBUG] p.yamlMap", p.yamlMap, "p.yamlData", p.yamlData)
-	if(p.yamlMap == nil) {
-		return defRecord, NewError("No data")
-	} //end if
-	if(len(p.yamlMap) <= 0) {
-		return defRecord, NewError("No records found")
-	} //end if
+	defRecord := AuthUserRecord{Exists:false, IsValid:false, UserName:""}
 	//--
 	authUserName = StrTrimWhitespaces(authUserName)
 	if((authUserName == "") || (AuthIsValidUserName(authUserName) != true)) {
-		return defRecord, NewError("Invalid UserName")
+		return defRecord, NewError("Empty or Invalid UserName")
 	} //end if
+	defRecord.UserName = authUserName
 	//--
-	ymlRecord, ok := p.yamlMap[authUserName]
-	if(!ok) {
-		return defRecord, NewError("User Record Not Found")
-	} //end if
-	if(ymlRecord == nil) {
+	if(arrUserRecord == nil) {
 		return defRecord, NewError("User Record is Null")
 	} //end if
+	if(len(arrUserRecord) <= 0) {
+		return defRecord, NewError("User Record is Empty")
+	} //end if
+	defRecord.Exists = true
 	//--
-	jsonRecord := JsonNoErrChkEncode(ymlRecord, false, false)
+	jsonRecord, errJson := JsonEncode(arrUserRecord, false, false)
+	if(errJson != nil) {
+		return defRecord, NewError("User Record JSON Encoding ERR: " + errJson.Error())
+	} //end if
+	jsonRecord = StrTrimWhitespaces(jsonRecord)
+	if(jsonRecord == "") {
+		return defRecord, NewError("JSON data record is Empty")
+	} //end if
 	arrRecord := JsonGetValueByKeyPath(jsonRecord, "")
 	//--
 	record := AuthUserRecord{}
@@ -122,10 +142,15 @@ func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, e
 	} //end if
 	record.UserName = authUserName
 	record.PassHash = StrTrimWhitespaces(arrRecord.Get("passhash").String())
-	record.PassAlgo = uint8(arrRecord.Get("passalgo").Uint())
+	if(arrRecord.Get("passalgo").Exists()) {
+		record.PassAlgo = uint8(arrRecord.Get("passalgo").Uint())
+	} else {
+		record.PassAlgo = ALGO_PASS_SMART_SAFE_SF_PASS // fallback if the `algo` field does not exists
+	} //end if
 	var isPassAlgoValid bool = false
 	switch(record.PassAlgo) { // {{{SYNC-AUTH-PASS-ALGOS}}}
 		case ALGO_PASS_NONE:
+			// invalid, must have a valid pass algo
 			break
 		case ALGO_PASS_PLAIN:
 			isPassAlgoValid = true
@@ -139,26 +164,25 @@ func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, e
 		case ALGO_PASS_SMART_SAFE_BCRYPT:
 			isPassAlgoValid = true
 			break
-		case ALGO_PASS_SMART_SAFE_OPQ_TOKEN:
-			// invalid, the user account can't have this kind of password hash
-			break
-		case ALGO_PASS_SMART_SAFE_WEB_TOKEN:
-			// invalid, the user account can't have this kind of password hash
-			break
-		case ALGO_PASS_CUSTOM_TOKEN:
-			// invalid, the user account can't have this kind of password hash
-			break
 		case ALGO_PASS_CUSTOM_HASH_PASS:
 			isPassAlgoValid = true // valid, for custom pass hash implementations
+			break
+		case ALGO_PASS_SMART_SAFE_OPQ_TOKEN: fallthrough
+		case ALGO_PASS_SMART_SAFE_WEB_TOKEN: fallthrough
+		case ALGO_PASS_CUSTOM_TOKEN:
+			// invalid, the user account can't have this kind of password hash
 			break
 	} //end if
 	if(isPassAlgoValid != true) {
 		return defRecord, NewError("Invalid Pass Algo")
 	} //end if
-	record.Totp2FASecret = StrTrimWhitespaces(arrRecord.Get("secret2fa").String())
-	record.PrivKey = StrTrimWhitespaces(arrRecord.Get("secretkey").String())
+	record.Totp2FASecret = StrTrimWhitespaces(arrRecord.Get("secret2fa").String()) // 2FA Secret Key
+	record.SecurityKey = StrTrimWhitespaces(arrRecord.Get("secretkey").String()) // OAuth2 (JWT Tokens) Secret Key
+	// TODO: implement encrypted private key + decrypt private key somewhere ...
+	record.PrivKey = StrTrimWhitespaces(arrRecord.Get("privkey").String()) // Private Key used for encryption and decryption
+	record.PubKey = StrTrimWhitespaces(arrRecord.Get("pubkey").String())
 	record.EmailAddr = StrTrimWhitespaces(arrRecord.Get("email").String())
-	record.FullName = StrTrimWhitespaces(arrRecord.Get("name").String())
+	record.FullName = StrTrimWhitespaces(arrRecord.Get("fullname").String())
 	record.Privileges = StrTrimWhitespaces(arrRecord.Get("privileges").String())
 	if(record.Privileges == "") {
 		record.Privileges = HTTP_AUTH_DEFAULT_PRIV // {{{SYNC-AUTH-RECORD-FALLBACK-PRIV}}}
@@ -167,7 +191,7 @@ func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, e
 	if(record.Restrictions == "") {
 		record.Restrictions = HTTP_AUTH_DEFAULT_RESTR // {{{SYNC-AUTH-RECORD-FALLBACK-RESTR}}}
 	} //end if
-	record.Quota = arrRecord.Get("quota").Uint()
+	record.Quota = arrRecord.Get("quota").Int()
 	record.MetaData = map[string]string{}
 	metaData := arrRecord.Get("metainfo").Map()
 	if(len(metaData) > 0) {
@@ -179,88 +203,79 @@ func (p *AuthProviderYaml) GetUserRecord(authUserName string) (AuthUserRecord, e
 		} //end for
 	} //end if
 	//--
+	record.IsValid = true // set at the end only for safety
+	//--
 	return record, nil
 	//--
 } //END FUNCTION
 
-func (p *AuthProviderYaml) VerifyUserTokenByRecord(authUserName string, authUserToken string) (AuthUserToken, error) {
+
+func (p *AuthDataProvider) ParseAndValidateAuthTokenRecord(authUserName string, authUserToken string, arrTokenRecord map[string]interface{}) (AuthUserToken, error) {
 	//--
-	defToken := AuthUserToken{IsValid:false, UserName:authUserName}
+	defer PanicHandler() // safe recovery handler
 	//--
-	if(p.yamlMap == nil) {
-		return defToken, NewError("No data")
-	} //end if
-	if(len(p.yamlMap) <= 0) {
-		return defToken, NewError("No records found")
-	} //end if
+	defToken := AuthUserToken{Exists:false, IsValid:false, UserName:""}
 	//--
 	authUserName = StrTrimWhitespaces(authUserName)
 	if((authUserName == "") || (AuthIsValidUserName(authUserName) != true)) {
-		return defToken, NewError("Invalid UserName")
+		return defToken, NewError("Empty or Invalid UserName")
 	} //end if
+	defToken.UserName = authUserName
 	//--
 	authUserToken = StrTrimWhitespaces(authUserToken)
 	if((authUserToken == "") || (AuthIsValidTokenOpaque(authUserToken) != true)) {
-		return defToken, NewError("Invalid Token Hash")
+		return defToken, NewError("Empty or Invalid Token Format")
 	} //end if
 	//--
-	ymlRecord, ok := p.yamlMap[authUserName]
-	if(!ok) {
-		return defToken, NewError("User Record Not Found")
+	if(arrTokenRecord == nil) {
+		return defToken, NewError("Token Record is Null")
 	} //end if
-	if(ymlRecord == nil) {
-		return defToken, NewError("User Record is Null")
+	if(len(arrTokenRecord) <= 0) {
+		return defToken, NewError("Token Record is Empty")
 	} //end if
+	defToken.Exists = true
 	//--
-	jsonRecord := JsonNoErrChkEncode(ymlRecord, false, false)
+	jsonRecord, errJson := JsonEncode(arrTokenRecord, false, false)
+	if(errJson != nil) {
+		return defToken, NewError("User Token Record JSON Encoding ERR: " + errJson.Error())
+	} //end if
+	jsonRecord = StrTrimWhitespaces(jsonRecord)
+	if(jsonRecord == "") {
+		return defToken, NewError("JSON data record is Empty")
+	} //end if
+	arrRecord := JsonGetValueByKeyPath(jsonRecord, "")
 	//--
-	theTokens := JsonGetValueByKeyPath(jsonRecord, "tokens")
-	if(!theTokens.Exists()) {
-		return defToken, NewError("No Tokens Defined")
+	theToken := AuthUserToken{}
+	theToken.Exists = true
+	theToken.TokenHash = StrTrimWhitespaces(arrRecord.Get("id").String())
+	theToken.UserName = authUserName
+	theToken.Privileges = StrTrimWhitespaces(arrRecord.Get("privileges").String())
+	if(theToken.Privileges == "") {
+		theToken.Privileges = HTTP_AUTH_DEFAULT_PRIV // {{{SYNC-AUTH-RECORD-FALLBACK-PRIV}}}
 	} //end if
-	if(!theTokens.IsArray()) {
-		return defToken, NewError("Invalid Tokens Definition")
+	theToken.Restrictions = StrTrimWhitespaces(arrRecord.Get("restrictions").String())
+	if(theToken.Restrictions == "") {
+		theToken.Restrictions = HTTP_AUTH_DEFAULT_RESTR // {{{SYNC-AUTH-RECORD-FALLBACK-RESTR}}}
 	} //end if
-	tokens := JsonGetValueByKeyPath(jsonRecord, "tokens").Array()
-	if((tokens == nil) || (len(tokens) <= 0)) {
-		return defToken, NewError("No Tokens Found")
-	} //end if
-	//--
-	theToken := AuthUserToken{IsValid:false, UserName:authUserName}
-	for i:=0; i<len(tokens); i++ {
-		token := tokens[i]
-		if(tokens[i].IsObject()) {
-			var id string = StrTrimWhitespaces(token.Get("id").String())
-			if((id != "") && (id == authUserToken)) {
-				var isExpired bool = false
-				var expiration string = StrToUpper(token.Get("expiration").String()) // may be as: `yyyy-mm-dd hh:ii:ss` or if not encosed in quotes, yaml will parse as `yyyy-mm-ddThh:ii:ssZ`
-				expiration = StrReplaceAll(expiration, "T", " ")
-				expiration = StrReplaceAll(expiration, "Z", " ")
-				expiration = StrTrimWhitespaces(expiration)
-				if(expiration != "") {
-					dt := DateTimeStructUtc(expiration)
-					if(dt.Time < TimeNowUtc()) {
-						isExpired = true
-					} //end if
-				} //end if
-				if(isExpired != true) {
-					theToken.IsValid = true
-				} //end if
-				theToken.IsExpired = isExpired
-				theToken.TokenHash = id
-				theToken.Expiration = expiration
-				theToken.Privileges = StrTrimWhitespaces(token.Get("privileges").String())
-				if(theToken.Privileges == "") {
-					theToken.Privileges = HTTP_AUTH_DEFAULT_PRIV // {{{SYNC-AUTH-RECORD-FALLBACK-PRIV}}}
-				} //end if
-				theToken.Restrictions = StrTrimWhitespaces(token.Get("restrictions").String())
-				if(theToken.Restrictions == "") {
-					theToken.Restrictions = HTTP_AUTH_DEFAULT_RESTR // {{{SYNC-AUTH-RECORD-FALLBACK-RESTR}}}
-				} //end if
-				break
-			} //end if
+	var isExpired bool = false // by default consider it non-expired ; make it expired only if the field expiration exists and is non-empty
+	var expiration string = StrToUpper(arrRecord.Get("expiration").String()) // may be as: `yyyy-mm-dd hh:ii:ss` or if not encosed in quotes ; ex: yaml will parse as `yyyy-mm-ddThh:ii:ssZ`
+	expiration = StrReplaceAll(expiration, "T", " ")
+	expiration = StrReplaceAll(expiration, "Z", " ")
+	expiration = StrTrimWhitespaces(expiration)
+	if(expiration != "") {
+		dt := DateTimeStructUtc(expiration)
+		if((dt.Status != "OK") || (dt.ErrMsg != "")) {
+			isExpired = true // malformed
+		} else if(dt.Time < TimeNowUtc()) {
+			isExpired = true
 		} //end if
-	} //end for
+	} //end if
+	theToken.IsExpired = isExpired
+	theToken.Expiration = expiration
+	//--
+	if(isExpired == false) {
+		theToken.IsValid = true
+	} //end if
 	//--
 	return theToken, nil
 	//--

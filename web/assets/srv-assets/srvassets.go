@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20250107.2358"
+	VERSION string = "r.20250118.2358"
 )
 
 var (
@@ -85,7 +85,7 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 	var path string = smart.GetHttpPathFromRequest(r)
 	//--
 	if((r.Method != "GET") && (r.Method != "HEAD")) {
-		log.Println("StatusCode: 405 # Failed to Serve Asset: `" + path + "`", "# Invalid Method:", r.Method, "::", smart.CurrentFunctionName())
+		log.Println("[META]", smart.CurrentFunctionName(), "# StatusCode: 405 # Failed to Serve Asset: `" + path + "`", "# Invalid Method:", r.Method)
 		smarthttputils.HttpStatus405(w, r, "Invalid Request Method [" + r.Method + "] for Asset: `" + path + "`", true) // html
 		return 405
 	} //end if
@@ -96,7 +96,7 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 		if(len(path) > 4) {
 			if(smart.StrStartsWith(path, "lib/")) {
 				if(smart.StrStartsWith(path, "lib/tpl/")) { // no-serve.http-access
-					log.Println("StatusCode: 410 # Inaccessible Asset: `" + path + "`", "# Protected", "::", smart.CurrentFunctionName())
+					log.Println("[META]", smart.CurrentFunctionName(), "# StatusCode: 410 # Inaccessible Asset: `" + path + "`", "# Protected")
 					smarthttputils.HttpStatus410(w, r, "Inaccessible Asset: `" + path + "`", true) // html
 					return 410
 				} else {
@@ -107,7 +107,7 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 	} //end if
 	//--
 	if(assetContent == "") {
-		log.Println("StatusCode: 404 # Failed to Serve Asset: `" + path + "`", "# Not Found", "::", smart.CurrentFunctionName())
+		log.Println("[META]", smart.CurrentFunctionName(), "# StatusCode: 404 # Failed to Serve Asset: `" + path + "`", "# Not Found")
 		smarthttputils.HttpStatus404(w, r, "Asset Not Found: `" + path + "`", true) // html
 		return 404
 	} //end if
@@ -135,9 +135,9 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 	} //end switch
 	//--
 	if(DEBUG == true) {
-		log.Println("[DATA] " + smart.CurrentFunctionName() + ": Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
+		log.Println("[DATA]", smart.CurrentFunctionName(), "# Served Asset: `" + path + "` :: ContentLength:", len(assetContent), "bytes ; lastModified: `" + cMod + "` ; cacheControl: `" + cCtl + "` ; cacheExpires:", cExp)
 	} //end if
-	log.Println("[NOTICE] " + smart.CurrentFunctionName() + ": Serving Asset: `" + path + "` ;", len(assetContent), "bytes")
+	log.Println("[NOTICE]", smart.CurrentFunctionName(), "# Serving Asset: `" + path + "` ;", len(assetContent), "bytes")
 	//--
 	smarthttputils.HttpStatus200(w, r, assetContent, path, "", cExp, cMod, cCtl, nil)
 	//--

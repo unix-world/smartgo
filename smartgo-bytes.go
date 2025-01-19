@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ BYTES ]
 
 // REQUIRE: go 1.19 or later
@@ -18,6 +18,21 @@ import (
 
 
 //-----
+
+
+func BytesConcatenate(src1 []byte, src2 []byte) []byte {
+	//--
+	if((src1 == nil) && (src2 == nil)) {
+		return nil
+	} else if(src1 == nil) {
+		return src2
+	} else if(src2 == nil) {
+		return src1
+	} //end if
+	//--
+	return append(src1, src2...)
+	//--
+} //END FUNCTION
 
 
 func BytesEqual(src1 []byte, src2 []byte) bool { // compare equality between 2 []byte slices, case sensitive ; ; ex: []byte("go") is equivalent with []byte("go")
@@ -39,14 +54,26 @@ func BytesIEqual(src1 []byte, src2 []byte) bool { // compare equality between 2 
 
 func BExplodeWithLimit(delimiter []byte, src []byte, limit int) [][]byte {
 	//--
-	return bytes.SplitN(src, delimiter, limit)
+	expl := bytes.SplitN(src, delimiter, limit)
+	//--
+	if(expl == nil) {
+		expl = [][]byte{}
+	} //end if
+	//--
+	return expl
 	//--
 } //END FUNCTION
 
 
 func BExplode(delimiter []byte, src []byte) [][]byte {
 	//--
-	return bytes.Split(src, delimiter)
+	expl := bytes.Split(src, delimiter)
+	//--
+	if(expl == nil) {
+		expl = [][]byte{}
+	} //end if
+	//--
+	return expl
 	//--
 } //END FUNCTION
 

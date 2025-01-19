@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ SMART.CORE ]
 
-// REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but real stable only since go 1.19)
+// REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but stable only since go 1.19)
 package smartgo
 
 import (
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20250107.2358"
+	VERSION string = "v.20250118.2358"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -38,6 +38,9 @@ const (
 	CARRIAGE_RETURN string = "\r" 					// The Carriage Return character \r
 
 	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 	// Ultra Wide Compatibility (Javascript / PHP)
+
+	REGEX_ASCII_ANDSPACE_CHARACTERS 	string = `^[[:graph:] \t\r\n]+$` 	// match all ASCII safe printable characters ; allow extra: space, tab, line feed, carriage return
+	REGEX_ASCII_NOSPACE_CHARACTERS 		string = `^[[:graph:]]+$` 			// match all ASCII safe printable characters except spaces
 )
 
 
@@ -242,7 +245,7 @@ func SmartListToArr(list string, noSpaces bool) []string {
 	} //end if
 	//--
 	exArr := strings.Split(list, ",") // explode
-	if(len(exArr) <= 0) {
+	if((exArr == nil) || (len(exArr) <= 0)) {
 		return arr
 	} //end if
 	//--

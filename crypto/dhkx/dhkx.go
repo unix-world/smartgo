@@ -1,6 +1,6 @@
 
-// (c) 2021-2024 unix-world.org
-// r.20241105.2358
+// (c) 2021-present unix-world.org
+// r.20250118.2358
 
 //=======
 // This is an implementation of Diffie-Hellman Key Exchange algorithm for a Client/Server suite, based on: github.com/monnand/dhkx
@@ -323,7 +323,7 @@ func DhKxClientExchange(handleDhkxCliRecvFunc HandleDhkxCliRecvFunc, handleDhkxC
 		return "ERR dhKxStep2: Shared Secret is NULL", grpCli, privCli, pubCli, pubKeyServer, "", ""
 	} //end if
 
-	var shardExch string = smart.ThreefishEncryptCBC(smart.Base64Encode(string(pubKeyServer)), smart.Sha384B64(string(shardCli)), false)
+	var shardExch string = smart.ThreefishEncryptCBC(smart.Base64Encode(string(pubKeyServer)), smart.Sha384B64(string(shardCli)), false, true) // randomize
 	errSendCliSend := handleDhkxCliSendFunc(pubCli, []byte(shardExch))
 	if(errSendCliSend != "") {
 		return "ERR Send to Server: " + errSendCliSend, grpCli, privCli, pubCli, pubKeyServer, "", ""

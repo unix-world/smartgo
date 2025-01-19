@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Validations :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -15,7 +15,7 @@ const (
 )
 
 
-func webUrlRouteIsValid(route string) bool { // just for URL Routes
+func WebUrlRouteIsValid(route string) bool { // just for URL Routes
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -57,11 +57,11 @@ func webUrlRouteIsValid(route string) bool { // just for URL Routes
 } //END FUNCTION
 
 
-func webUrlPathIsValid(urlPath string) bool { // just for URL Paths, a sub-set of URL Routes
+func WebUrlPathIsValid(urlPath string) bool { // just for URL Paths, a sub-set of URL Routes
 	//--
 	defer smart.PanicHandler()
 	//--
-	if(!webUrlRouteIsValid(urlPath)) {
+	if(!WebUrlRouteIsValid(urlPath)) {
 		return false
 	} //end if
 	//--
@@ -70,7 +70,7 @@ func webUrlPathIsValid(urlPath string) bool { // just for URL Paths, a sub-set o
 	} //end if
 	//--
 	urlPath = smart.StrTrimLeft(urlPath, "/") // fix: for the test below, it filesys paths allowed must not start with a slash /
-	if(!webPathIsValid(urlPath)) {
+	if(!WebPathIsValid(urlPath)) {
 		return false
 	} //end if
 	//--
@@ -79,7 +79,7 @@ func webUrlPathIsValid(urlPath string) bool { // just for URL Paths, a sub-set o
 } //END FUNCTION
 
 
-func webPathIsValid(path string) bool { // must work for dir or file
+func WebPathIsValid(path string) bool { // must work for dir or file
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -112,7 +112,7 @@ func webPathIsValid(path string) bool { // must work for dir or file
 } //END FUNCTION
 
 
-func webDirIsValid(path string) bool {
+func WebDirIsValid(path string) bool {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -121,7 +121,7 @@ func webDirIsValid(path string) bool {
 		return false
 	} //end if
 	//--
-	if(!webPathIsValid(path)) {
+	if(!WebPathIsValid(path)) {
 		return false
 	} //end if
 	//--
@@ -134,7 +134,7 @@ func webDirIsValid(path string) bool {
 } //END FUNCTION
 
 
-func webPathExists(path string) bool {
+func WebPathExists(path string) bool {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -149,13 +149,13 @@ func webPathExists(path string) bool {
 } //END FUNCTION
 
 
-func webDirExists(path string) bool {
+func WebDirExists(path string) bool {
 	//--
 	defer smart.PanicHandler()
 	//--
 	path = smart.StrTrimWhitespaces(path)
 	//--
-	if(!webPathExists(path)) {
+	if(!WebPathExists(path)) {
 		return false
 	} //end if
 	//--
@@ -168,13 +168,13 @@ func webDirExists(path string) bool {
 } //END FUNCTION
 
 
-func webFileExists(path string) bool {
+func WebFileExists(path string) bool {
 	//--
 	defer smart.PanicHandler()
 	//--
 	path = smart.StrTrimWhitespaces(path)
 	//--
-	if(!webPathExists(path)) {
+	if(!WebPathExists(path)) {
 		return false
 	} //end if
 	//--

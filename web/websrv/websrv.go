@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,10 +23,15 @@ var (
 	DEBUG bool = smart.DEBUG
 
 	httpAuthRealm string = "SmartGo.Web.Server: Auth Area"
+	httpServeSecure bool = false
+	httpServerAddr string = ""
+	httpServerPort string = ""
+
+	maxPostSize uint64 = smart.SIZE_BYTES_16M * 8 // 128 MB
 )
 
 const (
-	VERSION string = "r.20250107.2358"
+	VERSION string = "r.20250118.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -79,7 +84,7 @@ type HttpResponse struct {
 }
 type HttpHandlerFunc func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse)
 type smartRoute struct {
-	AuthSkip 		bool 				// if Auth is Enabled: all routes are enforced to authenticate, so to skip a particluar route (w/o tails) from authentication set this to TRUE ; if Auth is not enabled this setting has no effect
+	AuthSkip 		bool 				// if Auth is Enabled: all routes are enforced to authenticate, so to skip a particular route (w/o tails) from authentication set this to TRUE ; if Auth is not enabled this setting has no effect
 	AllowedMethods  []string 			// "OPTIONS" is handled separately (not allowed to be selected here) ; if is nil will (default) allow "HEAD", "GET", "POST" ; otherwise if explicit must be one or many of the: "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE"
 	MaxTailSegments int 				// if is zero, will allow no tails ; if is -1 will allow any number of tails and will pass them to controller ; if is 1 will alow one tail ; if is 2 will allow 2 tails, and so on ...
 	FxHandler  		HttpHandlerFunc 	// see UrlHandlerRegisterRoute()
@@ -97,6 +102,23 @@ type WebdavRunOptions struct {
 }
 
 
+func WebServerSetMaxPostSize(size uint64) bool {
+	//--
+	if(handlersAreLocked == true) {
+		return false // disallow changing after server started
+	} //end if
+	//--
+	if(size <= 0) {
+		return false
+	} //end if
+	//--
+	maxPostSize = size
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
 // IMPORTANT: If using Proxy with different PROXY_HTTP_BASE_PATH than "/" (ex: "/api/") the Proxy MUST strip back PROXY_HTTP_BASE_PATH to "/" for this backend
 func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
 
@@ -105,6 +127,10 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//--
 
 	defer smart.PanicHandler()
+
+	//--
+	httpServeSecure = serveSecure
+	//--
 
 	//-- lock routes
 	handlersAreLocked = true
@@ -116,6 +142,17 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//--
 
 	log.Println("[META] Web Server: Allowed Methods:", listMethods(allowedMethods))
+
+	//-- ip restriction list
+
+	allowedIPs = smart.StrTrimWhitespaces(allowedIPs)
+	if(allowedIPs != "") {
+		errValidateAllowedIpList := smart.ValidateIPAddrList(allowedIPs) // {{{SYNC-VALIDATE-IP-LIST-BEFORE-VERIFY-IP}}} ; validate here because is used later in a sub-method of this method (by the routes to check access)
+		if(errValidateAllowedIpList != nil) {
+			log.Println("[ERROR] Web Server: ALLOWED IP LIST Error: " + errValidateAllowedIpList.Error())
+			return 1002
+		} //end if
+	} //end if
 
 	//-- auth user / pass
 
@@ -145,6 +182,10 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	} //end if
 
 	if(isAuthActive) {
+		//--
+		if(allowedIPs != "") {
+			log.Println("[INFO]", "Web Server: Authentication ALLOWED IP LIST is: `" + allowedIPs + "`")
+		} //end if
 		//--
 		if(authRealm != "") {
 			if(smarthttputils.IsValidHttpAuthRealm(authRealm) != true) {
@@ -184,7 +225,11 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//--
 	} else {
 		//--
-		log.Println("[WARNING]", "Web Server: Authentication is NOT ENABLED")
+		if(allowedIPs != "") {
+			log.Println("[INFO]", "Web Server: Access ALLOWED IP LIST is: `" + allowedIPs + "`")
+		} else {
+			log.Println("[WARNING]", "Web Server: Authentication is NOT ENABLED")
+		} //end if
 		//--
 	} //end if
 
@@ -198,19 +243,21 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	if(smart.StrContains(httpAddr, ":")) {
 		httpAddr = "[" + httpAddr + "]" // {{{SYNC-SMART-SERVER-DOMAIN-IPV6-BRACKETS}}}
 	} //end if
+	httpServerAddr = httpAddr
 
 	if(!smart.IsNetValidPortNum(int64(httpPort))) {
 		log.Println("[WARNING]", "Web Server: Invalid Server Address (Port):", httpPort, "using the default port:", SERVER_PORT)
 		httpPort = SERVER_PORT
 	} //end if
+	httpServerPort = smart.ConvertUInt16ToStr(httpPort)
 
 	//-- certif path (can be absolute)
 	if(serveSecure == true) {
-		if(webDirIsValid(CERTIFICATES_DEFAULT_PATH) != true) {
+		if(WebDirIsValid(CERTIFICATES_DEFAULT_PATH) != true) {
 			log.Println("[ERROR]", "Web Server: Certificates Default Path is Invalid:", CERTIFICATES_DEFAULT_PATH)
 			return 1201
 		} //end if
-		if(webDirExists(CERTIFICATES_DEFAULT_PATH) != true) {
+		if(WebDirExists(CERTIFICATES_DEFAULT_PATH) != true) {
 			log.Println("[ERROR]", "Web Server: Certificates Default Path does not Exists or Is Not a Valid Directory:", CERTIFICATES_DEFAULT_PATH)
 			return 1202
 		} //end if
@@ -236,11 +283,11 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//-- web dir public path: relative only + safety constraints
 
 	if(servePublicPath == true) {
-		if(webDirIsValid(WEB_PUBLIC_RELATIVE_ROOT_PATH) != true) {
+		if(WebDirIsValid(WEB_PUBLIC_RELATIVE_ROOT_PATH) != true) {
 			log.Println("[ERROR]", "Web Server: WebPublic Root Path is Invalid:", WEB_PUBLIC_RELATIVE_ROOT_PATH)
 			return 1301
 		} //end if
-		if(webDirExists(WEB_PUBLIC_RELATIVE_ROOT_PATH) != true) {
+		if(WebDirExists(WEB_PUBLIC_RELATIVE_ROOT_PATH) != true) {
 			log.Println("[ERROR]", "Web Server: WebPublic Path does not Exists or Is Not a Valid Directory:", WEB_PUBLIC_RELATIVE_ROOT_PATH)
 			return 1302
 		} //end if
@@ -265,11 +312,11 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				return 1400
 			} //end if
 		} //end if
-		if(webPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}} ; tesh with webPathIsValid() instead of webDirIsValid() because have no trailing slash
+		if(WebPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}} ; test with WebPathIsValid() instead of WebDirIsValid() because have no trailing slash
 			log.Println("[ERROR]", "Web Server: WebDav Root Path is Invalid:", DAV_STORAGE_RELATIVE_ROOT_PATH)
 			return 1401
 		} //end if
-		if(webDirExists(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) {
+		if(WebDirExists(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) {
 			log.Println("[ERROR]", "Web Server: WebDav Root Path does not Exists or Is Not a Valid Directory:", DAV_STORAGE_RELATIVE_ROOT_PATH)
 			return 1402
 		} //end if
@@ -315,8 +362,39 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		//-- panic recovery
 		defer smart.PanicHandler() // safe recovery handler
+		//-- get remote address IP without port
+		rAddrCli, _ := smart.GetHttpRemoteAddrIpAndPortFromRequest(r) // this is using r.RemoteAddr
 		//-- get real client IP
 		_, realClientIp := GetVisitorRealIpAddr(r)
+		//-- validate remote address IP without port
+		rAddrCli = smart.StrTrimWhitespaces(rAddrCli) // trim, just in case
+		if((rAddrCli == "") || (smart.IsNetValidIpAddr(rAddrCli) != true)) {
+			log.Printf("[ERROR] Web Server: IP Detection FAILED in RemoteAddress/Client :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s] ; Detected: `%s`\n", "500", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp, rAddrCli)
+			smarthttputils.HttpStatus500(w, r, "IP Detection FAILED for IP Address", true)
+			return
+		} //end if
+		//-- validate real client IP
+		realClientIp = smart.StrTrimWhitespaces(realClientIp) // trim, just in case
+		if((realClientIp == "") || (smart.IsNetValidIpAddr(realClientIp) != true)) {
+			log.Printf("[ERROR] Web Server: IP Detection FAILED in RealClientIP :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s] ; Detected: `%s`\n", "500", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp, realClientIp)
+			smarthttputils.HttpStatus500(w, r, "IP Detection FAILED for Client IP", true)
+			return
+		} //end if
+		//-- if No Auth Enabled but an IP Restrict List have been set apply IP Restriction List to any request ; otherwise will be applied just on authentication
+		if(isAuthActive != true) {
+			if(allowedIPs != "") {
+				if(!smart.StrContains(allowedIPs, "<"+rAddrCli+">")) { // {{{SYNC-VALIDATE-IP-IN-A-LIST}}} ; validate Remote Address
+					log.Printf("[SRV] Web Server: IP Restriction Detected in RemoteAddress/Client (No:Auth) :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "423", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+					smarthttputils.HttpStatus423(w, r, "The access to this service is disabled. The IP: `" + rAddrCli + "` is not allowed by current IP Address list", true)
+					return
+				} //end if
+				if((realClientIp == "") || (!smart.StrContains(allowedIPs, "<"+realClientIp+">"))) { // {{{SYNC-VALIDATE-IP-IN-A-LIST}}} ; validate realClientIp address, which may be the same as above but also may be different if behind proxy
+					log.Printf("[SRV] Web Server: IP Restriction Detected in RealClientIP (No:Auth) :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "423", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+					smarthttputils.HttpStatus423(w, r, "The access to this service is disabled. The Client IP: `" + realClientIp + "` is not allowed by current IP Address list", true)
+					return
+				} //end if
+			} //end if
+		} //end if
 		//--
 		//== rate limit interceptor (must be first)
 		if(useRateLimit) { // RATE LIMIT
@@ -362,7 +440,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				var fixedRoute string = smart.StrTrimWhitespaces(smart.StrTrim(urlPath, " /")) // trim on both sides, needs to add prefix below (Base Path)
 				if(fixedRoute != "") {
 					//--
-					fixedRoute = GetBasePath() + fixedRoute
+					fixedRoute = GetBaseBrowserPath() + fixedRoute
 					//--
 					// MUST NOT Allow Handlers for paths that end with a slash / to avoid infinite cycle in net/http internally: redirectToPathSlash
 					// also must be sure that there is a registered handler for the redirecting URL here
@@ -374,7 +452,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			} //end if
 		} //end if
 		//-- check route safety
-		if((!webUrlRouteIsValid(urlPath)) || (!webUrlRouteIsValid("/"+headPath))) {
+		if((!WebUrlRouteIsValid(urlPath)) || (!WebUrlRouteIsValid("/"+headPath))) {
 			log.Printf("[SRV] Web Server: Unsafe Request Path Detected :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "400", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 			smarthttputils.HttpStatus400(w, r, "Unsafe Request Path Detected [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 			return
@@ -433,7 +511,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 				return
 			} //end if
-			if((servePublicPath == true) && ((urlPath == "/") || (webUrlPathIsValid(urlPath) == true))) {
+			if((servePublicPath == true) && ((urlPath == "/") || (WebUrlPathIsValid(urlPath) == true))) {
 				if(((urlPath == "/") || (smart.PathExists(WEB_PUBLIC_RELATIVE_ROOT_PATH + smart.StrTrimLeft(urlPath, "/")) == true))) {
 					pCode := webPublicHttpHandler(w, r)
 					log.Printf("[SRV] Web Server: Public File :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", smart.ConvertUInt16ToStr(pCode), r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
@@ -463,13 +541,19 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//-- auth check (if auth is active and not explicit skip auth by route)
 		var authErr error = nil
 		var authData smart.AuthDataStruct
-		if((isAuthActive == true) && (sr.AuthSkip != true)) { // this check must be before executing fx below
-			authErr, authData = smarthttputils.HttpAuthCheck(w, r, httpAuthRealm, authUser, authPass, authToken, allowedIPs, customAuthCheck, true) // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
-			if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
-				log.Println("[LOG]", "Web Server: Authentication Failed:", "authData: OK [", authData.OK, "] ; ErrMsg: `" + authData.ErrMsg + "` ; UserName: `" + authData.UserName + "` ; Error:", authErr)
-				// MUST NOT WRITE ANY ANSWER HERE ON FAIL: smarthttputils.HttpStatusXXX() as 401, 403, 429 because the smarthttputils.HttpAuthCheck() method manages 4xx-5xx codes directly if not success
+		if(sr.AuthSkip != true) { // this check must be before executing fx below
+			if(isAuthActive == true) {
+				authErr, authData = smarthttputils.HttpAuthCheck(w, r, httpAuthRealm, authUser, authPass, authToken, allowedIPs, customAuthCheck, true) // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}} ; if not success, outputs HTML 4xx-5xx and must stop (return) immediately after checks from this method
+				if((authErr != nil) || (authData.OK != true) || (authData.ErrMsg != "")) {
+					log.Println("[LOG]", "Web Server: Authentication Failed:", "authData: OK [", authData.OK, "] ; ErrMsg: `" + authData.ErrMsg + "` ; UserName: `" + authData.UserName + "` ; Error:", authErr)
+					// MUST NOT WRITE ANY ANSWER HERE ON FAIL: smarthttputils.HttpStatusXXX() as 401, 403, 429 because the smarthttputils.HttpAuthCheck() method manages 4xx-5xx codes directly if not success
+					return
+				} //end if
+			} else {
+				log.Printf("[LOG] Web Server: Authentication is Disabled, ACCESS DENY for a Route that requires Authentication :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "403", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
+				smarthttputils.HttpStatus403(w, r, "Web Server: Authentication is Disabled, ACCESS DENY: `" + GetCurrentPath(r) + "`", true)
 				return
-			} //end if
+			} //end if else
 		} //end if
 		//-- #end auth check
 		timerStart := time.Now()
@@ -483,7 +567,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//-- custom log
 		response.LogMessage = smart.StrTrimWhitespaces(response.LogMessage)
 		if(response.LogMessage != "") {
-			log.Println("[LOG]", "Web Server: Controller Route:", "`" + urlPath + "`:", response.LogMessage)
+			log.Println("[LOG]", "Web Server: Controller Route:", "`" + urlPath + "` :: RemoteAddress/Client [" + r.RemoteAddr + "] # RealClientIP [" + realClientIp + "]:", response.LogMessage)
 		} //end if
 		//-- fixes for default params
 		if(response.CacheExpiration <= 0) { // for easing the development if response.CacheExpiration is not specified the default value is zero but actually for no-cache -1 is needed ; this fix is needed because in http utils cache zero means at least 60 seconds ... and -1 is no cache !

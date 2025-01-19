@@ -2,7 +2,7 @@ github.com/golang-jwt/jwt/v4 @v4.5.1 # 20241108
 
 go 1.22
 
-modified by unixman: r.20250107.2358
+modified by unixman: r.20250115.2358
 	* added SHA-224
 	* added SHA-3: 224 / 256 / 384 / 512 ;  quantum computing safe
 	* added ed448, EddSA ; quantum computing safe
@@ -12,3 +12,5 @@ modified by unixman: r.20250107.2358
 	* commented out unsafe algos: HS256 (SHA-256) ; HS512 (SHA-512) ; they are unsafe for signatures, see length attack issue: https://crypto.stackexchange.com/questions/89561/known-text-attack-on-hash-function-sha-256-or-sha512
 	* removed EcDSA: is non-resilient to side-channel attacks, compared with EdDSA
 	* removed RSA: old, deprecated, too long for a token with a reasonable safety, compared with EdDSA
+	* fix: B63 decoding: add panic handler ; handle invalid padding, L=3
+	* fix: expired since error message to avoid display sub-seconds

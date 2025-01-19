@@ -1,6 +1,14 @@
 package jwt
 
+// modified by unixman: fix B64: add panic handler ; jsonEncode ; catch invalid pad L=3
+// r.20250110.2358
+
 import (
+	"log"
+	"errors"
+	"runtime/debug"
+
+	"bytes"
 	"strings"
 	"time"
 	"encoding/base64"
@@ -81,12 +89,14 @@ func (t *Token) SigningString() (string, error) {
 	var err error
 	var jsonValue []byte
 
-	if jsonValue, err = json.Marshal(t.Header); err != nil {
+//	if jsonValue, err = json.Marshal(t.Header); err != nil {
+	if jsonValue, err = jsonEncode(t.Header); err != nil { // // fix by unixman ; don't escape html, make JWT shorter
 		return "", err
 	}
 	header := EncodeSegment(jsonValue)
 
-	if jsonValue, err = json.Marshal(t.Claims); err != nil {
+//	if jsonValue, err = json.Marshal(t.Claims); err != nil {
+	if jsonValue, err = jsonEncode(t.Claims); err != nil { // // fix by unixman ; don't escape html, make JWT shorter
 		return "", err
 	}
 	claim := EncodeSegment(jsonValue)
@@ -114,24 +124,71 @@ func ParseWithClaims(tokenString string, claims Claims, keyFunc Keyfunc, options
 	return NewParser(options...).ParseWithClaims(tokenString, claims, keyFunc)
 }
 
+//-- unixman
+func jsonEncode(data interface{}) ([]byte, error) {
+	//--
+	defer panicHandler()
+	//-- no need any panic handler
+	out := bytes.Buffer{}
+	//--
+	encoder := json.NewEncoder(&out)
+	encoder.SetEscapeHTML(false) // don't escape html, make JWT shorter
+	//--
+	err := encoder.Encode(data)
+	if(err != nil) {
+		return nil, err
+	} //end if
+	//--
+	return bytes.TrimSpace(out.Bytes()), nil // must trim as will add a new line at the end ...
+	//--
+} //END FUNCTION
+//-- #
+
 // EncodeSegment encodes a JWT specific base64url encoding with padding stripped
 func EncodeSegment(seg []byte) string {
+	defer panicHandler() // by unixman
 	return base64.RawURLEncoding.EncodeToString(seg)
 }
 
 // DecodeSegment decodes a JWT specific base64url encoding with padding stripped
+// unixman: added panic handler ; fix: if padding is invalid (L=3) exit and notice err
 func DecodeSegment(seg string) ([]byte, error) {
+	//-- unixman
+	defer panicHandler() // req. by base64 decode panic handler with malformed data
+
+	if(seg == "") {
+		return nil, errors.New("Empty Data")
+	}
+	//-- #unixman
+
 	encoding := base64.RawURLEncoding
 
 	if DecodePaddingAllowed {
-		if l := len(seg) % 4; l > 0 {
+		//-- fix by unixman
+	//	if l := len(seg) % 4; l > 0 {
+		var l int = len(seg) % 4
+		if(l > 0) {
+			if(l == 1) { // {{{SYNC-B64-WRONG-PAD-3}}} ; it cannot end with 3 "=" signs
+				return nil, errors.New("Invalid B64 Padding Length, more than 2, L = 3")
+			}
 			seg += strings.Repeat("=", 4-l)
 		}
+		//-- #fix
 		encoding = base64.URLEncoding
 	}
 
 	if DecodeStrict {
 		encoding = encoding.Strict()
 	}
+
 	return encoding.DecodeString(seg)
 }
+
+//-- unixman
+func panicHandler() {
+	if panicInfo := recover(); panicInfo != nil {
+		log.Println("[ERROR] !!! PANIC Recovered:", panicInfo, "by jwt.DecodeSegment")
+		log.Println("[PANIC] !!! Debug Stack Trace:", string(debug.Stack()), "from jwt.DecodeSegment")
+	} //end if
+}
+//-- #

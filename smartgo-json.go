@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ JSON ]
 
 // REQUIRE: go 1.19 or later
@@ -29,6 +29,8 @@ const (
 
 func ConvertJsonNumberToStr(data interface{}) string { // after convert to string can be re-converted into int64 / float64 / ...
 	//--
+	defer PanicHandler()
+	//--
 	return data.(json.Number).String()
 	//--
 } //END FUNCTION
@@ -36,12 +38,16 @@ func ConvertJsonNumberToStr(data interface{}) string { // after convert to strin
 
 func ConvertJsonNumberToInt64(data interface{}) (int64, error) {
 	//--
+	defer PanicHandler()
+	//--
 	return data.(json.Number).Int64()
 	//--
 } //END FUNCTION
 
 
 func ConvertJsonNumberToFloat64(data interface{}) (float64, error) {
+	//--
+	defer PanicHandler()
 	//--
 	return data.(json.Number).Float64()
 	//--
@@ -52,6 +58,8 @@ func ConvertJsonNumberToFloat64(data interface{}) (float64, error) {
 
 
 func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, error) {
+	//--
+	defer PanicHandler()
 	//-- no need any panic handler
 	out := bytes.Buffer{}
 	//--
@@ -72,6 +80,8 @@ func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, erro
 
 
 func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
+	//--
+	defer PanicHandler()
 	//-- no need any panic handler
 	str, _ := JsonEncode(data, prettyprint, htmlsafe)
 	//--
@@ -84,6 +94,8 @@ func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) strin
 
 
 func JsonObjDecode(data string) (map[string]interface{}, error) { // can parse just a JSON Object as {"key1":..., "key2":...}
+	//--
+	defer PanicHandler()
 	//-- no need any panic handler
 	data = StrTrimWhitespaces(data)
 	if(data == "") {
@@ -105,6 +117,8 @@ func JsonObjDecode(data string) (map[string]interface{}, error) { // can parse j
 
 
 func JsonArrDecode(data string) ([]interface{}, error) { // can parse just a JSON Array as ["a", 2, "c", { "e": "f" }, ...]
+	//--
+	defer PanicHandler()
 	//-- no need any panic handler
 	data = StrTrimWhitespaces(data)
 	if(data == "") {
@@ -126,6 +140,8 @@ func JsonArrDecode(data string) ([]interface{}, error) { // can parse just a JSO
 
 
 func JsonStrDecode(data string) (string, error) { // can parse: only a JSON String
+	//--
+	defer PanicHandler()
 	//-- no need any panic handler
 	data = StrTrimWhitespaces(data)
 	if(data == "") {
@@ -147,6 +163,8 @@ func JsonStrDecode(data string) (string, error) { // can parse: only a JSON Stri
 
 
 func JsonScalarDecodeToStr(data string) (string, error) { // can parse the following JSON Scalar Types: Int / Float / Bool / Null, String :: will re-map any of these as string only
+	//--
+	defer PanicHandler()
 	//-- no need any panic handler
 	data = StrTrimWhitespaces(data)
 	if(data == "") {

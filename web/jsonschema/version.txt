@@ -5,5 +5,5 @@ go 1.21
 requires:
 	golang.org/x/text
 
-refactored as: github.com/unix-world/smartgo/web/jsonschema # r.20241216.2358
+refactored as: github.com/unix-world/smartgo/web/jsonschema # r.20250108.2358
 includes modifications by unixman: commented out returning full path/url in validation error message

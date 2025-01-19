@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ TPL (MARKERS-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -24,7 +24,7 @@ const (
 
 	MTPL_FILE_EXTENSION string = ".mtpl.htm"
 
-	MAX_DOC_SIZE_TPL uint64 = SIZE_BYTES_16M
+	MAX_DOC_SIZE_TPL uint64 = SIZE_BYTES_16M // {{{SYNC-TPL-MAX-SIZE}}} ; 16MB
 )
 
 //-----

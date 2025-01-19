@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ INI (PARSE) ]
 
 // REQUIRE: go 1.19 or later
@@ -16,6 +16,8 @@ import (
 
 
 func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]string, errMsg error) {
+	//--
+	defer PanicHandler()
 	//-- no panic handler needed
 	iniData, errParseIni := parseini.Load(iniContent)
 	if(errParseIni != nil) {

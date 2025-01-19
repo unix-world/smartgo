@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250103.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -181,7 +181,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 		log.Println("[ERROR] MsgPak Server: Empty Auth Shared PrivKey")
 		return 1009
 	} //end if
-	if(smart.AuthIsValidPrivKey(sharedEncPrivKey) != true) {
+	if(smart.AuthIsValidSecurityKey(sharedEncPrivKey) != true) {
 		log.Println("[ERROR] MsgPak Server: Invalid Auth Shared PrivKey Length: must be between 16 and 256 characters")
 		return 1010
 	} //end if
@@ -707,11 +707,16 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			isRequestOk = false
 		} //end if else
 		//--
-		var customcmd string = r.FormValue("cmd")
-		var customdata string = r.FormValue("data")
-		var askJson bool = (r.FormValue("mode") == "json")
+		var customcmd string  = ""
+		var customdata string = ""
+		var askJson bool      = false
+		if(isRequestOk == true) {
+			customcmd  = r.FormValue("cmd")
+			customdata = r.FormValue("data")
+			askJson    = (r.FormValue("mode") == "json")
+		} //end if
 		if(DEBUG == true) {
-			log.Println("[DEBUG] RequestVars:", "cmd", customcmd, ";", "data", customdata)
+			log.Println("[DEBUG] RequestVars:", "cmd", customcmd, ";", "data", customdata, "askJson", askJson)
 		} //end if
 		//--
 		if(isRequestOk == true) {

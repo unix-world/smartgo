@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ ARCHIVERS ]
 
 // REQUIRE: go 1.19 or later
@@ -110,6 +110,10 @@ func DataUnArchive(str string) string { // v3, v2, v1
 	//--
 	str = StrTrimWhitespaces(str)
 	if(str == "") {
+		return ""
+	} //end if
+	//--
+	if(!StrRegexMatch(REGEX_ASCII_ANDSPACE_CHARACTERS, str)) { // safety
 		return ""
 	} //end if
 	//--

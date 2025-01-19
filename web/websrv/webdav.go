@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -27,10 +27,15 @@ const webdavLockTimeSeconds uint16 = 300 // orphan locks will be cleared after t
 var webdavLockCache *smartcache.InMemCache = nil
 
 func webDavInitLockSysCache() {
+	//--
+	defer smart.PanicHandler() // safe recovery handler
+	//--
 	webdavLockCache = smartcache.NewCache("smart.websrv.webdav.locking.inMemCache", time.Duration(webdavLockTimeSeconds) * time.Second, webdav.DEBUG)
+	//--
 } //END FUNCTION
 
 func webdavLockExternalGetTokenHash(token string) string {
+	//--
 	token = smart.StrTrimWhitespaces(token)
 	if(token == "") {
 		return ""
@@ -39,10 +44,13 @@ func webdavLockExternalGetTokenHash(token string) string {
 		arr := smart.ExplodeWithLimit(":", token, 3)
 		token = smart.StrTrimWhitespaces(arr[len(arr)-1]) // get last part
 	} //end if
+	//--
 	return token
+	//--
 } //END FUNCTION
 
 func webdavLockExternalIsValid(token string) bool {
+	//--
 	if(token != smart.StrTrimWhitespaces(token)) {
 		return false
 	} //end if
@@ -52,10 +60,14 @@ func webdavLockExternalIsValid(token string) bool {
 	if(len(smart.StrReplaceAll(token, "-", "")) != 32) {
 		return false
 	} //end if
+	//--
 	return true
+	//--
 } //END FUNCTION
 
 func webdavLockingLOCK(internal bool, path string) (token string, err error) {
+	//--
+	defer smart.PanicHandler() // safe recovery handler
 	//--
 	if(webdavLockCache == nil) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
@@ -116,6 +128,8 @@ func webdavLockingLOCK(internal bool, path string) (token string, err error) {
 
 func webdavLockingUNLOCK(internal bool, token string) (success bool, err error) {
 	//--
+	defer smart.PanicHandler() // safe recovery handler
+	//--
 	if(webdavLockCache == nil) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
 		return true, smart.NewError("WebDav LockSys is N/A")
@@ -144,6 +158,8 @@ func webdavLockingUNLOCK(internal bool, token string) (success bool, err error) 
 } //END FUNCTION
 
 func webdavLockingEXISTS(internal bool, token string) bool {
+	//--
+	defer smart.PanicHandler() // safe recovery handler
 	//--
 	if(webdavLockCache == nil) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav LockSys Cache Structure is NIL")
@@ -175,7 +191,9 @@ func webdavLockingEXISTS(internal bool, token string) bool {
 	//--
 } //END FUNCTION
 
-func webdavLockSys() *webdav.LockSys { // TODO: implement SimpleCache ...
+func webdavLockSys() *webdav.LockSys {
+	//--
+	defer smart.PanicHandler() // safe recovery handler
 	//--
 	if(webdavLockCache == nil) {
 		return nil
@@ -194,12 +212,14 @@ func webdavLockSys() *webdav.LockSys { // TODO: implement SimpleCache ...
 
 func webDavUrlPath() string {
 	//--
-	return GetBasePath() + DAV_URL_PATH // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
+	return GetBaseBrowserPath() + DAV_URL_PATH // {{{SYNC-WEBSRV-ROUTE-WEBDAV}}}
 	//--
 } //END FUNCTION
 
 
 func webDavLogger(r *http.Request, err error) {
+	//--
+	defer smart.PanicHandler() // safe recovery handler
 	//--
 	remoteAddr, remotePort := GetVisitorRemoteIpAddrAndPort(r)
 	_, realClientIp := GetVisitorRealIpAddr(r)
@@ -221,14 +241,16 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
-	if(!webPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH)) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}}
+	// {{{SYNC-VALIDATE-IP-LIST-BEFORE-VERIFY-IP}}} ; no need to validate the allowedIPs ; it is not used directly by this method, only passed later to other method that will validate it
+	//--
+	if(!WebPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH)) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}}
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDAV Service Initialization Error, WebDAV Storage Path is Invalid: `" + DAV_STORAGE_RELATIVE_ROOT_PATH + "`")
 		smarthttputils.HttpStatus500(w, r, "WebDAV Service Internal Error", true)
 		return
 	} //end if
 	//--
 	var webDavRealUrlPath string = smart.StrTrimWhitespaces(webDavUrlPath())
-	if((webDavRealUrlPath == "") || (!smart.StrStartsWith(webDavRealUrlPath, "/")) || (!webUrlRouteIsValid(webDavRealUrlPath))) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}}
+	if((webDavRealUrlPath == "") || (!smart.StrStartsWith(webDavRealUrlPath, "/")) || (!WebUrlRouteIsValid(webDavRealUrlPath))) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-URL-PATH}}}
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDAV Service Initialization Error, WebDAV Route is Invalid: `" + webDavRealUrlPath + "`")
 		smarthttputils.HttpStatus500(w, r, "WebDAV Service cannot handle this Path: `" + GetCurrentPath(r) + "`", true)
 		return

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ MARKUP ]
 
 // REQUIRE: go 1.19 or later
@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	MAX_DOC_SIZE_HTML     uint64 	= SIZE_BYTES_16M * 4
-	MAX_DOC_SIZE_MARKDOWN uint64 	= SIZE_BYTES_16M
+	MAX_DOC_SIZE_VALIDATE_HTML 	uint64 = SIZE_BYTES_16M * 4 	// {{{SYNC-HTML-VALIDATOR-MAX-SIZE}}} 	; 64MB
+	MAX_DOC_SIZE_MARKDOWN 		uint64 = SIZE_BYTES_16M 		// {{{SYNC-MARKDOWN-MAX-SIZE}}} 		; 16MB
 
-	REGEX_HTML_LITERAL_ENTITY string = `(?i)&([a-z]+);`
-	REGEX_HTML_NUMERIC_ENTITY string = `(?i)&\#(x?[a-f0-9]+);`
-	REGEX_HTML_ANY_ENTITY string     = `(?i)&\#?(x?[a-z0-9]+);`
+	REGEX_HTML_LITERAL_ENTITY 	string = `(?i)&([a-z]+);`
+	REGEX_HTML_NUMERIC_ENTITY 	string = `(?i)&\#(x?[a-f0-9]+);`
+	REGEX_HTML_ANY_ENTITY 		string = `(?i)&\#?(x?[a-z0-9]+);`
 )
 
 
@@ -48,7 +48,7 @@ func MarkdownSmartToHTMLRender(mkdwDoc string, urlRelativePrefix string, useUnve
 	if(mkdwDoc == "") {
 		return "<!-- Markdown:empty -->", nil
 	} //end if
-	if(uint64(len(mkdwDoc)) > MAX_DOC_SIZE_MARKDOWN) {
+	if(uint64(len(mkdwDoc)) > MAX_DOC_SIZE_MARKDOWN) { // {{{SYNC-MARKDOWN-MAX-SIZE}}}
 		return "<!-- Markdown:oversized -->", nil
 	} //end if
 	//--
@@ -110,7 +110,7 @@ func SafePathMarkdownSmartFileToHTMLRender(mdFilePath string, allowAbsolutePath 
 	if(errSize != nil) {
 		return "", errSize
 	} //end if
-	if(uint64(fileSize) > MAX_DOC_SIZE_MARKDOWN) {
+	if(uint64(fileSize) > MAX_DOC_SIZE_MARKDOWN) { // {{{SYNC-MARKDOWN-MAX-SIZE}}}
 		return "<!-- # Markdown.Err:4 -->", NewError("Markdown File # OverSized # `" + mdFilePath + "`")
 	} //end if
 	//--
@@ -143,7 +143,7 @@ func MarkdownToHTMLRender(mkdwDoc string) (string, error) {
 	if(mkdwDoc == "") {
 		return "<!-- Markdown:empty -->", nil
 	} //end if
-	if(uint64(len(mkdwDoc)) > MAX_DOC_SIZE_MARKDOWN) {
+	if(uint64(len(mkdwDoc)) > MAX_DOC_SIZE_MARKDOWN) { // {{{SYNC-MARKDOWN-MAX-SIZE}}}
 		return "<!-- Markdown:oversized -->", nil
 	} //end if
 	//--
@@ -224,7 +224,7 @@ func SafePathMarkdownFileToHTMLRender(mdFilePath string, allowAbsolutePath bool)
 	if(errSize != nil) {
 		return "", errSize
 	} //end if
-	if(uint64(fileSize) > MAX_DOC_SIZE_MARKDOWN) {
+	if(uint64(fileSize) > MAX_DOC_SIZE_MARKDOWN) { // {{{SYNC-MARKDOWN-MAX-SIZE}}}
 		return "<!-- # Markdown.Err:4 -->", NewError("Markdown File # OverSized # `" + mdFilePath + "`")
 	} //end if
 	//--
@@ -256,7 +256,7 @@ func HTMLCodeFixValidate(htmlCode string) (string, error) {
 	if(htmlCode == "") {
 		return "<!-- Html:empty.vd -->", nil
 	} //end if
-	if(uint64(len(htmlCode)) > MAX_DOC_SIZE_HTML) {
+	if(uint64(len(htmlCode)) > MAX_DOC_SIZE_VALIDATE_HTML) {
 		return "<!-- Html:oversized.vd -->", nil
 	} //end if
 	//--
@@ -319,7 +319,7 @@ func HTMLCodeFixSanitize(htmlCode string) (string, error) {
 	if(htmlCode == "") {
 		return "<!-- Html:empty.sn -->", nil
 	} //end if
-	if(uint64(len(htmlCode)) > MAX_DOC_SIZE_HTML) {
+	if(uint64(len(htmlCode)) > MAX_DOC_SIZE_VALIDATE_HTML) {
 		return "<!-- Html:oversized.sn -->", nil
 	} //end if
 	//--

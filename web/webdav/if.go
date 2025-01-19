@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: If
-// r.20241221.2358 :: STABLE
+// r.20250108.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ STRINGS ]
 
 // REQUIRE: go 1.19 or later
@@ -107,14 +107,26 @@ func Chr(o uint8) string {
 
 func ExplodeWithLimit(delimiter string, text string, limit int) []string {
 	//--
-	return strings.SplitN(text, delimiter, limit)
+	expl := strings.SplitN(text, delimiter, limit)
+	//--
+	if(expl == nil) {
+		expl = []string{}
+	} //end if
+	//--
+	return expl
 	//--
 } //END FUNCTION
 
 
 func Explode(delimiter string, text string) []string {
 	//--
-	return strings.Split(text, delimiter)
+	expl := strings.Split(text, delimiter)
+	//--
+	if(expl == nil) {
+		expl = []string{}
+	} //end if
+	//--
+	return expl
 	//--
 } //END FUNCTION
 
@@ -699,7 +711,13 @@ func StrUnicodeLen(str string) int { // github.com/syyongx/php2go/blob/master/ph
 // PHP str_word_count()
 func StrWordCount(str string) []string { // github.com/syyongx/php2go/blob/master/php.go
 	//--
-	return strings.Fields(str)
+	wc := strings.Fields(str)
+	//--
+	if(wc == nil) {
+		wc = []string{}
+	} //end if
+	//--
+	return wc
 	//--
 } //END FUNCTION
 

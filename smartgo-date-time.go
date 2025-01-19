@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -17,17 +17,17 @@ import (
 
 const (
 	//-- Time Zones
-	TIME_ZONE_UTC                     string = "UTC"                            // UTC Time Zone Code
+	TIME_ZONE_UTC 						string = "UTC" 							// UTC Time Zone Code
 	//-- Time Zone Modes
-	TZ_MODE_UTC                       string = TIME_ZONE_UTC                    // Time Zone Mode UTC
-	TZ_MODE_LOCAL                     string = "LOCAL"                          // Time Zone Mode LOCAL
+	TZ_MODE_UTC 						string = TIME_ZONE_UTC 					// Time Zone Mode UTC
+	TZ_MODE_LOCAL 						string = "LOCAL" 							// Time Zone Mode LOCAL
 	//-- FIXED DATE CONSTANTS REFERENCE VALUES ... SYNCED WITH GO DATE STANDARDS !
-	DATE_TIME_DEFAULT_LOCAL_TIMEZONE  string = TIME_ZONE_UTC 					// Default Local Time Zone: UTC
-	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH string = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
-	DATE_TIME_FMT_ISO_STD_GO_EPOCH    string = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
-	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH  string = "2006-01-02 15:04:05 -0700" 		// GO EPOCH: WITH TIME, WITH TZ OFFSET
-	DATE_TIME_FMT_RFC1123_GO_EPOCH    string = "Mon, 02 Jan 2006 15:04:05" 		// GO EPOCH: RFC1123
-	DATE_TIME_FMT_CONDENSED           string = "20060102150405" 				// GO EPOCH: WITH TIME,   NO TZ OFFSET, CONDENSED
+	DATE_TIME_DEFAULT_LOCAL_TIMEZONE 	string = TIME_ZONE_UTC 					// Default Local Time Zone: UTC
+	DATE_TIME_FMT_ISO_NOTIME_GO_EPOCH 	string = "2006-01-02" 					// GO EPOCH:   NO TIME,   NO TZ OFFSET
+	DATE_TIME_FMT_ISO_STD_GO_EPOCH 		string = "2006-01-02 15:04:05" 			// GO EPOCH: WITH TIME,   NO TZ OFFSET
+	DATE_TIME_FMT_ISO_TZOFS_GO_EPOCH 	string = "2006-01-02 15:04:05 -0700" 		// GO EPOCH: WITH TIME, WITH TZ OFFSET
+	DATE_TIME_FMT_RFC1123_GO_EPOCH 		string = "Mon, 02 Jan 2006 15:04:05" 		// GO EPOCH: RFC1123
+	DATE_TIME_FMT_CONDENSED 			string = "20060102150405" 				// GO EPOCH: WITH TIME,   NO TZ OFFSET, CONDENSED
 	//-- #
 )
 
@@ -102,6 +102,8 @@ func DateTimeGetLocation() string {
 
 // PRIVATE
 func parseDateTimeAsStruct(mode string, dateIsoStr string) uxmDateTimeStruct { // mode = UTC | LOCAL
+	//--
+	defer PanicHandler()
 	//-- if dateIsoStr is empty will use Now()
 	dateIsoStr = StrTrimWhitespaces(dateIsoStr)
 	if((dateIsoStr == "") || (StrIContains(dateIsoStr, "NOW"))) {

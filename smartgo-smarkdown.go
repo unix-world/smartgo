@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ S-MARKDOWN ]
 
 // REQUIRE: go 1.19 or later
@@ -14,7 +14,7 @@ import (
 )
 
 const(
-	mkdwVersion string = "smart.markdown:parser@v.2.2.8-r.20241212"
+	mkdwVersion string = "smart.markdown:parser@v.2.2.8-r.20250108"
 )
 
 
@@ -83,6 +83,13 @@ func (m *SMarkdownParser) Parse(mkdw string) string {
 	if(m.documentParsed != false) {
 		log.Println("[WARNING]", CurrentFunctionName(), "# Re-using the markdown renderer instance is not supported ... use a new instance")
 		return `<!-- Markdown parser re-used, skip parsing -->`
+	} //end if
+	//-- size control
+	if(uint64(len(mkdw)) > SIZE_BYTES_16M) { // {{{SYNC-MARKDOWN-MAX-SIZE}}}
+		return `<!-- Markdown is OverSized, skip parsing -->`
+	} //end if
+	if(StrTrimWhitespaces(mkdw) == "") { // DO NOT TRIM OUTSIDE, NEEDS TO PRESERVE SPACES !
+		return `<!-- Markdown is Empty, skip parsing -->`
 	} //end if
 	//-- pre-fix charset, it is mandatory to be converted to UTF-8
 	mkdw = StrToValidUTF8Fix(mkdw)

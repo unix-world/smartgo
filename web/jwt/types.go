@@ -1,5 +1,8 @@
 package jwt
 
+// modified by unixman: use panic handler ; use jsonEncode
+// r.20250110.2358
+
 import (
 	"fmt"
 	"reflect"
@@ -76,6 +79,8 @@ func (date NumericDate) MarshalJSON() (b []byte, err error) {
 // NumericDate from a JSON representation, i.e. a json.Number. This number represents an UNIX epoch
 // with either integer or non-integer seconds.
 func (date *NumericDate) UnmarshalJSON(b []byte) (err error) {
+	defer panicHandler() // by unixman
+
 	var (
 		number json.Number
 		f      float64
@@ -100,6 +105,8 @@ func (date *NumericDate) UnmarshalJSON(b []byte) (err error) {
 type ClaimStrings []string
 
 func (s *ClaimStrings) UnmarshalJSON(data []byte) (err error) {
+	defer panicHandler() // by unixman
+
 	var value interface{}
 
 	if err = json.Unmarshal(data, &value); err != nil {
@@ -138,8 +145,10 @@ func (s ClaimStrings) MarshalJSON() (b []byte, err error) {
 	// desired based on the ecosystem of other JWT library used, so we make it configurable by the
 	// variable MarshalSingleStringAsArray.
 	if len(s) == 1 && !MarshalSingleStringAsArray {
-		return json.Marshal(s[0])
+	//	return json.Marshal(s[0])
+		return jsonEncode(s[0]) // fix by unixman ; don't escape html, make JWT shorter
 	}
 
-	return json.Marshal([]string(s))
+//	return json.Marshal([]string(s))
+	return jsonEncode([]string(s)) // fix by unixman ; don't escape html, make JWT shorter
 }

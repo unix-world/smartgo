@@ -1,5 +1,7 @@
 package jwt
 
+// added by unixman r.20250107
+
 import (
 	"errors"
 

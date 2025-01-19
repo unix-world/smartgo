@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Internal :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250103.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20250103.2358"
+	VERSION string = "r.20250118.2358"
 
 	CERTIFICATES_DEFAULT_PATH string = "./ssl"
 	CERTIFICATE_PEM_CRT string = "cert.crt"
@@ -187,8 +187,8 @@ func dhkxCliHandler(remoteId string, isServer bool, cmd string, data string) (an
 	if(DEBUG == true) {
 		log.Println("[DEBUG] DhKx SharedSecret:", shardCli)
 	} //end if
-	//--
-	return "<DHKX:SRV>", smart.BlowfishEncryptCBC(smart.BaseEncode(pubCli, "b58") + ":" + smart.BaseEncode([]byte(shardExch), "b62"), smart.BaseEncode(recvPubSrv, "b92")), shardCli
+	//-- randomized BFEnc
+	return "<DHKX:SRV>", smart.BlowfishEncryptCBC(smart.BaseEncode(pubCli, "b58") + ":" + smart.BaseEncode([]byte(shardExch), "b62"), smart.BaseEncode(recvPubSrv, "b92"), true), shardCli
 	//--
 } //END FUNCTION
 
@@ -376,7 +376,7 @@ func msgPakComposeMessage(cmd string, data string, sharedPrivateKey string, shar
 		return "", "MsgPak: Poly Checksum Failed: " + errPoly.Error()
 	} //end if
 	//--
-	var dataEnc string = smart.StrTrimWhitespaces(smart.ThreefishEncryptCBC(smart.DataArchive(data), sharedPrivateKey + "\v" + smart.Sh3a512B64(cmd + "\v" + sharedSecret + "\v" + polySum), false))
+	var dataEnc string = smart.StrTrimWhitespaces(smart.ThreefishEncryptCBC(smart.DataArchive(data), sharedPrivateKey + "\v" + smart.Sh3a512B64(cmd + "\v" + sharedSecret + "\v" + polySum), false, true)) // randomize
 	if(dataEnc == "") {
 		return "", "MsgPak: Encrypt Failed: Empty Data"
 	} //end if

@@ -1,3 +1,3 @@
-// JS-Script (UM): htmlembedded.js @ 2024-12-16 18:40:07 +0000
+// JS-Script (UM): htmlembedded.js @ 2025-01-07 23:40:22 +0000
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"),require("../htmlmixed/htmlmixed"),require("../../addon/mode/multiplex"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror","../htmlmixed/htmlmixed","../../addon/mode/multiplex"],e)}else{e(CodeMirror)}})(function(t){"use strict";t.defineMode("htmlembedded",function(e,o){var i=o.closeComment||"--%>";return t.multiplexingMode(t.getMode(e,"htmlmixed"),{open:o.openComment||"<%--",close:i,delimStyle:"comment",mode:{token:function(e){e.skipTo(i)||e.skipToEnd();return"comment"}}},{open:o.open||o.scriptStartRegex||"<%",close:o.close||o.scriptEndRegex||"%>",mode:t.getMode(e,o.scriptingModeSpec)})},"htmlmixed");t.defineMIME("application/x-ejs",{name:"htmlembedded",scriptingModeSpec:"javascript"})});
 // #END

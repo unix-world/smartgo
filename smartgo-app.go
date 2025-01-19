@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ APP ]
 
 // REQUIRE: go 1.19 or later
@@ -21,7 +21,7 @@ var (
 )
 
 var (
-	app_SMART_FRAMEWORK_SECURITY_KEY string = "Private-Key#0987654321" // set via AppSetSecurityKey ; 16..255 ; {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
+	app_SMART_FRAMEWORK_SECURITY_KEY string = "Private-Key#0987654321" // set via AppSetSecurityKey ; 16..256 ; {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}}
 )
 
 //-----
@@ -37,7 +37,7 @@ func AppSetSecurityKey(key string) bool {
 	} //end if
 	//--
 	var kLen int = len(key)
-	if((kLen < 16) || (kLen > 255)) { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
+	if((kLen < 16) || (kLen > 256)) { // {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}}
 		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo Security Key must be between 16 and 255 caracters long ...")
 		return false
 	} //end if
@@ -56,7 +56,7 @@ func AppGetSecurityKey() (string, error) {
 	var key string = StrTrimWhitespaces(app_SMART_FRAMEWORK_SECURITY_KEY)
 	//--
 	var kLen int = len(key)
-	if((kLen < 16) || (kLen > 255)) { // {{{SYNC-GO-SMART-CRYPTO-SEURITY-KEY-OR-AUTH-PKEY}}}
+	if((kLen < 16) || (kLen > 256)) { // {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}}
 		return "", NewError("SmartGo Security Key must be between 16 and 255 caracters long")
 	} //end if
 	//--

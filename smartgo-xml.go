@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250107.2358 :: STABLE
+// r.20250118.2358 :: STABLE
 // [ XML ]
 
 // REQUIRE: go 1.19 or later
@@ -20,6 +20,8 @@ import (
 
 
 func XmlEncode(data interface{}, prettyprint bool, includeHeader bool) (string, error) {
+	//--
+	defer PanicHandler() // for YAML Parser
 	//-- no need any panic handler
 	out := bytes.Buffer{}
 	//--
@@ -47,6 +49,8 @@ func XmlEncode(data interface{}, prettyprint bool, includeHeader bool) (string, 
 
 
 func XmlNoErrChkEncode(data interface{}, prettyprint bool, includeHeader bool) string {
+	//--
+	defer PanicHandler() // for YAML Parser
 	//-- no need any panic handler
 	str, _ := XmlEncode(data, prettyprint, includeHeader)
 	//--
@@ -59,6 +63,8 @@ func XmlNoErrChkEncode(data interface{}, prettyprint bool, includeHeader bool) s
 
 
 func XmlConvertToJson(xmlData string) (string, error) {
+	//--
+	defer PanicHandler() // for YAML Parser
 	//--
 	xml := strings.NewReader(xmlData) // xml is an io.Reader
 	json, err := xml2json.Convert(xml)

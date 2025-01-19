@@ -1,7 +1,7 @@
 package jwt
 
 // modified by unixman: added SHA-3 based hash signatures
-// r.20250106.2358
+// r.20250107.2358
 
 import (
 	"errors"
