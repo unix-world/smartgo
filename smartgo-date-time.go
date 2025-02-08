@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -426,14 +426,7 @@ func DateFromTime(t time.Time) string { // YYYY-MM-DD HH:II:SS +ZZZZ
 //-----
 
 
-func TimeNowUtc() int64 { // unix timestamp UTC
-	//--
-	return time.Now().UTC().Unix()
-	//--
-} //END FUNCTION
-
-
-func TimeNowLocal() int64 { // unix timestamp UTC
+func TimeNowUnix() int64 { // unix timestamp UTC ; no need to apply UTC() on it ; this is fixed, does not depend on a timezone
 	//--
 	return time.Now().Unix()
 	//--

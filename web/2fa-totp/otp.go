@@ -1,6 +1,6 @@
 
 // (c) 2024-present unix-world.org
-// v.20250108.2358
+// v.20250205.2358
 // license: BSD
 
 // based on: github.com/xlzd/gotp # license: MIT
@@ -46,7 +46,7 @@ type OTP struct {
 
 func currentTimestamp() int64 {
 	//--
-	return smart.TimeNowLocal()
+	return smart.TimeNowUnix()
 	//--
 } //END FUNCTION
 
@@ -151,7 +151,6 @@ func IsSecretValid(secret string, desiredLength uint8) bool {
 	} //end if
 	//--
 	data, err := base32.StdEncoding.DecodeString(secret)
-	//--
 	if(err != nil) {
 		return false
 	} //end if

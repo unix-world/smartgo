@@ -1,7 +1,7 @@
 package jwt
 
 // modified by unixman: use panic handler ; use jsonEncode
-// r.20250110.2358
+// r.20250207.2358
 
 import (
 	"fmt"
@@ -116,22 +116,22 @@ func (s *ClaimStrings) UnmarshalJSON(data []byte) (err error) {
 	var aud []string
 
 	switch v := value.(type) {
-	case string:
-		aud = append(aud, v)
-	case []string:
-		aud = ClaimStrings(v)
-	case []interface{}:
-		for _, vv := range v {
-			vs, ok := vv.(string)
-			if !ok {
-				return &json.UnsupportedTypeError{Type: reflect.TypeOf(vv)}
+		case string:
+			aud = append(aud, v)
+		case []string:
+			aud = ClaimStrings(v)
+		case []interface{}:
+			for _, vv := range v {
+				vs, ok := vv.(string)
+				if !ok {
+					return &json.UnsupportedTypeError{Type: reflect.TypeOf(vv)}
+				}
+				aud = append(aud, vs)
 			}
-			aud = append(aud, vs)
-		}
-	case nil:
-		return nil
-	default:
-		return &json.UnsupportedTypeError{Type: reflect.TypeOf(v)}
+		case nil:
+			return nil
+		default:
+			return &json.UnsupportedTypeError{Type: reflect.TypeOf(v)}
 	}
 
 	*s = aud

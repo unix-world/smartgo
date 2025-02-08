@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ CRYPTO / ENCIPHER ]
 
 // REQUIRE: go 1.19 or later
@@ -31,7 +31,8 @@ import (
 	"github.com/unix-world/smartgo/crypto/threefish"
 	"github.com/unix-world/smartgo/crypto/bcrypt"
 
-	"golang.org/x/crypto/argon2"
+//	"golang.org/x/crypto/argon2"
+	"github.com/unix-world/smartgo/crypto/argon2"
 
 	uid "github.com/unix-world/smartgo/crypto/uuid"
 )
@@ -62,7 +63,7 @@ const (
 	SALT_SEPARATOR string 					= "#" 											// fixed salt separator
 	SALT_SUFFIX string 						= "スマート フレームワーク" 						// fixed salt suffix
 
-	DERIVE_MIN_KLEN uint16 					=    3 											// Key Derive Min Length
+	DERIVE_MIN_KLEN uint16 					=    1 											// Key Derive Min Length ; // because it is used also in js for inputs this have to be the lowest as 1 (non empty minimal characters validated)
 	DERIVE_MAX_KLEN uint16 					= 4096 											// Key Derive Min Length
 	DERIVE_PREKEY_LEN uint16 				=   80 											// Key Derive Pre-Key Length
 	DERIVE_CENTITER_EK uint16 				=   87 											// Key Derive EK Iterations

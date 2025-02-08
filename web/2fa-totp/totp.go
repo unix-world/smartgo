@@ -1,6 +1,6 @@
 
 // (c) 2024-present unix-world.org
-// v.20250108.2358
+// v.20250205.2358
 // license: BSD
 
 // based on: github.com/xlzd/gotp # license: MIT
@@ -47,6 +47,10 @@ func NewTOTP(secret string, digits uint8, interval uint16, algo string) *TOTP {
 		case "sha256":
 		case "sha384":
 		case "sha512":
+		case "sha3-224":
+		case "sha3-256":
+		case "sha3-384":
+		case "sha3-512":
 			if(DEBUG) {
 				log.Println("[DEBUG]", smart.CurrentFunctionName(), "Algo", algo, "Digits", digits)
 			} //end if

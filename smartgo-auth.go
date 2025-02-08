@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -22,6 +22,7 @@ const (
 	ALGO_PASS_SMART_SAFE_BCRYPT 		uint8 = 123
 	ALGO_PASS_SMART_SAFE_OPQ_TOKEN 		uint8 = 204 // Opaque Token
 	ALGO_PASS_SMART_SAFE_WEB_TOKEN 		uint8 = 216 // Web (Signed) Token / JWT
+	ALGO_PASS_SMART_SAFE_SWT_TOKEN 		uint8 = 228 // SWT Tokens (only available in PHP)
 	ALGO_PASS_CUSTOM_TOKEN 				uint8 = 244 // other, custom implementations of token logic
 	ALGO_PASS_CUSTOM_HASH_PASS 			uint8 = 255 // other, custom implementations of pass hashing
 
@@ -39,8 +40,10 @@ const (
 	HTTP_AUTH_ADMIN_PRIV    string = "<admin>"   // must include only (one) the admin privilege     for a valid user,     admin ; NOT FOR external JWT Auth
 	HTTP_AUTH_DEFAULT_RESTR string = "<none>"    // must include only (one) the default restriction for a valid user, not admin ; NOT FOR external JWT Auth
 
-	REGEX_SAFE_AUTH_AREA string 		= `^[A-Z0-9\-\.]{4,48}` 							// this must not allow [] to conflict with the default area ; {{{SYNC-AUTH-EXT-AREA-REGEX}}}
-	REGEX_VALID_PRIV_RESTR_KEY string 	= `^([a-z]{1}[a-z0-9\-\:]{0,20}[a-z0-9]{1})$` 		// valid name for one privilege key from list of privileges ; a valid privilege key can have 2..22 characters and can contain only: `a-z`, `0-9`, `:` and `-` ; must start with `a-z` only ; must not end with `:` or `-`
+	REGEX_SAFE_METAKEY 		string = `^[a-z0-9\-\.]+$` // {{{SYNC-METADATA-VALID-KEY-REGEX}}} ; must be lowercase (insensitive case) to avoid duplicates
+
+	REGEX_SAFE_AUTH_AREA 		string 	= `^[A-Z0-9\-\.]{4,48}` 							// this must not allow [] to conflict with the default area ; {{{SYNC-AUTH-EXT-AREA-REGEX}}}
+	REGEX_VALID_PRIV_RESTR_KEY 	string 	= `^([a-z]{1}[a-z0-9\-\:]{0,20}[a-z0-9]{1})$` 		// valid name for one privilege key from list of privileges ; a valid privilege key can have 2..22 characters and can contain only: `a-z`, `0-9`, `:` and `-` ; must start with `a-z` only ; must not end with `:` or `-`
 
 	REGEX_SAFE_HTTP_USER_NAME 		string = `^[a-z0-9\.]{5,25}$` 							// Safe HTTP Auth UserName Regex ; intended as a safe user ID for all cases
 	REGEX_SAFE_AUTH_EMAIL_ADDRESS 	string = `^[_a-z0-9\-\.]{1,41}@[a-z0-9\-\.]{3,30}$` 	// Safe Auth Email regex ; internet email@(subdomain.)domain.name ; max 72 ; practical
@@ -51,10 +54,10 @@ const (
 
 	OPAQUE_TOKEN_FULL_NAME string = "Opaque:UUID"
 
-	HTTP_AUTH_USER_TOKEN  string = "@TOKEN@" 	// used for http client to add header: 				`Authorization: Token ****`  where `****` is the opaque token
-	HTTP_AUTH_USER_BEARER string = "@BEARER@" 	// used for http client to add header: 				`Authorization: Bearer ****` where `****` is the jwt signed token
-	HTTP_AUTH_USER_APIKEY string = "@APIKEY@" 	// used for http client to add header: 				`Authorization: Apikey ****` where `****` is the external jwt signed token for non-existing accounts
-	HTTP_AUTH_USER_RAW    string = "@RAW@" 		// used for http client to add custom header like: 	`Authorization: %Custom% ****` where `%Custom% ****` is the password ; ex: `Authorization: OAuth ****`
+	HTTP_AUTH_USER_TOKEN  string = ":TOKEN" 	// used for http client to add header: 				`Authorization: Token ****`  where `****` is the opaque token
+	HTTP_AUTH_USER_BEARER string = ":BEARER" 	// used for http client to add header: 				`Authorization: Bearer ****` where `****` is the jwt signed token
+	HTTP_AUTH_USER_APIKEY string = ":APIKEY" 	// used for http client to add header: 				`Authorization: Apikey ****` where `****` is the external jwt signed token for non-existing accounts
+	HTTP_AUTH_USER_RAW    string = ":RAW" 		// used for http client to add custom header like: 	`Authorization: %Custom% ****` where `%Custom% ****` is the password ; ex: `Authorization: OAuth ****`
 )
 
 var (
@@ -333,6 +336,10 @@ func AuthGetMetaData(authData AuthDataStruct, key string) (string, error) {
 		return "", NewError("Auth MetaData Key is Empty")
 	} //end if
 	//--
+	if(!StrRegexMatch(REGEX_SAFE_METAKEY, key)) { // {{{SYNC-METADATA-VALID-KEY-REGEX}}}
+		return "", NewError("Auth MetaData Key is Invalid")
+	} //end if
+	//--
 	val, ok := authData.MetaData[key]
 	if(!ok) {
 		return "", NewError("Auth MetaData Key is Missing")
@@ -448,7 +455,7 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 		} //end if
 	} //end if
 	//--
-	if((passAlgo == ALGO_PASS_SMART_SAFE_OPQ_TOKEN) || (passAlgo == ALGO_PASS_SMART_SAFE_WEB_TOKEN)) {
+	if((passAlgo == ALGO_PASS_SMART_SAFE_OPQ_TOKEN) || (passAlgo == ALGO_PASS_SMART_SAFE_WEB_TOKEN) || (passAlgo == ALGO_PASS_SMART_SAFE_SWT_TOKEN)) {
 		if(passHash != "") {
 			ok = false
 			if(errMsg == "") {
@@ -523,8 +530,8 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 		if(len(metaData) > 0) {
 			if(len(metaData) < 16) {
 				for kk,vv := range metaData {
-					kk = StrToLower(StrTrimWhitespaces(kk))
-					if(kk == "") {
+					kk = StrToLower(StrTrimWhitespaces(kk)) // {{{SYNC-METADATA-VALID-KEY-LOWERCASE}}}
+					if(kk == "") { // {{{SYNC-METADATA-VALID-KEY-NON-EMPTY}}}
 						safeMetaData = nil
 						ok = false
 						if(errMsg == "") {
@@ -532,7 +539,7 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 						} //end if
 						break
 					} //end if
-					if(len(kk) > 64) {
+					if(len(kk) > 64) { // {{{SYNC-METADATA-VALID-KEY-MAX-LEN}}}
 						safeMetaData = nil
 						ok = false
 						if(errMsg == "") {
@@ -540,7 +547,7 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 						} //end if
 						break
 					} //end if
-					if(!StrRegexMatch(REGEX_SAFE_VAR_NAME, kk)) {
+					if(!StrRegexMatch(REGEX_SAFE_METAKEY, kk)) { // {{{SYNC-METADATA-VALID-KEY-REGEX}}}
 						safeMetaData = nil
 						ok = false
 						if(errMsg == "") {
@@ -548,7 +555,7 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 						} //end if
 						break
 					} //end if
-					if(len(vv) > 4096) {
+					if(len(vv) > 4096) { // {{{SYNC-METADATA-VALID-VAL-MAX-SIZE}}}
 						safeMetaData = nil
 						ok = false
 						if(errMsg == "") {
@@ -566,6 +573,12 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 				} //end if
 			} //end if
 		} //end if
+	} //end if
+	//--
+	metaDT, okDT := safeMetaData["datetime"]
+	metaDT = StrTrimWhitespaces(metaDT)
+	if(!okDT || (metaDT == "")) {
+		safeMetaData["datetime"] = DateNowLocal() // {{{SYNC-ACOUNT-AUTH-REGISTER-METADATA-DATETIME}}} ;  this is mandatory to be set, will be check by auth default route
 	} //end if
 	//--
 	privAuthData := AuthDataStruct {
@@ -1270,6 +1283,9 @@ func AuthPassHashAlgoGetNameById(algo uint8) string {
 			break
 		case ALGO_PASS_SMART_SAFE_WEB_TOKEN:
 			name = "Token.Signed"
+			break
+		case ALGO_PASS_SMART_SAFE_SWT_TOKEN:
+			name = "Token.SWT"
 			break
 		case ALGO_PASS_CUSTOM_TOKEN:
 			name = "Custom.Token"

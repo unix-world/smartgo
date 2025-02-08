@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250207.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -114,7 +114,7 @@ func webdavLockingLOCK(internal bool, path string) (token string, err error) {
 	} //end if
 	cachedObj.Id = token
 	cachedObj.Data = path
-	cachedObj.Obj = smart.TimeNowUtc()
+	cachedObj.Obj = smart.TimeNowUnix()
 	okSet := webdavLockCache.Set(cachedObj, int64(webdavLockTimeSeconds))
 	if(!okSet) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDav:LockSys", "Set Cache Object Failed for Path: `" + path + "` ; Token: `" + token + "`")

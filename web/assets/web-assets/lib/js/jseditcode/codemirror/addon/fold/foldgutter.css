@@ -1,3 +1,3 @@
-/* CSS-Stylesheet (UM): foldgutter.css @ 2025-01-07 23:40:29 +0000 */
+/* CSS-Stylesheet (UM): foldgutter.css @ 2025-02-07 03:11:47 +0000 */
 .CodeMirror-foldmarker{color:#f50;text-shadow:#ececec 1px 1px 2px,#ececec -1px -1px 2px,#ececec 1px -1px 2px,#ececec -1px 1px 2px;font-weight:bold;line-height:.3;cursor:pointer}.CodeMirror-foldgutter{width:.8em;s}.CodeMirror-foldgutter-open,.CodeMirror-foldgutter-folded{cursor:pointer}.CodeMirror-foldgutter-open:after{content:"\25BE";color:#789}.CodeMirror-foldgutter-folded:after{content:"\25B8";color:#f50}
 /* #END */

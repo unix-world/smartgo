@@ -1,478 +1,166 @@
 package jsonschema
 
 import (
-	"net/netip"
-	gourl "net/url"
+	"errors"
+	"net"
+	"net/mail"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Format defined specific format.
-type Format struct {
-	// Name of format.
-	Name string
-
-	// Validate checks if given value is of this format.
-	Validate func(v any) error
+// Formats is a registry of functions, which know how to validate
+// a specific format.
+//
+// New Formats can be registered by adding to this map. Key is format name,
+// value is function that knows how to validate that format.
+var Formats = map[string]func(interface{}) bool{
+	"date-time":             isDateTime,
+	"date":                  isDate,
+	"time":                  isTime,
+	"duration":              isDuration,
+	"period":                isPeriod,
+	"hostname":              isHostname,
+	"email":                 isEmail,
+	"ip-address":            isIPV4,
+	"ipv4":                  isIPV4,
+	"ipv6":                  isIPV6,
+	"uri":                   isURI,
+	"iri":                   isURI,
+	"uri-reference":         isURIReference,
+	"uriref":                isURIReference,
+	"iri-reference":         isURIReference,
+	"uri-template":          isURITemplate,
+	"regex":                 isRegex,
+	"json-pointer":          isJSONPointer,
+	"relative-json-pointer": isRelativeJSONPointer,
+	"uuid":                  isUUID,
 }
 
-var formats = map[string]*Format{
-	"json-pointer":          {"json-pointer", validateJSONPointer},
-	"relative-json-pointer": {"relative-json-pointer", validateRelativeJSONPointer},
-	"uuid":                  {"uuid", validateUUID},
-	"duration":              {"duration", validateDuration},
-	"period":                {"period", validatePeriod},
-	"ipv4":                  {"ipv4", validateIPV4},
-	"ipv6":                  {"ipv6", validateIPV6},
-	"hostname":              {"hostname", validateHostname},
-	"email":                 {"email", validateEmail},
-	"date":                  {"date", validateDate},
-	"time":                  {"time", validateTime},
-	"date-time":             {"date-time", validateDateTime},
-	"uri":                   {"uri", validateURI},
-	"iri":                   {"iri", validateURI},
-	"uri-reference":         {"uri-reference", validateURIReference},
-	"iri-reference":         {"iri-reference", validateURIReference},
-	"uri-template":          {"uri-template", validateURITemplate},
-	"semver":                {"semver", validateSemver},
-}
-
-// see https://www.rfc-editor.org/rfc/rfc6901#section-3
-func validateJSONPointer(v any) error {
+// isDateTime tells whether given string is a valid date representation
+// as defined by RFC 3339, section 5.6.
+//
+// see https://datatracker.ietf.org/doc/html/rfc3339#section-5.6, for details
+func isDateTime(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
-	if s == "" {
-		return nil
+	if len(s) < 20 { // yyyy-mm-ddThh:mm:ssZ
+		return false
 	}
-	if !strings.HasPrefix(s, "/") {
-		return LocalizableError("not starting with /")
+	if s[10] != 'T' && s[10] != 't' {
+		return false
 	}
-	for _, tok := range strings.Split(s, "/")[1:] {
-		escape := false
-		for _, ch := range tok {
-			if escape {
-				escape = false
-				if ch != '0' && ch != '1' {
-					return LocalizableError("~ must be followed by 0 or 1")
-				}
-				continue
-			}
-			if ch == '~' {
-				escape = true
-				continue
-			}
-			switch {
-			case ch >= '\x00' && ch <= '\x2E':
-			case ch >= '\x30' && ch <= '\x7D':
-			case ch >= '\x7F' && ch <= '\U0010FFFF':
-			default:
-				return LocalizableError("invalid character %q", ch)
-			}
-		}
-		if escape {
-			return LocalizableError("~ must be followed by 0 or 1")
-		}
-	}
-	return nil
+	return isDate(s[:10]) && isTime(s[11:])
 }
 
-// see https://tools.ietf.org/html/draft-handrews-relative-json-pointer-01#section-3
-func validateRelativeJSONPointer(v any) error {
+// isDate tells whether given string is a valid full-date production
+// as defined by RFC 3339, section 5.6.
+//
+// see https://datatracker.ietf.org/doc/html/rfc3339#section-5.6, for details
+func isDate(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
-	}
-
-	// start with non-negative-integer
-	numDigits := 0
-	for _, ch := range s {
-		if ch >= '0' && ch <= '9' {
-			numDigits++
-		} else {
-			break
-		}
-	}
-	if numDigits == 0 {
-		return LocalizableError("must start with non-negative integer")
-	}
-	if numDigits > 1 && strings.HasPrefix(s, "0") {
-		return LocalizableError("starts with zero")
-	}
-	s = s[numDigits:]
-
-	// followed by either json-pointer or '#'
-	if s == "#" {
-		return nil
-	}
-	return validateJSONPointer(s)
-}
-
-// see https://datatracker.ietf.org/doc/html/rfc4122#page-4
-func validateUUID(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-
-	hexGroups := []int{8, 4, 4, 4, 12}
-	groups := strings.Split(s, "-")
-	if len(groups) != len(hexGroups) {
-		return LocalizableError("must have %d elements", len(hexGroups))
-	}
-	for i, group := range groups {
-		if len(group) != hexGroups[i] {
-			return LocalizableError("element %d must be %d characters long", i+1, hexGroups[i])
-		}
-		for _, ch := range group {
-			switch {
-			case ch >= '0' && ch <= '9':
-			case ch >= 'a' && ch <= 'f':
-			case ch >= 'A' && ch <= 'F':
-			default:
-				return LocalizableError("non-hex character %q", ch)
-			}
-		}
-	}
-	return nil
-}
-
-// see https://datatracker.ietf.org/doc/html/rfc3339#appendix-A
-func validateDuration(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-
-	// must start with 'P'
-	s, ok = strings.CutPrefix(s, "P")
-	if !ok {
-		return LocalizableError("must start with P")
-	}
-	if s == "" {
-		return LocalizableError("nothing after P")
-	}
-
-	// dur-week
-	if s, ok := strings.CutSuffix(s, "W"); ok {
-		if s == "" {
-			return LocalizableError("no number in week")
-		}
-		for _, ch := range s {
-			if ch < '0' || ch > '9' {
-				return LocalizableError("invalid week")
-			}
-		}
-		return nil
-	}
-
-	allUnits := []string{"YMD", "HMS"}
-	for i, s := range strings.Split(s, "T") {
-		if i != 0 && s == "" {
-			return LocalizableError("no time elements")
-		}
-		if i >= len(allUnits) {
-			return LocalizableError("more than one T")
-		}
-		units := allUnits[i]
-		for s != "" {
-			digitCount := 0
-			for _, ch := range s {
-				if ch >= '0' && ch <= '9' {
-					digitCount++
-				} else {
-					break
-				}
-			}
-			if digitCount == 0 {
-				return LocalizableError("missing number")
-			}
-			s = s[digitCount:]
-			if s == "" {
-				return LocalizableError("missing unit")
-			}
-			unit := s[0]
-			j := strings.IndexByte(units, unit)
-			if j == -1 {
-				if strings.IndexByte(allUnits[i], unit) != -1 {
-					return LocalizableError("unit %q out of order", unit)
-				}
-				return LocalizableError("invalid unit %q", unit)
-			}
-			units = units[j+1:]
-			s = s[1:]
-		}
-	}
-
-	return nil
-}
-
-func validateIPV4(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-	groups := strings.Split(s, ".")
-	if len(groups) != 4 {
-		return LocalizableError("expected four decimals")
-	}
-	for _, group := range groups {
-		if len(group) > 1 && group[0] == '0' {
-			return LocalizableError("leading zeros")
-		}
-		n, err := strconv.Atoi(group)
-		if err != nil {
-			return err
-		}
-		if n < 0 || n > 255 {
-			return LocalizableError("decimal must be between 0 and 255")
-		}
-	}
-	return nil
-}
-
-func validateIPV6(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-	if !strings.Contains(s, ":") {
-		return LocalizableError("missing colon")
-	}
-	addr, err := netip.ParseAddr(s)
-	if err != nil {
-		return err
-	}
-	if addr.Zone() != "" {
-		return LocalizableError("zone id is not a part of ipv6 address")
-	}
-	return nil
-}
-
-// see https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_host_names
-func validateHostname(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-
-	// entire hostname (including the delimiting dots but not a trailing dot) has a maximum of 253 ASCII characters
-	s = strings.TrimSuffix(s, ".")
-	if len(s) > 253 {
-		return LocalizableError("more than 253 characters long")
-	}
-
-	// Hostnames are composed of series of labels concatenated with dots, as are all domain names
-	for _, label := range strings.Split(s, ".") {
-		// Each label must be from 1 to 63 characters long
-		if len(label) < 1 || len(label) > 63 {
-			return LocalizableError("label must be 1 to 63 characters long")
-		}
-
-		// labels must not start or end with a hyphen
-		if strings.HasPrefix(label, "-") {
-			return LocalizableError("label starts with hyphen")
-		}
-		if strings.HasSuffix(label, "-") {
-			return LocalizableError("label ends with hyphen")
-		}
-
-		// labels may contain only the ASCII letters 'a' through 'z' (in a case-insensitive manner),
-		// the digits '0' through '9', and the hyphen ('-')
-		for _, ch := range label {
-			switch {
-			case ch >= 'a' && ch <= 'z':
-			case ch >= 'A' && ch <= 'Z':
-			case ch >= '0' && ch <= '9':
-			case ch == '-':
-			default:
-				return LocalizableError("invalid character %q", ch)
-			}
-		}
-	}
-	return nil
-}
-
-// see https://en.wikipedia.org/wiki/Email_address
-func validateEmail(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-	// entire email address to be no more than 254 characters long
-	if len(s) > 254 {
-		return LocalizableError("more than 255 characters long")
-	}
-
-	// email address is generally recognized as having two parts joined with an at-sign
-	at := strings.LastIndexByte(s, '@')
-	if at == -1 {
-		return LocalizableError("missing @")
-	}
-	local, domain := s[:at], s[at+1:]
-
-	// local part may be up to 64 characters long
-	if len(local) > 64 {
-		return LocalizableError("local part more than 64 characters long")
-	}
-
-	if len(local) > 1 && strings.HasPrefix(local, `"`) && strings.HasPrefix(local, `"`) {
-		// quoted
-		local := local[1 : len(local)-1]
-		if strings.IndexByte(local, '\\') != -1 || strings.IndexByte(local, '"') != -1 {
-			return LocalizableError("backslash and quote are not allowed within quoted local part")
-		}
-	} else {
-		// unquoted
-		if strings.HasPrefix(local, ".") {
-			return LocalizableError("starts with dot")
-		}
-		if strings.HasSuffix(local, ".") {
-			return LocalizableError("ends with dot")
-		}
-
-		// consecutive dots not allowed
-		if strings.Contains(local, "..") {
-			return LocalizableError("consecutive dots")
-		}
-
-		// check allowed chars
-		for _, ch := range local {
-			switch {
-			case ch >= 'a' && ch <= 'z':
-			case ch >= 'A' && ch <= 'Z':
-			case ch >= '0' && ch <= '9':
-			case strings.ContainsRune(".!#$%&'*+-/=?^_`{|}~", ch):
-			default:
-				return LocalizableError("invalid character %q", ch)
-			}
-		}
-	}
-
-	// domain if enclosed in brackets, must match an IP address
-	if strings.HasPrefix(domain, "[") && strings.HasSuffix(domain, "]") {
-		domain = domain[1 : len(domain)-1]
-		if rem, ok := strings.CutPrefix(domain, "IPv6:"); ok {
-			if err := validateIPV6(rem); err != nil {
-				return LocalizableError("invalid ipv6 address: %v", err)
-			}
-			return nil
-		}
-		if err := validateIPV4(domain); err != nil {
-			return LocalizableError("invalid ipv4 address: %v", err)
-		}
-		return nil
-	}
-
-	// domain must match the requirements for a hostname
-	if err := validateHostname(domain); err != nil {
-		return LocalizableError("invalid domain: %v", err)
-	}
-
-	return nil
-}
-
-// see see https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
-func validateDate(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
+		return true
 	}
 	_, err := time.Parse("2006-01-02", s)
-	return err
+	return err == nil
 }
 
-// see https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
-// NOTE: golang time package does not support leap seconds.
-func validateTime(v any) error {
+// isTime tells whether given string is a valid full-time production
+// as defined by RFC 3339, section 5.6.
+//
+// see https://datatracker.ietf.org/doc/html/rfc3339#section-5.6, for details
+func isTime(v interface{}) bool {
 	str, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
 
-	// min: hh:mm:ssZ
-	if len(str) < 9 {
-		return LocalizableError("less than 9 characters long")
-	}
-	if str[2] != ':' || str[5] != ':' {
-		return LocalizableError("missing colon in correct place")
-	}
+	// golang time package does not support leap seconds.
+	// so we are parsing it manually here.
 
-	// parse hh:mm:ss
-	var hms []int
-	for _, tok := range strings.SplitN(str[:8], ":", 3) {
-		i, err := strconv.Atoi(tok)
+	// hh:mm:ss
+	// 01234567
+	if len(str) < 9 || str[2] != ':' || str[5] != ':' {
+		return false
+	}
+	isInRange := func(str string, min, max int) (int, bool) {
+		n, err := strconv.Atoi(str)
 		if err != nil {
-			return LocalizableError("invalid hour/min/sec")
+			return 0, false
 		}
-		if i < 0 {
-			return LocalizableError("non-positive hour/min/sec")
+		if n < min || n > max {
+			return 0, false
 		}
-		hms = append(hms, i)
+		return n, true
 	}
-	if len(hms) != 3 {
-		return LocalizableError("missing hour/min/sec")
+	var h, m, s int
+	if h, ok = isInRange(str[0:2], 0, 23); !ok {
+		return false
 	}
-	h, m, s := hms[0], hms[1], hms[2]
-	if h > 23 || m > 59 || s > 60 {
-		return LocalizableError("hour/min/sec out of range")
+	if m, ok = isInRange(str[3:5], 0, 59); !ok {
+		return false
+	}
+	if s, ok = isInRange(str[6:8], 0, 60); !ok {
+		return false
 	}
 	str = str[8:]
 
-	// parse sec-frac if present
-	if rem, ok := strings.CutPrefix(str, "."); ok {
-		numDigits := 0
-		for _, ch := range rem {
-			if ch >= '0' && ch <= '9' {
-				numDigits++
-			} else {
+	// parse secfrac if present
+	if str[0] == '.' {
+		// dot following more than one digit
+		str = str[1:]
+		var numDigits int
+		for str != "" {
+			if str[0] < '0' || str[0] > '9' {
 				break
 			}
+			numDigits++
+			str = str[1:]
 		}
 		if numDigits == 0 {
-			return LocalizableError("no digits in second fraction")
+			return false
 		}
-		str = rem[numDigits:]
 	}
 
-	if str != "z" && str != "Z" {
-		// parse time-numoffset
-		if len(str) != 6 {
-			return LocalizableError("offset must be 6 characters long")
+	if len(str) == 0 {
+		return false
+	}
+
+	if str[0] == 'z' || str[0] == 'Z' {
+		if len(str) != 1 {
+			return false
 		}
+	} else {
+		// time-numoffset
+		// +hh:mm
+		// 012345
+		if len(str) != 6 || str[3] != ':' {
+			return false
+		}
+
 		var sign int
-		switch str[0] {
-		case '+':
+		if str[0] == '+' {
 			sign = -1
-		case '-':
+		} else if str[0] == '-' {
 			sign = +1
-		default:
-			return LocalizableError("offset must begin with plus/minus")
-		}
-		str = str[1:]
-		if str[2] != ':' {
-			return LocalizableError("missing colon in offset in correct place")
+		} else {
+			return false
 		}
 
-		var zhm []int
-		for _, tok := range strings.SplitN(str, ":", 2) {
-			i, err := strconv.Atoi(tok)
-			if err != nil {
-				return LocalizableError("invalid hour/min in offset")
-			}
-			if i < 0 {
-				return LocalizableError("non-positive hour/min in offset")
-			}
-			zhm = append(zhm, i)
+		var zh, zm int
+		if zh, ok = isInRange(str[1:3], 0, 23); !ok {
+			return false
 		}
-		zh, zm := zhm[0], zhm[1]
-		if zh > 23 || zm > 59 {
-			return LocalizableError("hour/min in offset out of range")
+		if zm, ok = isInRange(str[4:6], 0, 59); !ok {
+			return false
 		}
 
-		// apply timezone
+		// apply timezone offset
 		hm := (h*60 + m) + sign*(zh*60+zm)
 		if hm < 0 {
 			hm += 24 * 60
@@ -480,229 +168,400 @@ func validateTime(v any) error {
 		h, m = hm/60, hm%60
 	}
 
-	// check leap second
-	if s >= 60 && (h != 23 || m != 59) {
-		return LocalizableError("invalid leap second")
+	// check leapsecond
+	if s == 60 { // leap second
+		if h != 23 || m != 59 {
+			return false
+		}
 	}
 
-	return nil
+	return true
 }
 
-// see https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
-func validateDateTime(v any) error {
+// isDuration tells whether given string is a valid duration format
+// from the ISO 8601 ABNF as given in Appendix A of RFC 3339.
+//
+// see https://datatracker.ietf.org/doc/html/rfc3339#appendix-A, for details
+func isDuration(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
-
-	// min: yyyy-mm-ddThh:mm:ssZ
-	if len(s) < 20 {
-		return LocalizableError("less than 20 characters long")
+	if len(s) == 0 || s[0] != 'P' {
+		return false
 	}
-
-	if s[10] != 't' && s[10] != 'T' {
-		return LocalizableError("11th character must be t or T")
+	s = s[1:]
+	parseUnits := func() (units string, ok bool) {
+		for len(s) > 0 && s[0] != 'T' {
+			digits := false
+			for {
+				if len(s) == 0 {
+					break
+				}
+				if s[0] < '0' || s[0] > '9' {
+					break
+				}
+				digits = true
+				s = s[1:]
+			}
+			if !digits || len(s) == 0 {
+				return units, false
+			}
+			units += s[:1]
+			s = s[1:]
+		}
+		return units, true
 	}
-	if err := validateDate(s[:10]); err != nil {
-		return LocalizableError("invalid date element: %v", err)
+	units, ok := parseUnits()
+	if !ok {
+		return false
 	}
-	if err := validateTime(s[11:]); err != nil {
-		return LocalizableError("invalid time element: %v", err)
+	if units == "W" {
+		return len(s) == 0 // P_W
 	}
-	return nil
+	if len(units) > 0 {
+		if !strings.Contains("YMD", units) {
+			return false
+		}
+		if len(s) == 0 {
+			return true // "P" dur-date
+		}
+	}
+	if len(s) == 0 || s[0] != 'T' {
+		return false
+	}
+	s = s[1:]
+	units, ok = parseUnits()
+	return ok && len(s) == 0 && len(units) > 0 && strings.Contains("HMS", units)
 }
 
-func parseURL(s string) (*gourl.URL, error) {
-	u, err := gourl.Parse(s)
+// isPeriod tells whether given string is a valid period format
+// from the ISO 8601 ABNF as given in Appendix A of RFC 3339.
+//
+// see https://datatracker.ietf.org/doc/html/rfc3339#appendix-A, for details
+func isPeriod(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	slash := strings.IndexByte(s, '/')
+	if slash == -1 {
+		return false
+	}
+	start, end := s[:slash], s[slash+1:]
+	if isDateTime(start) {
+		return isDateTime(end) || isDuration(end)
+	}
+	return isDuration(start) && isDateTime(end)
+}
+
+// isHostname tells whether given string is a valid representation
+// for an Internet host name, as defined by RFC 1034 section 3.1 and
+// RFC 1123 section 2.1.
+//
+// See https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_host_names, for details.
+func isHostname(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	// entire hostname (including the delimiting dots but not a trailing dot) has a maximum of 253 ASCII characters
+	s = strings.TrimSuffix(s, ".")
+	if len(s) > 253 {
+		return false
+	}
+
+	// Hostnames are composed of series of labels concatenated with dots, as are all domain names
+	for _, label := range strings.Split(s, ".") {
+		// Each label must be from 1 to 63 characters long
+		if labelLen := len(label); labelLen < 1 || labelLen > 63 {
+			return false
+		}
+
+		// labels must not start with a hyphen
+		// RFC 1123 section 2.1: restriction on the first character
+		// is relaxed to allow either a letter or a digit
+		if first := s[0]; first == '-' {
+			return false
+		}
+
+		// must not end with a hyphen
+		if label[len(label)-1] == '-' {
+			return false
+		}
+
+		// labels may contain only the ASCII letters 'a' through 'z' (in a case-insensitive manner),
+		// the digits '0' through '9', and the hyphen ('-')
+		for _, c := range label {
+			if valid := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '-'); !valid {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// isEmail tells whether given string is a valid Internet email address
+// as defined by RFC 5322, section 3.4.1.
+//
+// See https://en.wikipedia.org/wiki/Email_address, for details.
+func isEmail(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	// entire email address to be no more than 254 characters long
+	if len(s) > 254 {
+		return false
+	}
+
+	// email address is generally recognized as having two parts joined with an at-sign
+	at := strings.LastIndexByte(s, '@')
+	if at == -1 {
+		return false
+	}
+	local := s[0:at]
+	domain := s[at+1:]
+
+	// local part may be up to 64 characters long
+	if len(local) > 64 {
+		return false
+	}
+
+	// domain if enclosed in brackets, must match an IP address
+	if len(domain) >= 2 && domain[0] == '[' && domain[len(domain)-1] == ']' {
+		ip := domain[1 : len(domain)-1]
+		if strings.HasPrefix(ip, "IPv6:") {
+			return isIPV6(strings.TrimPrefix(ip, "IPv6:"))
+		}
+		return isIPV4(ip)
+	}
+
+	// domain must match the requirements for a hostname
+	if !isHostname(domain) {
+		return false
+	}
+
+	_, err := mail.ParseAddress(s)
+	return err == nil
+}
+
+// isIPV4 tells whether given string is a valid representation of an IPv4 address
+// according to the "dotted-quad" ABNF syntax as defined in RFC 2673, section 3.2.
+func isIPV4(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	groups := strings.Split(s, ".")
+	if len(groups) != 4 {
+		return false
+	}
+	for _, group := range groups {
+		n, err := strconv.Atoi(group)
+		if err != nil {
+			return false
+		}
+		if n < 0 || n > 255 {
+			return false
+		}
+		if n != 0 && group[0] == '0' {
+			return false // leading zeroes should be rejected, as they are treated as octals
+		}
+	}
+	return true
+}
+
+// isIPV6 tells whether given string is a valid representation of an IPv6 address
+// as defined in RFC 2373, section 2.2.
+func isIPV6(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	if !strings.Contains(s, ":") {
+		return false
+	}
+	return net.ParseIP(s) != nil
+}
+
+// isURI tells whether given string is valid URI, according to RFC 3986.
+func isURI(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	u, err := urlParse(s)
+	return err == nil && u.IsAbs()
+}
+
+func urlParse(s string) (*url.URL, error) {
+	u, err := url.Parse(s)
 	if err != nil {
 		return nil, err
 	}
 
-	// gourl does not validate ipv6 host address
-	hostName := u.Hostname()
-	if strings.Contains(hostName, ":") {
-		if !strings.Contains(u.Host, "[") || !strings.Contains(u.Host, "]") {
-			return nil, LocalizableError("ipv6 address not enclosed in brackets")
+	// if hostname is ipv6, validate it
+	hostname := u.Hostname()
+	if strings.IndexByte(hostname, ':') != -1 {
+		if strings.IndexByte(u.Host, '[') == -1 || strings.IndexByte(u.Host, ']') == -1 {
+			return nil, errors.New("ipv6 address is not enclosed in brackets")
 		}
-		if err := validateIPV6(hostName); err != nil {
-			return nil, LocalizableError("invalid ipv6 address: %v", err)
+		if !isIPV6(hostname) {
+			return nil, errors.New("invalid ipv6 address")
 		}
 	}
-
 	return u, nil
 }
 
-func validateURI(v any) error {
+// isURIReference tells whether given string is a valid URI Reference
+// (either a URI or a relative-reference), according to RFC 3986.
+func isURIReference(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
-	u, err := parseURL(s)
-	if err != nil {
-		return err
-	}
-	if !u.IsAbs() {
-		return LocalizableError("relative url")
-	}
-	return nil
+	_, err := urlParse(s)
+	return err == nil && !strings.Contains(s, `\`)
 }
 
-func validateURIReference(v any) error {
+// isURITemplate tells whether given string is a valid URI Template
+// according to RFC6570.
+//
+// Current implementation does minimal validation.
+func isURITemplate(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
-	if strings.Contains(s, `\`) {
-		return LocalizableError(`contains \`)
-	}
-	_, err := parseURL(s)
-	return err
-}
-
-func validateURITemplate(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return nil
-	}
-	u, err := parseURL(s)
+	u, err := urlParse(s)
 	if err != nil {
-		return err
+		return false
 	}
-	for _, tok := range strings.Split(u.RawPath, "/") {
-		tok, err = decode(tok)
-		if err != nil {
-			return LocalizableError("percent decode failed: %v", err)
-		}
-		want := true
-		for _, ch := range tok {
-			var got bool
+	for _, item := range strings.Split(u.RawPath, "/") {
+		depth := 0
+		for _, ch := range item {
 			switch ch {
 			case '{':
-				got = true
+				depth++
+				if depth != 1 {
+					return false
+				}
 			case '}':
-				got = false
-			default:
-				continue
+				depth--
+				if depth != 0 {
+					return false
+				}
 			}
-			if got != want {
-				return LocalizableError("nested curly braces")
-			}
-			want = !want
 		}
-		if !want {
-			return LocalizableError("no matching closing brace")
+		if depth != 0 {
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
-func validatePeriod(v any) error {
+// isRegex tells whether given string is a valid regular expression,
+// according to the ECMA 262 regular expression dialect.
+//
+// The implementation uses go-lang regexp package.
+func isRegex(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
+	_, err := regexp.Compile(s)
+	return err == nil
+}
 
-	slash := strings.IndexByte(s, '/')
-	if slash == -1 {
-		return LocalizableError("missing slash")
+// isJSONPointer tells whether given string is a valid JSON Pointer.
+//
+// Note: It returns false for JSON Pointer URI fragments.
+func isJSONPointer(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
 	}
-
-	start, end := s[:slash], s[slash+1:]
-	if strings.HasPrefix(start, "P") {
-		if err := validateDuration(start); err != nil {
-			return LocalizableError("invalid start duration: %v", err)
+	if s != "" && !strings.HasPrefix(s, "/") {
+		return false
+	}
+	for _, item := range strings.Split(s, "/") {
+		for i := 0; i < len(item); i++ {
+			if item[i] == '~' {
+				if i == len(item)-1 {
+					return false
+				}
+				switch item[i+1] {
+				case '0', '1':
+					// valid
+				default:
+					return false
+				}
+			}
 		}
-		if err := validateDateTime(end); err != nil {
-			return LocalizableError("invalid end date-time: %v", err)
+	}
+	return true
+}
+
+// isRelativeJSONPointer tells whether given string is a valid Relative JSON Pointer.
+//
+// see https://tools.ietf.org/html/draft-handrews-relative-json-pointer-01#section-3
+func isRelativeJSONPointer(v interface{}) bool {
+	s, ok := v.(string)
+	if !ok {
+		return true
+	}
+	if s == "" {
+		return false
+	}
+	if s[0] == '0' {
+		s = s[1:]
+	} else if s[0] >= '0' && s[0] <= '9' {
+		for s != "" && s[0] >= '0' && s[0] <= '9' {
+			s = s[1:]
 		}
 	} else {
-		if err := validateDateTime(start); err != nil {
-			return LocalizableError("invalid start date-time: %v", err)
-		}
-		if strings.HasPrefix(end, "P") {
-			if err := validateDuration(end); err != nil {
-				return LocalizableError("invalid end duration: %v", err)
-			}
-		} else if err := validateDateTime(end); err != nil {
-			return LocalizableError("invalid end date-time: %v", err)
-		}
+		return false
 	}
-
-	return nil
+	return s == "#" || isJSONPointer(s)
 }
 
-// see https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions
-func validateSemver(v any) error {
+// isUUID tells whether given string is a valid uuid format
+// as specified in RFC4122.
+//
+// see https://datatracker.ietf.org/doc/html/rfc4122#page-4, for details
+func isUUID(v interface{}) bool {
 	s, ok := v.(string)
 	if !ok {
-		return nil
+		return true
 	}
-
-	// build --
-	if i := strings.IndexByte(s, '+'); i != -1 {
-		build := s[i+1:]
-		if build == "" {
-			return LocalizableError("build is empty")
-		}
-		for _, buildID := range strings.Split(build, ".") {
-			if buildID == "" {
-				return LocalizableError("build identifier is empty")
+	parseHex := func(n int) bool {
+		for n > 0 {
+			if len(s) == 0 {
+				return false
 			}
-			for _, ch := range buildID {
-				switch {
-				case ch >= '0' && ch <= '9':
-				case (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '-':
-				default:
-					return LocalizableError("invalid character %q in build identifier", ch)
-				}
+			hex := (s[0] >= '0' && s[0] <= '9') || (s[0] >= 'a' && s[0] <= 'f') || (s[0] >= 'A' && s[0] <= 'F')
+			if !hex {
+				return false
 			}
+			s = s[1:]
+			n--
 		}
-		s = s[:i]
+		return true
 	}
-
-	// pre-release --
-	if i := strings.IndexByte(s, '-'); i != -1 {
-		preRelease := s[i+1:]
-		for _, preReleaseID := range strings.Split(preRelease, ".") {
-			if preReleaseID == "" {
-				return LocalizableError("pre-release identifier is empty")
-			}
-			allDigits := true
-			for _, ch := range preReleaseID {
-				switch {
-				case ch >= '0' && ch <= '9':
-				case (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '-':
-					allDigits = false
-				default:
-					return LocalizableError("invalid character %q in pre-release identifier", ch)
-				}
-			}
-			if allDigits && len(preReleaseID) > 1 && preReleaseID[0] == '0' {
-				return LocalizableError("pre-release numeric identifier starts with zero")
-			}
+	groups := []int{8, 4, 4, 4, 12}
+	for i, numDigits := range groups {
+		if !parseHex(numDigits) {
+			return false
 		}
-		s = s[:i]
+		if i == len(groups)-1 {
+			break
+		}
+		if len(s) == 0 || s[0] != '-' {
+			return false
+		}
+		s = s[1:]
 	}
-
-	// versionCore --
-	versions := strings.Split(s, ".")
-	if len(versions) != 3 {
-		return LocalizableError("versionCore must have 3 numbers separated by dot")
-	}
-	names := []string{"major", "minor", "patch"}
-	for i, version := range versions {
-		if version == "" {
-			return LocalizableError("%s is empty", names[i])
-		}
-		if len(version) > 1 && version[0] == '0' {
-			return LocalizableError("%s starts with zero", names[i])
-		}
-		for _, ch := range version {
-			if ch < '0' || ch > '9' {
-				return LocalizableError("%s contains non-digit", names[i])
-			}
-		}
-	}
-
-	return nil
+	return len(s) == 0
 }

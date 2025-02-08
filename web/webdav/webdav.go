@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV
-// r.20250108.2358 :: STABLE
+// r.20250207.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20250108.2358"
+	VERSION string = "v.20250207.2358"
 )
 
 var (

@@ -1,12 +1,12 @@
 
 // SmartGo ASCII Captcha - Plugin for: SmartGo Captcha
 // (c) 2024-present unix-world.org
-// v.20250108.2358
+// v.20250207.2358
 // license: BSD
 
 //-- based on:
 // original work: ASCII Captcha 		@ https://github.com/bohnelang/ascii_captcha 		# head.20210317		! License: CC0
-// derived  work: Smart ASCII Captcha 	@ https://github.com/unix-world/Smart.Framework 	# head.20250108 	! License: BSD
+// derived  work: Smart ASCII Captcha 	@ https://github.com/unix-world/Smart.Framework 	# head.20250207 	! License: BSD
 //-- #
 
 package asciicaptcha

@@ -1,7 +1,7 @@
 package jwt
 
 // modified by unixman: fix B64: add panic handler ; jsonEncode ; catch invalid pad L=3
-// r.20250110.2358
+// r.20250207.2358
 
 import (
 	"log"

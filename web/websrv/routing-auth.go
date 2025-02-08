@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Auth :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250207.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -124,17 +124,13 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			} //end if
 			userMetaInfoDateTime, errUserMetaInfoDateTime := smart.AuthGetMetaData(authData, "DateTime") // just for testing this method which is rarely accessed ; the DateTime meta field should be set and non-empty
 			if(errUserMetaInfoDateTime != nil) {
-				if(len(authData.MetaData) > 0) { // works only with custom authenticator
-					response.ContentBody = ApiResponseJsonERR(500, "Failed to Get User`s MetaInfo DateTime", errUserMetaInfoDateTime)
-					return
-				} //end if
+				response.ContentBody = ApiResponseJsonERR(500, "Failed to Get User`s MetaInfo DateTime", errUserMetaInfoDateTime)
+				return
 			} //end if
 			userMetaInfoDateTime = smart.StrTrimWhitespaces(userMetaInfoDateTime)
 			if(userMetaInfoDateTime == "") {
-				if(len(authData.MetaData) > 0) { // works only with custom authenticator
-					response.ContentBody = ApiResponseJsonERR(500, "Failed to Get User`s MetaInfo DateTime: EMPTY", nil)
-					return
-				} //end if
+				response.ContentBody = ApiResponseJsonERR(500, "Failed to Get User`s MetaInfo DateTime: EMPTY", nil)
+				return
 			} //end if
 			var tkTyp string = ""
 			if(AuthTokenJwtIsEnabled() == true) {

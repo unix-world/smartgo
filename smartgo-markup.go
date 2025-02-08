@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ MARKUP ]
 
 // REQUIRE: go 1.19 or later
@@ -19,7 +19,9 @@ import (
 
 	uid "github.com/unix-world/smartgo/crypto/uuid"
 
-	xnethtml "golang.org/x/net/html"
+//	xnethtml "golang.org/x/net/html"
+	xnethtml "github.com/unix-world/smartgo/markup/html"
+
 	"github.com/unix-world/smartgo/markup/htmlsanitizer"
 
 	"github.com/unix-world/smartgo/markup/markdown"

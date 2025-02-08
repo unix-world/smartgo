@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ SMART.CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but stable only since go 1.19)
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20250118.2358"
+	VERSION string = "v.20250208.2358"
 	NAME string = "SmartGo"
 
 	DESCRIPTION string = "Smart.Framework.Go"
@@ -39,8 +39,9 @@ const (
 
 	TRIM_WHITESPACES string = " \t\n\r\x00\x0B" 	// Ultra Wide Compatibility (Javascript / PHP)
 
-	REGEX_ASCII_ANDSPACE_CHARACTERS 	string = `^[[:graph:] \t\r\n]+$` 	// match all ASCII safe printable characters ; allow extra: space, tab, line feed, carriage return
-	REGEX_ASCII_NOSPACE_CHARACTERS 		string = `^[[:graph:]]+$` 			// match all ASCII safe printable characters except spaces
+	REGEX_ASCII_NOSPACE_CHARACTERS 		string = `^[[:graph:]]+$` 			// match all ASCII safe printable characters except spaces ; [[:graph:]] is equivalent to [[:alnum:][:punct:]]
+	REGEX_ASCII_ANDSPACE_CHARACTERS 	string = `^[[:graph:] \t\r\n]+$` 	// match all ASCII safe printable characters ; allow extra safe spaces only: space, tab, line feed, carriage return
+	REGEX_ASCII_PRINTABLE_CHARACTERS 	string = `^[[:print:]]+$` 			// match all ASCII printable characters [[:print:]] is equivalent to [[:graph:][:whitespace:]] ; [:whitespace:] match a whitespace character such as space, tab, formfeed, and carriage return
 )
 
 

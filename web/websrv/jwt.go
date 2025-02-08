@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / JWT :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250207.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -254,7 +254,7 @@ func JwtNewAudience(ipList string, area string, privs string, restr string, cliS
 		if(ipList != "*") { // validate, except wildcard
 			errValidateAllowedIpList := smart.ValidateIPAddrList(ipList) // verify the IP list and if invalid make it empty as invalid !
 			if(errValidateAllowedIpList != nil) {
-				ipList = "" // set to empty, as invalid !
+				ipList = "" // set to empty, as invalid, to fail verification
 			} //end if
 		} //end if
 	} //end if
@@ -271,6 +271,17 @@ func JwtNewAudience(ipList string, area string, privs string, restr string, cliS
 		"R:" + restr,   // restrictions: default = @
 		"X:" + cliSign, // xtras: none = - ; this is a custom field to be used for external validations (ex: cookie bind to cli/browser signature)
 	}
+	//--
+	jwtTestAudience := JwtParseAudience(audience) // must test this because some extra validations like max string lengths are in this method
+	if(jwtTestAudience.Error != nil) {
+		audience = []string{ // set as invalid, to fail verification (must be non-null, because nil means default and some methods will issue default audience on nil)
+			"I:",
+			"A:",
+			"P:",
+			"R:",
+			"X:",
+		}
+	} //end if
 	//--
 	return audience
 	//--
@@ -290,23 +301,23 @@ func JwtParseAudience(audience []string) JwtAudience {
 		return jwtAudience
 	} //end if
 	//--
-	if((!smart.StrStartsWith(audience[0], "I:")) || (len(audience[0]) < 3)) { // ip list
+	if((!smart.StrStartsWith(audience[0], "I:")) || (len(audience[0]) < 3) || (len(audience[0]) > 255)) { // ip list
 		jwtAudience.Error = smart.NewError("IP List is Invalid")
 		return jwtAudience
 	} //end if
-	if((!smart.StrStartsWith(audience[1], "A:")) || (len(audience[1]) < 3)) { // area
+	if((!smart.StrStartsWith(audience[1], "A:")) || (len(audience[1]) < 3) || (len(audience[1]) > 255)) { // area
 		jwtAudience.Error = smart.NewError("Area is Invalid")
 		return jwtAudience
 	} //end if
-	if((!smart.StrStartsWith(audience[2], "P:")) || (len(audience[2]) < 3)) { // privileges
+	if((!smart.StrStartsWith(audience[2], "P:")) || (len(audience[2]) < 3) || (len(audience[2]) > 255)) { // privileges
 		jwtAudience.Error = smart.NewError("Privileges are Invalid")
 		return jwtAudience
 	} //end if
-	if((!smart.StrStartsWith(audience[3], "R:")) || (len(audience[3]) < 3)) { // restrictions
+	if((!smart.StrStartsWith(audience[3], "R:")) || (len(audience[3]) < 3) || (len(audience[3]) > 255)) { // restrictions
 		jwtAudience.Error = smart.NewError("Restrictions are Invalid")
 		return jwtAudience
 	} //end if
-	if((!smart.StrStartsWith(audience[4], "X:")) || (len(audience[4]) < 3)) { // xtras
+	if((!smart.StrStartsWith(audience[4], "X:")) || (len(audience[4]) < 3) || (len(audience[4]) > 512)) { // xtras
 		jwtAudience.Error = smart.NewError("Xtras are Invalid")
 		return jwtAudience
 	} //end if
@@ -873,7 +884,7 @@ func jwtVerify(tokenString string, jwtSignMethod string, clientIP string, dom st
 	if(vfyExpInt64At <= 0) {
 		return smart.NewError("Token ExpiresAt is Malformed")
 	} //end if
-	if(vfyExpInt64At <= smart.TimeNowUtc()) { // {{{SYNC-SMART-JWT-UTC-TIME}}} ; this is an extra safety check, it is actually verified at errTkn and tkn.Valid ; here must use: <= to cmply with above verification at errTkn
+	if(vfyExpInt64At <= smart.TimeNowUnix()) { // {{{SYNC-SMART-JWT-UTC-TIME}}} ; this is an extra safety check, it is actually verified at errTkn and tkn.Valid ; here must use: <= to cmply with above verification at errTkn
 		return smart.NewError("Token ExpiresAt is Expired")
 	} //end if
 	//--
@@ -889,7 +900,7 @@ func jwtVerify(tokenString string, jwtSignMethod string, clientIP string, dom st
 	if(vfyIssInt64At <= 0) {
 		return smart.NewError("Token IssuedAt is Malformed")
 	} //end if
-	if(vfyIssInt64At > smart.TimeNowUtc()) { // {{{SYNC-SMART-JWT-UTC-TIME}}} ; this is an extra safety check, it is actually verified at errTkn and tkn.Valid ; here must use: <= to cmply with above verification at errTkn
+	if(vfyIssInt64At > smart.TimeNowUnix()) { // {{{SYNC-SMART-JWT-UTC-TIME}}} ; this is an extra safety check, it is actually verified at errTkn and tkn.Valid ; here must use: <= to cmply with above verification at errTkn
 		return smart.NewError("Token IssuedAt is Invalid")
 	} //end if
 	//--

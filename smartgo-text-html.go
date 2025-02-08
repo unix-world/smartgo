@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ TEXT / HTML ]
 
 // REQUIRE: go 1.19 or later
@@ -18,6 +18,7 @@ func StrCreateSlug(s string) string {
 		return ""
 	} //end if
 	s = StrDeaccent(s)
+	s = StrReplaceAll(s, "?", "-") // replace all failed entities as `?` with `-` ; this is faster than regex below, pass through this one first
 	//--
 	s = StrRegexReplaceAll(`[^a-zA-Z0-9_\-]`, s, "-")
 	s = StrRegexReplaceAll(`[\-]+`, s, "-") // suppress multiple -

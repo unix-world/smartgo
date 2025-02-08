@@ -1,3 +1,3 @@
-// JS-Script (UM): colorize.js @ 2025-01-07 23:40:30 +0000
+// JS-Script (UM): colorize.js @ 2025-02-07 03:11:48 +0000
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"),require("./runmode"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror","./runmode"],e)}else{e(CodeMirror)}})(function(d){"use strict";var i=/^(p|li|div|h\\d|pre|blockquote|td)$/;function f(e,o){if(e.nodeType==3){return o.push(e.nodeValue)}for(var r=e.firstChild;r;r=r.nextSibling){f(r,o);if(i.test(e.nodeType)){o.push("\n")}}}d.colorize=function(e,o){if(!e){e=document.body.getElementsByTagName("pre")}for(var r=0;r<e.length;++r){var i=e[r];var n=i.getAttribute("data-lang")||o;if(!n){continue}var t=[];f(i,t);i.innerHTML="";d.runMode(t.join(""),n,i);i.className+=" cm-s-default"}}});
 // #END

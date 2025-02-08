@@ -15,7 +15,8 @@ import (
 	"net/url"
 	"strings"
 
-	"golang.org/x/net/proxy"
+//	"golang.org/x/net/proxy"
+	proxy "github.com/unix-world/smartgo/web-proxy"
 )
 
 type netDialerFunc func(ctx context.Context, network, addr string) (net.Conn, error)

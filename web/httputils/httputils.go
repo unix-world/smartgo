@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -26,7 +26,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 
-	"golang.org/x/time/rate"
+//	"golang.org/x/time/rate"
+	"github.com/unix-world/smartgo/utils/time-rate"
 
 	smart 		 "github.com/unix-world/smartgo"
 	smartcache 	 "github.com/unix-world/smartgo/data-structs/simplecache"
@@ -39,7 +40,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20250118.2358"
+	VERSION string = "r.20250208.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA

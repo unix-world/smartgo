@@ -1,5 +1,8 @@
 package jwt
 
+// modified by unixman: code reformat + add some errors from deleted files on refactoring
+// r.20250207.2358
+
 import (
 	"errors"
 )
@@ -88,26 +91,26 @@ func (e *ValidationError) Is(err error) bool {
 
 	// Otherwise, we need to match using our error flags
 	switch err {
-	case ErrTokenMalformed:
-		return e.Errors&ValidationErrorMalformed != 0
-	case ErrTokenUnverifiable:
-		return e.Errors&ValidationErrorUnverifiable != 0
-	case ErrTokenSignatureInvalid:
-		return e.Errors&ValidationErrorSignatureInvalid != 0
-	case ErrTokenInvalidAudience:
-		return e.Errors&ValidationErrorAudience != 0
-	case ErrTokenExpired:
-		return e.Errors&ValidationErrorExpired != 0
-	case ErrTokenUsedBeforeIssued:
-		return e.Errors&ValidationErrorIssuedAt != 0
-	case ErrTokenInvalidIssuer:
-		return e.Errors&ValidationErrorIssuer != 0
-	case ErrTokenNotValidYet:
-		return e.Errors&ValidationErrorNotValidYet != 0
-	case ErrTokenInvalidId:
-		return e.Errors&ValidationErrorId != 0
-	case ErrTokenInvalidClaims:
-		return e.Errors&ValidationErrorClaimsInvalid != 0
+		case ErrTokenMalformed:
+			return e.Errors&ValidationErrorMalformed != 0
+		case ErrTokenUnverifiable:
+			return e.Errors&ValidationErrorUnverifiable != 0
+		case ErrTokenSignatureInvalid:
+			return e.Errors&ValidationErrorSignatureInvalid != 0
+		case ErrTokenInvalidAudience:
+			return e.Errors&ValidationErrorAudience != 0
+		case ErrTokenExpired:
+			return e.Errors&ValidationErrorExpired != 0
+		case ErrTokenUsedBeforeIssued:
+			return e.Errors&ValidationErrorIssuedAt != 0
+		case ErrTokenInvalidIssuer:
+			return e.Errors&ValidationErrorIssuer != 0
+		case ErrTokenNotValidYet:
+			return e.Errors&ValidationErrorNotValidYet != 0
+		case ErrTokenInvalidId:
+			return e.Errors&ValidationErrorId != 0
+		case ErrTokenInvalidClaims:
+			return e.Errors&ValidationErrorClaimsInvalid != 0
 	}
 
 	return false

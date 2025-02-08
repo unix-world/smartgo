@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ CRYPTO / SSH ]
 
 // REQUIRE: go 1.19 or later
@@ -15,7 +15,7 @@ import (
 	cryptorand "crypto/rand"
 	"crypto/ed25519"
 
-	"golang.org/x/crypto/ssh"
+	openssh "github.com/unix-world/smartgo/crypto/open-ssh"
 )
 
 //-----
@@ -40,15 +40,15 @@ func GenerateSSHKeyPairEd25519(comment string, password string) (error, string, 
 	var p *pem.Block
 	var errM error
 	if(password != "") {
-		p, errM = ssh.MarshalPrivateKeyWithPassphrase(crypto.PrivateKey(priv), comment, []byte(password))
+		p, errM = openssh.MarshalPrivateKeyWithPassphrase(crypto.PrivateKey(priv), comment, []byte(password))
 	} else {
-		p, errM = ssh.MarshalPrivateKey(crypto.PrivateKey(priv), comment)
+		p, errM = openssh.MarshalPrivateKey(crypto.PrivateKey(priv), comment)
 	} //end if else
 	if(errM != nil) {
 		return errM, "", ""
 	} //end if
 	//--
-	publicKey, err := ssh.NewPublicKey(pub)
+	publicKey, err := openssh.NewPublicKey(pub)
 	if(err != nil) {
 		return errM, "", ""
 	} //end if

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ TPL (MARKERS-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -314,7 +314,7 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL is OverSized")
 		return ""
 	} //end if
-	//-- syntax: r.20231228
+	//--
 	if(isEncoded == true) {
 		template = RawUrlDecode(template)
 	} //end if
@@ -342,7 +342,7 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 
 
 func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool, revertSyntax bool, escapeRemainingSyntax bool, isMainHtml bool) string {
-	//-- syntax: r.20231228
+	//-- syntax: r.20250126
 	// render a string TPL with markers and placeholders and custom options
 	// low level usage only
 	// use Render* methods from above
@@ -1160,8 +1160,8 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 								tmp_marker_val = StrTrimWhitespaces(StrReplaceAll(StrNormalizeSpaces(tmp_marker_val), " ", ""))
 							} else if(escaping == "|nobackslash") { // remove backslashes from a string
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\", "")
-							} else if(escaping == "|rxpattern") { // prepare a regex escaped pattern for a browser input ; the following characters need tot to be escaped in a browser pattern sequence, but in PHP they are, in a regex pattern
-								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\/", "/")
+							} else if(escaping == "|rxpattern") { // prepare a regex escaped pattern for a browser input ; the following characters need to be not escaped in a browser pattern sequence, but in PHP they are, in a regex pattern
+								// the `-` and `/` must remain escaped
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\.", ".")
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\:", ":")
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\#", "#")

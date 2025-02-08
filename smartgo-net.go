@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"net"
+	"net/url"
 	"net/http"
 )
 
@@ -801,6 +802,54 @@ func GetUserAgentBrowserClassOs(signature string) (bw string, cls string, os str
 
 
 //-----
+
+
+func ParseUrl(u string) (*url.URL, error) {
+	//--
+	u = StrTrimWhitespaces(u)
+	if(u == "") {
+		return nil, NewError("URL is Empty")
+	} //end if
+	//--
+	pUrl, err := url.Parse(u)
+	if(err != nil) {
+		return nil, NewError("URL Parse Error: " + err.Error())
+	} //end if
+	if(pUrl == nil) {
+		return nil, NewError("URL Parse Error, Null")
+	} //end if
+	//--
+	if((pUrl.Scheme != "https") && (pUrl.Scheme != "http")) {
+		return nil, NewError("URL Scheme must be one of: `http://` or `https://`")
+	} //end if
+	//--
+	return pUrl, nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func IsNetValidHttpUrl(u string) bool {
+	//--
+	u = StrTrimWhitespaces(u)
+	if(u == "") {
+		return false
+	} //end if
+	//--
+	pUrl, err := url.Parse(u)
+	if((err != nil) || (pUrl == nil)) {
+		return false
+	} //end if
+	//--
+	if((pUrl.Scheme != "https") && (pUrl.Scheme != "http")) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
 
 
 func IsNetValidPortNum(p int64) bool { // can be a valid NUMERIC port between 1 and 65535

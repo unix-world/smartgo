@@ -1,4 +1,0 @@
-v.20250105
-Go 1.18 or later
-
-golang.org/x/sys v0.29.0

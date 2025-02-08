@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ STRINGS ]
 
 // REQUIRE: go 1.19 or later
@@ -13,10 +13,7 @@ import (
 
 	"strings"
 
-	"unicode"
 	"unicode/utf8"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 
 	"regexp"
 	"github.com/unix-world/smartgo/textproc/regexp2"
@@ -739,35 +736,6 @@ func StrRev(s string) string { // PHP compatible
 	} //end for
 	//--
 	return string(runes[n:])
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-//== PRIVATE
-func isUnicodeNonspacingMarks(r rune) bool {
-	//--
-	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
-	//--
-} //END FUNCTION
-//==
-
-
-func StrDeaccent(s string) string {
-	//--
-	defer PanicHandler() // req. by transform panic handler with malformed data
-	//--
-	if(s == "") {
-		return ""
-	} //end if
-	//--
-	t := transform.Chain(norm.NFD, transform.RemoveFunc(isUnicodeNonspacingMarks), norm.NFC)
-	//--
-	result, _, _ := transform.String(t, s)
-	//--
-	return result
 	//--
 } //END FUNCTION
 

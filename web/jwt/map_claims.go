@@ -1,5 +1,8 @@
 package jwt
 
+// modified by unixman: code reformat
+// r.20250207.2358
+
 import (
 	// "fmt"
 	"errors"
@@ -16,18 +19,18 @@ type MapClaims map[string]interface{}
 func (m MapClaims) VerifyAudience(cmp string, req bool) bool {
 	var aud []string
 	switch v := m["aud"].(type) {
-	case string:
-		aud = append(aud, v)
-	case []string:
-		aud = v
-	case []interface{}:
-		for _, a := range v {
-			vs, ok := a.(string)
-			if !ok {
-				return false
+		case string:
+			aud = append(aud, v)
+		case []string:
+			aud = v
+		case []interface{}:
+			for _, a := range v {
+				vs, ok := a.(string)
+				if !ok {
+					return false
+				}
+				aud = append(aud, vs)
 			}
-			aud = append(aud, vs)
-		}
 	}
 	return verifyAud(aud, cmp, req)
 }
@@ -43,16 +46,14 @@ func (m MapClaims) VerifyExpiresAt(cmp int64, req bool) bool {
 	}
 
 	switch exp := v.(type) {
-	case float64:
-		if exp == 0 {
-			return verifyExp(nil, cmpTime, req)
-		}
-
-		return verifyExp(&newNumericDateFromSeconds(exp).Time, cmpTime, req)
-	case json.Number:
-		v, _ := exp.Float64()
-
-		return verifyExp(&newNumericDateFromSeconds(v).Time, cmpTime, req)
+		case float64:
+			if exp == 0 {
+				return verifyExp(nil, cmpTime, req)
+			}
+			return verifyExp(&newNumericDateFromSeconds(exp).Time, cmpTime, req)
+		case json.Number:
+			v, _ := exp.Float64()
+			return verifyExp(&newNumericDateFromSeconds(v).Time, cmpTime, req)
 	}
 
 	return false
@@ -69,16 +70,14 @@ func (m MapClaims) VerifyIssuedAt(cmp int64, req bool) bool {
 	}
 
 	switch iat := v.(type) {
-	case float64:
-		if iat == 0 {
-			return verifyIat(nil, cmpTime, req)
-		}
-
-		return verifyIat(&newNumericDateFromSeconds(iat).Time, cmpTime, req)
-	case json.Number:
-		v, _ := iat.Float64()
-
-		return verifyIat(&newNumericDateFromSeconds(v).Time, cmpTime, req)
+		case float64:
+			if iat == 0 {
+				return verifyIat(nil, cmpTime, req)
+			}
+			return verifyIat(&newNumericDateFromSeconds(iat).Time, cmpTime, req)
+		case json.Number:
+			v, _ := iat.Float64()
+			return verifyIat(&newNumericDateFromSeconds(v).Time, cmpTime, req)
 	}
 
 	return false
@@ -95,16 +94,14 @@ func (m MapClaims) VerifyNotBefore(cmp int64, req bool) bool {
 	}
 
 	switch nbf := v.(type) {
-	case float64:
-		if nbf == 0 {
-			return verifyNbf(nil, cmpTime, req)
-		}
-
-		return verifyNbf(&newNumericDateFromSeconds(nbf).Time, cmpTime, req)
-	case json.Number:
-		v, _ := nbf.Float64()
-
-		return verifyNbf(&newNumericDateFromSeconds(v).Time, cmpTime, req)
+		case float64:
+			if nbf == 0 {
+				return verifyNbf(nil, cmpTime, req)
+			}
+			return verifyNbf(&newNumericDateFromSeconds(nbf).Time, cmpTime, req)
+		case json.Number:
+			v, _ := nbf.Float64()
+			return verifyNbf(&newNumericDateFromSeconds(v).Time, cmpTime, req)
 	}
 
 	return false

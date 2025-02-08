@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 // [ AUTH / MODEL ]
 
 // REQUIRE: go 1.19 or later
@@ -169,6 +169,7 @@ func (p *AuthDataProvider) ParseAndValidateAuthUserRecord(authUserName string, a
 			break
 		case ALGO_PASS_SMART_SAFE_OPQ_TOKEN: fallthrough
 		case ALGO_PASS_SMART_SAFE_WEB_TOKEN: fallthrough
+		case ALGO_PASS_SMART_SAFE_SWT_TOKEN: fallthrough
 		case ALGO_PASS_CUSTOM_TOKEN:
 			// invalid, the user account can't have this kind of password hash
 			break
@@ -178,7 +179,7 @@ func (p *AuthDataProvider) ParseAndValidateAuthUserRecord(authUserName string, a
 	} //end if
 	record.Totp2FASecret = StrTrimWhitespaces(arrRecord.Get("secret2fa").String()) // 2FA Secret Key
 	record.SecurityKey = StrTrimWhitespaces(arrRecord.Get("secretkey").String()) // OAuth2 (JWT Tokens) Secret Key
-	// TODO: implement encrypted private key + decrypt private key somewhere ...
+	// TODO: implement encrypted private key + decrypt private key somewhere, see SF as example ...
 	record.PrivKey = StrTrimWhitespaces(arrRecord.Get("privkey").String()) // Private Key used for encryption and decryption
 	record.PubKey = StrTrimWhitespaces(arrRecord.Get("pubkey").String())
 	record.EmailAddr = StrTrimWhitespaces(arrRecord.Get("email").String())
@@ -266,7 +267,7 @@ func (p *AuthDataProvider) ParseAndValidateAuthTokenRecord(authUserName string, 
 		dt := DateTimeStructUtc(expiration)
 		if((dt.Status != "OK") || (dt.ErrMsg != "")) {
 			isExpired = true // malformed
-		} else if(dt.Time < TimeNowUtc()) {
+		} else if(dt.Time < TimeNowUnix()) {
 			isExpired = true
 		} //end if
 	} //end if

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20250118.2358"
+	VERSION string = "r.20250208.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2025-01-18 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2025-02-07 12:28:08" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
@@ -506,8 +506,8 @@ const (
 <style>
 * { font-family: 'IBM Plex Sans', 'Noto Sans', arial, sans-serif; font-smooth: always; }
 body { background-color: #FFFFFF; color: #333333; }
-a { color:#333333; }
-hr { height:1px; border:none 0; border-top:1px solid #CCCCCC; }
+a { color: #333333; text-decoration-line: dotted !important; text-decoration-thickness: 0.5px !important; text-decoration-skip-ink: auto !important; }
+hr { height: 1px; border: none 0; border-top: 1px solid #CCCCCC; }
 div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weight: bold; font-style: normal; padding-left: 16px; padding-right: 16px; padding-top: 12px; padding-bottom: 8px; margin-top: 8px; margin-bottom: 8px; max-width: calc(100% - 10px) !important; min-width: 100px; min-height: 40px; height: auto !important; border-radius: 5px; box-sizing: content-box !important; opacity: 1 !important; background-color: #C62828 !important; color: #FFFFFF !important; }
 </style>
 [:::HEAD-EXT-HTML:::]
@@ -566,7 +566,8 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <!-- #end TPL -->
 `
 
-	HTML_CSS_STYLE_PREFER_COLOR_DARK string = `<style>@media (prefers-color-scheme: dark) { body { background-color: #2E2E2E; color: #F8F8F8; } a { color: #F8F8F8; } hr { height:1px; border:none 0; border-top:1px dashed #888888; } }</style>`
+	// sync with default-dark.css
+	HTML_CSS_STYLE_PREFER_COLOR_DARK 	string = `<style>@media (prefers-color-scheme: dark) { body { background-color: #2E2E2E; color: #F8F8F8; } a, a:link, a:visited, a:hover { color: #F8F8F8; } hr { height: 1px; border: none 0; border-top: 1px dashed #888888; } }</style>`
 
 	HTML_META_ROBOTS_NOINDEX 			string = `<meta name="robots" content="noindex">`
 	HTML_META_ROBOTS_NOINDEX_NOFOLLOW 	string = `<meta name="robots" content="noindex, nofollow">`

@@ -1,12 +1,14 @@
 
 // GO Lang :: SmartGo / Web Server / JSON-Validate :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250118.2358 :: STABLE
+// r.20250208.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
+	"strings"
+
 	smart 		"github.com/unix-world/smartgo"
 
 	jsonschema 	"github.com/unix-world/smartgo/web/jsonschema"
@@ -14,6 +16,8 @@ import (
 
 
 func JsonValidateWithSchema(draft uint16, schema string, json string) error { // if OK returns TRUE
+	//--
+	defer smart.PanicHandler()
 	//--
 	if(draft <= 0) {
 		draft = 7 // the default schema
@@ -29,30 +33,29 @@ func JsonValidateWithSchema(draft uint16, schema string, json string) error { //
 		return smart.NewError("JSON is Empty")
 	} //end if
 	//--
-	var sDraft *jsonschema.Draft
+	compiler := jsonschema.NewCompiler()
+	//--
 	switch(draft) {
 		case 4: // fast, but too old
-			sDraft = jsonschema.Draft4
+			compiler.Draft = jsonschema.Draft4
+			break
 		case 6: // fast, but missing some features
-			sDraft = jsonschema.Draft6
+			compiler.Draft = jsonschema.Draft6
+			break
 		case 7: // default, it is the most complete but still fast
-			sDraft = jsonschema.Draft7
+			compiler.Draft = jsonschema.Draft7
+			break
 		case 2019: // slow
-			sDraft = jsonschema.Draft2019
+			compiler.Draft = jsonschema.Draft2019
+			break
 		case 2020: // slow
-			sDraft = jsonschema.Draft2020
+			compiler.Draft = jsonschema.Draft2020
+			break
 		default:
 			return smart.NewError("JSON Schema Invalid Draft Version: " + smart.ConvertUInt16ToStr(draft))
 	} //end switch
 	//--
-	compiler := jsonschema.NewCompiler()
-	compiler.DefaultDraft(sDraft)
-	//--
-	schJson, errParseSchema := smart.JsonObjDecode(schema)
-	if(errParseSchema != nil) {
-		return smart.NewError("JSON Schema Parse Error: " + errParseSchema.Error())
-	} //end if
-	errInit := compiler.AddResource("schema.json", schJson);
+	errInit := compiler.AddResource("schema.json", strings.NewReader(schema));
 	if(errInit != nil) {
 		return smart.NewError("JSON Schema Init Error: " + errInit.Error())
 	} //end if
@@ -73,6 +76,7 @@ func JsonValidateWithSchema(draft uint16, schema string, json string) error { //
 	} //end if
 	//--
 	return nil
+	//--
 	//--
 } //END FUNCTION
 

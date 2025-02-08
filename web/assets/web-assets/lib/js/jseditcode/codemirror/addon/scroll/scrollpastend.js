@@ -1,3 +1,3 @@
-// JS-Script (UM): scrollpastend.js @ 2025-01-07 23:40:26 +0000
+// JS-Script (UM): scrollpastend.js @ 2025-02-07 03:11:46 +0000
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror"],e)}else{e(CodeMirror)}})(function(t){"use strict";t.defineOption("scrollPastEnd",false,function(e,n,i){if(i&&i!=t.Init){e.off("change",o);e.off("refresh",f);e.display.lineSpace.parentNode.style.paddingBottom="";e.state.scrollPastEndPadding=null}if(n){e.on("change",o);e.on("refresh",f);f(e)}});function o(e,n){if(t.changeEnd(n).line==e.lastLine()){f(e)}}function f(e){var n="";if(e.lineCount()>1){var i=e.display.scroller.clientHeight-30,t=e.getLineHandle(e.lastLine()).height;n=i-t+"px"}if(e.state.scrollPastEndPadding!=n){e.state.scrollPastEndPadding=n;e.display.lineSpace.parentNode.style.paddingBottom=n;e.off("refresh",f);e.setSize();e.on("refresh",f)}}});
 // #END

@@ -1,4 +1,4 @@
-v.20250108.2358
+v.20250207.2358
 
 unixman: contains modifications:
 	* added extra path security checks
@@ -7,5 +7,5 @@ unixman: contains modifications:
 
 Go 1.18 or later
 
-golang.org/x/net/webdav v0.19.0 @ r.20240103
+golang.org/x/net/webdav v0.34.0 @ r.20250207
 

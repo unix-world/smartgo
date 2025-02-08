@@ -1,0 +1,9 @@
+v.20250207
+Go 1.20 or later
+
+[ openssh: a refactored subset of that only generate SSH key pairs ]
+golang.org/x/crypto/ssh v0.34.0
+
+by unixman:
+	* removed weak deprecated algos
+	* refactored by logical minimalism
