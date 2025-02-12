@@ -1,0 +1,7 @@
+github.com/golang/snappy v0.0.4 @head.20250212
+
+go 1.11
+
+refactored by unixman as smartgoext/db/mongo-driver/pkg/golang/snappy
+removed asm files
+added a missing extra method EncodeBlockInto() from github.com/klauspost/compress/internal/snapref as a new file encode_snapref.go
