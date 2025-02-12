@@ -58,6 +58,9 @@ func (r *Renderer) list(w io.Writer, node *ast.List, entering bool) {
 		}
 	} else {
 		r.listDepth--
+		//-- unixman: fix from upstream: fe0b4be2f24a142e21231a0252f8dd54bbba4589
+		fmt.Fprintf(w, "\n")
+		//-- #fix
 	}
 }
 
@@ -82,7 +85,15 @@ func (r *Renderer) listItem(w io.Writer, node *ast.ListItem, entering bool) {
 
 func (r *Renderer) para(w io.Writer, node *ast.Paragraph, entering bool) {
 	if !entering && r.lastOutputLen > 0 {
-		r.outs(w, "\n")
+		//-- unixman: fix from upstream: fe0b4be2f24a142e21231a0252f8dd54bbba4589
+	//	r.outs(w, "\n")
+		//--
+		var br string = "\n\n"
+		if _, ok := node.Parent.(*ast.ListItem); ok { // List items don't need the extra line-break
+			br = "\n"
+		}
+		r.outs(w, br)
+		//-- #fix
 	}
 }
 
@@ -224,7 +235,10 @@ func (r *Renderer) codeBlock(w io.Writer, node *ast.CodeBlock) {
 	}
 	r.outs(w, "\n")
 	r.out(w, text)
-	r.outs(w, "\n```\n")
+	//-- unixman: fix from upstream: 4f606c78d442b950bc612d2cc32cb1dbc5bc3b39
+//	r.outs(w, "\n```\n")
+	r.outs(w, "```\n\n")
+	//-- #end fix
 }
 
 func (r *Renderer) code(w io.Writer, node *ast.Code) {
@@ -241,7 +255,10 @@ func (r *Renderer) heading(w io.Writer, node *ast.Heading, entering bool) {
 		r.outs(w, " ")
 		r.out(w, node.Literal)
 	} else {
-		r.outs(w, "\n")
+		//-- unixman: fix from upstream: fe0b4be2f24a142e21231a0252f8dd54bbba4589
+	//	r.outs(w, "\n")
+		r.outs(w, "\n\n")
+		//-- #fix
 	}
 }
 

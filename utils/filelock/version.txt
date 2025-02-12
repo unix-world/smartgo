@@ -1,4 +1,0 @@
-github.com/jviney/go-filelock @head.20240116
-
-go 1.12
-

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250207.2358 :: STABLE
+// r.20250211.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -31,7 +31,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20250207.2358"
+	VERSION string = "r.20250211.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -123,7 +123,7 @@ func WebServerSetMaxPostSize(size uint64) bool {
 func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
 
 	//--
-	// this method should return (error codes) just int16 positive values and zero if ok ; negative values are reserved for outsite managers
+	// this method should return (error codes) just int16, only positive, values and zero if ok ; negative values are reserved for outsite managers
 	//--
 
 	defer smart.PanicHandler()
@@ -312,7 +312,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				return 1400
 			} //end if
 		} //end if
-		if(WebPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}} ; test with WebPathIsValid() instead of WebDirIsValid() because have no trailing slash
+		if(smart.PathIsWebSafeValidSafePath(DAV_STORAGE_RELATIVE_ROOT_PATH) != true) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}} ; test with smart.PathIsWebSafeValidSafePath() instead of WebDirIsValid() because have no trailing slash
 			log.Println("[ERROR]", "Web Server: WebDav Root Path is Invalid:", DAV_STORAGE_RELATIVE_ROOT_PATH)
 			return 1401
 		} //end if

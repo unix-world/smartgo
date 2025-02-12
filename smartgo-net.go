@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250208.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -42,7 +42,7 @@ const (
 	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
 	DEFAULT_FAKE_HOSTPORT_SERVER string = "256.256.256.256:65535"
 
-	DEFAULT_BROWSER_UA string = "NetSurf/3.11 (Sf/Go)"
+	DEFAULT_BROWSER_UA string = "NetSurf/3.11 (Sf.Go/" + VERSION + ")"
 )
 
 var (

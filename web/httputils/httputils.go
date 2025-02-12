@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250208.2358 :: STABLE
+// r.20250211.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -33,6 +33,7 @@ import (
 	smartcache 	 "github.com/unix-world/smartgo/data-structs/simplecache"
 	assets 		 "github.com/unix-world/smartgo/web/assets/web-assets"
 	smartcaptcha "github.com/unix-world/smartgo/web/captcha"
+	filelock 	 "github.com/unix-world/smartgo/utils/filelock"
 	pbar 		 "github.com/unix-world/smartgo/ui/progressbar"
 )
 
@@ -40,7 +41,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20250208.2358"
+	VERSION string = "r.20250211.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -113,7 +114,7 @@ const (
 	//--
 	MAX_SIZE_ETAG int64 = 1048576 // 1MB 1048576 bytes ; 100% of assets match this criteria ; for the rest (ex: public files), Weak ETag is not worth ...
 	//--
-	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-]+$`
+	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-\.\:\#]+$` // original: `^[a-zA-Z0-9_\-]+$` ; allow extended as PHP supports
 	//--
 
 	//--
@@ -527,17 +528,16 @@ func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkip
 //-----
 
 
-func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData bytes.Buffer, multipartType string) {
+func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *bytes.Buffer, multipartType string) {
 	//--
 	defer smart.PanicHandler()
 	//--
 	// This will create the form data or multi/part form data by reading all files in memory
 	//--
-	emptyData := bytes.Buffer{}
 	postData  := bytes.Buffer{}
 	//--
 	if(reqArr == nil) {
-		return "", emptyData, ""
+		return "", nil, ""
 	} //end if
 	//--
 	w := multipart.NewWriter(&postData)
@@ -551,11 +551,11 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData byte
 			if(smart.StrRegexMatch(REGEX_SAFE_HTTP_FORM_VAR_NAME, key)) { // form field
 				for z:=0; z<len(val); z++ {
 					if(int64(len(val[z])) > int64(HTTP_CLI_MAX_POST_VAL_SIZE)) {
-						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + smart.ConvertIntToStr(len(val[z])) + "` bytes ; Oversized #" + smart.ConvertIntToStr(z), emptyData, ""
+						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + smart.ConvertIntToStr(len(val[z])) + "` bytes ; Oversized #" + smart.ConvertIntToStr(z), nil, ""
 					} //end if
 					v, ev := w.CreateFormField(key)
 					if(ev != nil) {
-						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + val[z] + "` #" + smart.ConvertIntToStr(z) + ": " + ev.Error(), emptyData, ""
+						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + val[z] + "` #" + smart.ConvertIntToStr(z) + ": " + ev.Error(), nil, ""
 					} //end if
 					v.Write([]byte(val[z]))
 					validPostVarsOrFiles++
@@ -563,75 +563,80 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData byte
 						log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post Form Variable Add: `" + key + "`: `" + val[z] + "` #", z)
 					} //end if
 				} //end for
-			} else if(key == "@file") { // form file
-				for z:=0; z<len(val); z++ {
-					var uploadFilePath string = val[z]
-					if(!smart.PathIsSafeValidPath(uploadFilePath)) {
-						return "ERR: The POST File Path is Invalid or Unsafe: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					if(smart.PathIsEmptyOrRoot(uploadFilePath)) {
-						return "ERR: The POST File Path is Empty or is Root: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					if(smart.PathIsAbsolute(uploadFilePath)) {
-						return "ERR: The POST File Path is Absolute, must be Relative: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					if(smart.PathIsBackwardUnsafe(uploadFilePath)) {
-						return "ERR: The POST File Path is Backward Unsafe: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					if(!smart.PathExists(uploadFilePath)) {
-						return "ERR: The POST File Path does NOT Exists: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					if(smart.PathIsDir(uploadFilePath)) {
-						return "ERR: The POST File Path is a Directory: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					if(!smart.PathIsFile(uploadFilePath)) {
-						return "ERR: The POST File Path is NOT a File: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					var fName string = smart.StrTrimWhitespaces(smart.PathBaseName(uploadFilePath))
-					if((fName == "") || (!smart.PathIsSafeValidFileName(fName))) {
-						return "ERR: FAILED to detect the File Name from the POST File Path: `" + uploadFilePath + "`", emptyData, ""
-					} //end if
-					f, ef := w.CreateFormFile("file", fName)
-					if(ef != nil) {
-						return "ERR: FAILED to add the POST File Path: `" + uploadFilePath + "`: " + ef.Error(), emptyData, ""
-					} //end if
-					stat, errStat := os.Stat(uploadFilePath)
-					if(errStat != nil) {
-						return "ERR: FAILED to stat the POST File Path: `" + uploadFilePath + "`: " + errStat.Error(), emptyData, ""
-					} //end if
-					if(stat.Size() > int64(HTTP_CLI_MAX_POST_FILE_SIZE)) {
-						return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: File is Oversized: " + smart.ConvertInt64ToStr(stat.Size()), emptyData, ""
-					} //end if
-					file, errOpen := os.Open(uploadFilePath)
-					if(errOpen != nil) {
-						return "ERR: FAILED to open for read the POST File Path: `" + uploadFilePath + "`: " + errOpen.Error(), emptyData, ""
-					} //end if
-					_, errCopy := io.Copy(f, file)
-					file.Close()
-					if(errCopy != nil) {
-						return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: " + errCopy.Error(), emptyData, ""
-					} //end if
-					validPostVarsOrFiles++
-					if(DEBUG == true) {
-						log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
-					} //end if
-				} //end for
+			} else if(smart.StrStartsWith(key, "@")) { // form file, similar with CURL
+				fkey := smart.StrTrimWhitespaces(smart.StrTrimLeft(key, "@"))
+				if(smart.StrRegexMatch(REGEX_SAFE_HTTP_FORM_VAR_NAME, fkey)) {
+					for z:=0; z<len(val); z++ {
+						var uploadFilePath string = val[z]
+						if(!smart.PathIsSafeValidPath(uploadFilePath)) {
+							return "ERR: The POST File Path is Invalid or Unsafe: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						if(smart.PathIsEmptyOrRoot(uploadFilePath)) {
+							return "ERR: The POST File Path is Empty or is Root: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						if(smart.PathIsAbsolute(uploadFilePath)) {
+							return "ERR: The POST File Path is Absolute, must be Relative: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						if(smart.PathIsBackwardUnsafe(uploadFilePath)) {
+							return "ERR: The POST File Path is Backward Unsafe: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						if(!smart.PathExists(uploadFilePath)) {
+							return "ERR: The POST File Path does NOT Exists: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						if(smart.PathIsDir(uploadFilePath)) {
+							return "ERR: The POST File Path is a Directory: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						if(!smart.PathIsFile(uploadFilePath)) {
+							return "ERR: The POST File Path is NOT a File: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						var fName string = smart.StrTrimWhitespaces(smart.PathBaseName(uploadFilePath))
+						if((fName == "") || (!smart.PathIsSafeValidFileName(fName))) {
+							return "ERR: FAILED to detect the File Name from the POST File Path: `" + uploadFilePath + "`", nil, ""
+						} //end if
+						f, ef := w.CreateFormFile(fkey, fName)
+						if(ef != nil) {
+							return "ERR: FAILED to add the POST File Path: `" + uploadFilePath + "`: " + ef.Error(), nil, ""
+						} //end if
+						stat, errStat := os.Stat(uploadFilePath)
+						if(errStat != nil) {
+							return "ERR: FAILED to stat the POST File Path: `" + uploadFilePath + "`: " + errStat.Error(), nil, ""
+						} //end if
+						if(stat.Size() > int64(HTTP_CLI_MAX_POST_FILE_SIZE)) {
+							return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: File is Oversized: " + smart.ConvertInt64ToStr(stat.Size()), nil, ""
+						} //end if
+						file, errOpen := os.Open(uploadFilePath)
+						if(errOpen != nil) {
+							return "ERR: FAILED to open for read the POST File Path: `" + uploadFilePath + "`: " + errOpen.Error(), nil, ""
+						} //end if
+						_, errCopy := io.Copy(f, file)
+						file.Close()
+						if(errCopy != nil) {
+							return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: " + errCopy.Error(), nil, ""
+						} //end if
+						validPostVarsOrFiles++
+						if(DEBUG == true) {
+							log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
+						} //end if
+					} //end for
+				} else {
+					return "ERR: Invalid File Key in Request Arr Data: `" + key + "` as `" + fkey + "`", nil, ""
+				} //end if else
 			} else {
-				return "ERR: Invalid Key in Request Arr Data: `" + key + "`", emptyData, ""
+				return "ERR: Invalid Key in Request Arr Data: `" + key + "`", nil, ""
 			} //end if else
 		} else {
-			return "ERR: Empty Key in Request Arr Data", emptyData, ""
+			return "ERR: Empty Key in Request Arr Data", nil, ""
 		} //end if
 		if(int64(len(postData.Bytes())) > int64(HTTP_CLI_MAX_POST_DATA_SIZE)) {
-			return "ERR: POST Data is Oversized,Max Limit is: " + smart.ConvertUInt64ToStr(HTTP_CLI_MAX_POST_DATA_SIZE) + " bytes", emptyData, ""
+			return "ERR: POST Data is Oversized,Max Limit is: " + smart.ConvertUInt64ToStr(HTTP_CLI_MAX_POST_DATA_SIZE) + " bytes", nil, ""
 		} //end if
 	} //end for
 	//--
 	if(validPostVarsOrFiles <= 0) {
-		return "ERR: No Valid POST Data found", emptyData, ""
+		return "ERR: No Valid POST Data found", nil, ""
 	} //end if
 	//--
-	return "", postData, w.FormDataContentType()
+	return "", &postData, w.FormDataContentType()
 	//--
 } //END FUNCTION
 
@@ -648,7 +653,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
 	downloadLocalDirPath = smart.SafePathFixSeparator(downloadLocalDirPath)
 	//--
-	var uaSignature string = DEFAULT_CLIENT_UA + " (" + smart.DESCRIPTION + " " + smart.VERSION + " " + VERSION + "; " + smart.CurrentOSName() + "/" + smart.CurrentOSArch() + "; " + "GoLang/" + smart.CurrentRuntimeVersion() + ")"
+	var uaSignature string = DEFAULT_CLIENT_UA + " " + "HttpUtils/" + VERSION + " (" + "GoLang/" + smart.CurrentRuntimeVersion() + "; " + smart.CurrentOSName() + "/" + smart.CurrentOSArch() + ")"
 	//--
 	method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
 	//--
@@ -700,7 +705,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	if((uri == "") || (len(uri) > int(HTTP_MAX_SIZE_SAFE_URL))) {
 		httpResult.Uri = ""
 		httpResult.Errors = "ERR: URL is Empty or Too Long"
-		httpResult.HttpStatus = -101
+		httpResult.HttpStatus = -100
 		return
 	} //end if
 	httpResult.Uri = uri
@@ -924,7 +929,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			break
 		default:
 			httpResult.Errors = "ERR: Invalid Method: `" + method + "`"
-			httpResult.HttpStatus = -102
+			httpResult.HttpStatus = -101
 			return
 	} //end switch
 	//--
@@ -953,7 +958,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				httpResult.HttpStatus = -804
 				return
 			} //end if
-			if(smart.PathIsAbsolute(downloadLocalDirPath)) { // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+			if(smart.PathIsAbsolute(downloadLocalDirPath)) { // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-DISALLOW-ABSOLUTE}}}
 				httpResult.Errors = "ERR: The DOWNLOAD File Path is Absolute, must be Relative: `" + downloadLocalDirPath + "`"
 				httpResult.HttpStatus = -805
 				return
@@ -1069,7 +1074,6 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		pbOptionWriter = pbar.OptionSetWriter(&blackholePBar) // in this case output to a bytes buffer that will be discarded after the method ends
 	} //end if
 	//--
-	formData := bytes.Buffer{}
 	var errData string = ""
 	var multipartType string = ""
 	var formDataLen int64 = 0
@@ -1080,9 +1084,15 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	var cTypeHdr string = ""
 	//--
 	if(isPost == true) { // POST must have some data to post
+		var formData *bytes.Buffer = nil
 		errData, formData, multipartType = reqArrToHttpFormData(reqArr)
 		if(errData != "") {
 			httpResult.Errors = "ERR: Invalid POST Form Data: " + errData
+			httpResult.HttpStatus = -102
+			return
+		} //end if
+		if(formData == nil) {
+			httpResult.Errors = "ERR: Empty POST Form Data"
 			httpResult.HttpStatus = -103
 			return
 		} //end if
@@ -1098,7 +1108,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		if(formDataLen > 0) {
 			obar.RenderBlank()
 		} //end if
-		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(&formData))
+		req, errReq = http.NewRequest(method, uri, obar.NewProxyReader(formData))
 		blackholePBar = bytes.Buffer{} // free
 		log.Println("[INFO]", smart.CurrentFunctionName(), ": Post Data: `" + httpResult.LastUri + "` @ Size:", formDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(formDataLen)) + ")")
 	} else if(isPut == true) {
@@ -1434,53 +1444,83 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			dFileName = "file-err-" + smart.ConvertIntToStr(statusCode) + ".download"
 		} //end if
 		//-- do minimalistict safety checks, the rest of checks were made above
+		dFileName = smart.StrTrimWhitespaces(dFileName)
 		if(!smart.PathIsSafeValidFileName(dFileName)) {
 			dFileName = "file.download"
 		} //end if
-		dFileName = smart.StrTrimWhitespaces(dFileName)
+		downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
+		if((downloadLocalDirPath == "") || (!smart.PathIsSafeValidPath(downloadLocalDirPath))) {
+			httpResult.Errors = "ERR: Failed to resolve a Download Safe Dir Path: `" + downloadLocalDirPath + "`"
+			httpResult.HttpStatus = -810
+			return
+		} //end if
 		if((dFileName == "") || (!smart.PathIsSafeValidFileName(dFileName))) {
 			httpResult.Errors = "ERR: Failed to resolve a Download Safe File Name: `" + dFileName + "`"
-			httpResult.HttpStatus = -810
+			httpResult.HttpStatus = -811
 			return
 		} //end if
 		httpResult.DownloadLocalFileName = dFileName
 		var dFullPath string = downloadLocalDirPath + dFileName
 		if((!smart.PathIsSafeValidPath(dFullPath)) || smart.PathIsBackwardUnsafe(dFullPath)) {
 			httpResult.Errors = "ERR: Failed to resolve a Download Safe Path: `" + dFullPath + "`"
-			httpResult.HttpStatus = -811
+			httpResult.HttpStatus = -812
 			return
 		} //end if
-		//--
-		var theDwnLockFile string = dFullPath + ".tmp"
-		//--
-		if(!smart.PathExists(theDwnLockFile)) {
-			if(smart.PathExists(dFullPath)) {
-				if(smart.PathIsFile(dFullPath)) {
-					smart.SafePathFileDelete(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
-				} else {
-					httpResult.Errors = "ERR: Failed to clear the Download File for writing: `" + dFullPath + "`"
-					httpResult.HttpStatus = -812
-					return
-				} //end if
-			} //end if
-		} //end if
-		dFile, dErr := os.OpenFile(dFullPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, smart.CHOWN_FILES)
-		if(dErr != nil) {
-			httpResult.Errors = "ERR: Failed to open the Download File for writing: `" + dFullPath + "`: " + dErr.Error()
+		if(smart.PathIsAbsolute(dFullPath)) { // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-DISALLOW-ABSOLUTE}}}
+			httpResult.Errors = "ERR: Unsafe, Cannot use an Absolute Path as a Download Path: `" + dFullPath + "`"
 			httpResult.HttpStatus = -813
 			return
 		} //end if
-		smart.SafePathFileWrite(theDwnLockFile, "a", false, smart.DateNowLocal() + "\n" + dFullPath + "\n") // append, to see if there are colissions {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
-		defer func() {
-			dFile.Close()
-			smart.SafePathFileDelete(theDwnLockFile, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
-		}()
+		//--
+		lockFDwn := filelock.LockFile{
+			Path: 		dFullPath,  // path that needs to be locked, not the lock file path !
+			Timeout: 	timeoutSec, // seconds
+		}
+		errDwnLock := lockFDwn.Lock()
+		if(errDwnLock != nil) {
+			httpResult.Errors = "ERR: Failed to get an exclusive Lock for the Download File: `" + dFullPath + "` (file may be already in use by another concurrent process): " + errDwnLock.Error()
+			httpResult.HttpStatus = -820
+			return
+		} //end if
+		defer lockFDwn.Unlock()
+		//--
+		if(smart.PathExists(dFullPath)) {
+			if(smart.PathIsFile(dFullPath)) {
+				dwDelOk, dwDelErr := smart.SafePathFileDelete(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-DISALLOW-ABSOLUTE}}}
+				if(dwDelErr != nil) {
+					httpResult.Errors = "ERR: Failed to Remove a residual existing Download File: `" + dFullPath + "`: " + dwDelErr.Error()
+					httpResult.HttpStatus = -821
+					return
+				} //end if
+				if(dwDelOk != true) {
+					httpResult.Errors = "ERR: Cannot Remove a residual existing Download File: `" + dFullPath + "`"
+					httpResult.HttpStatus = -822
+					return
+				} //end if
+				if(smart.PathExists(dFullPath)) {
+					httpResult.Errors = "ERR: Could Not Remove a residual existing Download File, it still exists: `" + dFullPath + "`"
+					httpResult.HttpStatus = -823
+					return
+				} //end if
+			} else {
+				httpResult.Errors = "ERR: Cannot Download File, Path is a Dir: `" + dFullPath + "`"
+				httpResult.HttpStatus = -824
+				return
+			} //end if
+		} //end if
+		//-- {{{SYNC-HTTPCLI-DOWNLOAD-PATH-DISALLOW-ABSOLUTE}}}
+		dFile, dErr := os.OpenFile(dFullPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY|os.O_TRUNC, smart.CHOWN_FILES)
+		if(dErr != nil) {
+			httpResult.Errors = "ERR: Failed to open the Download File for writing: `" + dFullPath + "`: " + dErr.Error()
+			httpResult.HttpStatus = -825
+			return
+		} //end if
 		//--
 		log.Println("[INFO]", smart.CurrentFunctionName(), ": [" + method + " / " + smart.ConvertIntToStr(httpResult.HttpStatus) + "] :: Download Data to File [" + dFileName + "] to `" + downloadLocalDirPath + "` from `" + httpResult.LastUri + "` Size:", resp.ContentLength, "bytes (" + smart.PrettyPrintBytes(uint64(resp.ContentLength)) + ")")
 		//--
 		bytesCopied, rdBodyErr = io.Copy(io.MultiWriter(dFile, dbar), resp.Body)
 		//--
-		dwFSize, dwFSizErr := smart.SafePathFileGetSize(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-ALLOW-ABSOLUTE}}}
+		dwFSize, dwFSizErr := smart.SafePathFileGetSize(dFullPath, false) // {{{SYNC-HTTPCLI-DOWNLOAD-PATH-DISALLOW-ABSOLUTE}}}
 		if(dwFSizErr != nil) {
 			dwFSize = 0
 		} //end if
@@ -1558,19 +1598,28 @@ func TlsConfigServer(forceHttpV1 bool, description string) tls.Config {
 	} //end if
 	log.Println("[INFO]", smart.CurrentFunctionName() + ": [TLS 1.3]", nextProtos, description)
 	//--
-	cfg := tls.Config{ // support just TLS 1.3 ; there are many downgrade based attacks on TLS if many versions are supported
-		MinVersion: 		tls.VersionTLS13,
+	cfg := tls.Config{ // support just TLS 1.3 and 1.2 (backward compatible) ; enable TLS_FALLBACK_SCSV because without there are many downgrade based attacks on TLS if many versions are supported
+		MinVersion: 		tls.VersionTLS12,
 		MaxVersion: 		tls.VersionTLS13,
 		CurvePreferences: 	[]tls.CurveID{ // https://safecurves.cr.yp.to
-			tls.X25519,
 			tls.CurveP521,
-		//	tls.CurveP384,
-		//	tls.CurveP256
+			tls.X25519,
+			tls.CurveP384,
+		//	tls.CurveP256,
 		},
 		CipherSuites: []uint16{ // TLS 1.3 ciphersuites are not configurable: https://pkg.go.dev/crypto/tls#Config.CipherSuites
-			tls.TLS_CHACHA20_POLY1305_SHA256, // tls1.3
-			tls.TLS_AES_256_GCM_SHA384, // tls1.3
-		//	tls.TLS_AES_128_GCM_SHA256, // tls1.3
+			//-- tls 1.3
+			tls.TLS_CHACHA20_POLY1305_SHA256, 	// tls1.3
+			tls.TLS_AES_256_GCM_SHA384, 		// tls1.3
+			//-- tls 1.2
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, 	// tls1.2
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, 	// tls1.2
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, 		// tls1.2 ; macOS, webDAV
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, 			// tls1.2 ; macOS, webDAV
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384, 				// tls1.2
+			//-- security:
+			tls.TLS_FALLBACK_SCSV, // protection against TLS downgrade attacks
+			//-- #
 		},
 		NextProtos: nextProtos,
 	}

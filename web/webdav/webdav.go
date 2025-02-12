@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV
-// r.20250207.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20250207.2358"
+	VERSION string = "v.20250210.2358"
 )
 
 var (
@@ -82,12 +82,18 @@ func (h *Handler) ServeHTTP(ww http.ResponseWriter, r *http.Request, smartSafeVa
 	w := &loggedResponse{ResponseWriter: ww, status:200}
 	useSmartSafeValidPaths = smartSafeValidPaths
 //-- #unixman
-	status, err := http.StatusBadRequest, errUnsupportedMethod
+//	status, err := http.StatusBadRequest, errUnsupportedMethod // commented with the below line, on: 20250211 ; if something is not working with all clients, roll back
+	status, err := http.StatusMethodNotAllowed, errUnsupportedMethod
 	if(h.LockSys != nil) {
 		log.Println("[META]", "SmartGo::WebDAV", VERSION, "LockSys: ON")
 	} else {
 		log.Println("[META]", "SmartGo::WebDAV", VERSION, "LockSys: N/A")
 	} //end if else
+
+	//-- unixman
+	r.URL.Path = smart.StrTr(r.URL.Path, map[string]string{ " ":"-", }) // fix for macos
+	//-- #end fix
+
 	if h.FileSystem == nil {
 		status, err = http.StatusInternalServerError, errNoFileSystem
 	} else {
@@ -126,7 +132,6 @@ func (h *Handler) ServeHTTP(ww http.ResponseWriter, r *http.Request, smartSafeVa
 			//-- #unixman
 		} //end switch
 	} //end if
-
 	if status != 0 {
 		w.WriteHeader(status)
 		if status != http.StatusNoContent {

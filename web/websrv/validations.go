@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Validations :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250207.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -70,40 +70,7 @@ func WebUrlPathIsValid(urlPath string) bool { // just for URL Paths, a sub-set o
 	} //end if
 	//--
 	urlPath = smart.StrTrimLeft(urlPath, "/") // fix: for the test below, it filesys paths allowed must not start with a slash /
-	if(!WebPathIsValid(urlPath)) {
-		return false
-	} //end if
-	//--
-	return true
-	//--
-} //END FUNCTION
-
-
-func WebPathIsValid(path string) bool { // must work for dir or file
-	//--
-	defer smart.PanicHandler()
-	//--
-	path = smart.StrTrimWhitespaces(path)
-	if(path == "") {
-		return false
-	} //end if
-	//--
-	if((path == ".") || (path == "./") || (path == "..") || smart.StrContains(path, "..") || smart.StrContains(path, " ") || smart.StrContains(path, "\\") || smart.StrContains(path, ":")) {
-		return false
-	} //end if
-	//--
-	if(smart.StrStartsWith(path, "/") == true) { // safety: dissalow start with / ; will be later checked for absolute path, but this is much clear to have also
-		return false
-	} //end if
-	//--
-	if(smart.IsPathAlikeWithSafeFixedPath(path, true) != true) { // need to fix trailing slashes, it can be a dir path
-		return false
-	} //end if
-	//--
-	if((smart.PathIsEmptyOrRoot(path) == true) || (smart.PathIsSafeValidPath(path) != true) || (smart.PathIsBackwardUnsafe(path) == true)) {
-		return false
-	} //end if
-	if((smart.PathIsAbsolute(path) == true) || (smart.PathIsSafeValidSafePath(path) != true)) {
+	if(!smart.PathIsWebSafeValidSafePath(urlPath)) {
 		return false
 	} //end if
 	//--
@@ -121,7 +88,7 @@ func WebDirIsValid(path string) bool {
 		return false
 	} //end if
 	//--
-	if(!WebPathIsValid(path)) {
+	if(!smart.PathIsWebSafeValidSafePath(path)) {
 		return false
 	} //end if
 	//--

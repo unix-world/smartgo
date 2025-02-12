@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Web-Public :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250207.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -60,7 +60,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 	urlPath = smart.StrTrimWhitespaces(smart.StrTrimLeft(urlPath, " /"))
 	var path string = WEB_PUBLIC_RELATIVE_ROOT_PATH + urlPath
 	//--
-	if(!WebPathIsValid(path)) {
+	if(!smart.PathIsWebSafeValidSafePath(path)) {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 400 :: Invalid Web Public Path: `" + path + "`")
 		smarthttputils.HttpStatus400(w, r, "Invalid WP Request Path", true)
 		return 400
@@ -73,7 +73,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 	if((WebDirIsValid(smart.PathAddDirLastSlash(path)) == true) && (WebDirExists(path) == true)) {
 		path = smart.PathAddDirLastSlash(path) + DEFAULT_DIRECTORY_INDEX_HTML
 	} //end if
-	if((WebPathIsValid(path) != true) || (WebFileExists(path) != true)) {
+	if((smart.PathIsWebSafeValidSafePath(path) != true) || (WebFileExists(path) != true)) {
 		log.Println("[WARNING]", smart.CurrentFunctionName(), "HTTP Status 404 :: Web Public File Path Not Found Or Is Invalid: `" + path + "`")
 		smarthttputils.HttpStatus404(w, r, "WP Request File Path N/A", true)
 		return 404

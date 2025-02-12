@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250208.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -30,7 +30,7 @@ const (
 	CHOWN_DIRS  os.FileMode = 0755
 	CHOWN_FILES os.FileMode = 0644
 
-	//-- Cross Platform Safe Paths ; The following are disallowed in Windows paths: `< > : " / \ | ? *` ; also disallow SPACE because of the web context
+	//-- Cross Platform Safe Paths ; The following are disallowed in Windows paths: `< > : " / \ | ? *` ; also disallow `=` (lock file reserved) and SPACE because of the web context
 	REGEX_SAFE_PATH_NAME string 			= `^[_a-zA-Z0-9\-\.@#\/`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect)
 	REGEX_SAFE_FILE_NAME string 			= `^[_a-zA-Z0-9\-\.@#`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect) ; like above, just missing slash /
 	//-- allow just: "_ a-z A-Z 0-9 - . @ # ` ~ ! $ % & ( ) ^ { } ' [ ] , ; +" ; for dir paths also allow "/"
@@ -938,41 +938,55 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 //-----
 
 
-func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent string, errMsg error) {
+func SafePathFileBytRead(filePath string, allowAbsolutePath bool) ([]byte, error) {
 	//--
 	defer PanicHandler()
 	//--
 	if(StrTrimWhitespaces(filePath) == "") {
-		return "", NewError("WARNING: File Path is Empty")
+		return nil, NewError("WARNING: File Path is Empty")
 	} //end if
 	//--
 	filePath = SafePathFixClean(filePath)
 	//--
 	if(PathIsEmptyOrRoot(filePath) == true) {
-		return "", NewError("WARNING: File Path is Empty/Root")
+		return nil, NewError("WARNING: File Path is Empty/Root")
 	} //end if
 	//--
 	if(PathIsSafeValidPath(filePath) != true) {
-		return "", NewError("WARNING: File Path is Invalid Unsafe")
+		return nil, NewError("WARNING: File Path is Invalid Unsafe")
 	} //end if
 	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
-		return "", NewError("WARNING: File Path is Backward Unsafe")
+		return nil, NewError("WARNING: File Path is Backward Unsafe")
 	} //end if
 	//--
 	if(allowAbsolutePath != true) {
 		if(PathIsAbsolute(filePath) == true) {
-			return "", NewError("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
+			return nil, NewError("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
 		} //end if
 	} //end if
 	//--
 	if(PathIsDir(filePath)) {
-		return "", NewError("WARNING: File Path is a Directory not a File")
+		return nil, NewError("WARNING: File Path is a Directory not a File")
 	} //end if
 	//--
 	content, err := os.ReadFile(filePath)
 	if(err != nil) {
-		return "", NewError("ERROR: File Read: " + err.Error())
+		return nil, NewError("ERROR: File Read: " + err.Error())
+	} //end if
+	//--
+	return content, nil
+	//--
+} //END FUNCTION
+
+
+func SafePathFileRead(filePath string, allowAbsolutePath bool) (string, error) {
+	//--
+	defer PanicHandler()
+	//--
+	content, err := SafePathFileBytRead(filePath, allowAbsolutePath)
+	if(err != nil) {
+		return "", err
 	} //end if
 	//--
 	return string(content), nil
@@ -980,7 +994,7 @@ func SafePathFileRead(filePath string, allowAbsolutePath bool) (fileContent stri
 } //END FUNCTION
 
 
-func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, fileContent string) (isSuccess bool, errMsg error) {
+func SafePathFileBytWrite(filePath string, wrMode string, allowAbsolutePath bool, fileContent []byte) (bool, error) {
 	//--
 	defer PanicHandler()
 	//--
@@ -1015,28 +1029,17 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 	} //end if
 	//--
 	if(wrMode == FILE_WRITE_MODE_APPEND) { // append mode
-		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, CHOWN_FILES)
+		f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, CHOWN_FILES)
 		if(err != nil) {
 			return false, err
 		} //end if
-	//	defer f.Close() // changes as below to log if not closing a file the issue with 'too many open files'
-		fClose := func() { // because this method in append mode is used for writing also the log files make defer a bit more safe, from above
-			if err := f.Close(); err != nil {
-				log.Println("[ERROR] " + CurrentFunctionName() + ":", "FAILED to explicit Close an Opened File (write:append mode): `" + filePath + "` # Errors:", err)
-			} else {
-				if(DEBUG == true) { // !!! need this because actually this method will write also to log files so this will repeat on each logged message !!!
-					log.Println("[DEBUG] " + CurrentFunctionName() + ":", "An Opened File (write:append mode) was explicit Closed: `" + filePath) // this is important, as all logs that write to files must be able to watch this ... to monitor (debug) if the past issue with too many opened files persists after new fixes ...
-				} //end if
-			} //end if
-		} //end function
-		if _, err := f.WriteString(fileContent); err != nil {
-			fClose()
+		defer f.Close()
+		if _, err := f.Write(fileContent); err != nil {
 			return false, err
 		} //end if
-		fClose()
 		return true, nil // must return here to avoid defered f to be out of scope
 	} else if(wrMode == FILE_WRITE_MODE_DEFAULT) { // write (default) mode
-		err := os.WriteFile(filePath, []byte(fileContent), CHOWN_FILES)
+		err := os.WriteFile(filePath, fileContent, CHOWN_FILES)
 		if(err != nil) {
 			return false, err
 		} //end if
@@ -1044,6 +1047,62 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 	} //end if else
 	//--
 	return false, NewError("WARNING: Invalid File Write Mode: `" + wrMode + "`")
+	//--
+} //END FUNCTION
+
+
+func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, fileContent string) (bool, error) {
+	//--
+	defer PanicHandler()
+	//--
+	// wrMode : "w" for write (FILE_WRITE_MODE_DEFAULT) | "a" for append (FILE_WRITE_MODE_APPEND)
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return false, NewError("WARNING: File Path is Empty")
+	} //end if
+	//--
+	filePath = SafePathFixClean(filePath)
+	//--
+	if(PathIsEmptyOrRoot(filePath) == true) {
+		return false, NewError("WARNING: File Path is Empty/Root")
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return false, NewError("WARNING: File Path is Invalid Unsafe")
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return false, NewError("WARNING: File Path is Backward Unsafe")
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return false, NewError("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
+		} //end if
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return false, NewError("WARNING: File Path is a Directory not a File")
+	} //end if
+	//--
+	fFlags := os.O_CREATE|os.O_WRONLY
+	if(wrMode == FILE_WRITE_MODE_APPEND) { // append mode
+		fFlags |= os.O_APPEND
+	} else if(wrMode == FILE_WRITE_MODE_DEFAULT) {
+		fFlags |= os.O_TRUNC // required, without this will not write the file if is not empty !
+	} else {
+		return false, NewError("WARNING: Invalid File Write Mode: `" + wrMode + "`")
+	} //end if
+	//--
+	f, err := os.OpenFile(filePath, fFlags, CHOWN_FILES)
+	if(err != nil) {
+		return false, err
+	} //end if
+	defer f.Close()
+	if _, err := f.WriteString(fileContent); err != nil {
+		return false, err
+	} //end if
+	return true, nil // must return here to avoid defered f to be out of scope
 	//--
 } //END FUNCTION
 
@@ -1402,6 +1461,58 @@ func SafePathGetMTime(thePath string, allowAbsolutePath bool) (mTime int64, errM
 	modifTime := fd.ModTime()
 	//--
 	return int64(modifTime.Unix()), nil
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func PathIsWebSafeValidPath(path string) bool { // must work for dir or file ; used for web srv
+	//--
+	defer PanicHandler()
+	//--
+	path = StrTrimWhitespaces(path)
+	if(path == "") {
+		return false
+	} //end if
+	//--
+	if((path == ".") || (path == "./") || (path == "..") || StrContains(path, "..") || StrContains(path, " ") || StrContains(path, "\\") || StrContains(path, ":")) {
+		return false
+	} //end if
+	//--
+	if(StrStartsWith(path, "/") == true) { // safety: dissalow start with / ; will be later checked for absolute path, but this is much clear to have also
+		return false
+	} //end if
+	//--
+	if(IsPathAlikeWithSafeFixedPath(path, true) != true) { // need to fix trailing slashes, it can be a dir path
+		return false
+	} //end if
+	//--
+	if((PathIsEmptyOrRoot(path) == true) || (PathIsSafeValidPath(path) != true) || (PathIsBackwardUnsafe(path) == true)) {
+		return false
+	} //end if
+	//--
+	if(PathIsAbsolute(path) == true) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func PathIsWebSafeValidSafePath(path string) bool { // must work for dir or file ; used for web srv
+	//--
+	if(PathIsWebSafeValidPath(path) != true) {
+		return false
+	} //end if
+	//--
+	if(PathIsSafeValidSafePath(path) != true) {
+		return false
+	} //end if
+	//--
+	return true
 	//--
 } //END FUNCTION
 

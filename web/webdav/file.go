@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: File
-// r.20250207.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -82,12 +82,14 @@ func (d Dir) resolve(name string) string {
 	//-- unixman
 	if((name != "") && (name != "/")) {
 		if(useSmartSafeValidPaths) {
-			if(smart.PathIsSafeValidSafePath(name) != true) {
+		//	if(smart.PathIsSafeValidSafePath(name) != true) { // better validation, below line
+			if((smart.PathIsSafeValidSafePath(name) != true) || (smart.PathIsWebSafeValidSafePath(smart.StrTrimLeft(name, "/")) != true)) {
 				log.Println("[NOTICE]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Unsafe SmartValid Path Name (Rejected): `" + name + "`")
 				return ""
 			} //end if
 		} else {
-			if(smart.PathIsSafeValidPath(name) != true) {
+		//	if(smart.PathIsSafeValidPath(name) != true) { // better validation, below line
+			if((smart.PathIsSafeValidPath(name) != true) || (smart.PathIsWebSafeValidPath(smart.StrTrimLeft(name, "/")) != true)) {
 				log.Println("[NOTICE]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Unsafe Valid Path Name (Rejected): `" + name + "`")
 				return ""
 			} //end if

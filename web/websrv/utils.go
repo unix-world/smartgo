@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250207.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -73,6 +73,8 @@ func GetUrlRawQuery(r *http.Request) string { // get the url raw query as string
 
 func ParseUrlRawQuery(urlQuery string) map[string][]string {
 	//--
+	defer smart.PanicHandler()
+	//--
 	urlQuery = smart.StrTrimWhitespaces(urlQuery)
 	if(urlQuery == "") {
 		return nil
@@ -90,6 +92,8 @@ func ParseUrlRawQuery(urlQuery string) map[string][]string {
 
 func GetUrlQueryVar(r *http.Request, key string) string { // get an url param string from request
 	//--
+	defer smart.PanicHandler()
+	//--
 	key = smart.StrTrimWhitespaces(key)
 	if(key == "") {
 		return ""
@@ -101,6 +105,8 @@ func GetUrlQueryVar(r *http.Request, key string) string { // get an url param st
 
 
 func GetUrlQueryVars(r *http.Request, key string) []string { // get an url param array from request
+	//--
+	defer smart.PanicHandler()
 	//--
 	key = smart.StrTrimWhitespaces(key)
 	if(key == "") {
@@ -114,12 +120,16 @@ func GetUrlQueryVars(r *http.Request, key string) []string { // get an url param
 
 func GetAllUrlQueryVars(r *http.Request) map[string][]string { // get all url params from request
 	//--
+	defer smart.PanicHandler()
+	//--
 	return r.URL.Query()
 	//--
 } //END FUNCTION
 
 
 func GetPostVar(r *http.Request, key string) string { // get a post param string from request
+	//--
+	defer smart.PanicHandler()
 	//--
 	if(r.PostForm == nil) {
 		ParseForm(r)
@@ -140,6 +150,8 @@ func GetPostVar(r *http.Request, key string) string { // get a post param string
 
 func GetPostVars(r *http.Request, key string) []string { // get a post param array from request
 	//--
+	defer smart.PanicHandler()
+	//--
 	if(r.PostForm == nil) {
 		ParseForm(r)
 	} //end if
@@ -159,6 +171,8 @@ func GetPostVars(r *http.Request, key string) []string { // get a post param arr
 
 func GetAllPostVars(r *http.Request) map[string][]string { // get all post params from request
 	//--
+	defer smart.PanicHandler()
+	//--
 	if(r.PostForm == nil) {
 		ParseForm(r)
 	} //end if
@@ -172,6 +186,8 @@ func GetAllPostVars(r *http.Request) map[string][]string { // get all post param
 
 
 func GetRequestVar(r *http.Request, key string) string { // get an url or post (mixed) param string from request
+	//--
+	defer smart.PanicHandler()
 	//--
 	// The precedence order:
 	//  1. application/x-www-form-urlencoded form body (POST, PUT, PATCH only)
@@ -197,6 +213,8 @@ func GetRequestVar(r *http.Request, key string) string { // get an url or post (
 
 func GetRequestVars(r *http.Request, key string) []string { // get an url or post (mixed) param array from request
 	//--
+	defer smart.PanicHandler()
+	//--
 	// The precedence order:
 	//  1. application/x-www-form-urlencoded form body (POST, PUT, PATCH only)
 	//  2. query parameters (always)
@@ -221,6 +239,8 @@ func GetRequestVars(r *http.Request, key string) []string { // get an url or pos
 
 func GetAllRequestVars(r *http.Request) map[string][]string { // get all url and post (mixed) params from request
 	//--
+	defer smart.PanicHandler()
+	//--
 	// The precedence order:
 	//  1. application/x-www-form-urlencoded form body (POST, PUT, PATCH only)
 	//  2. query parameters (always)
@@ -242,10 +262,13 @@ type MultiPartPostFile struct {
 	Error  error
 	Header *multipart.FileHeader
 	File   multipart.File
+	Key    string
 }
 
 
 func GetPostFile(r *http.Request, key string) MultiPartPostFile {
+	//--
+	defer smart.PanicHandler()
 	//--
 	if(r.PostForm == nil) {
 		ParseForm(r)
@@ -269,6 +292,7 @@ func GetPostFile(r *http.Request, key string) MultiPartPostFile {
 	} //end if
 	theFile.Header = h
 	theFile.File = f
+	theFile.Key = key
 	//--
 	return theFile
 	//--
@@ -276,6 +300,8 @@ func GetPostFile(r *http.Request, key string) MultiPartPostFile {
 
 
 func GetPostFiles(r *http.Request, key string) ([]MultiPartPostFile, error) {
+	//--
+	defer smart.PanicHandler()
 	//--
 	if(r.MultipartForm == nil) {
 		errMultiPart := ParseMultipartForm(r)
@@ -302,6 +328,7 @@ func GetPostFiles(r *http.Request, key string) ([]MultiPartPostFile, error) {
 		} else {
 			theFile.Header = fhs[i]
 			theFile.File = f
+			theFile.Key = key
 		} //end if
 		theFiles = append(theFiles, theFile)
 	} //end for
@@ -311,7 +338,37 @@ func GetPostFiles(r *http.Request, key string) ([]MultiPartPostFile, error) {
 } //END FUNCTION
 
 
+func GetAllPostFiles(r *http.Request) map[string][]MultiPartPostFile {
+	//--
+	defer smart.PanicHandler()
+	//--
+	if(r.MultipartForm == nil) {
+		ParseMultipartForm(r)
+	} //end if
+	//--
+	var allFiles map[string][]MultiPartPostFile = map[string][]MultiPartPostFile{}
+	//--
+	if((r.MultipartForm == nil) || (r.MultipartForm.File == nil)) {
+		return allFiles
+	} //end if
+	//--
+	fhs := r.MultipartForm.File
+	if(len(fhs) <= 0) {
+		return allFiles
+	} //end if
+	for k, _ := range fhs {
+		theFiles, _ := GetPostFiles(r, k)
+		allFiles[k] = theFiles
+	} //end for
+	//--
+	return allFiles
+	//--
+} //END FUNCTION
+
+
 func ParseForm(r *http.Request) error {
+	//--
+	defer smart.PanicHandler()
 	//--
 	// For all requests, ParseForm parses the raw query from the URL and updates r.Form.
 	// Request body parameters take precedence over URL query string values in r.Form.
@@ -325,6 +382,8 @@ func ParseForm(r *http.Request) error {
 
 
 func ParseMultipartForm(r *http.Request) error {
+	//--
+	defer smart.PanicHandler()
 	//--
 	// ParseMultipartForm will call internally the ParseForm if necessary
 	// If ParseForm returns an error, ParseMultipartForm returns it but also continues parsing the request body.
@@ -362,6 +421,8 @@ func GetBaseDomainDomainPort(r *http.Request) (string, string, string, error) {
 	//--
 	// returns: basedom, dom, port, errDomPort
 	//--
+	defer smart.PanicHandler()
+	//--
 	dom, port, errDomPort := smart.GetHttpDomainAndPortFromRequest(r)
 	if(errDomPort != nil) {
 		return "", "", "", errDomPort
@@ -394,12 +455,16 @@ func GetBasePath() string { // this is the internal (non-proxy mode) base path w
 
 func GetBaseBrowserPath() string { // includes proxy prefix if any ; includes trailing slashes
 	//--
+	defer smart.PanicHandler()
+	//--
 	return smart.GetHttpProxyBasePath() // if no proxy, this is: `/` ; but under proxy may be the same or as: `/custom-path/`
 	//--
 } //END FUNCTION
 
 
 func GetCurrentPath(r *http.Request) string { // this does not include the proxy prefix, it is the internal path
+	//--
+	defer smart.PanicHandler()
 	//--
 	return smart.GetHttpPathFromRequest(r)
 	//--
@@ -408,12 +473,16 @@ func GetCurrentPath(r *http.Request) string { // this does not include the proxy
 
 func GetCurrentBrowserPath(r *http.Request) string { // this includes the proxy prefix
 	//--
+	defer smart.PanicHandler()
+	//--
 	return smart.GetHttpBrowserPathFromRequest(r)
 	//--
 } //END FUNCTION
 
 
 func GetCurrentBaseUrl(r *http.Request) string { // this does not include the proxy prefix/domain/port, it is the internal url
+	//--
+	defer smart.PanicHandler()
 	//--
 	dom := httpServerAddr
 	port := httpServerPort
@@ -425,12 +494,16 @@ func GetCurrentBaseUrl(r *http.Request) string { // this does not include the pr
 
 func GetCurrentBrowserBaseUrl(r *http.Request) string { // this includes the proxy prefix/domain/port, it is the browser external url as seen in browser
 	//--
+	defer smart.PanicHandler()
+	//--
 	return smart.GetHttpBaseUrlFromRequest(r)
 	//--
 } //END FUNCTION
 
 
 func GetCurrentUrl(r *http.Request, withUrlQuery bool) string { // this does not include the proxy prefix/domain/port, it is the internal url
+	//--
+	defer smart.PanicHandler()
 	//--
 	var urlQuery = ""
 	if(withUrlQuery) {
@@ -449,6 +522,8 @@ func GetCurrentUrl(r *http.Request, withUrlQuery bool) string { // this does not
 
 func GetCurrentBrowserUrl(r *http.Request, withUrlQuery bool) string { // this includes the proxy prefix/domain/port, it is the browser external url as seen in browser
 	//--
+	defer smart.PanicHandler()
+	//--
 	return smart.GetHttpUrlFromRequest(r, withUrlQuery)
 	//--
 } //END FUNCTION
@@ -466,6 +541,8 @@ func GetCurrentProtocol(r *http.Request) string { // this is the internal server
 
 
 func GetCurrentBrowserProtocol(r *http.Request) string { // if proxy this is the proxy protocol, otherwise the internal server protocol
+	//--
+	defer smart.PanicHandler()
 	//--
 	return smart.GetHttpProtocolFromRequest(r)
 	//--
@@ -487,6 +564,8 @@ func GetAuthRealm() string {
 
 
 func EncryptUrlValue(val string) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	if(val == "") {
 		return ""
@@ -520,6 +599,8 @@ func EncryptUrlValue(val string) string {
 
 
 func DecryptUrlValue(val string) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	val = smart.StrTrimWhitespaces(val)
 	if(val == "") {

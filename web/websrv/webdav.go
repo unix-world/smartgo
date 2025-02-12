@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250207.2358 :: STABLE
+// r.20250211.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"os"
+	"io"
 	"context"
 
 	"net/http"
@@ -243,7 +244,7 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 	//--
 	// {{{SYNC-VALIDATE-IP-LIST-BEFORE-VERIFY-IP}}} ; no need to validate the allowedIPs ; it is not used directly by this method, only passed later to other method that will validate it
 	//--
-	if(!WebPathIsValid(DAV_STORAGE_RELATIVE_ROOT_PATH)) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}}
+	if(!smart.PathIsWebSafeValidSafePath(DAV_STORAGE_RELATIVE_ROOT_PATH)) { // {{{SYNC-VALIDATE-WEBSRV-WEBDAV-STORAGE-PATH}}}
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "WebDAV Service Initialization Error, WebDAV Storage Path is Invalid: `" + DAV_STORAGE_RELATIVE_ROOT_PATH + "`")
 		smarthttputils.HttpStatus500(w, r, "WebDAV Service Internal Error", true)
 		return
@@ -315,10 +316,12 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 		} //end if // storagePath
 	} //end if
 	//--
+	ls := webdavLockSys()
+	//--
 	wdav := webdav.Handler{
 		Prefix:     	webDavRealUrlPath,
 		FileSystem: 	webdav.Dir(webDavStorageRootPath),
-		LockSys: 		webdavLockSys(),
+		LockSys: 		ls,
 		Logger:     	webDavLogger,
 	}
 	//-- #end auth check
@@ -330,11 +333,41 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 		info, err := wdav.FileSystem.Stat(context.TODO(), wdirPath)
 		if(err == nil) {
 			if(info.IsDir()) {
-				r.Method = "PROPFIND" // this is a mapping for a directory from GET to PROPFIND ; TODO: it can be later supplied as a HTML Page listing all entries ; by mapping to PROPFIND will serve an XML
-				if(r.Header == nil) { // fix for null
-					r.Header = http.Header{}
-				} //end if
-				r.Header.Set("Depth", "1") // fix: ignore depth infinity, to avoid overload the file system
+				if(r.Method == http.MethodPost) { // POST
+					wdvAction := smart.StrToLower(smart.StrTrimWhitespaces(GetPostVar(r, "webdav_action")))
+					if(wdvAction != "upf") {
+						smarthttputils.HttpStatus405(w, r, "Invalid POST Data [Rule:WEBDAV:POST:PARAM:ACTION]: `" + GetCurrentPath(r) + "`", true)
+						webDavLogger(r, smart.NewError("Invalid WebDAV POST Data")) // important to log also this because return premature
+						return
+					} //end if
+					realPath, errRealPath := wdav.FileSystem.GetRealPath(context.TODO(), wdirPath)
+					if(errRealPath != nil) {
+						smarthttputils.HttpStatus406(w, r, "Invalid POST Path [Rule:WEBDAV:POST:PATH]: `" + GetCurrentPath(r) + "`", true)
+						webDavLogger(r, smart.NewError("Invalid WebDAV POST Path")) // important to log also this because return premature
+						return
+					} //end if
+					if(!smart.StrStartsWith("./"+realPath, DAV_STORAGE_RELATIVE_ROOT_PATH)) {
+						smarthttputils.HttpStatus423(w, r, "Unsafe POST Path [Rule:WEBDAV:POST:PATH]: `" + GetCurrentPath(r) + "`", true)
+						webDavLogger(r, smart.NewError("Unsafe WebDAV POST Path")) // important to log also this because return premature
+						return
+					} //end if
+					errUpload := webDavUploadHandler(r, realPath, webDavUseSmartSafeValidPaths, "file", ls)
+					if(errUpload != nil) {
+						smarthttputils.HttpStatus422(w, r, "POST File Save Failed [Rule:WEBDAV:POST:FILES:FILE]: `" + GetCurrentPath(r) + "`", true)
+						webDavLogger(r, smart.NewError("WebDAV POST File Save Failed: " + errUpload.Error())) // important to log also this because return premature
+						log.Println("[WARNING]", "WebDAV POST File(s) Error:", errUpload)
+						return
+					} //end if
+					smarthttputils.HttpStatus201(w, r, "201 Created", "201.txt", "", -1, "", "", nil)
+					webDavLogger(r, nil)
+					return
+				} else { // HEAD, GET
+					r.Method = "PROPFIND" // this is a mapping for a directory from GET to PROPFIND ; TODO: it can be later supplied as a HTML Page listing all entries ; by mapping to PROPFIND will serve an XML
+					if(r.Header == nil) { // fix for null
+						r.Header = http.Header{}
+					} //end if
+					r.Header.Set("Depth", "1") // fix: ignore depth infinity, to avoid overload the file system
+				} //end if else
 			} //end if
 		} //end if
 	} //end if
@@ -343,6 +376,119 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 	} //end if
 	//-- use no locks: first because many clients are buggy and can lock infinite a resource ; 2nd because on per-user instance the locking system is reset on each request
 	wdav.ServeHTTP(w, r, webDavUseSmartSafeValidPaths) // if all ok above (basic auth + credentials ok, serve ...)
+	//--
+} //END FUNCTION
+
+
+func webDavUploadHandler(r *http.Request, realPath string, useSmartSafeValidPaths bool, formFieldName string, ls *webdav.LockSys) error {
+	//--
+	// this is mosty a general upload handler, but written with WebDAV POST Upload in mind
+	// outside WebDAV context the ls (lock sys) can be Null
+	//--
+//	log.Println("[DEBUG]", "realPath", realPath)
+	//--
+	if(smart.StrTrimWhitespaces(realPath) == "") {
+		return smart.NewError("Upload Path is Empty")
+	} //end if
+	//--
+	if(useSmartSafeValidPaths == true) {
+		if(smart.PathIsWebSafeValidSafePath(realPath) != true) {
+			return smart.NewError("Upload Path is Not Safe")
+		} //end if
+	} else {
+		if(smart.PathIsWebSafeValidPath(realPath) != true) {
+			return smart.NewError("Upload Path is Unsafe")
+		} //end if
+	} //end if else
+	//--
+	formFieldName = smart.StrTrimWhitespaces(formFieldName)
+	if((formFieldName == "") || (!smart.StrRegexMatch(smarthttputils.REGEX_SAFE_HTTP_FORM_VAR_NAME, formFieldName))) {
+		return smart.NewError("Upload Form Field Name is Empty or Unsafe: `" + formFieldName + "`")
+	} //end if
+	//--
+	wdvFiles, errPostFiles := GetPostFiles(r, formFieldName)
+	if(errPostFiles != nil) {
+		return smart.NewError("Upload Files ERR: " + errPostFiles.Error())
+	} //end if
+	if(len(wdvFiles) <= 0) {
+		return smart.NewError("No Upload Files found")
+	} //end if
+	//--
+	for uf:=0; uf<len(wdvFiles); uf++ {
+		//--
+		upf := wdvFiles[uf]
+		//--
+		if((upf.Error != nil) || (upf.Header == nil) || (upf.File == nil)) {
+			return smart.NewError("Upload File Failed #" + smart.ConvertIntToStr(uf))
+		} //end if
+		//--
+		upfName := smart.StrTrimWhitespaces(upf.Header.Filename)
+		if(upfName == "") {
+			return smart.NewError("Upload File has an Empty File Name #" + smart.ConvertIntToStr(uf))
+		} //end if
+		//--
+		upfPath := smart.PathAddDirLastSlash(realPath) + upfName
+		//--
+		if(ls != nil) {
+			lToken, errLToken := ls.Lock(false, upfPath)
+			if(errLToken != nil) {
+				return smart.NewError("Failed to Lock Upload File #" + smart.ConvertIntToStr(uf) + ", ERR: " + errLToken.Error())
+			} //end if
+			if(smart.StrTrimWhitespaces(lToken) == "") {
+				return smart.NewError("Failed to Lock Upload File #" + smart.ConvertIntToStr(uf) + ", Token is Empty")
+			} //end if
+			if(ls.Exists(false, lToken) != true) {
+				return smart.NewError("Failed to Lock Upload File #" + smart.ConvertIntToStr(uf) + ", Lock Token Not Found")
+			} //end if
+			defer ls.Unlock(false, lToken)
+		} //end if
+		//--
+		//== start: single file upload standalone code
+		//--
+		if(useSmartSafeValidPaths == true) {
+			if(smart.PathIsSafeValidSafeFileName(upfName) != true) {
+				return smart.NewError("Upload File Name is Not Safe #" + smart.ConvertIntToStr(uf))
+			} //end if
+		} else {
+			if(smart.PathIsSafeValidFileName(upfName) != true) {
+				return smart.NewError("Upload File Name is Unsafe #" + smart.ConvertIntToStr(uf))
+			} //end if
+		} //end if else
+		//--
+		if(useSmartSafeValidPaths == true) {
+			if(smart.PathIsWebSafeValidSafePath(upfPath) != true) {
+				return smart.NewError("Upload File Path is Not Safe #" + smart.ConvertIntToStr(uf))
+			} //end if
+		} else {
+			if(smart.PathIsWebSafeValidPath(upfPath) != true) {
+				return smart.NewError("Upload File Path is Unsafe #" + smart.ConvertIntToStr(uf))
+			} //end if
+		} //end if else
+		//--
+		var isOkSave bool = true
+		fUpRes, fUpErrRes := os.OpenFile(upfPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, smart.CHOWN_FILES)
+		if(fUpErrRes != nil) {
+			isOkSave = false
+		} else {
+			_, errUplCopy := io.Copy(fUpRes, upf.File)
+			if(errUplCopy != nil) {
+				isOkSave = false
+			} //end if
+		} //end if
+		errUplClose := fUpRes.Close()
+		if(errUplClose != nil) {
+			return smart.NewError("Failed to Save/Close Upload File #" + smart.ConvertIntToStr(uf))
+		} //end if
+		fUpRes = nil // force close
+		if(isOkSave != true) {
+			return smart.NewError("Failed to Save Upload File #" + smart.ConvertIntToStr(uf))
+		} //end if
+		//--
+		//== end: single file upload standalone code #
+		//--
+	} //end for
+	//--
+	return nil
 	//--
 } //END FUNCTION
 

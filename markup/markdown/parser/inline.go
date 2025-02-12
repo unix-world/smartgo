@@ -280,7 +280,7 @@ func maybeInlineFootnoteOrSuper(p *Parser, data []byte, offset int) (int, ast.No
 // '[': parse a link or an image or a footnote or a citation
 func link(p *Parser, data []byte, offset int) (int, ast.Node) {
 	// no links allowed inside regular links, footnote, and deferred footnotes
-	if p.insideLink && (offset > 0 && data[offset-1] == '[' || len(data)-1 > offset && data[offset+1] == '^') {
+	if p.InsideLink && (offset > 0 && data[offset-1] == '[' || len(data)-1 > offset && data[offset+1] == '^') { // unixman: fix from upstream: 7a1f277a159ead8ffed4d3f6d515994cac82b576
 		return 0, nil
 	}
 
@@ -631,10 +631,10 @@ func link(p *Parser, data []byte, offset int) (int, ast.Node) {
 		} else {
 			// links cannot contain other links, so turn off link parsing
 			// temporarily and recurse
-			insideLink := p.insideLink
-			p.insideLink = true
+			insideLink := p.InsideLink // unixman: fix from upstream: 7a1f277a159ead8ffed4d3f6d515994cac82b576
+			p.InsideLink = true // unixman: fix from upstream: 7a1f277a159ead8ffed4d3f6d515994cac82b576
 			p.Inline(link, data[1:txtE])
-			p.insideLink = insideLink
+			p.InsideLink = insideLink // unixman: fix from upstream: 7a1f277a159ead8ffed4d3f6d515994cac82b576
 		}
 		return i, link
 
@@ -874,7 +874,7 @@ const shortestPrefix = 6 // len("ftp://"), the shortest of the above
 
 func maybeAutoLink(p *Parser, data []byte, offset int) (int, ast.Node) {
 	// quick check to rule out most false hits
-	if p.insideLink || len(data) < offset+shortestPrefix {
+	if p.InsideLink || len(data) < offset+shortestPrefix { // unixman: fix from upstream: 7a1f277a159ead8ffed4d3f6d515994cac82b576
 		return 0, nil
 	}
 	for _, prefix := range protocolPrefixes {

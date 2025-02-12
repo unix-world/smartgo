@@ -4,6 +4,6 @@ Go 1.14 or later
 
 github.com/schultz-is/go-threefish
 
-# refactored by unixman as:
-github.com/unix-world/smartgo/threefish
+# refactored by unixman r.20250208 as:
+github.com/unix-world/smartgo/crypto/threefish
 

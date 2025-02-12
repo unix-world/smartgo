@@ -1,29 +1,27 @@
-# Go file locking
+# Go simple file locking
 
 ## Overview
 
-Exclusive file locks with timeouts using `flock`.
+cross platform safe, using os.O_EXCL
 
 ## Example
 
 ```
-  // Try to obtain an exclusive file lock with a timeout
-  lock := filelock.FileLock{Path: "example.lock", Timeout: time.Second * 1}
-  err := lock.Lock()
-  if err != nil {
-    if err == ErrLockTimeout {
-      // Lock timeout
-    }
+	// Try to obtain an exclusive file lock with a timeout
+	lock := filelock.LockFile{
+		Path: 		"example.txt", // lockfile will be: example.txt.lock
+		Timeout: 	1, // seconds
+	}
+	err := lock.Lock()
+	if(err != nil) {
+		return
+	}
 
-    // Other error
-  }
-
-  // Lock obtained successfully, must be released.
-  defer lock.Unlock()
+	// Lock obtained successfully, should be released, but if it is not on the next lock will check lockfile MTime and if expired will overwrite otherwise will return error as cannot obtain lock
+	defer lock.Unlock()
 ```
 
-See tests for more examples.
+## About
 
-## License
-
-Apache 2.0
+(c) 2025 unix-world.org
+License: BSD

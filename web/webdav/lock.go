@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV :: Lock
-// r.20250207.2358 :: STABLE
+// r.20250210.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // custom locking system (unixman)
