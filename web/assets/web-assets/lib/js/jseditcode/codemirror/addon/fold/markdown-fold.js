@@ -1,3 +1,3 @@
-// JS-Script (UM): markdown-fold.js @ 2025-02-07 03:11:47 +0000
+// JS-Script (UM): markdown-fold.js @ 2025-02-15 03:03:24 +0000
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror"],e)}else{e(CodeMirror)}})(function(d){"use strict";d.registerHelper("fold","markdown",function(r,e){var i=100;function o(e){var n=r.getTokenTypeAt(d.Pos(e,0));return n&&/\bheader\b/.test(n)}function n(e,n,r){var t=n&&n.match(/^#+/);if(t&&o(e)){return t[0].length}t=r&&r.match(/^[=\-]+\s*$/);if(t&&o(e+1)){return r[0]=="="?1:2}return i}var t=r.getLine(e.line),f=r.getLine(e.line+1);var l=n(e.line,t,f);if(l===i){return undefined}var u=r.lastLine();var a=e.line,c=r.getLine(a+2);while(a<u){if(n(a+1,f,c)<=l){break}++a;f=c;c=r.getLine(a+2)}return{from:d.Pos(e.line,t.length),to:d.Pos(a,r.getLine(a).length)}})});
 // #END

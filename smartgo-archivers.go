@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250210.2358 :: STABLE
+// r.20250214.2358 :: STABLE
 // [ ARCHIVERS ]
 
 // REQUIRE: go 1.19 or later
@@ -15,6 +15,8 @@ import (
 
 	"compress/flate"
 	"compress/gzip"
+
+	"github.com/unix-world/smartgo/compress/snappy"
 )
 
 
@@ -45,7 +47,7 @@ func DataArchive(str string) string { // v3 only
 	var data string = StrTrimWhitespaces(Bin2Hex(str)) + SEPARATOR_SFZ_CHECKSUM_V3 + chksum // v3
 	str = ""
 	//--
-	var arch string = GzDeflate(data, -1)
+	var arch string = string(GzDeflate([]byte(data), -1))
 	var alen int = len(arch)
 	//--
 	if((arch == "") || (alen <= 0)) { // check also division by zero
@@ -175,7 +177,7 @@ func DataUnArchive(str string) string { // v3, v2, v1
 		return ""
 	} //end if
 	//--
-	arr[0] = GzInflate(arr[0])
+	arr[0] = string(GzInflate([]byte(arr[0])))
 	if(arr[0] == "") {
 		log.Println("[NOTICE] " + CurrentFunctionName() + ": Invalid Zlib GzInflate Data for packet (version:", versionDetected, ") with signature:", arr[1])
 		return ""
@@ -251,80 +253,12 @@ func DataUnArchive(str string) string { // v3, v2, v1
 //-----
 
 
-func GzEncode(str string, level int) string {
-	//--
-	defer PanicHandler() // req. by gz encode panic handler with malformed data
-	//--
-	if(str == "") {
-		return ""
-	} //end if
-	//--
-	if((level < 1) || (level > 9)) {
-		level = -1 // zlib default compression
-	} //end if
-	//--
-	var b bytes.Buffer
-	w, err := gzip.NewWriterLevel(&b, level) // RFC 1952 (gzip compatible)
-	//--
-	if(err != nil) {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", err)
-		return ""
-	} //end if
-	//--
-	w.Write([]byte(str))
-	w.Close()
-	//--
-	var out string = b.String()
-	if(out == "") {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty Arch Data")
-		return ""
-	} //end if
-	//--
-	return out
-	//--
-} //END FUNCTION
-
-
-func GzDecode(str string) string {
-	//--
-	defer PanicHandler() // req. by gz decode panic handler with malformed data
-	//--
-	str = StrTrimWhitespaces(str)
-	if(str == "") {
-		return ""
-	} //end if
-	//--
-	b := bytes.NewReader([]byte(str))
-	r, err := gzip.NewReader(b) // RFC 1952 (gzip compatible)
-	if(err != nil) {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", err)
-		return ""
-	} //end if
-	bb2 := new(bytes.Buffer)
-	_, _ = io.Copy(bb2, r)
-	r.Close()
-	byts := bb2.Bytes()
-	//--
-	var out string = string(byts)
-	if(out == "") {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty UnArch Data")
-		return ""
-	} //end if
-	//--
-	return out
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func GzDeflate(str string, level int) string {
+func GzDeflate(data []byte, level int) []byte { // compress ; zlib
 	//--
 	defer PanicHandler() // req. by gz deflate panic handler with malformed data
 	//--
-	if(str == "") {
-		return ""
+	if(data == nil) {
+		return nil
 	} //end if
 	//--
 	if((level < 1) || (level > 9)) {
@@ -335,17 +269,16 @@ func GzDeflate(str string, level int) string {
 	w, err := flate.NewWriter(&b, level) // RFC 1951
 	//--
 	if(err != nil) {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", err)
-		return ""
+		log.Println("[NOTICE]",  CurrentFunctionName() + ":", err)
+		return nil
 	} //end if
 	//--
-	w.Write([]byte(str))
+	w.Write(data)
 	w.Close()
 	//--
-	var out string = b.String()
-	if(out == "") {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty Arch Data")
-		return ""
+	var out []byte = b.Bytes()
+	if(out == nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", "Empty Arch Data")
 	} //end if
 	//--
 	return out
@@ -353,29 +286,137 @@ func GzDeflate(str string, level int) string {
 } //END FUNCTION
 
 
-func GzInflate(str string) string {
+func GzInflate(data []byte) []byte { // uncompress ; zlib
 	//--
 	defer PanicHandler() // req. by gz inflate panic handler with malformed data
 	//--
-	str = StrTrimWhitespaces(str)
-	if(str == "") {
-		return ""
+	data = BytTrimWhitespaces(data)
+	if(data == nil) {
+		return nil
 	} //end if
 	//--
-	b := bytes.NewReader([]byte(str))
+	b := bytes.NewReader(data)
 	r := flate.NewReader(b) // RFC 1951
 	bb2 := new(bytes.Buffer)
 	_, _ = io.Copy(bb2, r)
 	r.Close()
 	byts := bb2.Bytes()
 	//--
-	var out string = string(byts)
-	if(out == "") {
-		log.Println("[NOTICE] " + CurrentFunctionName() + ":", "Empty UnArch Data")
-		return ""
+	if(byts == nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", "Empty UnArch Data")
+	} //end if
+	//--
+	return byts
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func GzEncode(data []byte, level int) []byte { // compress ; gzip compatible
+	//--
+	defer PanicHandler() // req. by gz encode panic handler with malformed data
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	if((level < 1) || (level > 9)) {
+		level = -1 // zlib default compression
+	} //end if
+	//--
+	var b bytes.Buffer
+	w, err := gzip.NewWriterLevel(&b, level) // RFC 1952 (gzip compatible)
+	//--
+	if(err != nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", err)
+		return nil
+	} //end if
+	//--
+	w.Write(data)
+	w.Close()
+	//--
+	var out []byte = b.Bytes()
+	if(out == nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", "Empty Arch Data")
 	} //end if
 	//--
 	return out
+	//--
+} //END FUNCTION
+
+
+func GzDecode(data []byte) []byte { // uncompress ; gzip compatible
+	//--
+	defer PanicHandler() // req. by gz decode panic handler with malformed data
+	//--
+	data = BytTrimWhitespaces(data)
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	b := bytes.NewReader(data)
+	r, err := gzip.NewReader(b) // RFC 1952 (gzip compatible)
+	if(err != nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", err)
+		return nil
+	} //end if
+	bb2 := new(bytes.Buffer)
+	_, _ = io.Copy(bb2, r)
+	r.Close()
+	byts := bb2.Bytes()
+	//--
+	if(byts == nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", "Empty UnArch Data")
+	} //end if
+	//--
+	return byts
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SnappyCompress(data []byte) []byte { // compress ; snappy
+	//--
+	defer PanicHandler() // req. by gz deflate panic handler with malformed data
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	byts := snappy.Encode(nil, data)
+	//--
+	if(byts == nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", "Empty Arch Data")
+	} //end if
+	//--
+	return byts
+	//--
+} //END FUNCTION
+
+
+func SnappyUncompress(data []byte) []byte { // uncompress ; snappy
+	//--
+	defer PanicHandler() // req. by gz deflate panic handler with malformed data
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	byts, err := snappy.Decode(nil, data)
+	if(err != nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", err)
+		return nil
+	} //end if
+	//--
+	if(byts == nil) {
+		log.Println("[NOTICE]", CurrentFunctionName() + ":", "Empty UnArch Data")
+	} //end if
+	//--
+	return byts
 	//--
 } //END FUNCTION
 

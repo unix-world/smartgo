@@ -2,7 +2,7 @@ github.com/golang-jwt/jwt/v4 @v4.5.1 # 20241108
 
 go 1.22
 
-modified by unixman: r.20250207.2358
+modified by unixman: r.20250214.2358
 	* added SHA-224
 	* added SHA-3: 224 / 256 / 384 / 512 ;  quantum computing safe
 	* added ed448, EddSA ; quantum computing safe

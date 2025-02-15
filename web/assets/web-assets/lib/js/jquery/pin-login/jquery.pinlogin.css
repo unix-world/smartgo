@@ -1,3 +1,3 @@
-/* CSS-Stylesheet (UM): jquery.pinlogin.css @ 2025-02-07 03:11:51 +0000 */
+/* CSS-Stylesheet (UM): jquery.pinlogin.css @ 2025-02-15 03:03:27 +0000 */
 div.pinlogin{display:inline-block}.pinlogin .pinlogin-field{box-sizing:border-box;display:inline-block;width:28px;height:28px;padding:0;margin:1px;border:1px solid #eee;border-radius:2px;text-align:center;color:#777;font-size:.8125rem !important;font-weight:bold !important}.pinlogin .pinlogin-field:first-of-type{margin-left:0}.pinlogin .pinlogin-field:last-of-type{margin-right:0}.pinlogin .pinlogin-field:read-only{border:1px solid #ececec;background:#fafafa;cursor:default}.pinlogin .pinlogin-field.invalid{border:1px solid #fc0;color:#f30}.pinlogin .pinlogin-field:focus{outline:0;border-color:#129fea}
 /* #END */

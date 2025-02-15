@@ -1,6 +1,6 @@
 
 // (c) 2024-present unix-world.org
-// v.20250205.2358
+// v.20250214.2358
 // license: BSD
 
 // based on: github.com/xlzd/gotp # license: MIT
