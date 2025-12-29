@@ -1,5 +1,7 @@
-v1.5.3.1 @head.20241215
+v1.5.3.2 @head.20251208
 github.com/gorilla/websocket
+
+go 1.20
 
 @require
     golang.org/x/net

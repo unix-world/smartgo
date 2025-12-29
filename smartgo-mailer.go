@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251229.2358 :: STABLE
 // [ MAILER ]
 
 // REQUIRE: go 1.19 or later
@@ -352,12 +352,13 @@ func SendSmtpEmail(smtpConf SmtpConfig, mailMsgStruct MailMessageStruct) error {
 	//println(msgID)
 	msg.SetHeader("Message-Id", msgID)
 	//--
-	uuidBound := uid.Uuid10Num() + uid.Uuid10Seq() + Crc32b("@MimePart---#Boundary@" + DateNowUtc())
-	boundary :=  "_===-Mime.Part___.0000" + uuidBound + "__P_.-===_" // 60 characters
+	uuidBound := "000000000000000" + uid.Uuid10Num() + uid.Uuid10Num() + uid.Uuid10Str() // 45
+	boundary  := "_Smart-Mail=X=" + uuidBound + "_" // 60 characters ; multipart/mixed
+	aboundary := "_Smart-Mail=A=" + uuidBound + "_" // 60 characters ; multipart/alternative
+	rboundary := "_Smart-Mail=R=" + uuidBound + "_" // 60 characters ; multipart/related
+	//--
 	msg.SetBoundary(boundary)
-	aboundary := "_=-=-Mime.Alt___.00000" + uuidBound + "__A_.=-=-_" // 60 characters
 	msg.SetABoundary(aboundary)
-	rboundary := "_-==-Mime.Related___.0" + uuidBound + "__R_.-==-_" // 60 characters
 	msg.SetRBoundary(rboundary)
 	//--
 	mailMsgStruct.Encoding = StrToUpper(StrTrimWhitespaces(mailMsgStruct.Encoding))

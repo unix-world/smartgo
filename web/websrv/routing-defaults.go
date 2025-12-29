@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -23,16 +23,27 @@ import (
 //-- home page (html)
 var RouteHandlerHomePage HttpHandlerFunc = func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse) {
 	//--
-	// route: /
+	// route: / ; allowed methods: GET, HEAD
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
-	response.StatusCode = 200
 	const title string = "WebApp"
-	var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.app { text-align:center; margin:20px; } div.app * { color: #ED2839 !important; }" + "\n" + "</style>"
-	var bodyHtml string = `<center><div class="app" style="background:#FFFFFF; width:552px; border-radius:7px;">` + "<h1>" + smart.EscapeHtml(TheStrName) + "</h1>" + "\n" + `<img alt="app:svg" title="` + smart.EscapeHtml(title) + `" width="512" height="512" src="` + smart.EscapeHtml(assets.GetAppLogo(false)) + `"></div></center>` + "\n"
-	response.ContentBody = assets.HtmlStandaloneFaviconTemplate(title, headHtml, bodyHtml, false, assets.GetAppLogo(true)) // skip js
+	//--
+	response.StatusCode = 200
 	response.ContentFileName = "webapp.html"
+	//--
+	if(r.Method == "HEAD") {
+		response.ContentBody = `<h1>` + smart.EscapeHtml(title) + `</h1>`
+	} else if(r.Method == "GET") {
+		var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.app { text-align:center; margin:20px; } div.app * { color: #ED2839 !important; }" + "\n" + "</style>"
+		var bodyHtml string = `<center><div class="app" style="background:#FFFFFF; width:552px; border-radius:7px;">` + "<h1>" + smart.EscapeHtml(TheStrName) + "</h1>" + "\n" + `<img alt="app:svg" title="` + smart.EscapeHtml(title) + `" width="512" height="512" src="` + smart.EscapeHtml(assets.GetAppLogo(false)) + `"></div></center>` + "\n"
+		response.ContentBody = assets.HtmlStandaloneFaviconTemplate(title, headHtml, bodyHtml, false, assets.GetAppLogo(true)) // skip js
+	} else {
+		response.StatusCode = 405
+		response.ContentBody = "WebServer: `" + smart.EscapeHtml(r.Method) + "` Method is Not Allowed for this Path: `/`"
+		response.ContentFileName = "405.html"
+		return
+	} //end if
 	//-- optionals
 	response.ContentDisposition = ""
 	response.CacheExpiration = -1

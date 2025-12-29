@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251229.2358 :: STABLE
 // [ S-MARKDOWN ]
 
 // REQUIRE: go 1.19 or later
@@ -14,7 +14,7 @@ import (
 )
 
 const(
-	mkdwVersion string = "smart.markdown:parser@v.2.2.8-r.20250108"
+	mkdwVersion string = "smart.markdown:parser@v.2.2.8-r.20251216"
 )
 
 
@@ -1491,7 +1491,7 @@ func (m *SMarkdownParser) renderHtmlMediaOnly(extractedMediaOnlyArr []string, li
 				if(isSet) {
 					value = StrTrimWhitespaces(value)
 					if(value != "") {
-						theStyle = `style="` + EscapeHtml(value) + `"`
+						theStyle = ` style="` + EscapeHtml(value) + `"`
 					} //end if
 				} //end if
 				//--

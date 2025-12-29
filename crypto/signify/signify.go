@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo/Crypto/Signify :: Smart.Go.Framework
 // (c) 2025-present unix-world.org
-// r.20250208.2358 :: STABLE
+// r.20251205.2358 :: STABLE
 
 package signify
 
@@ -10,6 +10,8 @@ package signify
 // License: BSD
 // based on: github.com/ebfe/signify
 // refactored and modernized by unix-world.org
+
+// modified by unixman: make it signify nopassphrase compatible
 
 import (
 	"errors"
@@ -32,7 +34,7 @@ import (
 )
 
 const (
-	commentHdr       string = "untrusted comment: "
+	CommentHdr       string = "untrusted comment: "
 	defaultKDFRounds int    = 42
 )
 
@@ -156,10 +158,10 @@ func ReadFile(r io.Reader) (comment string, content []byte, err error) {
 		return "", nil, fmt.Errorf("signify: read error %s", sc.Err())
 	}
 	comment = sc.Text()
-	if !strings.HasPrefix(comment, commentHdr) {
+	if !strings.HasPrefix(comment, CommentHdr) {
 		return "", nil, errors.New("signify: missing header")
 	}
-	comment = comment[len(commentHdr):]
+	comment = comment[len(CommentHdr):]
 
 	if !sc.Scan() {
 		return "", nil, fmt.Errorf("signify: read error %s", sc.Err())
@@ -172,7 +174,7 @@ func ReadFile(r io.Reader) (comment string, content []byte, err error) {
 
 func WriteFile(w io.Writer, comment string, content []byte) error {
 	b64 := base64.StdEncoding.EncodeToString(content)
-	_, err := fmt.Fprintf(w, "%s%s\n%s\n", commentHdr, comment, b64)
+	_, err := fmt.Fprintf(w, "%s%s\n%s\n", CommentHdr, comment, b64)
 	return err
 }
 
@@ -234,7 +236,10 @@ func decryptPrivateKey(rek *rawEncryptedKey, passphrase []byte) (*PrivateKey, er
 
 	if rek.KDFRounds != 0 {
 		var errK error
-		xorkey, errK = bcrypt_pbkdf.Key(passphrase, rek.Salt[:], int(rek.KDFRounds), ed25519.PrivateKeySize)
+		//-- fix
+	//	xorkey, errK = bcrypt_pbkdf.Key(passphrase, rek.Salt[:], int(rek.KDFRounds), ed25519.PrivateKeySize)
+		xorkey, errK = bcrypt_pbkdf.KeyAllowEmptyPass(passphrase, rek.Salt[:], int(rek.KDFRounds), ed25519.PrivateKeySize) // fix by unixman: make it signify nopassphrase compatible
+		//-- #fix
 		if(errK != nil) {
 			return nil, errK
 		}
@@ -263,9 +268,11 @@ func encryptPrivateKey(priv *PrivateKey, rand io.Reader, passphrase []byte, roun
 	if rounds < 0 {
 		rounds = defaultKDFRounds
 	}
-	if len(passphrase) == 0 {
-		rounds = 0
-	}
+	//-- fix by unixman: make it signify nopassphrase compatible
+//	if len(passphrase) == 0 {
+//		rounds = 0
+//	}
+	//-- #fix
 
 	rke.PKAlgo = algoEd
 	rke.KDFAlgo = algoBcrypt
@@ -276,7 +283,10 @@ func encryptPrivateKey(priv *PrivateKey, rand io.Reader, passphrase []byte, roun
 	rke.Checksum = checksum(priv.Bytes[:])
 	rke.Fingerprint = priv.Fingerprint
 
-	xorkey, errK := bcrypt_pbkdf.Key(passphrase, rke.Salt[:], rounds, ed25519.PrivateKeySize)
+	//-- fix
+//	xorkey, errK := bcrypt_pbkdf.Key(passphrase, rke.Salt[:], rounds, ed25519.PrivateKeySize)
+	xorkey, errK := bcrypt_pbkdf.KeyAllowEmptyPass(passphrase, rke.Salt[:], rounds, ed25519.PrivateKeySize) // fix by unixman: make it signify nopassphrase compatible
+	//-- #fix
 	if(errK != nil) {
 		return nil, errK
 	}
@@ -290,7 +300,7 @@ func encryptPrivateKey(priv *PrivateKey, rand io.Reader, passphrase []byte, roun
 
 func ParsePrivateKey(data, passphrase []byte) (*PrivateKey, error) {
 	if !bytes.Equal(algoEd[:], data[:2]) {
-		return nil, errors.New("signify: unknown public key algorithm")
+		return nil, errors.New("signify: unknown private key algorithm")
 	}
 	if !bytes.Equal(algoBcrypt[:], data[2:4]) {
 		return nil, errors.New("signify: unknown kdf algorithm")
@@ -343,7 +353,7 @@ func MarshalPublicKey(pub *PublicKey) []byte {
 
 func ParseSignature(data []byte) (*Signature, error) {
 	if !bytes.Equal(algoEd[:], data[:2]) {
-		return nil, errors.New("signify: unknown public key algorithm")
+		return nil, errors.New("signify: unknown signature algorithm")
 	}
 
 	rs, err := parseRawSignature(data)

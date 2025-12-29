@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251229.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -72,7 +72,7 @@ func PathDirName(filePath string) string { // returns: `a/path/to` from `a/path/
 } //END FUNCTION
 
 
-func PathBaseName(filePath string) string { // returns: `file.extenstion` | `lastDirInPath` from `(/)a/path/to/lastDirInPath|file.extension`
+func PathBaseName(filePath string) string { // returns: `file.extension` | `lastDirInPath` from `(/)a/path/to/lastDirInPath|file.extension`
 	//--
 	if(filePath == "") {
 		return ""

@@ -11,6 +11,8 @@
 
 package bcrypt_pbkdf
 
+// modified by unixman, r.20251208.2358
+
 import (
 	"errors"
 
@@ -21,16 +23,32 @@ import (
 
 const blockSize = 32
 
+
+func Key(password, salt []byte, rounds, keyLen int) ([]byte, error) { // standard, original method
+	return newKey(false, password, salt, rounds, keyLen)
+} //END FUNCTION
+
+
+func KeyAllowEmptyPass(password, salt []byte, rounds, keyLen int) ([]byte, error) { // custom method by unixman: to allow with empty password to make it signify nopassphrase compatible
+	return newKey(true, password, salt, rounds, keyLen)
+} //END FUNCTION
+
+
 // Key derives a key from the password, salt and rounds count, returning a
 // []byte of length keyLen that can be used as cryptographic key.
-func Key(password, salt []byte, rounds, keyLen int) ([]byte, error) {
+func newKey(allowNoPass bool, password, salt []byte, rounds, keyLen int) ([]byte, error) {
 	if rounds < 1 {
 		return nil, errors.New("bcrypt_pbkdf: number of rounds is too small")
 	}
-	if len(password) == 0 {
-		return nil, errors.New("bcrypt_pbkdf: empty password")
-	}
-	if len(salt) == 0 || len(salt) > 1<<20 {
+	//-- fix by unixman
+	if(allowNoPass != true) { // allow with empty password to make it signify nopassphrase compatible
+		if len(password) <= 0 {
+			return nil, errors.New("bcrypt_pbkdf: empty password")
+		}
+	} //end if
+	//-- #fix
+//	if len(salt) == 0 || len(salt) > 1<<20 {
+	if len(salt) <= 0 || len(salt) > 1<<20 { // fix by unixman
 		return nil, errors.New("bcrypt_pbkdf: bad salt length")
 	}
 	if keyLen > 1024 {
@@ -72,9 +90,11 @@ func Key(password, salt []byte, rounds, keyLen int) ([]byte, error) {
 		}
 	}
 	return key[:keyLen], nil
-}
+} //END FUNCTION
+
 
 var magic = []byte("OxychromaticBlowfishSwatDynamite")
+
 
 func bcryptHash(out, shapass, shasalt []byte) {
 	c, err := blowfish.NewSaltedCipher(shapass, shasalt)
@@ -95,4 +115,7 @@ func bcryptHash(out, shapass, shasalt []byte) {
 	for i := 0; i < 32; i += 4 {
 		out[i+3], out[i+2], out[i+1], out[i] = out[i], out[i+1], out[i+2], out[i+3]
 	}
-}
+} //END FUNCTION
+
+
+// #end

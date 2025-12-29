@@ -1,3 +1,3 @@
-// JS-Script (UM): indent-fold.js @ 2025-02-15 03:03:24 +0000
+// JS-Script (UM): indent-fold.js @ 2025-12-16 17:19:13 +0200
 (function(e){if(typeof exports=="object"&&typeof module=="object"){e(require("../../lib/codemirror"))}else if(typeof define=="function"&&define.amd){define(["../../lib/codemirror"],e)}else{e(CodeMirror)}})(function(l){"use strict";function u(e,n){var t=e.getLine(n);var i=t.search(/\S/);if(i==-1||/\bcomment\b/.test(e.getTokenTypeAt(l.Pos(n,i+1)))){return-1}return l.countColumn(t,null,e.getOption("tabSize"))}l.registerHelper("fold","indent",function(e,n){var t=u(e,n.line);if(t<0){return}var i=null;for(var r=n.line+1,o=e.lastLine();r<=o;++r){var f=u(e,r);if(f==-1){}else if(f>t){i=r}else{break}}if(i){return{from:l.Pos(n.line,e.getLine(n.line).length),to:l.Pos(i,e.getLine(i).length)}}})});
 // #END

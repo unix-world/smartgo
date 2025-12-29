@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251229.2358 :: STABLE
 // [ LOGGER ]
 
 // REQUIRE: go 1.19 or later
@@ -28,7 +28,14 @@ const (
 //func FatalError(logMessages ...interface{}) {
 func FatalError(logMessages ...any) {
 	//--
-	log.Println("[ERROR] ! FATAL !", fmt.Sprint(logMessages...))
+//	log.Println("[ERROR] ! FATAL !", fmt.Sprint(logMessages...))
+	//-- fix for above, does not expand with between spaces
+	var txtLog string = ""
+	for _, e := range logMessages {
+		txtLog += fmt.Sprint(e) + " "
+	} //end for
+	log.Println("[ERROR] ! FATAL !", StrTrimWhitespaces(txtLog))
+	//--
 	os.Exit(1)
 	//--
 } //END FUNCTION

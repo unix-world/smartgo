@@ -1,12 +1,13 @@
 
 // GO Lang :: SmartGo / Web Server / Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
+	"bytes"
 	"time"
 	"net/url"
 	"net/http"
@@ -254,6 +255,32 @@ func GetAllRequestVars(r *http.Request) map[string][]string { // get all url and
 	} //end if
 	//--
 	return r.Form
+	//--
+} //END FUNCTION
+
+
+func GetPostFileContentByKeyAndFname(r *http.Request, key string, fName string) string {
+	//--
+	key   = smart.StrTrimWhitespaces(key)
+	fName = smart.StrTrimWhitespaces(fName) // optional, can be empty
+	//--
+	if((key == "") || (len(key) > 255)) {
+		return ""
+	} //end if
+	//--
+	objPostFile := GetPostFile(r, key)
+	//--
+	var theFileContent string = ""
+	if((objPostFile.Error == nil) && (objPostFile.Header != nil) && (objPostFile.File != nil)) {
+		var theFileName string = smart.StrTrimWhitespaces(objPostFile.Header.Filename)
+		if((theFileName != "") && ((theFileName == fName) || (fName == ""))) {
+			theBuf := new(bytes.Buffer)
+			theBuf.ReadFrom(objPostFile.File)
+			theFileContent = theBuf.String()
+		} //end if
+	} //end if
+	//--
+	return theFileContent // do not trim, may be binary
 	//--
 } //END FUNCTION
 

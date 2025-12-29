@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251229.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -834,7 +834,7 @@ func AuthIsValid2FACode(code string) bool {
 } //END FUNCTION
 
 
-func AuthIsValidSecurityKey(key string) bool { // {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}}
+func AuthIsValidSecurityKey(key string) bool { // {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}} ; must allow no less than 16 but at least 256 as in AppSetSecurityKey / AppGetSecurityKey
 	//--
 	if(StrTrimWhitespaces(key) == "") {
 		return false
@@ -842,7 +842,8 @@ func AuthIsValidSecurityKey(key string) bool { // {{{SYNC-GO-SMART-CRYPTO-SECURI
 	if(StrLen(key) != StrLen(StrTrimWhitespaces(key))) {
 		return false
 	} //end if
-	if((StrLen(key) < 16) || (StrLen(key) > 256)) { // 256 is req. by the msgpak server ...
+//	if((StrLen(key) < 16) || (StrLen(key) > 256)) { // 256 is req. by the msgpak server
+	if((StrLen(key) < 16) || (StrLen(key) > 384)) { // 256 is req. by the msgpak server ; fix: 265 by the web auth provider with ext auth JWT ; let it relaxed to 384
 		return false
 	} //end if
 	//--

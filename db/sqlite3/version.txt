@@ -1,4 +1,4 @@
-github.com/mattn/go-sqlite3 @ v1.14.24.1 @ head.20241215
+github.com/mattn/go-sqlite3 @ v1.14.32.1 @ head.20251208
 
 go 1.19
 

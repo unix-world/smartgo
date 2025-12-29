@@ -35,7 +35,7 @@ This package follows the official [Golang Release Policy](https://golang.org/doc
   - [Android](#android)
 - [ARM](#arm)
 - [Cross Compile](#cross-compile)
-- [Google Cloud Platform](#google-cloud-platform)
+- [Compiling](#compiling)
   - [Linux](#linux)
     - [Alpine](#alpine)
     - [Fedora](#fedora)
@@ -227,11 +227,7 @@ Steps:
 
 Please refer to the project's [README](https://github.com/FiloSottile/homebrew-musl-cross#readme) for further information.
 
-# Google Cloud Platform
-
-Building on GCP is not possible because Google Cloud Platform does not allow `gcc` to be executed.
-
-Please work only with compiled final binaries.
+# Compiling
 
 ## Linux
 
@@ -354,6 +350,8 @@ For example the TDM-GCC Toolchain can be found [here](https://jmeubank.github.io
     ```
 
 # User Authentication
+
+***This is deprecated***
 
 This package supports the SQLite User Authentication module.
 

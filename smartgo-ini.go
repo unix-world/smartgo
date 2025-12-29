@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20250214.2358 :: STABLE
+// r.20251229.2358 :: STABLE
 // [ INI (PARSE) ]
 
 // REQUIRE: go 1.19 or later
@@ -24,6 +24,12 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 		return nil, NewError("INI # Parse Error: " + errParseIni.Error())
 	} //end if
 	//--
+	var strReplacements map[string]string = map[string]string{
+		`\\r`: "\r",
+		`\\n`: "\n",
+		`\\t`: "\t",
+	}
+	//--
 	var settings map[string]string = map[string]string{}
 	if(iniKeys != nil) { // get all these keys ; if key does not exist will fill it with an empty string ; ex: []string where each value is "section:key"
 		for i := 0; i < len(iniKeys); i++ {
@@ -33,7 +39,7 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 					sk[0] = StrTrimWhitespaces(sk[0])
 					sk[1] = StrTrimWhitespaces(sk[1])
 					if((sk[0] != "") && (sk[1] != "")) {
-						settings[sk[0] + ":" + sk[1]] = parseini.GetIniStrVal(iniData, sk[0], sk[1])
+						settings[sk[0] + ":" + sk[1]] = StrTr(parseini.GetIniStrVal(iniData, sk[0], sk[1]), strReplacements)
 					} //end if
 				} //end if
 			} //end if
@@ -42,7 +48,11 @@ func IniContentParse(iniContent string, iniKeys []string) (iniMap map[string]str
 		for k, v := range iniData {
 			if(v != nil) {
 				for kk, _ := range v {
-					settings[k + ":" + kk] = parseini.GetIniStrVal(iniData, k, kk)
+					k = StrTrimWhitespaces(k)
+					kk = StrTrimWhitespaces(kk)
+					if((k != "") && (kk != "")) {
+						settings[k + ":" + kk] = StrTr(parseini.GetIniStrVal(iniData, k, kk), strReplacements)
+					} //end if
 				} //end for
 			} //end if
 		} //end for
