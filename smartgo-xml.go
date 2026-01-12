@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251229.2358 :: STABLE
+// r.20260111.2358 :: STABLE
 // [ XML ]
 
 // REQUIRE: go 1.19 or later
@@ -11,6 +11,7 @@ import (
 	"bytes"
 
 	"encoding/xml"
+
 	"github.com/unix-world/smartgo/data-structs/tidwall/x2j"
 )
 
@@ -20,7 +21,7 @@ import (
 
 func XmlEncode(data interface{}, prettyprint bool, includeHeader bool) (string, error) {
 	//--
-	defer PanicHandler() // for YAML Parser
+	defer PanicHandler() // for XML Parser
 	//-- no need any panic handler
 	out := bytes.Buffer{}
 	//--
@@ -49,7 +50,7 @@ func XmlEncode(data interface{}, prettyprint bool, includeHeader bool) (string, 
 
 func XmlNoErrChkEncode(data interface{}, prettyprint bool, includeHeader bool) string {
 	//--
-	defer PanicHandler() // for YAML Parser
+	defer PanicHandler() // for XML Parser
 	//-- no need any panic handler
 	str, _ := XmlEncode(data, prettyprint, includeHeader)
 	//--
@@ -63,7 +64,7 @@ func XmlNoErrChkEncode(data interface{}, prettyprint bool, includeHeader bool) s
 
 func XmlConvertToJson(xmlData string) (string, error) {
 	//--
-	defer PanicHandler() // for YAML Parser
+	defer PanicHandler() // for XML Parser
 	//--
 	jsondata, err := x2j.Convert([]byte(xmlData))
 	if(err != nil) {

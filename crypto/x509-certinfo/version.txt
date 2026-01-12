@@ -1,0 +1,6 @@
+github.com/grantae/certinfo @ v.20260108 r.20260110.0207
+
+Go 1.13 or later
+
+modified by unixman
+

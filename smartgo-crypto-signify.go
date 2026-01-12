@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251229.2358 :: STABLE
+// r.20260111.2358 :: STABLE
 // [ CRYPTO / SIGNIFY ]
 
 // REQUIRE: go 1.19 or later
@@ -90,8 +90,6 @@ func SignifySign(privKeyB64 []byte, privKeyPass []byte, dataToSign []byte, comme
 		return NewError("B64 Private Key is Empty, Null"), ""
 	} //end if
 	//--
-
-
 	commentPrivKey, sRawPrivKey, errRdSgn := signify.ReadData(privKeyB64)
 	if(errRdSgn != nil) {
 		return NewError("Parse Private Key Text Failed: " + errRdSgn.Error()), ""

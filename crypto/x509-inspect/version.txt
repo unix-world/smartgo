@@ -1,0 +1,8 @@
+github.com/footprintai/go-certs/pkg/certs/inspect @head.20260110
+
+go 1.22
+
+unixman:
+	* imported only inspect, the package contains many more files
+	* modified to allow load certificate from string instead of file path
+
