@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260114.2358 :: STABLE
+// r.20260116.2358 :: STABLE
 // [ CRYPTO / X509 ]
 
 // REQUIRE: go 1.22 or later
@@ -1113,10 +1113,10 @@ func GenerateX509Certificate(certInfo CertInfo, sigAlg x509.SignatureAlgorithm, 
 		} //end if
 	} //end if else
 	//--
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 256) // 256 bit serial
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(888888887777777787), 256) // 256 bit serial, starting from 888888887777777787 as min, to have a safe large number as min.
 	serialNumber, errSerial := crand.Int(crand.Reader, serialNumberLimit)
 	if(errSerial != nil) {
-		return nil, NewError("Serial Error: " + errSerial.Error())
+		return nil, NewError("Certificate Serial Error: " + errSerial.Error())
 	} //end if
 	//--
 	criticalTimestampExt, errCritTimeStamp := criticalTimestamping()
