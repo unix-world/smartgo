@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260116.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -58,6 +58,8 @@ const (
 	HTTP_AUTH_USER_BEARER string = ":BEARER" 	// used for http client to add header: 				`Authorization: Bearer ****` where `****` is the jwt signed token
 	HTTP_AUTH_USER_APIKEY string = ":APIKEY" 	// used for http client to add header: 				`Authorization: Apikey ****` where `****` is the external jwt signed token for non-existing accounts
 	HTTP_AUTH_USER_RAW    string = ":RAW" 		// used for http client to add custom header like: 	`Authorization: %Custom% ****` where `%Custom% ****` is the password ; ex: `Authorization: OAuth ****`
+
+	JWT_API_KEY_VIRTUAL_EXTERNAL string = "ApiKey:Virtual:External"
 )
 
 var (
@@ -310,6 +312,9 @@ type AuthDataStruct struct {
 	SecurityKey  string             `json:"-"` 				// Security Key
 	PubKey       string             `json:"pubKey"` 		// Public Key
 	PrivKey      string             `json:"-"` 				// Private Key
+	SignKeyCert  string             `json:"signKeyCert"` 	// Sign Key Certificate
+	SignKeyPub   string             `json:"signKeyPub"` 	// Sign Key Public
+	SignKeyPriv  string             `json:"-"` 				// Sign Key Private (encrypted with user's SecurityKey, as in Sf.Auth.Users/Admins)
 	Privileges   string             `json:"privileges"` 	// Privileges: <priv1>,<priv2>,...
 	Restrictions string             `json:"restrictions"` 	// Restrictions: <restr1>,<restr2>,...
 	EmailAddr    string             `json:"emailAddr"` 		// User Email Address
@@ -573,6 +578,10 @@ func AuthDataInit(ok bool, errMsg string, method uint8, area string, realm strin
 				} //end if
 			} //end if
 		} //end if
+	} //end if
+	//--
+	if(safeMetaData == nil) { // bug fix: must be non-null below, it can be null only by reset above ...
+		safeMetaData = map[string]string{}
 	} //end if
 	//--
 	metaDT, okDT := safeMetaData["datetime"]

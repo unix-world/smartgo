@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260116.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 // [ CRYPTO / SIGNIFY ]
 
 // REQUIRE: go 1.19 or later
@@ -11,6 +11,13 @@ import (
 	cryptorand "crypto/rand"
 
 	signify "github.com/unix-world/smartgo/crypto/signify"
+)
+
+
+//-----
+
+const (
+	SignifyErrInvalidSignature = "Signify (Ed25519) Signature is Invalid, Verification Failed, does Not Match Data"
 )
 
 //-----
@@ -43,7 +50,6 @@ func SignifyGenerateKeys(privKeyPass []byte, allowEmptyPass bool) (string, strin
 		return "", "", NewError("Marshal Priv Key is Null")
 	} //end if
 	//--
-//	var privDataKey []byte = Base64BytEncode(bytPrivKey)
 	var commntPrivKey string = "signify private key"
 	if(privKeyPass != nil) {
 		commntPrivKey += " (protected)"
@@ -81,74 +87,6 @@ func SignifyGenerateKeys(privKeyPass []byte, allowEmptyPass bool) (string, strin
 //-----
 
 
-func SignifySign(privKeyB64 []byte, privKeyPass []byte, dataToSign []byte, comment string, isDetached bool) (error, string) {
-	//--
-	defer PanicHandler()
-	//--
-	privKeyB64 = BytTrimWhitespaces(privKeyB64)
-	if(privKeyB64 == nil) {
-		return NewError("B64 Private Key is Empty, Null"), ""
-	} //end if
-	//--
-	commentPrivKey, sRawPrivKey, errRdSgn := signify.ReadData(privKeyB64)
-	if(errRdSgn != nil) {
-		return NewError("Parse Private Key Text Failed: " + errRdSgn.Error()), ""
-	} //end if
-	if(sRawPrivKey == nil) {
-		return NewError("Parse Private Key Text Failed: PrivKey is Null"), ""
-	} //end if
-	commentPrivKey = StrTrimWhitespaces(commentPrivKey)
-	if(commentPrivKey == "") {
-		return NewError("Parse Private Key Text Failed: Comment is Empty"), ""
-	} //end if
-	//--
-	if(dataToSign == nil) {
-		return nil, ""
-	} //end if
-	//--
-	comment = StrNormalizeSpaces(comment)
-	comment = StrTrimWhitespaces(comment)
-	if(len(comment) > 87) {
-		return NewError("Comment is Too Long"), ""
-	} //end if
-	//--
-	privKey, errPrivKey := signify.ParsePrivateKey(sRawPrivKey, privKeyPass)
-	if(errPrivKey != nil) {
-		return errPrivKey, ""
-	} //end if
-	if(privKey == nil) {
-		return NewError("Private Key Parsing Failed, Null"), ""
-	} //end if
-	//--
-	signature := signify.Sign(privKey, BytesConcatenate(dataToSign, []byte("\n"))) // {{{SYNC-SIGNIFY-SIGN-FIX-APPEND-LF}}}
-	if(signature == nil) {
-		return NewError("Sign Failed, Null"), ""
-	} //end if
-	//--
-	bytSignature := signify.MarshalSignature(signature)
-	if(bytSignature == nil) {
-		return NewError("Sign Marshal Signature Failed, Null"), ""
-	} //end if
-	//--
-	signedData, errWrSgn := signify.WriteData(comment + " # " + DateNowUtc(), bytSignature)
-	if(errWrSgn != nil) {
-		return errWrSgn, ""
-	} //end if
-	if(signedData == nil) {
-		return NewError("Sign Signature Failed, Null"), ""
-	} //end if
-	//--
-	if(isDetached == false) {
-		signedData = append(signedData, []byte(dataToSign)...)
-	} else {
-		signedData = BytTrimWhitespaces(signedData)
-	} //end if
-	//--
-	return nil, string(signedData) + "\n" // fix: add endline LF terminator to be compatible with OpenBSD's Signify
-	//--
-} //END FUNCTION
-
-
 func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, dataToCheck []byte) error {
 	//--
 	// dataToCheck can be binary data but only if isDetached is TRUE
@@ -157,7 +95,7 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 	//--
 	pubkeyTxt = BytTrimWhitespaces(pubkeyTxt)
 	if(pubkeyTxt == nil) {
-		return NewError("Public Key Text is Empty")
+		return NewError("Public Key Text is Empty, Null")
 	} //end if
 	//--
 	signatureText = BytTrimWhitespaces(signatureText)
@@ -214,7 +152,7 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 		dataB64BytSgn = append(dataB64BytSgn, Base64BytEncode(dataBytSgn)...)
 		dataB64BytSgn = append(dataB64BytSgn, '\n')
 		if(BytContains(signatureText, dataB64BytSgn) != true) {
-			return NewError("Parse Signature Text Failed: B64 Signature does not match")
+			return NewError("Parse Signature Text Failed: Text Signature does not match")
 		} //end if
 		//--
 		dataToCheck = nil // make sure ...
@@ -238,15 +176,102 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 		return NewError("Parse Data Signature Failed: " + errSgn.Error())
 	} //end if
 	if(signature == nil) {
-		return NewError("Parse Data Signature Failed: Ed25519 Signature is Null")
+		return NewError("Parse Data Signature Failed: Signature is Null")
 	} //end if
 	//--
 	var vfyData bool = signify.Verify(pubKey, dataToCheck, signature)
 	if(vfyData != true) {
-		return NewError("Ed25519 Signature is Invalid, Verification Failed, does Not Match Data")
+		return NewError(SignifyErrInvalidSignature)
 	} //end if
 	//--
-	return nil // Ed25519 Signature Verified
+	return nil // Signature Verified
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SignifySign(privKeyTxt []byte, privKeyPass []byte, pubkeyTxt []byte, dataToSign []byte, comment string, isDetached bool) (error, string) {
+	//--
+	defer PanicHandler()
+	//--
+	privKeyTxt = BytTrimWhitespaces(privKeyTxt)
+	if(privKeyTxt == nil) {
+		return NewError("Private Key Text is Empty, Null"), ""
+	} //end if
+	//--
+	pubkeyTxt = BytTrimWhitespaces(pubkeyTxt)
+	if(pubkeyTxt == nil) {
+		return NewError("Public Key Text is Empty, Null"), ""
+	} //end if
+	//--
+	commentPrivKey, sRawPrivKey, errRdSgn := signify.ReadData(privKeyTxt)
+	if(errRdSgn != nil) {
+		return NewError("Parse Private Key Text Failed: " + errRdSgn.Error()), ""
+	} //end if
+	if(sRawPrivKey == nil) {
+		return NewError("Parse Private Key Text Failed: PrivKey is Null"), ""
+	} //end if
+	commentPrivKey = StrTrimWhitespaces(commentPrivKey)
+	if(commentPrivKey == "") {
+		return NewError("Parse Private Key Text Failed: Comment is Empty"), ""
+	} //end if
+	//--
+	if(dataToSign == nil) {
+		return nil, ""
+	} //end if
+	//--
+	comment = StrNormalizeSpaces(comment)
+	comment = StrTrimWhitespaces(comment)
+	if(len(comment) > 87) {
+		return NewError("Comment is Too Long"), ""
+	} //end if
+	//--
+	privKey, errPrivKey := signify.ParsePrivateKey(sRawPrivKey, privKeyPass)
+	if(errPrivKey != nil) {
+		return errPrivKey, ""
+	} //end if
+	if(privKey == nil) {
+		return NewError("Private Key Parsing Failed, Null"), ""
+	} //end if
+	//--
+	signature := signify.Sign(privKey, BytesConcatenate(dataToSign, []byte("\n"))) // {{{SYNC-SIGNIFY-SIGN-FIX-APPEND-LF}}}
+	if(signature == nil) {
+		return NewError("Sign Failed, Null"), ""
+	} //end if
+	//--
+	bytSignature := signify.MarshalSignature(signature)
+	if(bytSignature == nil) {
+		return NewError("Sign Marshal Signature Failed, Null"), ""
+	} //end if
+	//--
+	signedData, errWrSgn := signify.WriteData(comment + " # " + DateNowUtc(), bytSignature)
+	if(errWrSgn != nil) {
+		return errWrSgn, ""
+	} //end if
+	if(signedData == nil) {
+		return NewError("Sign Signature Failed, Null"), ""
+	} //end if
+	//--
+	if(isDetached == false) {
+		signedData = append(signedData, []byte(dataToSign)...)
+	} else {
+		signedData = BytTrimWhitespaces(signedData)
+	} //end if
+	//--
+	signedData = append(signedData, []byte("\n")...) // fix: add endline LF terminator to be compatible with OpenBSD's Signify
+	//--
+	dataToVfy := dataToSign
+	if(isDetached == false) {
+		dataToVfy = nil
+	} //end if
+	errVfy := SignifyVerify(pubkeyTxt, signedData, isDetached, dataToVfy)
+	if(errVfy != nil) {
+		return NewError("Sign Verification Failed: " + errVfy.Error()), ""
+	} //end if
+	//--
+	return nil, string(signedData)
 	//--
 } //END FUNCTION
 

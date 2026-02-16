@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / JWT :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251216.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -1084,6 +1084,123 @@ func AuthTokenJwtAlgoSet(jwtAlgo string) bool {
 	} //end if else
 	//--
 	return ok
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func JwtAudienceGetApiKeyVirtualAreaName(tkArea string) string {
+	//--
+	tkArea = smart.StrTrimWhitespaces(tkArea)
+	//--
+	if((tkArea == "") || (tkArea == smart.HTTP_AUTH_DEFAULT_AREA)) { // {{{SYNC-AUTH-JWT-DEFAULT-AREA}}}
+		tkArea = ""
+	} else if((smart.AuthIsValidExtArea(tkArea) != true) || (smart.StrContains(tkArea, ".") == true)) { // {{{SYNC-AUTH-JWT-DEFAULT-AREA}}}
+		tkArea = ""
+	} //end if
+	//--
+	return "APIKEY.VIRTUAL." + tkArea + ".-."
+	//--
+} //END FUNCTION
+
+
+func JwtAudienceXtrasExtractUserId(area string, key string, authData smart.AuthDataStruct) string {
+	//--
+	if((smart.StrTrimWhitespaces(area) == "") || (smart.StrTrimWhitespaces(area) == smart.HTTP_AUTH_DEFAULT_AREA)) { // {{{SYNC-AUTH-JWT-DEFAULT-AREA}}}
+		return ""
+	} //end if
+	if((smart.AuthIsValidExtArea(area) != true) || (smart.StrContains(area, ".") == true)) { // {{{SYNC-AUTH-JWT-DEFAULT-AREA}}}
+		return ""
+	} //end if
+	var tkArea string = JwtAudienceGetApiKeyVirtualAreaName(area)
+	if(smart.StrTrimWhitespaces(tkArea) == "") {
+		return ""
+	} //end if
+	if(authData.Area != tkArea) {
+		return ""
+	} //end if
+	//--
+	if(authData.Area == smart.HTTP_AUTH_DEFAULT_AREA) { // {{{SYNC-AUTH-JWT-DEFAULT-AREA}}}
+		return ""
+	} //end if
+	if(authData.OK != true) {
+		return ""
+	} //end if
+	if(authData.ErrMsg != "") {
+		return ""
+	} //end if
+	//--
+	if((authData.UserID == "") || (smart.AuthIsValidUserEmail(authData.UserID) != true)) {
+		return ""
+	} //end if
+	if((authData.UserName == "") || (smart.AuthIsValidUserEmail(authData.UserName) != true)) {
+		return ""
+	} //end if
+	if(authData.UserName != authData.UserID) {
+		return ""
+	} //end if
+	//--
+	key = smart.StrTrimWhitespaces(key)
+	if(key == "") {
+		return ""
+	} //end if
+	//--
+	jwtApiKeyVirtualExternal, errJwtApiKeyVirtualExternal := smart.AuthGetMetaData(authData, "jwt.auth.type")
+	if(errJwtApiKeyVirtualExternal != nil) {
+		return ""
+	} //end if
+	if(smart.StrTrimWhitespaces(jwtApiKeyVirtualExternal) == "") {
+		return ""
+	} //end if
+	if(jwtApiKeyVirtualExternal != smart.JWT_API_KEY_VIRTUAL_EXTERNAL) {
+		return ""
+	} //end if
+	//--
+	jwtAudienceA, errJwtAudienceA := smart.AuthGetMetaData(authData, "jwt.audience.a")
+	if(errJwtAudienceA != nil) {
+		return ""
+	} //end if
+	jwtAudienceA = smart.StrTrimWhitespaces(jwtAudienceA)
+	if((jwtAudienceA == "") || (jwtAudienceA != area)) {
+		return ""
+	} //end if
+	//--
+	jwtAudienceX, errJwtAudienceX := smart.AuthGetMetaData(authData, "jwt.audience.x")
+	if(errJwtAudienceX != nil) {
+		return ""
+	} //end if
+	jwtAudienceX = smart.StrTrimWhitespaces(jwtAudienceX)
+	if(jwtAudienceX == "") {
+		return ""
+	} //end if
+	//--
+	if(smart.StrContains(jwtAudienceX, `:{`) != true) {
+		return ""
+	} //end if
+	//--
+	arrJwtAudX := smart.ExplodeWithLimit(`:{`, jwtAudienceX, 2)
+	if(len(arrJwtAudX) != 2) {
+		return ""
+	} //end if
+	arrJwtAudX[1] = smart.StrTrimWhitespaces(arrJwtAudX[1])
+	if(arrJwtAudX[1] == "") {
+		return ""
+	} //end if
+	if(!smart.StrEndsWith(arrJwtAudX[1], `}`)) {
+		return ""
+	} //end if
+	//--
+	var userId string = smart.JsonGetValueByKeyPath(`{` + arrJwtAudX[1], key).String()
+	if(smart.StrTrimWhitespaces(userId) == "") {
+		return ""
+	} //end if
+	if(smart.AuthIsValidUserName(userId) != true) { // expects here a valid user ID and NOT Ext User ID ; sync with Sf.AuthUsers.Id
+		return ""
+	} //end if
+	//--
+	return smart.StrTrimWhitespaces(userId)
 	//--
 } //END FUNCTION
 

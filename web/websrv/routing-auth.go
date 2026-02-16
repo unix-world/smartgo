@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Auth :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251216.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -22,9 +22,19 @@ const (
 	DEBUG_AUTH bool = false // DO NOT SET this to TRUE in production environments ! it is meant just for development purposes
 )
 
+type authMetaNfo struct {
+	Auth2FAEnabled 			bool   `json:"auth2FAEnabled"`
+	AuthBasicEnabled 		bool   `json:"authBasicEnabled"`
+	AuthTokenEnabled 		bool   `json:"authTokenEnabled"`
+	AuthCookieEnabled 		bool   `json:"authCookieEnabled"`
+	AuthBearerEnabled 		bool   `json:"authBearerEnabled"`
+	AuthApiKeyEnabled 		bool   `json:"authApikeyEnabled"`
+	AuthSignedTokensDefAlgo string `json:"authSignedTokensDefAlgo,omitempty"`
+	AuthOpaqueTokensDefAlgo string `json:"authOpaqueTokensDefAlgo,omitempty"`
+}
 
 type authStatusNfo struct {
-	Authenticated 		bool   				`json:"authenticated"`
+	AuthOK 				bool   				`json:"authOK"`
 	AuthErrors 			string 				`json:"authErrors"`
 	AuthMethodID 		uint8  				`json:"authMethodId"`
 	AuthMethodName 		string 				`json:"authMethodName"`
@@ -44,28 +54,19 @@ type authStatusNfo struct {
 	AuthRestrictions 	string 				`json:"authRestrictions"`
 	AuthSecurityKeySize uint64 				`json:"authSecurityKeySize"`
 	AuthPrivateKeySize 	uint64 				`json:"authPrivateKeySize"`
-	AuthPublicKeySize 	uint64 				`json:"authPublicKeySize"`
 	AuthPublicKey 		string 				`json:"authPublicKey"`
+	AuthSignKeyCert 	string 				`json:"authSignKeyCert"`
+	AuthSignKeyPub 		string 				`json:"authSignKeyPub"`
+	AuthSignKeyPrivSize uint64 				`json:"authSignKeyPrivSize"`
 	AuthQuota 			int64 				`json:"authQuota"`
 	AuthMetaData 		map[string]string 	`json:"authMetaData"`
-	AuthJwtToken        *JwtTokenData 		`json:"authJwtToken,omitempty"`
-}
-
-type authMetaNfo struct {
-	Auth2FAEnabled 			bool   `json:"auth2FAEnabled"`
-	AuthBasicEnabled 		bool   `json:"authBasicEnabled"`
-	AuthTokenEnabled 		bool   `json:"authTokenEnabled"`
-	AuthCookieEnabled 		bool   `json:"authCookieEnabled"`
-	AuthBearerEnabled 		bool   `json:"authBearerEnabled"`
-	AuthApiKeyEnabled 		bool   `json:"authApikeyEnabled"`
-	AuthSignedTokensDefAlgo string `json:"authSignedTokensDefAlgo,omitempty"`
-	AuthOpaqueTokensDefAlgo string `json:"authOpaqueTokensDefAlgo,omitempty"`
 }
 
 type authNfo struct {
-	Status    *authStatusNfo 		`json:"status,omitempty"`
-	MetaInfo  *authMetaNfo 			`json:"metaInfo,omitempty"`
-	DebugData *smart.AuthDataStruct `json:"debugData,omitempty"`
+	AuthInfo 			*authStatusNfo 			`json:"authInfo,omitempty"`
+	AuthJwtTokenInfo 	*JwtTokenData 			`json:"authJwtTokenInfo,omitempty"`
+	MetaInfo 			*authMetaNfo 			`json:"metaInfo,omitempty"`
+	DebugData 			*smart.AuthDataStruct 	`json:"debugData,omitempty"`
 }
 
 
@@ -189,8 +190,8 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				AuthSignedTokensDefAlgo: 	tkTyp,
 				AuthOpaqueTokensDefAlgo: 	tkOpqTyp,
 			}
-			status := authStatusNfo{
-				Authenticated: authData.OK,
+			authInfo := authStatusNfo{
+				AuthOK: authData.OK,
 				AuthErrors: authData.ErrMsg,
 				AuthMethodID: authData.Method,
 				AuthMethodName: "Auth:" + smart.AuthMethodGetNameById(authData.Method),
@@ -210,14 +211,16 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				AuthRestrictions: authData.Restrictions,
 				AuthSecurityKeySize: uint64(len(authData.SecurityKey)),
 				AuthPrivateKeySize: uint64(len(authData.PrivKey)),
-				AuthPublicKeySize: uint64(len(authData.PubKey)),
 				AuthPublicKey: authData.PubKey,
+				AuthSignKeyCert: authData.SignKeyCert,
+				AuthSignKeyPub: authData.SignKeyPub,
+				AuthSignKeyPrivSize: uint64(len(authData.SignKeyPriv)),
 				AuthQuota: authData.Quota,
 				AuthMetaData: safeMetaData,
-				AuthJwtToken: jwtInfo,
 			}
 			nfo := authNfo {
-				Status: &status,
+				AuthInfo: &authInfo,
+				AuthJwtTokenInfo: jwtInfo,
 				MetaInfo: &metaInfo,
 			}
 			if(DEBUG_AUTH) {
@@ -233,7 +236,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				var title = "Auth Info"
 				var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n"
 				var bodyHtml string = "<h1>" + smart.EscapeHtml(title) + "</h1>" + "\n"
-				bodyHtml += `<div class="operation_hint">API access point &nbsp;<i class="sfi sfi-lock sfi-xl" title="Requires Authentication" style="cursor:help;"></i> [Accept: ` + smart.EscapeHtml(smarthttputils.MIME_TYPE_JSON) + `]: <i>` + smart.EscapeHtml("`" + bwPath + "`") + `</i></div>` + "\n"
+				bodyHtml += `<div class="operation_hint">API access point &nbsp;<i class="sfi sfi-lock-alt" title="Requires Authentication" style="cursor:help;"></i> [Accept: ` + smart.EscapeHtml(smarthttputils.MIME_TYPE_JSON) + `]: <i>` + smart.EscapeHtml("`" + bwPath + "`") + `</i></div>` + "\n"
 				bodyHtml += smart.RenderMarkersTpl(assets.ReadWebAsset("lib/tpl/syntax-highlight-init.inc.mtpl.htm"), map[string]string{
 					"THEME": "", // ``, `dark`, `light`
 					"AREAS": "body",
@@ -348,12 +351,12 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			bodyHtml += `<hr>` + "\n"
 			bodyHtml += `<h5>2FA Setup QRCode to use with <i style="color:#ED2839;">FreeOTP App</i> or similar 2FA authenticator apps:</h5><img class="svg" src="` + smart.EscapeHtml(smart.DATA_URL_SVG_IMAGE_PREFIX + smart.EscapeUrl(svgQR.Svg)) + `" title="` + smart.EscapeHtml(qrUrl) + `">` + "\n"
 			bodyHtml += `<br>` + "\n"
-			bodyHtml += `<button class="ux-button ux-button-primary" onclick="self.location = self.location; return false;"><i class="sfi sfi-lg sfi-spinner9"></i>&nbsp; Generate New 2FA TOTP Secret</button>`
+			bodyHtml += `<button class="ux-button ux-button-primary" onclick="self.location = self.location; return false;"><i class="sfi sfi-lg sfi-clock"></i>&nbsp; Generate New 2FA TOTP Secret</button>`
 			bodyHtml += `<hr>` + "\n"
 			bodyHtml += `<textarea id="area-secret" class="ux-field" style="width:320px; height:25px; font-size:0.625rem !important; color:#CDCDCD !important;" readonly>` + smart.EscapeHtml(rndSecret) + `</textarea>` + "\n"
 			bodyHtml += `<br>` + "\n"
 			bodyHtml += `<script>const copyElemToClipboard = () => { const err = smartJ$Browser.copyToClipboard('area-secret'); const txt = 'Copy to Clipboard'; const img = '<br><i class="sfi sfi-clipboard"></i>'; if(!!err) { console.error('ERR: copyElemToClipboard:', err); smartJ$Browser.GrowlNotificationAdd(txt, 'FAILED to Copy the Secret to Clipboard' + img, null, 3500, false, 'pink'); } else { smartJ$Browser.GrowlNotificationAdd(txt, 'Secret has been Copied to Clipboard' + img, null, 1500, false, 'blue'); } };</script>` + "\n"
-			bodyHtml += `<button class="ux-button ux-button-small ux-button-details" onclick="copyElemToClipboard(); return false;"><i class="sfi sfi-stack"></i>&nbsp; Copy Secret to Clipboard</button>` + `&nbsp; <span style="color:#685A8B;">[&nbsp;username:&nbsp;` + "`<b>" + smart.EscapeHtml(authData.UserName) + "</b>`" + `&nbsp;]</span>` + "\n"
+			bodyHtml += `<button class="ux-button ux-button-small ux-button-details" onclick="copyElemToClipboard(); return false;"><i class="sfi sfi-copy"></i>&nbsp; Copy Secret to Clipboard</button>` + `&nbsp; <span style="color:#685A8B;">[&nbsp;username:&nbsp;` + "`<b>" + smart.EscapeHtml(authData.UserName) + "</b>`" + `&nbsp;]</span>` + "\n"
 			bodyHtml += `<br>` + "\n"
 			response.ContentBody = srvassets.HtmlServerFaviconTemplate(title, headHtml, bodyHtml, true, assets.GetAuthLogo(false)) // load js
 			response.StatusCode = 200
@@ -488,7 +491,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n"
 				var bodyHtml string = "<h1>" + smart.EscapeHtml(title) + "</h1>" + "\n"
 				bodyHtml += `<hr>` + "\n"
-				bodyHtml += `<div class="operation_hint">API access point &nbsp;<i class="sfi sfi-lock sfi-xl" title="Requires Authentication" style="cursor:help;"></i> [Accept: ` + smart.EscapeHtml(smarthttputils.MIME_TYPE_JSON) + `]: <i>` + smart.EscapeHtml("`" + bwPath + "`") + `</i> ; Query Parameters: (<i>?expMinutes=` + smart.ConvertInt64ToStr(JwtMinExpirationMinutes) + `..` + smart.ConvertInt64ToStr(JwtMaxExpirationMinutes) + `</i>)</div>` + "\n"
+				bodyHtml += `<div class="operation_hint">API access point &nbsp;<i class="sfi sfi-lock-alt" title="Requires Authentication" style="cursor:help;"></i> [Accept: ` + smart.EscapeHtml(smarthttputils.MIME_TYPE_JSON) + `]: <i>` + smart.EscapeHtml("`" + bwPath + "`") + `</i> ; Query Parameters: (<i>?expMinutes=` + smart.ConvertInt64ToStr(JwtMinExpirationMinutes) + `..` + smart.ConvertInt64ToStr(JwtMaxExpirationMinutes) + `</i>)</div>` + "\n"
 				bodyHtml += smart.RenderMarkersTpl(assets.ReadWebAsset("lib/tpl/syntax-highlight-init.inc.mtpl.htm"), map[string]string{
 					"THEME": "", // ``, `dark`, `light`
 					"AREAS": "body",
@@ -501,12 +504,12 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				bodyHtml += `<br>` + "\n"
 				bodyHtml += `<b>LifeTime&nbsp;(minutes):</b>&nbsp;<input type="number" placeholder="1234" id="mins" maxlength="6" title="Min: ` + smart.EscapeHtml(smart.ConvertInt64ToStr(JwtMinExpirationMinutes)) + ` ; Max: ` + smart.EscapeHtml(smart.ConvertInt64ToStr(JwtMaxExpirationMinutes)) + ` ; Default: ` + smart.EscapeHtml(smart.ConvertInt64ToStr(JwtDefaultExpirationMinutes)) + ` " class="ux-field" value="` + smart.ConvertInt64ToStr(expMinutes) + `" min="` + smart.ConvertInt64ToStr(JwtMinExpirationMinutes) + `" max="` + smart.ConvertInt64ToStr(JwtMaxExpirationMinutes) + `" autocomplete="off" style="width:100px; text-align:center;">` + "\n"
 				bodyHtml += `<b>IPAddresses&nbsp;(Ipv4/Ipv6):</b>&nbsp;<input type="text" id="ip" maxlength="255" placeholder="127.0.0.1, ::1" title="IP List separed by comma, or wildcard * for any IP" class="ux-field" value="` + ipAddress + `" autocomplete="off" style="width:200px; text-align:center;">` + "\n"
-				bodyHtml += `<button class="ux-button ux-button-regular" onclick="let mins = smartJ$Utils.format_number_int(jQuery('input#mins').val(), false); if((!mins) || (!smartJ$Utils.isFiniteNumber(mins)) || (mins <= 0)) { smartJ$Browser.GrowlNotificationAdd('Error', '&lt;h5&gt;Invalid or Non-Numeric Expression&lt;/h5&gt;', '', 3500, false, 'pink'); } else { let ipAddr = jQuery('input#ip').val(); setTimeout(() => { self.location = '` + smart.EscapeJs(bwPath) + `?expMinutes=' + smartJ$Utils.escape_url(mins) + '&ipAddress=' + smartJ$Utils.escape_url(ipAddr); }, 50); }"><i class="sfi sfi-lg sfi-spinner10"></i>&nbsp; Generate New JWT Access Token</button>` + "\n"
+				bodyHtml += `<button class="ux-button ux-button-regular" onclick="let mins = smartJ$Utils.format_number_int(jQuery('input#mins').val(), false); if((!mins) || (!smartJ$Utils.isFiniteNumber(mins)) || (mins <= 0)) { smartJ$Browser.GrowlNotificationAdd('Error', '&lt;h5&gt;Invalid or Non-Numeric Expression&lt;/h5&gt;', '', 3500, false, 'pink'); } else { let ipAddr = jQuery('input#ip').val(); setTimeout(() => { self.location = '` + smart.EscapeJs(bwPath) + `?expMinutes=' + smartJ$Utils.escape_url(mins) + '&ipAddress=' + smartJ$Utils.escape_url(ipAddr); }, 50); }"><i class="sfi sfi-lg sfi-key"></i>&nbsp; Generate New JWT Access Token</button>` + "\n"
 				bodyHtml += `<hr>` + "\n"
 				bodyHtml += `<textarea id="area-secret" class="ux-field" style="min-width:700px; width:100%; height:50px; font-size:0.625rem !important; color:#CDCDCD !important;" readonly>` + smart.EscapeHtml(data.Token) + `</textarea>` + "\n"
 				bodyHtml += `<br>` + "\n"
 				bodyHtml += `<script>const copyElemToClipboard = () => { const err = smartJ$Browser.copyToClipboard('area-secret'); const txt = 'Copy to Clipboard'; const img = '<br><i class="sfi sfi-clipboard"></i>'; if(!!err) { console.error('ERR: copyElemToClipboard:', err); smartJ$Browser.GrowlNotificationAdd(txt, 'FAILED to Copy the Secret to Clipboard' + img, null, 3500, false, 'pink'); } else { smartJ$Browser.GrowlNotificationAdd(txt, 'Secret has been Copied to Clipboard' + img, null, 1500, false, 'blue'); } };</script>` + "\n"
-				bodyHtml += `<button class="ux-button ux-button-small ux-button-details" onclick="copyElemToClipboard(); return false;"><i class="sfi sfi-stack"></i>&nbsp; Copy Secret to Clipboard</button>` + `&nbsp; <span style="color:#685A8B;">[&nbsp;username:&nbsp;` + "`<b>" + smart.EscapeHtml(authData.UserName) + "</b>`" + `&nbsp;]</span>` + "\n"
+				bodyHtml += `<button class="ux-button ux-button-small ux-button-details" onclick="copyElemToClipboard(); return false;"><i class="sfi sfi-copy"></i>&nbsp; Copy Secret to Clipboard</button>` + `&nbsp; <span style="color:#685A8B;">[&nbsp;username:&nbsp;` + "`<b>" + smart.EscapeHtml(authData.UserName) + "</b>`" + `&nbsp;]</span>` + "\n"
 				bodyHtml += `<br>` + "\n"
 				response.ContentBody = srvassets.HtmlServerFaviconTemplate(title, headHtml, bodyHtml, true, assets.GetAuthLogo(false)) // load js
 				response.ContentFileName = "auth.html"

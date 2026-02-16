@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251216.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -31,7 +31,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20251216.2358"
+	VERSION string = "r.20260216.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -90,7 +90,8 @@ type smartRoute struct {
 	FxHandler  		HttpHandlerFunc 	// see UrlHandlerRegisterRoute()
 }
 var allowedMethods []string = []string{ "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE" } // OPTIONS is always available thus must not be includded here
-var urlHandlersMap = map[string]smartRoute{}
+var urlNamedRoutesMap map[string]string = map[string]string{}
+var urlHandlersMap map[string]smartRoute = map[string]smartRoute{}
 var handlersWriteMutex sync.Mutex
 var handlersAreLocked bool = false // after server boot process no more handlers are allowed to be registered, by setting this flag to TRUE
 const msgErrHandlersLocked string = "Web Server Handlers are Locked after starting the server. Operation Disallowed."

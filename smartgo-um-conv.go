@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260116.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 // [ UM / CONV ]
 
 // REQUIRE: go 1.19 or later
@@ -14,6 +14,39 @@ import (
 const (
 	SIZE_BYTES_16M uint64 = 16777216 // Reference Unit
 )
+
+
+//-----
+
+
+func ParseHexColor(hexClr string) (error, [3]int) {
+	//--
+	var r int = 0;
+	var g int = 0;
+	var b int = 0;
+	//--
+	var clr [3]int = [3]int{r, g, b}
+	//--
+	if(hexClr == "") {
+		return NewError("Invalid Hex Color, empty"), clr
+	} //end if
+	if(len(hexClr) != 7) {
+		return NewError("Invalid Hex Color, length must be 7"), clr
+	} //end if
+	if(!StrStartsWith(hexClr, "#")) {
+		return NewError("Invalid Hex Color, must start with #"), clr
+	} //end if
+	//--
+	_, err := fmt.Sscanf(StrToUpper(hexClr), "#%02x%02x%02x", &r, &g, &b)
+	if(err != nil) {
+		return NewError("Parse Hex Color failed: " + err.Error()), clr
+	} //end if
+	//--
+	clr = [3]int{r, g, b}
+	//--
+	return nil, clr
+	//--
+} //END FUNCTION
 
 
 //-----

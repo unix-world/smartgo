@@ -1,0 +1,6 @@
+github.com/juliankoehn/barcode @head.20260202
+
+go 1.13
+
+//subset, modified by unixman: 20260203.2358
+

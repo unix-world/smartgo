@@ -2,8 +2,8 @@ package qrsvg
 
 // based on: github.com/wamuir/svg-qr-code ; go 1.16 @ License: MIT # v.20231205
 
-// QrSVG for GO # r.20241124.2358
-// (c) 2023-2024 unix-world.org
+// QrSVG for GO # r.20260202.2358
+// (c) 2023-present unix-world.org
 // License: BSD
 // custom modifications by unixman:
 // 	* implement ellipse
@@ -80,6 +80,14 @@ func (q *QR) generateSVG(transparentBgColor string) *SVG {
 	q.qrcode.DisableBorder = true
 	var i image.Image = q.qrcode.Image(0)
 	var w int = i.Bounds().Max.X
+	var h int = i.Bounds().Max.Y
+
+	if((w <= 0) || (h <= 0)) {
+		return nil // invalid dimensions
+	}
+	if(w != h) {
+		return nil // uneven dimensions
+	}
 
 	var svg SVG
 	svg.NS = "http://www.w3.org/2000/svg"
@@ -103,9 +111,11 @@ func (q *QR) generateSVG(transparentBgColor string) *SVG {
 	}
 
 	svg.RBlocks = append(svg.RBlocks, RBlock{0, 0, int(svg.Width), int(svg.Height), bgColor})
+	var idx int = 0
 	for x := 0; x < w; x++ {
-		for y := 0; y < w; y++ {
+		for y := 0; y < h; y++ {
 			theFill := hex(i.At(x, y))
+		//	fmt.Println(idx, w, h, theFill)
 			if(transparentBgColor != "") {
 				if(strings.ToUpper(theFill) == transparentBgColor) { // {{{QR-SVG-SYNC-COLOR-NONE}}}
 					theFill = "none"
@@ -128,6 +138,7 @@ func (q *QR) generateSVG(transparentBgColor string) *SVG {
 					Fill:   theFill,
 				})
 			}
+			idx++
 		}
 	}
 
@@ -238,7 +249,13 @@ func New(s string, level string, fgColor string, bgColor string, useDots bool, b
 	}
 
 	q := QR{s, blockSize, borderWidth, code.BackgroundColor, useDots, "", code}
-	q.Svg = q.generateSVG(transparentBgColor).getAsString()
+	//-- fix by unixman
+	theSvg := q.generateSVG(transparentBgColor)
+	if(theSvg == nil) {
+		return qerr, errors.New("SVG is Null")
+	}
+	//-- #
+	q.Svg = theSvg.getAsString()
 
 	return q, nil
 }

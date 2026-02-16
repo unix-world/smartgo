@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260116.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 // [ NUMBERS ]
 
 // REQUIRE: go 1.19 or later
@@ -23,7 +23,9 @@ const (
 )
 
 
-//----- IMPORTANT: never use string(number) ... it will lead to strange situations ... use the convert methods from below
+//----- IMPORTANT:
+// never use string(number) ... it will lead to strange situations ... use the convert methods from below
+// cast to float types before divisions or complicated calculations between numbers ... strange results may happen if not !
 
 
 func IsInteger(s string, allowNegatives bool) bool {
@@ -272,6 +274,25 @@ func ParseStrAsUInt64(s string) uint64 {
 	} //end if else
 	//--
 	return num
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func Float64ToFixedDecimals(num float64, precision int) float64 { // converts a float64 number to fixed decimals
+	//--
+	if(precision < 0) {
+		return 0
+	} //end if
+	//--
+	output := math.Pow(10, float64(precision))
+	if(output <= 0) {
+		return 0 // safety check: avoid below division by zero
+	} //end if
+	//--
+	return float64(int(num * output + math.Copysign(0.5, num * output))) / output
 	//--
 } //END FUNCTION
 

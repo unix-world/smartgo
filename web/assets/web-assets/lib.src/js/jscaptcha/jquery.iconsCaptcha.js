@@ -2,7 +2,7 @@
 // Icons Captcha: v1.0
 // (c) 2021-present unix-world.org
 // License: BSD
-// r.20250214
+// r.20260128
 // jquery.iconsCaptcha.js
 
 jQuery.fn.iconsCaptcha || (($) => {

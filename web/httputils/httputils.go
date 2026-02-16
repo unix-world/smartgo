@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251216.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -41,7 +41,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20251216.2358"
+	VERSION string = "r.20260216.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -3259,13 +3259,8 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 				err = "Auth.Default: [Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Token Hash"
 			} //end if else
 		} else if(httpAuthMode == smart.HTTP_AUTH_MODE_BASIC) { // basic auth only, no 2FA (2FA req. custom implementation)
-
-
 			if((smart.StrTrimWhitespaces(user) != "") && (smart.StrTrimWhitespaces(pass) != "")) {
-
 				if((smart.StrTrimWhitespaces(user) != "") && (smart.StrContains(user, "#") != false) && (smart.StrTrimWhitespaces(pass) != "")) { // Auth Basic.Token
-
-
 					var tokenBasicAuthOk bool = false
 					tkUserName, tokenHash, errTokenSepare := smart.AuthUserTokenBasicSepareParts(user, pass)
 					if(tkUserName != "") {
@@ -3274,19 +3269,14 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 					if(errTokenSepare != nil) { // expects: username=user#token ; pass=Token-Hash
 						err = "Auth.Default: [Basic.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: " + errTokenSepare.Error()
 					} else if((smart.StrTrimWhitespaces(tkUserName) != "") && (smart.AuthIsValidUserName(tkUserName) == true) && (smart.StrTrimWhitespaces(tokenHash) != "")) {
-
 						tokenBasicAuthOk, aData = smart.AuthUserTokenDefaultCheck(authRealm, tkUserName, tokenHash, httpAuthMode, authUsername, authToken, "", "", smart.HTTP_AUTH_DEFAULT_PRIV, smart.HTTP_AUTH_DEFAULT_RESTR, smart.AuthGetUserDefaultPrivKey(tkUserName), "", smart.AuthGetUserDefaultSecurityKey(tkUserName), 0, nil) // only opaque tokens are supported with the auth basic mode
 						if(tokenBasicAuthOk != true) { // default check: user, pass, requiredUsername, requiredPassword
 							aData.OK = false // make sure to set to false, it was not OK
 							err = "Auth.Default: [Basic.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: no match or invalid"
 						} //end if
-
-
 					} else {
 						err = "Auth.Default: [Basic.Token:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Token Hash"
 					} //end if else
-
-
 				} else if((smart.StrTrimWhitespaces(user) != "") && (smart.AuthIsValidUserName(user) == true) && (smart.StrTrimWhitespaces(pass) != "")) { // Auth Basic
 					if(smart.Auth2FACookieIsEnabled() != true) {
 						var authBasicOk bool = false
@@ -3301,12 +3291,9 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 				} else {
 					err = "Auth.Default: [Basic/Basic.Token:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Password"
 				} //end if else
-
 			} else {
 				err = "Auth.Default: [Basic:User/Pass:" + smart.ConvertUInt8ToStr(httpAuthMode) + "] Failed: Empty or Invalid UserName / Password"
 			} //end if else
-
-
 		} else { // except HTTP_AUTH_MODE_BASIC without 2FA, supported as default implementation, other modes (incl. 2FA) requires custom implementation, via custom auth provider, see above: customAuthCheck
 			err = "Auth Mode NOT Supported: [" + smart.ConvertUInt8ToStr(httpAuthMode) + "] / [Auth:" + smart.AuthMethodGetNameById(httpAuthMode) + "]"
 		} //end if else
@@ -3551,8 +3538,7 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		//-------------- specials
-		case "asc": fallthrough
-		case "sig":
+		case "asc":
 			mimeType = MIME_TYPE_SIG_GPG
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
@@ -3613,6 +3599,8 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 		case "md": fallthrough // markdown
 		case "markdown": fallthrough // markdown
 		case "pem": fallthrough // PEM Certificate File
+		case "sig": fallthrough // Signature (ex: signify signature)
+		case "pub": fallthrough // Public Key (ex: signify public key)
 		case "crl": fallthrough // Certificate Revocation List
 		case "crt": fallthrough // Certificate File
 		case "cer": fallthrough // Certificate File

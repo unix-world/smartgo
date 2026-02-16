@@ -2,7 +2,7 @@
 // [@[#[!NO-STRIP!]#]@]
 // Default Settings for Smart.Framework JS
 // smart-framework-settings.js
-// v.20251216
+// v.20260128
 
 const smartJ$Options = {
 	BrowserTest: {

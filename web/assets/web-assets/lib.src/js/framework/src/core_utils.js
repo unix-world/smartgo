@@ -19,7 +19,7 @@
  * @author unix-world.org
  * @license BSD
  * @file core_utils.js
- * @version 20251216
+ * @version 20260128
  * @class smartJ$Utils
  * @static
  * @frozen

@@ -2,7 +2,7 @@
 
 /*
 License: BSD
-	extended by unixman (stable.20250726), (c) 2015-present unix-world.org
+	extended by unixman (stable.20260208), (c) 2015-present unix-world.org
 	based on Pure.css v.1.0 :: https://github.com/pure-css/pure # (c) 2013 Yahoo! Inc.
 	based on w3.css :: https://www.w3schools.com/w3css/4/w3.css # (c) 2021 w3schools.com
 */
@@ -206,7 +206,7 @@ License: BSD
 
 }
 
-@media (hover: none), all and (max-width:767px) { /* touchscreens or screens with a width lower than 768px */
+@media (hover: none), all and (max-width:991px) { /* touchscreens or screens with a width lower than 992px */
 
 	/* Responsive Simple Navs (by Unixman) */
 
@@ -249,8 +249,11 @@ License: BSD
 		margin-left: calc(100vw - 88px) !important;
 		margin-top: -7px !important;
 	}
-	nav.ux-navy > ul li dfn {
+	nav.ux-navy > ul li dfn,
+	nav.ux-navy > ul li var {
 		display: inline-block !important;
+		padding-left: 20px;
+		padding-right: 20px;
 	}
 	nav.ux-navy > ul li .icon {
 		margin-right: 0 !important;

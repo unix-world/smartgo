@@ -1,0 +1,15 @@
+
+https://iconly.io
+Project sf-icons:
+	* Class Prefix: 	sfi
+	* Font Name: 		sf-icons
+	* Font Height: 		1024
+	* Font Descent: 	 128
+
+
+https://icomoon.io
+Font Metrics:
+	* Em Square Height: 		1024
+	* Baseline Height (% Em): 	16
+	* Whitespace Width (% Em): 	64 (previous was 50)
+

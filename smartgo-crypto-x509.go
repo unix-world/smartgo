@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260116.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 // [ CRYPTO / X509 ]
 
 // REQUIRE: go 1.22 or later
@@ -42,19 +42,33 @@ var (
 )
 
 const (
-	PureEd25519 		= x509.PureEd25519
+	X509PemCertificateStartTag   = "-----BEGIN CERTIFICATE-----"
+	X509PemCertificateEndTag     = "-----END CERTIFICATE-----"
 
-	ECDSAWithSHA512 	= x509.ECDSAWithSHA512
-	ECDSAWithSHA384 	= x509.ECDSAWithSHA384
-	ECDSAWithSHA256 	= x509.ECDSAWithSHA256
+	X509PemPrivateKeyEncStartTag = "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+	X509PemPrivateKeyEncEndTag   = "-----END ENCRYPTED PRIVATE KEY-----"
 
-	SHA512WithRSAPSS 	= x509.SHA512WithRSAPSS
-	SHA384WithRSAPSS 	= x509.SHA384WithRSAPSS
-	SHA256WithRSAPSS 	= x509.SHA256WithRSAPSS
+	X509PemPrivateKeyStartTag    = "-----BEGIN PRIVATE KEY-----"
+	X509PemPrivateKeyEndTag      = "-----END PRIVATE KEY-----"
 
-	SHA512WithRSA 		= x509.SHA512WithRSA
-	SHA384WithRSA 		= x509.SHA384WithRSA
-	SHA256WithRSA 		= x509.SHA256WithRSA
+	X509PemPublicKeyStartTag     = "-----BEGIN PUBLIC KEY-----"
+	X509PemPublicKeyEndTag       = "-----END PUBLIC KEY-----"
+)
+
+const (
+	X509PureEd25519 		= x509.PureEd25519
+
+	X509EcdsaWithSha512 	= x509.ECDSAWithSHA512
+	X509EcdsaWithSha384 	= x509.ECDSAWithSHA384
+	X509EcdsaWithSha256 	= x509.ECDSAWithSHA256
+
+	X509Sha512WithRsaPss 	= x509.SHA512WithRSAPSS
+	X509Sha384WithRsaPss 	= x509.SHA384WithRSAPSS
+	X509Sha256WithRsaPss 	= x509.SHA256WithRSAPSS
+
+	X509Sha512WithRsa 		= x509.SHA512WithRSA
+	X509Sha384WithRsa 		= x509.SHA384WithRSA
+	X509Sha256WithRsa 		= x509.SHA256WithRSA
 )
 
 
@@ -64,7 +78,7 @@ type CertX509KeyPair struct {
 	PemPublicKey   string
 }
 
-type CertInfo struct {
+type CertX509Info struct {
 	Validity 		uint8
 	CommonName 		string
 
@@ -82,7 +96,7 @@ type CertInfo struct {
 	Password 		[]byte // optional
 }
 
-type SignDefinition struct { // this is compatible with ASN1, but can be used without ASN1 if R is not used ...
+type SignX509Definition struct { // this is compatible with ASN1, but can be used without ASN1 if R is not used ...
 	R *big.Int
 	S *big.Int
 }
@@ -208,10 +222,10 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 		return NewError("Failed to parse PEM PublicKey, is Null")
 	} //end if
 	//--
-	sig := SignDefinition{} // Init the signature struct with R and S components
+	sig := SignX509Definition{} // Init the signature struct with R and S components
 	if(useASN1) {
 		//--
-		_, errAsn1 := asn1.Unmarshal([]byte(signature), &sig)
+		_, errAsn1 := asn1.Unmarshal(signature, &sig)
 		if(errAsn1 != nil) {
 			return NewError("ASN1 Unmarshal Failed: " + errAsn1.Error())
 		} //end if
@@ -271,7 +285,7 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 				if(len(bSig) < reqLen) {
 					bSig = padX509Signature(bSig, reqLen) // fix for crypto/ed25519: verification error when leading zeroes are gone due conversions from byte[] to biging on signing
 				} //end if
-			} else { // bug fix, if signature is not ASN1 use it as this because some signature fails with sig SignDefinition algo
+			} else { // bug fix, if signature is not ASN1 use it as this because some signature fails with sig SignX509Definition algo
 				bSig = signature
 			} //end if else
 			//--
@@ -333,7 +347,7 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 				if(len(bSig) < reqLen) {
 					bSig = padX509Signature(bSig, reqLen) // fix for crypto/rsa: verification error when leading zeroes are gone due conversions from byte[] to biging on signing
 				} //end if
-			} else { // bug fix, if signature is not ASN1 use it as this because some signature fails with sig SignDefinition algo
+			} else { // bug fix, if signature is not ASN1 use it as this because some signature fails with sig SignX509Definition algo
 				bSig = signature
 			} //end if else
 			//--
@@ -426,7 +440,7 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 	} //end if
 	//--
 	var bSig []byte = nil
-	sig := SignDefinition{} // Init the signature struct with R and S components
+	sig := SignX509Definition{} // Init the signature struct with R and S components
 	var ok bool = false
 	switch(mode) { // {{{SYNC-GO-X509-SIGN-VERIFY-MODES}}}
 		case "EdDSA": // PureEd25519
@@ -1035,7 +1049,7 @@ func DecryptPrivateKeyPEM(pemPrivKey string, password string) (error, string) {
 } //END FUNCTION
 
 
-func GenerateX509CertificateWithCA(certCaInfo CertInfo, certCliInfo CertInfo, sigAlg x509.SignatureAlgorithm) (CertX509KeyPair, CertX509KeyPair, error) {
+func GenerateX509CertificateWithCA(certCaInfo CertX509Info, certCliInfo CertX509Info, sigAlg x509.SignatureAlgorithm) (CertX509KeyPair, CertX509KeyPair, error) {
 	//--
 	defer PanicHandler()
 	//--
@@ -1054,7 +1068,7 @@ func GenerateX509CertificateWithCA(certCaInfo CertInfo, certCliInfo CertInfo, si
 } //END FUNCTION
 
 
-func GenerateX509Certificate(certInfo CertInfo, sigAlg x509.SignatureAlgorithm, isCA bool, caPwd string, issuer *CertX509KeyPair) (*CertX509KeyPair, error) {
+func GenerateX509Certificate(certInfo CertX509Info, sigAlg x509.SignatureAlgorithm, isCA bool, caPwd string, issuer *CertX509KeyPair) (*CertX509KeyPair, error) {
 	//--
 	defer PanicHandler()
 	//--

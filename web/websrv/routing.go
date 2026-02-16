@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251216.2358 :: STABLE
+// r.20260216.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -12,6 +12,51 @@ import (
 
 	smart "github.com/unix-world/smartgo"
 )
+
+
+type GetParam struct {
+	Optional bool   `json:"optional,omitempty"`
+	Value    string `json:"value"`
+}
+
+type PostParam struct {
+	Optional bool   `json:"optional,omitempty"`
+	Type     string `json:"type"` // "var" | "file"
+	Value    string `json:"value"`
+}
+
+type ApiRouteType = struct {
+	Method 		string               `json:"method"`
+	Output 		string               `json:"output"`
+	UrlParams 	map[string]GetParam  `json:"urlParams,omitempty"`
+	PostParams 	map[string]PostParam `json:"postParams,omitempty"`
+}
+
+
+func GetNamedRoutes() map[string]string {
+	//--
+	if(urlNamedRoutesMap == nil) {
+		return map[string]string{}
+	} //end if
+	//--
+	return urlNamedRoutesMap
+	//--
+} //END FUNCTION
+
+
+func UrlHandlerRegisterNamedRoute(name string, route string) bool {
+	//--
+	var isOK bool = false
+	//--
+	name = smart.StrTrimWhitespaces(name)
+	if(name != "") {
+		urlNamedRoutesMap[route] = name // use the URL as key to avoid duplicates
+		isOK = true
+	} //end if
+	//--
+	return isOK
+	//--
+} //END FUNCTION
 
 
 func UrlHandlerRegisterRoute(route string, skipAuth bool, methods []string, maxTailSegments int, fxHandler HttpHandlerFunc) bool {

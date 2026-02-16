@@ -33,7 +33,7 @@
  * @author unix-world.org
  * @license BSD
  * @file browser_utils.js
- * @version 20251216
+ * @version 20260128
  * @class smartJ$Browser
  * @static
  * @frozen

@@ -1,3 +1,3 @@
-// JS-Script (UM): settings-jquery.js @ 2025-12-16 17:19:16 +0200
+// JS-Script (UM): settings-jquery.js @ 2026-02-09 02:29:19 +0000
 jQuery.ajaxSetup({timeout:0,cache:false});
 // #END

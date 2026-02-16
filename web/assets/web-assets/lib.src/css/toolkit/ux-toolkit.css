@@ -2,7 +2,7 @@
 
 /*
 License: BSD
-	extended by unixman, (stable.20250726), (c) 2015-present unix-world.org
+	extended by unixman, (stable.20260208), (c) 2015-present unix-world.org
 	based on Pure.css v.1.0 :: https://github.com/pure-css/pure # (c) 2013 Yahoo! Inc.
 	based on w3.css :: https://www.w3schools.com/w3css/4/w3.css # (c) 2021 w3schools.com
 */
@@ -343,17 +343,20 @@ a.ux-link:hover {
 
 /*** Buttons :: modified ***/
 
+.ux-button,
+.ux-button *:not(.sfi) {
+	font-size: 0.9375rem !important; /* 15px */
+	line-height: normal !important;
+}
 .ux-button {
 	/* Structure */
+	font-family: inherit !important;
+	font-weight: bold !important;
 	display: inline-block; /* do not mark as important as it can't hide using jquery hide() */
 	overflow: hidden;
-	line-height: normal !important;
 	white-space: nowrap !important;
 	vertical-align: middle !important;
 	text-align: center !important;
-	font-family: inherit !important;
-	font-size: 0.9375rem !important; /* 15px */
-	font-weight: bold !important;
 	text-decoration: none !important;
 	cursor: pointer !important;
 	padding: 7px 15px 7px 15px !important;
@@ -519,57 +522,49 @@ a.ux-link:hover {
 .ux-button-xsmall {
 	padding: 5px 8px 5px 8px !important;
 }
-.ux-button-xsmall, .ux-button-xsmall * {
+.ux-button-xsmall,
+.ux-button-xsmall *:not(.sfi) {
 	font-size: 0.75rem !important; /* 11px */
 	line-height: 0.75rem !important; /* 11px */
-}
-.ux-button-xsmall .sfi {
-	font-size: 0.875rem !important; /* 13px */
 }
 
 .ux-button-small {
 	padding: 7px 12px 7px 12px !important;
 }
-.ux-button-small, .ux-button-small * {
+.ux-button-small,
+.ux-button-small *:not(.sfi) {
 	font-size: 0.875rem !important; /* 14px */
 	line-height: 0.875rem !important; /* 14px */
 }
-.ux-button-small .sfi {
-	font-size: 1rem !important; /* 16px */
-}
 
 .ux-button-super {
-	padding: 7px 12px 7px 12px !important;
+	padding: 8px 14px 8px 14px !important;
 	margin-bottom: 10px !important; /* sync with .ux-field-xl */
 }
-.ux-button-super, .ux-button-super * {
-	font-size: 1.25rem !important; /* 20px */
-	line-height: 1.25rem !important; /* 20px */
+.ux-button-super,
+.ux-button-super *:not(.sfi) {
+	font-size: 1rem !important; /* 20px */
 }
 .ux-button-super .sfi {
-	font-size: 1.375rem !important; /* 22px */
+	font-size: 1.25rem !important;
 }
 
 .ux-button-large {
 	padding: 11px 17px 11px 17px !important;
 }
-.ux-button-large, .ux-button-large * {
+.ux-button-large,
+.ux-button-large * {
 	font-size: 1.25rem !important; /* 20px */
 	line-height: 1.25rem !important; /* 20px */
-}
-.ux-button-large .sfi {
-	font-size: 1.5rem !important; /* 24px */
 }
 
 .ux-button-xlarge {
 	padding: 13px 21px 13px 21px !important;
 }
-.ux-button-xlarge, .ux-button-xlarge * {
+.ux-button-xlarge,
+.ux-button-xlarge * {
 	font-size: 1.5rem !important; /* 24px */
 	line-height: 1.5rem !important; /* 24px */
-}
-.ux-button-xlarge .sfi {
-	font-size: 1.75rem !important; /* 28px */
 }
 
 .ux-button-responsive {
@@ -771,6 +766,10 @@ input[type=text].ux-date-field.ux-date-field-xs {
 	font-size: 0.875rem !important;
 	width: 125px !important;
 	height: 25.5px !important;
+}
+
+.ux-control-group {
+	line-height: 1.25 !important;
 }
 
 .ux-form input[type="text"],
@@ -1218,6 +1217,13 @@ since IE8 won't execute CSS that contains a CSS3 selector.
 nav.ux-navy {
 	z-index: 5555;
 }
+nav.ux-navy > ul li a .icon {
+	font-size: 1.25em !important;
+	line-height: 1em !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	padding-top: 1px !important;
+}
 
 nav.ux-navy > input[type="checkbox"] {
 	display: none;
@@ -1255,6 +1261,8 @@ nav.ux-navy > ul li span {
 }
 nav.ux-navy > ul li span.img {
 	height: 36px !important;
+	margin: 0;
+	margin-top: 1px !important;
 	padding: 0 !important;
 	padding-right: 0.625rem !important;
 }
@@ -1733,6 +1741,8 @@ nav.ux-navbar span.detail-l {
 }
 nav.ux-navbar div#logo {
 	display: block;
+	margin: 0;
+	margin-bottom: 1px;
 	padding: 0 25px;
 	float: left;
 	font-size: 20px;
@@ -1746,6 +1756,7 @@ nav.ux-navbar label#alt-logo {
 nav.ux-navbar img#img-logo {
 	display: block;
 	float: left;
+	margin: 0;
 	margin-top: 2px;
 	width: 48px;
 	height: 48px;
@@ -2226,6 +2237,9 @@ nav.ux-navbar.navbar-dark a:hover {
 .ux-sidebar {
 	background-color: #3B4250;
 }
+.ux-sidebar label{
+	font-size: 1.25rem !important;
+}
 .ux-sidebar label *,
 .ux-sidenav a {
 	color: #FEFEFE;
@@ -2291,23 +2305,29 @@ nav.ux-navbar.navbar-dark a:hover {
 	width: 80px;
 	min-height: 240px;
 	z-index: 1;
+	box-sizing: content-box;
 	transition: width 400ms;
 }
 .ux-sidebar label {
-	display: inline-block;
-	margin-top: 10px;
-	margin-left: 17px;
+	display: inline-block !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	margin-top: 10px !important;
+	margin-left: 17px !important;
 	z-index: -2;
+	box-sizing: content-box;
 }
 .ux-sidebar input[type=checkbox] {
-	cursor: context-menu;
-	display: inline-block;
-	height: 80px;
-	width: 100%;
-	margin-left: 0;
-	margin-top: -70px;
-	margin-bottom: 5px;
-	opacity: 0;
+	cursor: context-menu !important;
+	display: block !important;
+	height: 85px !important;
+	width: 80px !important;
+	margin-left: 0 !important;
+	margin-right: 0 !important;
+	margin-top: -70px !important;
+	margin-bottom: 25px !important;
+	padding: 0 !important;
+	opacity: 0 !important;
 	z-index: -1;
 }
 .ux-sidebar input[type=checkbox]:hover {
@@ -2328,6 +2348,9 @@ nav.ux-navbar.navbar-dark a:hover {
 	text-indent: 15px;
 	visibility: visible;
 }
+.ux-sidebar span {
+	font-size: 1.125rem;
+}
 
 /*** Tabs (by Unixman) ***/
 
@@ -2347,6 +2370,7 @@ nav.ux-navbar.navbar-dark a:hover {
 	list-style: none;
 	padding: 0;
 	margin: 0;
+	margin-bottom: -3px;
 	align-items: stretch;
 }
 
@@ -2355,15 +2379,19 @@ nav.ux-navbar.navbar-dark a:hover {
 	margin: 0;
 	margin-bottom: -1px;
 	margin-left: -1px;
-	padding: 12px 15px;
+	padding: 8px 15px;
 	border: 1px solid #E2E2E2;
 	border-bottom: 1px solid #FFFFFF;
 	background: #F0F0F0;
 	color: #666666;
+	line-height: 1.5rem;
 	font-size: 0.875rem;
 	font-weight: bold;
 	cursor: pointer;
 	transition: all 0.3s;
+}
+.ux-tab > label .sfi {
+	margin-right: 4px;
 }
 .ux-tab.dark > label {
 	border: 1px solid #666666;

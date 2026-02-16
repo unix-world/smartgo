@@ -1,6 +1,6 @@
 
 // JQuery Compatibility: Browser and Trim
-// v.20200629
+// v.20260128
 // LICENSE: BSD
 
 //===== INFO: $.browser has been deprecated and removed since jQuery 1.9
@@ -77,6 +77,29 @@ jQuery.SmartBrowserGetVersion();
 //	} //END FUNCTION
 //} //end if
 //--
+
+//-- Jquery: find the next element after a known element: https://stackoverflow.com/questions/8901854/jquery-find-the-next-inputtext-element-after-a-known-element
+(function($){
+	$.fn.findNext = function(sel) { // ex: $elem.findNext('input').focus();
+		var $result = $(sel).first();
+		if($result.length <= 0) {
+			return $result;
+		} //end if
+		$result = [];
+		var thisIndex = $('*').index($(this));
+		var selIndex = Number.MAX_SAFE_INTEGER;
+		$(sel).each(function(i,val){
+			var valIndex = $('*').index($(val));
+			if(thisIndex < valIndex && valIndex < selIndex) {
+				selIndex = valIndex;
+				$result = $(val);
+			} //end if
+		});
+		return $result;
+	};
+})(jQuery);
+//--
+
 
 //-- jQuery TapHold for Mobiles (Double-Click Emulation): https://gist.github.com/attenzione/7098476
 (function($){
