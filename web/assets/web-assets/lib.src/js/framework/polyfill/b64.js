@@ -23,7 +23,7 @@
  * @author unix-world.org
  * @license BSD
  * @file b64.js
- * @version 20250304
+ * @version 20260221
  * @class smartJ$Base64
  * @static
  * @frozen

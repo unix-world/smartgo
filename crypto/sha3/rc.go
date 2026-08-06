@@ -1,3 +1,4 @@
+
 package sha3
 
 // RC stores the round constants for use in the ι step.
@@ -27,3 +28,5 @@ var RC = [24]uint64{
 	0x0000000080000001,
 	0x8000000080008008,
 }
+
+// #end

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260208.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20260208.2358"
+	VERSION string = "r.20260806.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2026-02-08 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2026-08-06 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
@@ -520,7 +520,7 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <div class="message">[###MESSAGE-TEXT|html|nl2br###]</div>
 [:::BODY-EXT-HTML:::]
 <hr>
-<div align="left">&nbsp;<b><a href="[###URL-HOMEPAGE|html###]">Return to HomePage</a></b>&nbsp;</div>
+<div align="left">&nbsp;<a href="[###URL-HOMEPAGE|html###]">Return to MainPage</a>&nbsp;</div>
 <div align="right">&nbsp;<small id="server-signature"><b>Smart.Framework.Go</b> :: WebApp</small>&nbsp;</div>
 <br>
 <div align="right" title="` + smart.COPYRIGHT + `">[###FOOTER-HTML###]</div>

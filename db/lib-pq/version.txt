@@ -5,3 +5,5 @@ go 1.13
 unixman:
     DISABLED: github.com/lib/pq/auth/kerberos due a lot of extra dependencies ; this can be loaded separately if really needed
 
+contains fixes by unixman: # r.20260221
+	* replace deprecated ioutil*

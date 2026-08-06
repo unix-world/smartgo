@@ -2,6 +2,6 @@ github.com/cloudflare/circl # v1.3.6 # internal/sha3
 
 go 1.19
 
-# r.20231202.2358
+# r.20260216.2358
 # includes modifications by unixman in:hashes.go # see the comments in the file
 

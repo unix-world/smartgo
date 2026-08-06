@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ UM / CONV ]
 
 // REQUIRE: go 1.19 or later
@@ -12,7 +12,9 @@ import (
 )
 
 const (
-	SIZE_BYTES_16M uint64 = 16777216 // Reference Unit
+	SIZE_BYTES_65K uint64 =    65535 // Reference Unit 65KB
+	SIZE_BYTES_1M  uint64 =  1048576 // Reference Unit  1MB
+	SIZE_BYTES_16M uint64 = 16777216 // Reference Unit 16MB
 )
 
 

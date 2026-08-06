@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ FS (FILESYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -20,22 +20,30 @@ import (
 	"encoding/hex"
 
 	"hash"
+	"hash/adler32"
+	"hash/crc32"
+	"hash/crc64"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"github.com/unix-world/smartgo/crypto/sha3" // {{{SYNC-SMARTGO-SHA3}}} ; this is a better version than golang.org/x/crypto/sha3, works without amd64 ASM - non hardware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
 )
 
 const (
-	CHOWN_DIRS  os.FileMode = 0755
-	CHOWN_FILES os.FileMode = 0644
+	CHMOD_DIRS  os.FileMode = 0755
+	CHMOD_FILES os.FileMode = 0644
 
 	//-- Cross Platform Safe Paths ; The following are disallowed in Windows paths: `< > : " / \ | ? *` ; also disallow `=` (lock file reserved) and SPACE because of the web context
+	REGEX_NEGATIVE_SAFE_PATH_NAME string 	= `[^_a-zA-Z0-9\-\.@#\/`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+` 	// SAFETY: MATCH ALL CHARACTERS NOT IN THE BELOW SET, USED FOR CLEANUP
+	//--
 	REGEX_SAFE_PATH_NAME string 			= `^[_a-zA-Z0-9\-\.@#\/`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect)
 	REGEX_SAFE_FILE_NAME string 			= `^[_a-zA-Z0-9\-\.@#`+"`"+`~\!\$%&\(\)\^\{\}'`+`\[\],;\+`+`]+$` 	// SAFETY: SAFE Cross Platform Character Set for FileSystems: Smart + MsDOS + Linux/Unix + Windows (intersect) ; like above, just missing slash /
 	//-- allow just: "_ a-z A-Z 0-9 - . @ # ` ~ ! $ % & ( ) ^ { } ' [ ] , ; +" ; for dir paths also allow "/"
 
 	//-- Web Ultra-Safe Paths (Smart)
+	REGEX_NEGATIVE_SMART_SAFE_PATH string 	= `[^_a-zA-Z0-9\-\.@#\/]+` 			// SAFETY: MATCH ALL CHARACTERS NOT IN THE BELOW SET, USED FOR CLEANUP
+	//--
 	REGEX_SMART_SAFE_PATH_NAME string 		= `^[_a-zA-Z0-9\-\.@#\/]+$` 		// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM PATHS ...
 	REGEX_SMART_SAFE_FILE_NAME string 		= `^[_a-zA-Z0-9\-\.@#]+$` 			// SAFETY: SUPPORT ONLY THESE CHARACTERS IN FILE SYSTEM FILE AND DIR NAMES ... ; like above, just missing slash /
 	//-- allow just: "_ a-z A-Z 0-9 - . @ #" ; for dir paths also allow "/"
@@ -472,6 +480,93 @@ func SafePathFixClean(p string) string {
 } //END FUNCTION
 
 
+func SafePathCleanInvalidChars(path string, isFilePath bool, allowPathSlash bool, allowAbsolute bool, smartSafe bool) string {
+	//--
+	// isFilePath must be set to TRUE if path is a file path, must not end with a slash
+	// allowPathSlash must be set to FALSE for file names ; for paths must be set to TRUE
+	//--
+	defer PanicHandler()
+	//--
+	path = StrTrimWhitespaces(path)
+	if(path == "") {
+		return ""
+	} //end if
+	//--
+	var doesPathEndsWithSlash bool = false
+	if(StrEndsWith(path, "/") == true) {
+		doesPathEndsWithSlash = true
+	} //end if
+	path = StrTrimWhitespaces(SafePathFixClean(path))
+	if(path == "") {
+		return ""
+	} //end if
+	if(doesPathEndsWithSlash == true) { // if any trailing slash it was removed by SafePathFixClean ; restore it
+		path = PathAddDirLastSlash(path)
+	} //end if
+	//--
+	var rx string = REGEX_NEGATIVE_SAFE_PATH_NAME
+	if(smartSafe == true) {
+		rx = REGEX_NEGATIVE_SMART_SAFE_PATH
+	} //end if
+	//--
+	path = StrTrimWhitespaces(StrRegexReplaceAll(rx, path, ""))
+	if(path == "") {
+		return ""
+	} //end if
+	//--
+	if(allowAbsolute != true) {
+		path = StrTrimLeftWhitespaces(StrTrimLeft(path, "/"))
+	} //end if
+	if(isFilePath == true) {
+		path = StrTrimRightWhitespaces(StrTrimRight(path, "/"))
+	} //end if
+	path = StrReplaceAll(path, "..", ".")
+	//--
+	if(smartSafe == true) {
+		if(PathIsSafeValidSafePath(path) != true) {
+			return ""
+		} //end if
+	} else {
+		if(PathIsSafeValidPath(path) != true) {
+			return ""
+		} //end if
+	} //end if else
+	//--
+	if(allowPathSlash != true) {
+		//--
+		path = StrReplaceAll(path, "/", "")
+		//--
+		if(smartSafe == true) {
+			if(PathIsSafeValidSafeFileName(path) != true) {
+				return ""
+			} //end if
+		} else {
+			if(PathIsSafeValidFileName(path) != true) {
+				return ""
+			} //end if
+		} //end if else
+		//--
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(path) == true) {
+		return ""
+	} //end if
+	//--
+	if(allowAbsolute != true) {
+		if(PathIsAbsolute(path) == true) {
+			return ""
+		} //end if
+	} //end if
+	//--
+	if((path == ".") || (path == "..") || (path == "/")) {
+		return ""
+	} //end if
+	//--
+	return path
+	//--
+} //END FUNCTION
+
+
 func IsPathAlikeWithSafeFixedPath(path string, fixTrailingSlashes bool) bool {
 	//--
 	comparePath := StrTrimWhitespaces(path)
@@ -539,9 +634,9 @@ func SafePathDirCreate(dirPath string, allowRecursive bool, allowAbsolutePath bo
 		//--
 		var err error = nil
 		if(allowRecursive == true) {
-			err = os.MkdirAll(dirPath, CHOWN_DIRS)
+			err = os.MkdirAll(dirPath, CHMOD_DIRS)
 		} else {
-			err = os.Mkdir(dirPath, CHOWN_DIRS)
+			err = os.Mkdir(dirPath, CHMOD_DIRS)
 		} //end if else
 		if(err != nil) {
 			return false, err
@@ -824,6 +919,99 @@ func SafePathEmbedDirScan(efs *embed.FS, dirPath string, recursive bool) (isSucc
 //-----
 
 
+func SafePathFileCrc(mode string, filePath string, allowAbsolutePath bool) (hashSum string, errMsg error) {
+	//--
+	defer PanicHandler()
+	//--
+	if(StrTrimWhitespaces(filePath) == "") {
+		return "", NewError("WARNING: File Path is Empty")
+	} //end if
+	//--
+	filePath = SafePathFixClean(filePath)
+	//--
+	if(PathIsEmptyOrRoot(filePath) == true) {
+		return "", NewError("WARNING: File Path is Empty/Root")
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return "", NewError("WARNING: File Path is Invalid Unsafe")
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return "", NewError("WARNING: File Path is Backward Unsafe")
+	} //end if
+	//--
+	if(allowAbsolutePath != true) {
+		if(PathIsAbsolute(filePath) == true) {
+			return "", NewError("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
+		} //end if
+	} //end if
+	//--
+	if(PathIsDir(filePath)) {
+		return "", NewError("WARNING: File Path is a Directory not a File")
+	} //end if
+	//--
+	var isSupported bool = false
+	if(mode == "crc64e") {
+		isSupported = true
+	} else if(mode == "crc32b") {
+		isSupported = true
+	} else if(mode == "adler32") {
+		isSupported = true
+	} //end if else
+	if(isSupported != true) {
+		return "", NewError("WARNING: Invalid Mode: `" + mode + "`")
+	} //end if
+	//--
+	f, errO := os.Open(filePath)
+	if(errO != nil) {
+		return "", NewError("ERROR: Failed to Open File: " + errO.Error())
+	} //end if
+	defer f.Close()
+	//--
+	if(mode == "crc64e") {
+		//--
+		h := crc64.New(crc64TableECMA)
+		//--
+		if _, errC := io.Copy(h, f); errC != nil {
+			return "", NewError("ERROR: Failed to Read File: " + errC.Error())
+		} //end if
+		//--
+		hexCrc := StrToLower(hex.EncodeToString(h.Sum(nil)))
+		//--
+		return hexCrc, nil
+		//--
+	} else if(mode == "crc32b") {
+		//--
+		h := crc32.NewIEEE()
+		//--
+		if _, errC := io.Copy(h, f); errC != nil {
+			return "", NewError("ERROR: Failed to Read File: " + errC.Error())
+		} //end if
+		//--
+		hexCrc := StrToLower(hex.EncodeToString(h.Sum(nil)))
+		//--
+		return hexCrc, nil
+		//--
+	} else if(mode == "adler32") {
+		//--
+		h := adler32.New()
+		//--
+		if _, errC := io.Copy(h, f); errC != nil {
+			return "", NewError("ERROR: Failed to Read File: " + errC.Error())
+		} //end if
+		//--
+		hexCrc := StrToLower(hex.EncodeToString(h.Sum(nil)))
+		//--
+		return hexCrc, nil
+		//--
+	} //end if else
+	//--
+	return "", NewError("ERROR: Invalid Mode: `" + mode + "`")
+	//--
+} //END FUNCTION
+
+
 func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, errMsg error) {
 	//--
 	defer PanicHandler()
@@ -866,7 +1054,6 @@ func SafePathFileMd5(filePath string, allowAbsolutePath bool) (hashSum string, e
 		return "", NewError("ERROR: Failed to Read File: " + errC.Error())
 	} //end if
 	//--
-//	hexMd5 := StrToLower(fmt.Sprintf("%x", h.Sum(nil)))
 	hexMd5 := StrToLower(hex.EncodeToString(h.Sum(nil)))
 	//--
 	return hexMd5, nil
@@ -907,10 +1094,22 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 	} //end if
 	//--
 	var h hash.Hash = nil
-	if(mode == "sha512") {
+	if(mode == "sha3-512") {
+		h = sha3.New512()
+	} else if(mode == "sha3-384") {
+		h = sha3.New384()
+	} else if(mode == "sha3-256") {
+		h = sha3.New256()
+	} else if(mode == "sha3-224") {
+		h = sha3.New224()
+	} else if(mode == "sha512") {
 		h = sha512.New()
+	} else if(mode == "sha384") {
+		h = sha512.New384()
 	} else if(mode == "sha256") {
 		h = sha256.New()
+	} else if(mode == "sha224") {
+		h = sha256.New224()
 	} else if(mode == "sha1") {
 		h = sha1.New()
 	} //end if else
@@ -927,7 +1126,6 @@ func SafePathFileSha(mode string, filePath string, allowAbsolutePath bool) (hash
 		return "", NewError("ERROR: Failed to Read File: " + errC.Error())
 	} //end if
 	//--
-//	hexSha := StrToLower(fmt.Sprintf("%x", h.Sum(nil)))
 	hexSha := StrToLower(hex.EncodeToString(h.Sum(nil)))
 	//--
 	return hexSha, nil
@@ -1029,7 +1227,7 @@ func SafePathFileBytWrite(filePath string, wrMode string, allowAbsolutePath bool
 	} //end if
 	//--
 	if(wrMode == FILE_WRITE_MODE_APPEND) { // append mode
-		f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, CHOWN_FILES)
+		f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, CHMOD_FILES)
 		if(err != nil) {
 			return false, err
 		} //end if
@@ -1039,7 +1237,7 @@ func SafePathFileBytWrite(filePath string, wrMode string, allowAbsolutePath bool
 		} //end if
 		return true, nil // must return here to avoid defered f to be out of scope
 	} else if(wrMode == FILE_WRITE_MODE_DEFAULT) { // write (default) mode
-		err := os.WriteFile(filePath, fileContent, CHOWN_FILES)
+		err := os.WriteFile(filePath, fileContent, CHMOD_FILES)
 		if(err != nil) {
 			return false, err
 		} //end if
@@ -1094,7 +1292,7 @@ func SafePathFileWrite(filePath string, wrMode string, allowAbsolutePath bool, f
 		return false, NewError("WARNING: Invalid File Write Mode: `" + wrMode + "`")
 	} //end if
 	//--
-	f, err := os.OpenFile(filePath, fFlags, CHOWN_FILES)
+	f, err := os.OpenFile(filePath, fFlags, CHMOD_FILES)
 	if(err != nil) {
 		return false, err
 	} //end if
@@ -1342,7 +1540,7 @@ func SafePathFileCopy(filePath string, fileNewPath string, allowAbsolutePath boo
 	if(!PathIsFile(fileNewPath)) {
 		return false, NewError("WARNING: New File Path cannot be found after copy")
 	} //end if
-	errChmod := os.Chmod(fileNewPath, CHOWN_FILES)
+	errChmod := os.Chmod(fileNewPath, CHMOD_FILES)
 	if(err != nil) {
 		log.Println("[WARNING] " + CurrentFunctionName() + ": Failed to CHMOD the Destination File after copy", fileNewPath, errChmod)
 	} //end if

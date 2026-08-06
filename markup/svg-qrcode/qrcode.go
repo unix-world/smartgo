@@ -1,11 +1,12 @@
 // go-qrcode
 // Copyright 2014 Tom Harwood
 
-// QrSVG for GO # r.20241124.2358
-// (c) 2023-2024 unix-world.org
+// QrSVG for GO # r.20260223.2358
+// (c) 2023-present, unix-world.org
 // License: BSD
 // custom modifications by unixman:
 // 	* return copy not reference of QRCode
+//	* replaced deprecated io-util
 
 /*
 Package qrcode implements a QR Code encoder.
@@ -55,6 +56,7 @@ This package implements a subset of QR Code 2005, as defined in ISO/IEC
 package qrcode
 
 import (
+	"log"
 	"bytes"
 	"errors"
 	"fmt"
@@ -62,8 +64,6 @@ import (
 	"image/color"
 	"image/png"
 	"io"
-	"io/ioutil"
-	"log"
 	"os"
 
 	bitset "github.com/unix-world/smartgo/markup/svg-qrcode/bitset"
@@ -387,7 +387,7 @@ func (q *QRCode) WriteFile(size int, filename string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(filename, png, os.FileMode(0644))
+	return os.WriteFile(filename, png, os.FileMode(0644))
 }
 
 // encode completes the steps required to encode the QR Code. These include

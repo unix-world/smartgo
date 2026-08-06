@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ CRYPTO / HASH ]
 
 // REQUIRE: go 1.19 or later
@@ -13,14 +13,17 @@ import (
 	"encoding/hex"
 	"encoding/base64"
 
+	"hash/adler32"
 	"hash/crc32"
+	"hash/crc64"
+
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/hmac"
 
-	"github.com/unix-world/smartgo/crypto/sha3" // {{{SYNC-SMARTGO-SHA3}}} ; this is a better version than golang.org/x/crypto/sha3, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
+	"github.com/unix-world/smartgo/crypto/sha3" // {{{SYNC-SMARTGO-SHA3}}} ; this is a better version than golang.org/x/crypto/sha3, works without amd64 ASM - non hardware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
 
 	"github.com/unix-world/smartgo/crypto/poly1305"
 )
@@ -169,7 +172,6 @@ func Sh3a512(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -217,7 +219,6 @@ func Sh3a384(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -265,7 +266,6 @@ func Sh3a256(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -313,7 +313,6 @@ func Sh3a224(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -361,7 +360,6 @@ func Sha512(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -415,7 +413,6 @@ func Sha384(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -463,7 +460,6 @@ func Sha256(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -511,7 +507,6 @@ func Sha224(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -559,7 +554,6 @@ func Sha1(str string) string {
 	//--
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
 	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
 	//--
 } //END FUNCTION
@@ -645,13 +639,68 @@ func MdByt5B64(src []byte) []byte {
 //-----
 
 
+func Crc64e(str string) string {
+	//--
+	hash := crc64.New(crc64TableECMA)
+	hash.Write([]byte(str))
+	//--
+	return StrToLower(hex.EncodeToString(hash.Sum(nil))) // hex 16 characters, fixed
+	//--
+} //END FUNCTION
+
+
+func CrcByt64e(src []byte) []byte {
+	//--
+	hash := crc64.New(crc64TableECMA)
+	hash.Write(src)
+	//--
+	return BytToLower(Bin2BytHex(hash.Sum(nil))) // hex 16 characters, fixed
+	//--
+} //END FUNCTION
+
+
+var crc64TableECMA = crc64.MakeTable(crc64.ECMA)
+
+
+func Crc64eB36(str string) string {
+	//--
+	hash := crc64.New(crc64TableECMA)
+	hash.Write([]byte(str))
+	//--
+	return StrToLower(StrPad2LenLeft(BaseEncode(hash.Sum(nil), "b36"), "0", 13)) // max hex FFFFFFFFFFFFFFFF is b36 3W5E11264SGSF (13 chars, needs padding)
+	//--
+} //END FUNCTION
+
+
+func CrcByt64eB36(src []byte) []byte {
+	//--
+	hash := crc64.New(crc64TableECMA)
+	hash.Write(src)
+	//--
+	return BytToLower([]byte(StrPad2LenLeft(BaseEncode(hash.Sum(nil), "b36"), "0", 13))) // max hex FFFFFFFFFFFFFFFF is b36 3W5E11264SGSF (13 chars, needs padding)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func Crc32b(str string) string {
 	//--
 	hash := crc32.NewIEEE()
 	hash.Write([]byte(str))
 	//--
-//	return StrToLower(fmt.Sprintf("%x", hash.Sum(nil)))
-	return StrToLower(hex.EncodeToString(hash.Sum(nil)))
+	return StrToLower(hex.EncodeToString(hash.Sum(nil))) // hex 8 characters, fixed
+	//--
+} //END FUNCTION
+
+
+func CrcByt32b(src []byte) []byte {
+	//--
+	hash := crc32.NewIEEE()
+	hash.Write(src)
+	//--
+	return BytToLower(Bin2BytHex(hash.Sum(nil))) // hex 8 characters, fixed
 	//--
 } //END FUNCTION
 
@@ -661,7 +710,60 @@ func Crc32bB36(str string) string {
 	hash := crc32.NewIEEE()
 	hash.Write([]byte(str))
 	//--
-	return StrPad2LenLeft(StrToLower(BaseEncode(hash.Sum(nil), "b36")), "0", 7)
+	return StrToLower(StrPad2LenLeft(BaseEncode(hash.Sum(nil), "b36"), "0", 7)) // max hex FFFFFFFF is b36 1Z141Z3 (7 chars)
+	//--
+} //END FUNCTION
+
+
+func CrcByt32bB36(src []byte) []byte {
+	//--
+	hash := crc32.NewIEEE()
+	hash.Write(src)
+	//--
+	return BytToLower([]byte(StrPad2LenLeft(BaseEncode(hash.Sum(nil), "b36"), "0", 7))) // max hex FFFFFFFF is b36 1Z141Z3 (7 chars)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func Adler32(str string) string {
+	//--
+	hash := adler32.New()
+	hash.Write([]byte(str))
+	//--
+	return StrToLower(hex.EncodeToString(hash.Sum(nil))) // hex 8 characters, fixed
+	//--
+} //END FUNCTION
+
+
+func AdlerByt32(src []byte) []byte {
+	//--
+	hash := adler32.New()
+	hash.Write(src)
+	//--
+	return BytToLower(Bin2BytHex(hash.Sum(nil))) // hex 8 characters, fixed
+	//--
+} //END FUNCTION
+
+
+func Adler32B36(str string) string {
+	//--
+	hash := adler32.New()
+	hash.Write([]byte(str))
+	//--
+	return StrToLower(StrPad2LenLeft(BaseEncode(hash.Sum(nil), "b36"), "0", 7)) // max hex FFFFFFFF is b36 1Z141Z3 (7 chars)
+	//--
+} //END FUNCTION
+
+
+func AdlerByt32B36(src []byte) []byte {
+	//--
+	hash := adler32.New()
+	hash.Write(src)
+	//--
+	return BytToLower([]byte(StrPad2LenLeft(BaseEncode(hash.Sum(nil), "b36"), "0", 7))) // max hex FFFFFFFF is b36 1Z141Z3 (7 chars)
 	//--
 } //END FUNCTION
 

@@ -1,3 +1,4 @@
+
 package edx25519
 
 import (
@@ -5,12 +6,14 @@ import (
 	"math/bits"
 )
 
+
 var order = [paramB]byte{
 	0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,
 	0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
 }
+
 
 // isLessThan returns true if 0 <= x < y, and assumes that slices have the same length.
 func isLessThan(x, y []byte) bool {
@@ -20,6 +23,7 @@ func isLessThan(x, y []byte) bool {
 	}
 	return x[i] < y[i]
 }
+
 
 // reduceModOrder calculates k = k mod order of the curve.
 func reduceModOrder(k []byte, is512Bit bool) {
@@ -33,6 +37,7 @@ func reduceModOrder(k []byte, is512Bit bool) {
 		binary.LittleEndian.PutUint64(k[i*8:(i+1)*8], X[i])
 	}
 }
+
 
 // red512 calculates x = x mod Order of the curve.
 func red512(x *[8]uint64, full bool) {
@@ -133,6 +138,7 @@ func red512(x *[8]uint64, full bool) {
 	x[0], x[1], x[2], x[3] = r0, r1, r2, r3
 }
 
+
 // calculateS performs s = r+k*a mod Order of the curve.
 func calculateS(s, r, k, a []byte) {
 	K := [4]uint64{
@@ -173,3 +179,6 @@ func calculateS(s, r, k, a []byte) {
 	binary.LittleEndian.PutUint64(s[2*8:3*8], S[2])
 	binary.LittleEndian.PutUint64(s[3*8:4*8], S[3])
 }
+
+
+// #end

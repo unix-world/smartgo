@@ -1,8 +1,10 @@
+
 package edx25519
 
 import (
 	fp "github.com/unix-world/smartgo/crypto/eddsa/internal/math/fp25519"
 )
+
 
 type (
 	pointR1 struct{ x, y, z, ta, tb fp.Elt }
@@ -11,12 +13,16 @@ type (
 		z2 fp.Elt
 	}
 )
+
+
 type pointR3 struct{ addYX, subYX, dt2 fp.Elt }
+
 
 func (P *pointR1) neg() {
 	fp.Neg(&P.x, &P.x)
 	fp.Neg(&P.ta, &P.ta)
 }
+
 
 func (P *pointR1) SetIdentity() {
 	P.x = fp.Elt{}
@@ -25,6 +31,7 @@ func (P *pointR1) SetIdentity() {
 	P.ta = fp.Elt{}
 	P.tb = fp.Elt{}
 }
+
 
 func (P *pointR1) toAffine() {
 	fp.Inv(&P.z, &P.z)
@@ -36,6 +43,7 @@ func (P *pointR1) toAffine() {
 	P.ta = P.x
 	P.tb = P.y
 }
+
 
 func (P *pointR1) ToBytes(k []byte) error {
 	P.toAffine()
@@ -52,6 +60,7 @@ func (P *pointR1) ToBytes(k []byte) error {
 	k[paramB-1] = k[paramB-1] | (b << 7)
 	return nil
 }
+
 
 func (P *pointR1) FromBytes(k []byte) bool {
 	if len(k) != paramB {
@@ -88,6 +97,7 @@ func (P *pointR1) FromBytes(k []byte) bool {
 	return true
 }
 
+
 // double calculates 2P for curves with A=-1.
 func (P *pointR1) double() {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
@@ -107,15 +117,18 @@ func (P *pointR1) double() {
 	fp.Mul(Py, g, h)  // Y = G * H, T = E * H
 }
 
+
 func (P *pointR1) mixAdd(Q *pointR3) {
 	fp.Add(&P.z, &P.z, &P.z) // D = 2*z1
 	P.coreAddition(Q)
 }
 
+
 func (P *pointR1) add(Q *pointR2) {
 	fp.Mul(&P.z, &P.z, &Q.z2) // D = 2*z1*z2
 	P.coreAddition(&Q.pointR3)
 }
+
 
 // coreAddition calculates P=P+Q for curves with A=-1.
 func (P *pointR1) coreAddition(Q *pointR3) {
@@ -137,6 +150,7 @@ func (P *pointR1) coreAddition(Q *pointR3) {
 	fp.Mul(Py, g, h)     // Y = G * H, T = E * H
 }
 
+
 func (P *pointR1) oddMultiples(T []pointR2) {
 	var R pointR2
 	n := len(T)
@@ -149,6 +163,7 @@ func (P *pointR1) oddMultiples(T []pointR2) {
 		T[i].fromR1(P)
 	}
 }
+
 
 func (P *pointR1) isEqual(Q *pointR1) bool {
 	l, r := &fp.Elt{}, &fp.Elt{}
@@ -169,10 +184,12 @@ func (P *pointR1) isEqual(Q *pointR1) bool {
 	return b
 }
 
+
 func (P *pointR3) neg() {
 	P.addYX, P.subYX = P.subYX, P.addYX
 	fp.Neg(&P.dt2, &P.dt2)
 }
+
 
 func (P *pointR2) fromR1(Q *pointR1) {
 	fp.Add(&P.addYX, &Q.y, &Q.x)
@@ -183,6 +200,7 @@ func (P *pointR2) fromR1(Q *pointR1) {
 	fp.Add(&P.z2, &Q.z, &Q.z)
 }
 
+
 func (P *pointR3) cneg(b int) {
 	t := &fp.Elt{}
 	fp.Cswap(&P.addYX, &P.subYX, uint(b))
@@ -190,8 +208,12 @@ func (P *pointR3) cneg(b int) {
 	fp.Cmov(&P.dt2, t, uint(b))
 }
 
+
 func (P *pointR3) cmov(Q *pointR3, b int) {
 	fp.Cmov(&P.addYX, &Q.addYX, uint(b))
 	fp.Cmov(&P.subYX, &Q.subYX, uint(b))
 	fp.Cmov(&P.dt2, &Q.dt2, uint(b))
 }
+
+
+// #end

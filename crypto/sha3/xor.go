@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build (!amd64 && !386 && !ppc64le) || appengine
-// +build !amd64,!386,!ppc64le appengine
+// unixman, r.20260216.2358
+// removed conditional compiler flags
 
 package sha3
 
 // A storageBuf is an aligned array of maxRate bytes.
 type storageBuf [maxRate]byte
 
+
 func (b *storageBuf) asBytes() *[maxRate]byte {
 	return (*[maxRate]byte)(b)
 }
+
+
+// #end

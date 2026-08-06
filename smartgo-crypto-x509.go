@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ CRYPTO / X509 ]
 
 // REQUIRE: go 1.22 or later
@@ -716,13 +716,46 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 							return NewError(fmt.Sprintf(inspStartsFailed, key, val))
 						} //end if
 						break
+					case "Subject^*": // subject starts with, case insensitive
+						if(!StrIStartsWith(iCert.Subject, val)) {
+							return NewError(fmt.Sprintf(inspStartsFailed, key, val))
+						} //end if
+						break
 					case "Subject&~": // subject contains with, case sensitive
 						if(!StrContains(iCert.Subject, val)) {
 							return NewError(fmt.Sprintf(inspContainsFailed, key, val))
 						} //end if
 						break
+					case "Subject&*": // subject contains with, case sensitive
+						if(!StrIContains(iCert.Subject, val)) {
+							return NewError(fmt.Sprintf(inspContainsFailed, key, val))
+						} //end if
+						break
+					case "Subject&|~": fallthrough 	// subject contains with, case sensitive
+					case "Subject&|*": 				// subject contains with, case insensitive
+						arrExp := Explode("|", val)
+						var exprFound bool = false
+						for itr:=0; itr<len(arrExp); itr++ {
+							arrExp[itr] = StrTrimWhitespaces(arrExp[itr])
+							if(arrExp[itr] != "") {
+								if(StrEndsWith(key, "&|~") && StrContains(iCert.Subject, arrExp[itr])) { // case sensitive
+									exprFound = true
+								} else if(StrEndsWith(key, "&|*") && StrIContains(iCert.Subject, arrExp[itr])) { // case insensitive
+									exprFound = true
+								} //end if
+							} //end if
+						} //end for
+						if(exprFound != true) {
+							return NewError(fmt.Sprintf(inspContainsFailed, key, val))
+						} //end if
+						break
 					case "Subject$~": // subject ends with, case sensitive
 						if(!StrEndsWith(iCert.Subject, val)) {
+							return NewError(fmt.Sprintf(inspEndsFailed, key, val))
+						} //end if
+						break
+					case "Subject$*": // subject ends with, case insensitive
+						if(!StrIEndsWith(iCert.Subject, val)) {
 							return NewError(fmt.Sprintf(inspEndsFailed, key, val))
 						} //end if
 						break
@@ -736,13 +769,45 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 							return NewError(fmt.Sprintf(inspStartsFailed, key, val))
 						} //end if
 						break
+					case "Issuer^*": // issuer starts with, case insensitive
+						if(!StrIStartsWith(iCert.Issuer, val)) {
+							return NewError(fmt.Sprintf(inspStartsFailed, key, val))
+						} //end if
+						break
 					case "Issuer&~": // issuer contains with, case sensitive
 						if(!StrContains(iCert.Issuer, val)) {
 							return NewError(fmt.Sprintf(inspContainsFailed, key, val))
 						} //end if
 						break
+					case "Issuer&*": // issuer contains with, case insensitive
+						if(!StrIContains(iCert.Issuer, val)) {
+							return NewError(fmt.Sprintf(inspContainsFailed, key, val))
+						} //end if
+						break
+					case "Issuer&|~": fallthrough 	// issuer contains with, case sensitive
+					case "Issuer&|*": 				// issuer contains with, case insensitive
+						arrExp := Explode("|", val)
+						var exprFound bool = false
+						for itr:=0; itr<len(arrExp); itr++ {
+							arrExp[itr] = StrTrimWhitespaces(arrExp[itr])
+							if(arrExp[itr] != "") {
+								if(StrEndsWith(key, "&|~") && StrContains(iCert.Subject, arrExp[itr])) { // case sensitive
+									exprFound = true
+								} else if(StrEndsWith(key, "&|*") && StrIContains(iCert.Subject, arrExp[itr])) { // case insensitive
+									exprFound = true
+								} //end if
+							} //end if
+						} //end for
+						if(exprFound != true) {
+							return NewError(fmt.Sprintf(inspContainsFailed, key, val))
+						} //end if
 					case "Issuer$~": // issuer ends with, case sensitive
 						if(!StrEndsWith(iCert.Issuer, val)) {
+							return NewError(fmt.Sprintf(inspEndsFailed, key, val))
+						} //end if
+						break
+					case "Issuer$*": // issuer ends with, case insensitive
+						if(!StrIEndsWith(iCert.Issuer, val)) {
 							return NewError(fmt.Sprintf(inspEndsFailed, key, val))
 						} //end if
 						break
@@ -776,9 +841,9 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 						if(StrToUpper(val) != iCert.SignatureAlgo) {
 							return NewError(fmt.Sprintf(inspFailed, key, val))
 						} //end if
-					//-- internal, go x509
+					//-- below are internal, go x509 verifications ...
 					case "isExpired":
-						tm, errTm := time.Parse(time.RFC3339, val) // RFC3339, ex: "2026-01-02T15:04:05Z"
+						tm, errTm := time.Parse(time.RFC3339, val) // RFC3339, ex: "2025-01-02T15:04:05Z"
 						if(errTm != nil) {
 							return NewError("Invalid value for isExpired: " + errTm.Error())
 						} //end if

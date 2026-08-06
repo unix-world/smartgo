@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -22,6 +22,8 @@ import (
 var (
 	DEBUG bool = smart.DEBUG
 
+	httpServerInit bool = false // because of these variables which are static only support one instance per go script, thus this is a flag to disalow running multiple instances ...
+
 	httpAuthRealm string = "SmartGo.Web.Server: Auth Area"
 	httpServeSecure bool = false
 	httpServerAddr string = ""
@@ -31,7 +33,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20260216.2358"
+	VERSION string = "r.20260801.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -121,7 +123,7 @@ func WebServerSetMaxPostSize(size uint64) bool {
 
 
 // IMPORTANT: If using Proxy with different PROXY_HTTP_BASE_PATH than "/" (ex: "/api/") the Proxy MUST strip back PROXY_HTTP_BASE_PATH to "/" for this backend
-func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int) int16 {
+func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int, enableGzip bool) int16 {
 
 	//--
 	// this method should return (error codes) just int16, only positive, values and zero if ok ; negative values are reserved for outsite managers
@@ -130,19 +132,42 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	defer smart.PanicHandler()
 
 	//--
+	if(httpServerInit == true) {
+		log.Println("[ERROR]", "Web Server: An Instance has already been started ...")
+		return 1000
+	} //end if
+	//--
+	httpServerInit = true // flag
+	//--
+
+	//--
 	httpServeSecure = serveSecure
+	//--
+	if(httpServeSecure == true) {
+		log.Println("[META]", "Web Server: Serve SECURE:", "ON")
+	} else {
+		log.Println("[META]", "Web Server: Serve SECURE:", "OFF")
+	} //end if else
+	//--
+
+	//--
+	if(enableGzip == true) {
+		log.Println("[NOTICE]", "Web Server: GZip Handler:", "ON")
+	} else {
+		log.Println("[NOTICE]", "Web Server: GZip Handler:", "OFF")
+	} //end if else
 	//--
 
 	//-- lock routes
 	handlersAreLocked = true
 	//-- todo: check if there is at leat one handler and for /
 	if(urlHandlersMap == nil) {
-		log.Println("[ERROR] Web Server: Internal Error, Handlers are NULL")
+		log.Println("[ERROR]", "Web Server: Internal Error, Handlers are NULL")
 		return 1001
 	} //en dif
 	//--
 
-	log.Println("[META] Web Server: Allowed Methods:", listMethods(allowedMethods))
+	log.Println("[META]", "Web Server: Allowed Methods:", listMethods(allowedMethods))
 
 	//-- ip restriction list
 
@@ -150,7 +175,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	if(allowedIPs != "") {
 		errValidateAllowedIpList := smart.ValidateIPAddrList(allowedIPs) // {{{SYNC-VALIDATE-IP-LIST-BEFORE-VERIFY-IP}}} ; validate here because is used later in a sub-method of this method (by the routes to check access)
 		if(errValidateAllowedIpList != nil) {
-			log.Println("[ERROR] Web Server: ALLOWED IP LIST Error: " + errValidateAllowedIpList.Error())
+			log.Println("[ERROR]", "Web Server: ALLOWED IP LIST Error: " + errValidateAllowedIpList.Error())
 			return 1002
 		} //end if
 	} //end if
@@ -162,17 +187,17 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	if(authUser != "") {
 		isAuthActive = true
 		if((smart.StrTrimWhitespaces(authPass) == "") && (smart.StrTrimWhitespaces(authToken) == "")) {
-			log.Println("[ERROR] Web Server: Empty Auth Password and Token when a UserName is Set")
+			log.Println("[ERROR]", "Web Server: Empty Auth Password and Token when a UserName is Set")
 			return 1100
 		} //end if
 		if(customAuthCheck != nil) {
-			log.Println("[ERROR] Web Server: Auth User / Pass / Token is set but also a custom Auth Handler")
+			log.Println("[ERROR]", "Web Server: Auth User / Pass / Token is set but also a custom Auth Handler")
 			return 1101
 		} //end if
 	} else if(customAuthCheck != nil) {
 		isAuthActive = true
 		if((smart.StrTrimWhitespaces(authUser) != "") && (smart.StrTrimWhitespaces(authPass) != "")) {
-			log.Println("[ERROR] Web Server: Custom Auth Handler is Set but also Auth User / Pass")
+			log.Println("[ERROR]", "Web Server: Custom Auth Handler is Set but also Auth User / Pass")
 			return 1102
 		} //end if
 	} //end if
@@ -223,6 +248,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} else {
 			log.Println("[WARNING]", "Web Server: Authentication is DISABLED for", len(skipAuthRoutes) ,"Registered Routes: [", smart.Implode(" ; ", skipAuthRoutes), "] - check the routes listed here and ensure this is not a security concern ...")
 		} //end if else
+		//--
+		var allRoutes []string = listRoutes()
+		log.Println("[DATA]", "List of Registered Routes (", len(allRoutes), "):" + smart.Implode(" ; ", allRoutes))
 		//--
 	} else {
 		//--
@@ -359,8 +387,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	// 		* Max Path Characters: 1024 	(safe for FileSystem access, as path, cross-platform) 			; {{{SYNC-HTTP-WEBSRV-MAX-PATH-LENGTH}}}
 	// 		* Max Path Segments:    128 	(safe for FileSystem access, as dir structure, cross-platform) 	; {{{SYNC-HTTP-WEBSRV-MAX-PATH-SEGMENTS}}}
 	//--
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	defHandler := func(w http.ResponseWriter, r *http.Request) {
 		//-- panic recovery
 		defer smart.PanicHandler() // safe recovery handler
 		//-- get remote address IP without port
@@ -659,7 +686,7 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			case 302:
 				smarthttputils.HttpStatus302(w, r, response.ContentBody, isHtmlAnswer) // for 3xx the content is the redirect URL
 				break
-			// case 304 canno be handled here, this is a special case
+			// case 304 cannot be handled here, this is a special case
 			//-- client errors
 			case 400:
 				smarthttputils.HttpStatus400(w, r, response.ContentBody, isHtmlAnswer)
@@ -695,6 +722,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 				break
 			case 410:
 				smarthttputils.HttpStatus410(w, r, response.ContentBody, isHtmlAnswer)
+				break
+			case 413:
+				smarthttputils.HttpStatus413(w, r, response.ContentBody, isHtmlAnswer)
 				break
 			case 415:
 				smarthttputils.HttpStatus415(w, r, response.ContentBody, isHtmlAnswer)
@@ -745,7 +775,13 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//		log.Println("[DEBUG]", "Web Server Mux Handler Response Content Type:", "MimeType = `" + mType + "` / Charset = `" + mCharSet + "` / Header [" + smarthttputils.HTTP_HEADER_CONTENT_TYPE + "] Raw Value is: `" + hdrCType + "`")
 	//	} //end if
 		//--
-	})
+	} //end fx
+
+	if(enableGzip == true) {
+		mux.HandleFunc("/", gzipHandler(defHandler))
+	} else {
+		mux.HandleFunc("/", defHandler)
+	} //end if else
 
 	//-- serve logic: is better to manage outside the async calls because extra monitoring logic can be implemented !
 

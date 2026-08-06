@@ -32,7 +32,7 @@
  * @author unix-world.org
  * @license BSD
  * @file arch_utils.js
- * @version 20260128
+ * @version 20260804
  * @class smartJ$SnappyCompress
  * @static
  * @frozen
@@ -340,7 +340,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file arch_utils.js
- * @version 20260128
+ * @version 20260804
  * @class smartJ$SnappyUncompress
  * @static
  * @frozen
@@ -517,7 +517,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file arch_utils.js
- * @version 20260128
+ * @version 20260804
  * @class smartJ$ArchSnappy
  * @static
  * @frozen
@@ -546,18 +546,27 @@ const smartJ$ArchSnappy = new class{constructor(){ // STATIC CLASS (ES6)
 	const _Ba$eConv = smartJ$BaseConv;
 	const _Crypto$Hash = smartJ$CryptoHash;
 
-	const pfx = 'sy1!';
+	const pfx = 'sz1!';
+	const vByte = '\v';
+	const nByte = '\u0000';
 
-	const compress = (txtPlain) => {
+	const maxDataSize = 1048576; // max 1MB, sync with PHP and Go
+
+	const dataPack = (txtPlain) => {
 		//--
-		const _m$ = 'compress';
+		const _m$ = 'dataPack';
 		//--
 		txtPlain = _Utils$.stringPureVal(txtPlain); // don't trim
 		if(txtPlain == '') {
 			return '';
 		} //end if
 		//--
-		const crc = _Crypto$Hash.crc32b(txtPlain, true);
+		if(txtPlain.length > maxDataSize) {
+			_p$.warn(_N$, _m$, 'Data is Oversized');
+			return '';
+		} //end if
+		//--
+		const crc = _Crypto$Hash.crc32b(txtPlain + nByte + String(txtPlain.length) + vByte + _Crypto$Hash.sh3a512(txtPlain, true), true);
 		const snapC = new smartJ$SnappyCompress(txtPlain);
 		txtPlain = null; // free mem
 		//--
@@ -576,43 +585,48 @@ const smartJ$ArchSnappy = new class{constructor(){ // STATIC CLASS (ES6)
 		return String(pfx + ';' + b64Arch + ';' + crc);
 		//--
 	}; //END
-	_C$.compress = compress; // export
+	_C$.dataPack = dataPack; // export
 
-	const uncompress = (b64Arch) => {
+	const dataUnpack = (pkData) => {
 		//--
-		const _m$ = 'uncompress';
+		const _m$ = 'dataUnpack';
 		//--
-		b64Arch = _Utils$.stringPureVal(b64Arch, true); // trim, b64
-		if(b64Arch == '') {
+		pkData = _Utils$.stringPureVal(pkData, true); // trim, b64
+		if(pkData == '') {
 			return '';
 		} //end if
 		//--
-		let parts = b64Arch.split(';', 3);
+		if(pkData.length > maxDataSize) {
+			_p$.warn(_N$, _m$, 'Package is Oversized');
+			return '';
+		} //end if
+		//--
+		let parts = pkData.split(';', 3);
 		if(parts[0] !== pfx) {
 			_p$.warn(_N$, _m$, 'Invalid Signature');
 			return '';
 		} //end if
 		const crc = _Utils$.stringPureVal(parts[2], true);
-		b64Arch = _Utils$.stringPureVal(parts[1], true);
+		pkData = _Utils$.stringPureVal(parts[1], true);
 		parts = null; // free mem
 		//--
 		if(crc == '') {
 			_p$.warn(_N$, _m$, 'Empty CRC');
 			return '';
 		} //end if
-		if(b64Arch == '') {
+		if(pkData == '') {
 			_p$.warn(_N$, _m$, 'Empty B64 Data');
 			return '';
 		} //end if
 		//--
-		b64Arch = _Ba$eConv.b64s_dec(b64Arch, true); // binary
-		if(b64Arch == '') {
+		pkData = _Ba$eConv.b64s_dec(pkData, true); // binary
+		if(pkData == '') {
 			_p$.warn(_N$, _m$, 'Empty Arch Data');
 			return '';
 		} //end if
 		//--
-		const snapU = new smartJ$SnappyUncompress(b64Arch);
-		b64Arch = null; // free mem
+		const snapU = new smartJ$SnappyUncompress(pkData);
+		pkData = null; // free mem
 		//--
 		const txtPlain = String(snapU.uncompress() || '');
 		if(txtPlain == '') {
@@ -620,7 +634,7 @@ const smartJ$ArchSnappy = new class{constructor(){ // STATIC CLASS (ES6)
 			return '';
 		} //end if
 		//--
-		if(_Crypto$Hash.crc32b(txtPlain, true) !== crc) {
+		if(_Crypto$Hash.crc32b(txtPlain + nByte + String(txtPlain.length) + vByte + _Crypto$Hash.sh3a512(txtPlain, true), true) !== crc) {
 			_p$.warn(_N$, _m$, 'Data CRC Failed');
 			return '';
 		} //end if
@@ -628,7 +642,7 @@ const smartJ$ArchSnappy = new class{constructor(){ // STATIC CLASS (ES6)
 		return String(txtPlain);
 		//--
 	}; //END
-	_C$.uncompress = uncompress; // export
+	_C$.dataUnpack = dataUnpack; // export
 
 }}; //END CLASS
 

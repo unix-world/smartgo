@@ -4,6 +4,7 @@
 
 package sha3
 
+
 // KeccakF1600 applies the Keccak permutation to a 1600b-wide
 // state represented as a slice of 25 uint64s.
 // If turbo is true, applies the 12-round variant instead of the
@@ -389,3 +390,6 @@ func KeccakF1600(a *[25]uint64, turbo bool) {
 		a[24] = bc4 ^ (bc1 &^ bc0)
 	}
 }
+
+
+// #end

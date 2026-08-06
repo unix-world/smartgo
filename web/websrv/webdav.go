@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -466,7 +466,7 @@ func webDavUploadHandler(r *http.Request, realPath string, useSmartSafeValidPath
 		} //end if else
 		//--
 		var isOkSave bool = true
-		fUpRes, fUpErrRes := os.OpenFile(upfPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, smart.CHOWN_FILES)
+		fUpRes, fUpErrRes := os.OpenFile(upfPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, smart.CHMOD_FILES)
 		if(fUpErrRes != nil) {
 			isOkSave = false
 		} else {

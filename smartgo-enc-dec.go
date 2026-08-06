@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ ENCODERS / DECODERS ]
 
 // REQUIRE: go 1.19 or later
@@ -397,6 +397,64 @@ func Base64uToBase64(data string) string {
 	} //end if
 	//--
 	return Base64sToBase64(data) // the missing padding will be fixed inside B64 Decode
+	//--
+} //END FUNCTION
+
+
+func Base64uBytEncode(data []byte) []byte {
+	//--
+	defer PanicHandler() // req. by base64 enc
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	data = Base64sBytEncode(data)
+	data = BytTrimRight(data, ".") // B64u have no padding
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+func Base64uBytDecode(data []byte) []byte {
+	//--
+	defer PanicHandler() // req. by base64 decode panic handler with malformed data
+	//--
+	if(data == nil) {
+		return nil
+	} //end if
+	//--
+	return Base64sBytDecode(data)
+	//--
+} //END FUNCTION
+
+
+func Base64uEncode(data string) string {
+	//--
+	defer PanicHandler() // req. by base64 enc
+	//--
+	if(data == "") {
+		return ""
+	} //end if
+	//--
+	data = Base64sEncode(data)
+	data = StrTrimRight(data, ".") // B64u have no padding
+	//--
+	return data
+	//--
+} //END FUNCTION
+
+
+func Base64uDecode(data string) string {
+	//--
+	defer PanicHandler() // req. by base64 decode panic handler with malformed data
+	//--
+	if(data == "") {
+		return ""
+	} //end if
+	//--
+	return Base64sDecode(data)
 	//--
 } //END FUNCTION
 

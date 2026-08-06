@@ -26,7 +26,7 @@
  * @author unix-world.org
  * @license BSD
  * @file ifmodalbox_scanner.js
- * @version 20260128
+ * @version 20260804
  * @class jQuery.Plugin::smartJ$ModalBox@Scanner
  * @static
  *

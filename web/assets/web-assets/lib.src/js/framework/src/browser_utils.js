@@ -33,7 +33,7 @@
  * @author unix-world.org
  * @license BSD
  * @file browser_utils.js
- * @version 20260128
+ * @version 20260804
  * @class smartJ$Browser
  * @static
  * @frozen
@@ -3312,8 +3312,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 		//--
 		mimeType = _Utils$.stringPureVal(mimeType, true); // cast to string, trim
 		if(mimeType == '') {
-			_p$.error(_N$, _m$, 'ERR:', 'Empty MimeType');
-			return;
+			mimeType = '*'; // alluw any mime type in this case
 		} //end if
 		//--
 		inputUpldFileId = _Utils$.stringPureVal(inputUpldFileId, true); // cast to string, trim
@@ -3362,7 +3361,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 			let the_type_of_file = _Utils$.stringPureVal(the_file.type, true).toLowerCase();
 			let the_size_of_file = _Utils$.format_number_int(the_file.size, false);
 			//--
-			if((the_name_of_file == '') || (the_type_of_file == '') || (the_type_of_file !== mimeType)) { // check file type
+			if((the_name_of_file == '') || (the_type_of_file == '') || (((mimeType !== '*')) && (the_type_of_file !== mimeType))) { // check file type
 				$upldr.val('');
 				$divpw.text(txtWarn + 'Invalid File Type [' + the_type_of_file + ']: ' + the_name_of_file);
 				return;

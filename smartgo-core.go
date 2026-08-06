@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ SMART.CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but stable only since go 1.19)
@@ -302,6 +302,415 @@ func SmartArrToList(arr []string, sepSpaces bool) string {
 	} //end if
 	//--
 	return strings.Join(safeArr, glue) // implode
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func InterfaceToString(m interface{}) (string, error) {
+	//--
+	res, ok := m.(string)
+	if(ok != true) {
+		return "", NewError("Failed to cast interface to String")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToStringSlice(m []interface{}) ([]string, error) {
+	//--
+	var arr []string
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToString(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt(m interface{}) (int, error) {
+	//--
+	res, ok := m.(int)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Int")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToIntSlice(m []interface{}) ([]int, error) {
+	//--
+	var arr []int
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToInt(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt64(m interface{}) (int64, error) {
+	//--
+	res, ok := m.(int64)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Int64")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt64Slice(m []interface{}) ([]int64, error) {
+	//--
+	var arr []int64
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToInt64(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt32(m interface{}) (int32, error) {
+	//--
+	res, ok := m.(int32)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Int32")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt32Slice(m []interface{}) ([]int32, error) {
+	//--
+	var arr []int32
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToInt32(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt16(m interface{}) (int16, error) {
+	//--
+	res, ok := m.(int16)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Int16")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt16Slice(m []interface{}) ([]int16, error) {
+	//--
+	var arr []int16
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToInt16(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt8(m interface{}) (int8, error) {
+	//--
+	res, ok := m.(int8)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Int8")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToInt8Slice(m []interface{}) ([]int8, error) {
+	//--
+	var arr []int8
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToInt8(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt(m interface{}) (uint, error) {
+	//--
+	res, ok := m.(uint)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to UInt")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUIntSlice(m []interface{}) ([]uint, error) {
+	//--
+	var arr []uint
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToUInt(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt64(m interface{}) (uint64, error) {
+	//--
+	res, ok := m.(uint64)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to UInt64")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt64Slice(m []interface{}) ([]uint64, error) {
+	//--
+	var arr []uint64
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToUInt64(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt32(m interface{}) (uint32, error) {
+	//--
+	res, ok := m.(uint32)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to UInt32")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt32Slice(m []interface{}) ([]uint32, error) {
+	//--
+	var arr []uint32
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToUInt32(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt16(m interface{}) (uint16, error) {
+	//--
+	res, ok := m.(uint16)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to UInt16")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt16Slice(m []interface{}) ([]uint16, error) {
+	//--
+	var arr []uint16
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToUInt16(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt8(m interface{}) (uint8, error) {
+	//--
+	res, ok := m.(uint8)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to UInt8")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToUInt8Slice(m []interface{}) ([]uint8, error) {
+	//--
+	var arr []uint8
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToUInt8(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToFloat64(m interface{}) (float64, error) {
+	//--
+	res, ok := m.(float64)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Float64")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToFloat64Slice(m []interface{}) ([]float64, error) {
+	//--
+	var arr []float64
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToFloat64(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToFloat32(m interface{}) (float32, error) {
+	//--
+	res, ok := m.(float32)
+	if(ok != true) {
+		return 0, NewError("Failed to cast interface to Float32")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToFloat32Slice(m []interface{}) ([]float32, error) {
+	//--
+	var arr []float32
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToFloat32(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToBool(m interface{}) (bool, error) {
+	//--
+	res, ok := m.(bool)
+	if(ok != true) {
+		return false, NewError("Failed to cast interface to Bool")
+	} //end if
+	//--
+	return res, nil
+	//--
+} //END FUNCTION
+
+
+func InterfaceToBoolSlice(m []interface{}) ([]bool, error) {
+	//--
+	var arr []bool
+	//--
+	for i:=0; i<len(m); i++ {
+		res, err := InterfaceToBool(m[i])
+		if(err != nil) {
+			return nil, err
+		} //end if
+		arr = append(arr, res)
+	} //end for
+	//--
+	return arr, nil
 	//--
 } //END FUNCTION
 

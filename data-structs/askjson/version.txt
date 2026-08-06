@@ -1,0 +1,7 @@
+github.com/simonnilsson/ask @head.20260216
+
+go 1.17
+
+refactored and modified by unixman r.20260218.2358
+
+

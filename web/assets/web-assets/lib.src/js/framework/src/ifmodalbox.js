@@ -24,7 +24,7 @@
  * @author unix-world.org
  * @license BSD
  * @file ifmodalbox.js
- * @version 20260128
+ * @version 20260804
  * @class smartJ$ModalBox
  * @fires iFrame: Show / Load / Unload / Hide
  * @listens getHandlerOnBeforeUnload() that can be set by setHandlerOnBeforeUnload(()=>{})
@@ -34,7 +34,7 @@
  */
 const smartJ$ModalBox = new class{constructor(){ // STATIC CLASS
 	const _N$ = 'smartJ$ModalBox';
-	const VER = 'r.20260128';
+	const VER = 'r.20260804';
 
 	// :: static
 	const _C$ = this; // self referencing

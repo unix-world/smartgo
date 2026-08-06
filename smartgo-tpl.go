@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ TPL (MARKERS-TPL TEMPLATING) ]
 
 // REQUIRE: go 1.19 or later
@@ -28,6 +28,9 @@ const (
 )
 
 //-----
+
+
+// syntax: r.20260805
 
 
 //-----
@@ -786,7 +789,7 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 						iKeyValue = StrTrimWhitespaces(iKeyValue)
 						if((iKeyValue != "") && (StrStartsWith(iKeyValue, "{") || StrStartsWith(iKeyValue, "["))) { // {{{SYNC-GO-TPL-JSON-STARTS}}}
 						//	log.Println("[DEBUG]", CurrentFunctionName(), "iKeyValue @ 0", iKeyValue)
-							jsonDat, jsonErr := JsonGetValueByKeysPath(iKeyValue) // get fastjson root, no keys
+							jsonDat, jsonErr := JsonGetValueByKeysPath(iKeyValue) // get root, no keys
 							iKeyValue = "" // reset
 							if(jsonErr != nil) {
 								if(isConditionalBlockERR == "") {
@@ -797,12 +800,13 @@ func markersTplProcessIfSyntax(template string, arrobj map[string]string) string
 									isConditionalBlockERR = "IF var name `" + tmp_ifs_var_if + "` Parsed JSON is NULL"
 								} //end if
 							} else {
-								if(jsonDat.Exists(theIfSubVar)) {
+								jsonRawValIfSubVar := jsonDat.GetArgs(theIfSubVar)
+								if(jsonRawValIfSubVar.Exists()) {
 									if(theIfSubSubVar != "") {
-										iKeyValue = jsonDat.GetScalarAsString(theIfSubVar, theIfSubSubVar)
+										iKeyValue = jsonRawValIfSubVar.GetArgs(theIfSubSubVar).String()
 									//	log.Println("[DEBUG]", CurrentFunctionName(), "iKeyValue @ 2", theIfSubVar, theIfSubSubVar, iKeyValue)
 									} else {
-										iKeyValue = jsonDat.GetScalarAsString(theIfSubVar)
+										iKeyValue = jsonRawValIfSubVar.String()
 									//	log.Println("[DEBUG]", CurrentFunctionName(), "iKeyValue @ 1", theIfSubVar, iKeyValue)
 									} //end if else
 								} else {
@@ -1076,18 +1080,31 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							//--
 						//	log.Println("[DEBUG]", CurrentFunctionName(), ": escaping + " # found Marker Escaping [Arr] at index: " + ConvertIntToStr(i) + "." + ConvertIntToStr(j))
 							//--
-							if(escaping == "|bool") { // Boolean
+							if(escaping == "|len") { // Byte Length
+								tmp_marker_val = ConvertIntToStr(StrLen(tmp_marker_val))
+							} else if(escaping == "|ulen") { // Unicode Length
+								tmp_marker_val = ConvertIntToStr(StrUnicodeLen(tmp_marker_val))
+							//--
+							} else if(escaping == "|bool") { // Boolean
 								tmp_marker_val = ParseBoolStrAsStdBoolStr(tmp_marker_val)
 							} else if(escaping == "|int") { // Integer
 								tmp_marker_val = ConvertInt64ToStr(ParseStrAsInt64(tmp_marker_val))
-							} else if(escaping == "|dec1") { // Decimals: 1
-								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 1)
-							} else if(escaping == "|dec2") { // Decimals: 2
-								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 2)
-							} else if(escaping == "|dec3") { // Decimals: 3
-								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 3)
-							} else if(escaping == "|dec4") { // Decimals: 4
-								tmp_marker_val = ParseFloatStrAsDecimalStr(tmp_marker_val, 4)
+							} else if(escaping == "|dec1") { // Fixed Decimals: 1
+								tmp_marker_val = Float64StrToFixedDecimalsStr(tmp_marker_val, 1)
+							} else if(escaping == "|dec2") { // Fixed Decimals: 2
+								tmp_marker_val = Float64StrToFixedDecimalsStr(tmp_marker_val, 2)
+							} else if(escaping == "|dec3") { // Fixed Decimals: 3
+								tmp_marker_val = Float64StrToFixedDecimalsStr(tmp_marker_val, 3)
+							} else if(escaping == "|dec4") { // Fixed Decimals: 4
+								tmp_marker_val = Float64StrToFixedDecimalsStr(tmp_marker_val, 4)
+							} else if(escaping == "|dex1") { // Max Decimals: 1
+								tmp_marker_val = Float64StrToMaxDecimalsStr(tmp_marker_val, 1)
+							} else if(escaping == "|dex2") { // Max Decimals: 2
+								tmp_marker_val = Float64StrToMaxDecimalsStr(tmp_marker_val, 2)
+							} else if(escaping == "|dex3") { // Max Decimals: 3
+								tmp_marker_val = Float64StrToMaxDecimalsStr(tmp_marker_val, 3)
+							} else if(escaping == "|dex4") { // Max Decimals: 4
+								tmp_marker_val = Float64StrToMaxDecimalsStr(tmp_marker_val, 4)
 							} else if(escaping == "|num") { // Number (Float / Decimal / Integer)
 								tmp_marker_val = ParseStrAsFloat64StrFixedPrecision(tmp_marker_val)
 							//--
@@ -1143,6 +1160,14 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							} else if(escaping == "|idtxt") { // id_txt: Id-Txt
 								tmp_marker_val = StrReplaceWithLimit(tmp_marker_val, "_", "-", -1) // replace all
 								tmp_marker_val = StrUcWords(tmp_marker_val)
+							} else if(escaping == "|unixname") { // unix name: a-z0-9, max 32 characters
+								tmp_marker_val = StrCreateSlug(tmp_marker_val)
+								tmp_marker_val = StrToLower(tmp_marker_val)
+								tmp_marker_val = StrSubstr(tmp_marker_val, 0, 32)
+								tmp_marker_val = StrTr(tmp_marker_val, map[string]string{
+									"-": "",
+									"_": "",
+								})
 							} else if(escaping == "|slug") { // Slug: a-zA-Z0-9_- / - / -- : -
 								tmp_marker_val = StrCreateSlug(tmp_marker_val)
 							} else if(escaping == "|htmid") { // HTML-ID: a-zA-Z0-9_-
@@ -1154,9 +1179,9 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 								if(StrTrimWhitespaces(tmp_marker_val) == "") {
 									tmp_marker_val = UNDEF_VAR_NAME
 								} //end if
-							} else if(escaping == "|normspaces") { // normalize spaces
+							} else if(escaping == "|nmspace") { // normalize spaces
 								tmp_marker_val = StrNormalizeSpaces(tmp_marker_val)
-							} else if(escaping == "|nospaces") { // no spaces
+							} else if(escaping == "|nospace") { // no spaces
 								tmp_marker_val = StrTrimWhitespaces(StrReplaceAll(StrNormalizeSpaces(tmp_marker_val), " ", ""))
 							} else if(escaping == "|nobackslash") { // remove backslashes from a string
 								tmp_marker_val = StrReplaceAll(tmp_marker_val, "\\", "")
@@ -1200,6 +1225,10 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 								tmp_marker_val = StrUcWords(tmp_marker_val)
 							} else if(escaping == "|trim") { // apply trim
 								tmp_marker_val = StrTrimWhitespaces(tmp_marker_val)
+							} else if(escaping == "|ltrim") { // apply ltrim
+								tmp_marker_val = StrTrimLeftWhitespaces(tmp_marker_val)
+							} else if(escaping == "|rtrim") { // apply rtrim
+								tmp_marker_val = StrTrimRightWhitespaces(tmp_marker_val)
 							} else if(escaping == "|rev") { // reverse string
 								tmp_marker_val = StrRev(tmp_marker_val)
 							//--
@@ -1209,20 +1238,19 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 							} else if(escaping == "|syntaxhtml") { // fix back markers tpl escapings in html
 								tmp_marker_val = MarkersTplPrepareNosyntaxHtml(tmp_marker_val, false)
 							//--
-							} else if(escaping == "|hexi10") { // Converts a 64-bit positive integer number to hex (string)
-								tmp_marker_val = UInt64ToHex(ParseStrAsUInt64(tmp_marker_val))
 							} else if(escaping == "|hex") { // Apply Bin2Hex Encode
 								tmp_marker_val = Bin2Hex(tmp_marker_val)
-							//--
-							} else if(escaping == "|b64tob64s") { // Convert from Base64 Encoding to Base64 Safe URL Encoding
-								tmp_marker_val = Base64ToBase64s(tmp_marker_val)
-							} else if(escaping == "|b64stob64") { // Convert from Base64 Safe URL Encoding to Base64 Encoding
-								tmp_marker_val = Base64sToBase64(tmp_marker_val)
+							} else if(escaping == "|hexi10") { // Converts a 64-bit positive integer number to hex (string)
+								tmp_marker_val = UInt64ToHex(ParseStrAsUInt64(tmp_marker_val))
 							//--
 							} else if(escaping == "|b64") { // Apply Base64 Encode
 								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b64")
 							} else if(escaping == "|b64s") { // Apply Base64 Encode
 								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b64s")
+							} else if(escaping == "|b64tob64s") { // Convert from Base64 Encoding to Base64 Safe URL Encoding
+								tmp_marker_val = Base64ToBase64s(tmp_marker_val)
+							} else if(escaping == "|b64stob64") { // Convert from Base64 Safe URL Encoding to Base64 Encoding
+								tmp_marker_val = Base64sToBase64(tmp_marker_val)
 							//--
 							} else if(escaping == "|b32") { // Apply Base32 Encode
 								tmp_marker_val = BaseEncode([]byte(tmp_marker_val), "b32")

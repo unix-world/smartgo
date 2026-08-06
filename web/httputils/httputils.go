@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
@@ -41,7 +41,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20260216.2358"
+	VERSION string = "r.20260801.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -112,7 +112,7 @@ const (
 	CACHE_CONTROL_PUBLIC  string = "public"
 	CACHE_CONTROL_DEFAULT string = "default"
 	//--
-	MAX_SIZE_ETAG int64 = 1048576 // 1MB 1048576 bytes ; 100% of assets match this criteria ; for the rest (ex: public files), Weak ETag is not worth ...
+	MAX_SIZE_ETAG uint64 = smart.SIZE_BYTES_1M // 1MB 1048576 bytes ; 100% of assets match this criteria ; for the rest (ex: public files), Weak ETag is not worth ...
 	//--
 	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-\.\:\#]+$` // original: `^[a-zA-Z0-9_\-]+$` ; allow extended as PHP supports
 	//--
@@ -139,6 +139,7 @@ const (
 	HTTP_STATUS_408 string = "408 Request Timeout"
 	HTTP_STATUS_409 string = "409 Conflict" // example: conflicts occur if a request to create collection /a/b/c/d/ is made, and /a/b/c/ does not exist
 	HTTP_STATUS_410 string = "410 Gone" // a more permanent 404 like status, ex: if a page was available just for a period of time
+	HTTP_STATUS_413 string = "413 Content Too Large"
 	HTTP_STATUS_415 string = "415 Unsupported Media Type"
 	HTTP_STATUS_422 string = "422 Unprocessable Content" // 422 Unprocessable Entity
 	HTTP_STATUS_423 string = "423 Locked"
@@ -161,6 +162,12 @@ const (
 	HTTP_HEADER_CONTENT_X_REQUESTED_WITH string = "x-requested-with"
 	//--
 	HTTP_HEADER_ACCEPT_MIMETYPE string = "accept"
+	//--
+	HTTP_HEADER_TRANSFER_ENCODING string = "transfer-encoding"
+	HTTP_HEADER_VALUE_IDENTITY string = "identity" // using this with gzip will disable transfer encoding chunk with gzip !
+	//--
+	HTTP_HEADER_CONTENT_AENC string = "accept-encoding"
+	HTTP_HEADER_CONTENT_SENC string = "content-encoding"
 	//--
 	HTTP_HEADER_CONTENT_TYPE string = "content-type"
 	HTTP_HEADER_CONTENT_DISP string = "content-disposition"
@@ -1509,7 +1516,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			} //end if
 		} //end if
 		//-- {{{SYNC-HTTPCLI-DOWNLOAD-PATH-DISALLOW-ABSOLUTE}}}
-		dFile, dErr := os.OpenFile(dFullPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY|os.O_TRUNC, smart.CHOWN_FILES)
+		dFile, dErr := os.OpenFile(dFullPath, os.O_EXCL|os.O_CREATE|os.O_WRONLY|os.O_TRUNC, smart.CHMOD_FILES)
 		if(dErr != nil) {
 			httpResult.Errors = "ERR: Failed to open the Download File for writing: `" + dFullPath + "`: " + dErr.Error()
 			httpResult.HttpStatus = -825
@@ -1597,15 +1604,15 @@ func TlsConfigServer(forceHttpV1 bool, description string) tls.Config {
 		nextProtos = nextProtos[len(nextProtos)-1:] // keep just the last
 	} //end if
 	log.Println("[INFO]", smart.CurrentFunctionName() + ": [TLS 1.3]", nextProtos, description)
-	//--
+	//-- chromium/chrome only supports a certificate CurveP384/SHA384, not yet CurveP521/SHA512
 	cfg := tls.Config{ // support just TLS 1.3 and 1.2 (backward compatible) ; enable TLS_FALLBACK_SCSV because without there are many downgrade based attacks on TLS if many versions are supported
 		MinVersion: 		tls.VersionTLS12,
 		MaxVersion: 		tls.VersionTLS13,
 		CurvePreferences: 	[]tls.CurveID{ // https://safecurves.cr.yp.to
 			tls.CurveP521,
-			tls.X25519,
+			tls.X25519, // for go inter-services
 			tls.CurveP384,
-		//	tls.CurveP256,
+		//	tls.CurveP256, // disabled, weak
 		},
 		CipherSuites: []uint16{ // TLS 1.3 ciphersuites are not configurable: https://pkg.go.dev/crypto/tls#Config.CipherSuites
 			//-- tls 1.3
@@ -1616,6 +1623,8 @@ func TlsConfigServer(forceHttpV1 bool, description string) tls.Config {
 			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, 	// tls1.2
 			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, 		// tls1.2 ; macOS, webDAV
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, 			// tls1.2 ; macOS, webDAV
+		//	tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, 			// tls1.2
+		//	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, 			// tls1.2
 			tls.TLS_RSA_WITH_AES_256_GCM_SHA384, 				// tls1.2
 			//-- security:
 			tls.TLS_FALLBACK_SCSV, // protection against TLS downgrade attacks
@@ -1859,7 +1868,7 @@ func HttpHeadersCacheControl(w http.ResponseWriter, r *http.Request, expiration 
 
 //-----
 
-type HttpStreamerFunc func() (ioReadStream io.Reader)
+type HttpStreamerFunc func() (ioReadStream io.ReadCloser, errInttStream error)
 
 // valid code: 200 ; 201 ; 202 ; 203 ; 208
 // contentFnameOrPath: stream.ext (will get extension .ext and serve mime type by this extension) ; default, fallback to .stream
@@ -1933,12 +1942,37 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 	w.WriteHeader(int(code))
 	//--
 	log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Stream: `" + route + "` ; ContentType: `" + contentType + "` ; ContentDisposition: `" + contentDisposition + "` ; StatusCode:", code, "; ClientIP:", realClientIp)
-	_, errStream := io.Copy(w, streamBytesFunc()) // transfer stream to response
+	controllerStream, errControllerStream := streamBytesFunc()
+	if(errControllerStream != nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Stream Init Failed: `" + route + "` ; ClientIP: " + realClientIp + " ; Error:", errControllerStream)
+		return
+	} //end if
+	if(controllerStream == nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Stream Init Failed: `" + route + "` ; ClientIP: " + realClientIp + " ; Error, Stream is Null")
+		return
+	} //end if
+	defer controllerStream.Close()
+	_, errStream := io.Copy(w, controllerStream) // transfer stream to response
 	if(errStream != nil) {
 		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Failed to Serve Stream: `" + route + "` ; ClientIP: " + realClientIp + " ; Error:", errStream)
 		fmt.Fprintf(w, "%s", errStream) // write error also on stream ...
 	} //end if
 	return
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HttpIsSetContentEncoding(w http.ResponseWriter) bool {
+	//--
+	var hdrContentEncoding string = smart.StrTrimWhitespaces(w.Header().Get(HTTP_HEADER_CONTENT_SENC)) // encoding header
+	if(hdrContentEncoding != "") {
+		return true
+	} //end if
+	//--
+	return false
 	//--
 } //END FUNCTION
 
@@ -1965,6 +1999,8 @@ func httpOKXWriteAllowedHeaders(w http.ResponseWriter, headers map[string]string
 		val = HttpSafeHeaderValue(val) 	// this will also trim
 		switch(key) {
 			//-- these headers are managed above, don't allow rewrite
+			case HTTP_HEADER_CONTENT_SENC:
+				break
 			case HTTP_HEADER_CONTENT_TYPE:
 				break
 			case HTTP_HEADER_CONTENT_DISP:
@@ -2087,11 +2123,11 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	isCachedContent := HttpHeadersCacheControl(w, r, cacheExpiration, cacheLastModified, cacheControl)
 	if(isCachedContent == true) {
 		var eTag string = ""
-		if(int64(len(content)) <= MAX_SIZE_ETAG) { // {{{SYNC-SIZE-MAX-ETAG}}} ; manage eTag only for content size <= 1MB
+		if(uint64(len(content)) <= MAX_SIZE_ETAG) { // {{{SYNC-SIZE-MAX-ETAG}}} ; manage eTag only for content size <= 1MB
 			eTag = smart.Md5(content) // do not enclose here in double quotes, needs pure value for below check, 304 (if match)
 		} //end if
 		if(eTag != "") {
-			w.Header().Set(HTTP_HEADER_ETAG_SUM, `"`+eTag+`"`) // trick: use a Weak ETag as (W/"") or by enclosing ETag in double quotes to allow GZip compression ...
+			w.Header().Set(HTTP_HEADER_ETAG_SUM, `"`+eTag+`"`) // trick: use a Weak ETag as (W/"") or by enclosing ETag in double quotes to work with gzip compression ...
 			var match string = smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_ETAG_IFNM))
 			if(DEBUG == true) {
 				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": If None Match (Header):", match)
@@ -2110,7 +2146,9 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	} else {
 		w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 		w.Header().Set(HTTP_HEADER_CONTENT_DISP, contentDisposition)
-		w.Header().Set(HTTP_HEADER_CONTENT_LEN,  smart.ConvertIntToStr(len(content)))
+		if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+			w.Header().Set(HTTP_HEADER_CONTENT_LEN,  smart.ConvertIntToStr(len(content)))
+		} //end if
 	} //end if
 	//--
 	httpOKXWriteAllowedHeaders(w, headers, smart.CurrentFunctionName())
@@ -2181,7 +2219,7 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 	defer smart.PanicHandler()
 	//--
 	var title string = ""
-	switch(code) {
+	switch(code) { // 304 is handled only internal, cannot be handled here
 		case 301:
 			title = HTTP_STATUS_301
 			break
@@ -2226,7 +2264,9 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 	w.Header().Set(HTTP_HEADER_REDIRECT_LOCATION, redirectUrl)
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
-	w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+		w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	} //end if
 	w.WriteHeader(int(code)) // status code must be after set headers
 	w.Write([]byte(content))
 	//--
@@ -2239,18 +2279,19 @@ func HttpStatus301(w http.ResponseWriter, r *http.Request, redirectUrl string, o
 	//--
 } //END FUNCTION
 
-
 func HttpStatus302(w http.ResponseWriter, r *http.Request, redirectUrl string, outputHtml bool) {
 	//--
 	httpStatus3XX(w, r, 302, redirectUrl, outputHtml)
 	//--
 } //END FUNCTION
 
+// 304 is handled only internal, no external method
+
 
 //-----
 
 
-// valid code: 400 ; 401 ; 402 ; 403 ; 404 ; 405 ; 406 ; 408 ; 409 ; 410 ; 415 ; 422 ; 423 ; 424 ; 429 ; 500 ; 501 ; 502 ; 503 ; 504 ; 507
+// valid code: 400 ; 401 ; 402 ; 403 ; 404 ; 405 ; 406 ; 408 ; 409 ; 410 ; 413 ; 415 ; 422 ; 423 ; 424 ; 429 ; 500 ; 501 ; 502 ; 503 ; 504 ; 507
 func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageText string, outputHtml bool, isMessageTextHtmlPage bool, displayCaptcha bool) {
 	//--
 	defer smart.PanicHandler()
@@ -2299,6 +2340,10 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			break
 		case 410:
 			title = HTTP_STATUS_410
+			displayCaptcha = false
+			break
+		case 413:
+			title = HTTP_STATUS_413
 			displayCaptcha = false
 			break
 		case 415:
@@ -2443,7 +2488,9 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 	//--
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
-	w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+		w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	} //end if
 	w.WriteHeader(int(code)) // status code must be after set headers
 	w.Write([]byte(content))
 	//--
@@ -2567,6 +2614,12 @@ func HttpStatus409(w http.ResponseWriter, r *http.Request, messageText string, o
 func HttpStatus410(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
 	//--
 	httpStatusERR(w, r, 410, messageText, outputHtml, false, false)
+	//--
+} //END FUNCTION
+
+func HttpStatus413(w http.ResponseWriter, r *http.Request, messageText string, outputHtml bool) {
+	//--
+	httpStatusERR(w, r, 413, messageText, outputHtml, false, false)
 	//--
 } //END FUNCTION
 

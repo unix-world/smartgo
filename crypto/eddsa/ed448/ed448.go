@@ -1,5 +1,4 @@
 // Package ed448 implements Ed448 signature scheme as described in RFC-8032.
-//
 // This package implements two signature variants.
 //
 //	| Scheme Name | Sign Function     | Verification  | Context           |
@@ -12,15 +11,14 @@
 // function for all schemes is available through the crypto.Signer interface,
 // which is implemented by the PrivateKey type. A correspond all-in-one
 // verification method is provided by the VerifyAny function.
-//
 // Both schemes require a context string for domain separation. This parameter
 // is passed using a SignerOptions struct defined in this package.
 //
 // References:
-//
 //   - RFC8032: https://rfc-editor.org/rfc/rfc8032.txt
 //   - EdDSA for more curves: https://eprint.iacr.org/2015/677
 //   - High-speed high-security signatures: https://doi.org/10.1007/s13389-012-0027-1
+
 package ed448
 
 import (
@@ -39,6 +37,7 @@ import (
 	"github.com/unix-world/smartgo/crypto/eddsa/internal/sign"
 )
 
+
 const (
 	// ContextMaxSize is the maximum length (in bytes) allowed for context.
 	ContextMaxSize = 255
@@ -52,10 +51,12 @@ const (
 	SeedSize = 57
 )
 
+
 const (
 	paramB   = 456 / 8    // Size of keys in bytes.
 	hashSize = 2 * paramB // Size of the hash function's output.
 )
+
 
 // SignerOptions implements crypto.SignerOpts and augments with parameters
 // that are specific to the Ed448 signature schemes.
@@ -71,16 +72,20 @@ type SignerOptions struct {
 	Scheme SchemeID
 }
 
+
 // SchemeID is an identifier for each signature scheme.
 type SchemeID uint
+
 
 const (
 	ED448 SchemeID = iota
 	ED448Ph
 )
 
+
 // PublicKey is the type of Ed448 public keys.
 type PublicKey []byte
+
 
 // Equal reports whether pub and x have the same value.
 func (pub PublicKey) Equal(x crypto.PublicKey) bool {
@@ -88,8 +93,10 @@ func (pub PublicKey) Equal(x crypto.PublicKey) bool {
 	return ok && bytes.Equal(pub, xx)
 }
 
+
 // PrivateKey is the type of Ed448 private keys. It implements crypto.Signer.
 type PrivateKey []byte
+
 
 // Equal reports whether priv and x have the same value.
 func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
@@ -97,12 +104,14 @@ func (priv PrivateKey) Equal(x crypto.PrivateKey) bool {
 	return ok && subtle.ConstantTimeCompare(priv, xx) == 1
 }
 
+
 // Public returns the PublicKey corresponding to priv.
 func (priv PrivateKey) Public() crypto.PublicKey {
 	publicKey := make([]byte, PublicKeySize)
 	copy(publicKey, priv[SeedSize:])
 	return PublicKey(publicKey)
 }
+
 
 // Seed returns the private key seed corresponding to priv. It is provided for
 // interoperability with RFC 8032. RFC 8032's private keys correspond to seeds
@@ -113,9 +122,16 @@ func (priv PrivateKey) Seed() []byte {
 	return seed
 }
 
-func (priv PrivateKey) Scheme() sign.Scheme { return sch }
 
-func (pub PublicKey) Scheme() sign.Scheme { return sch }
+func (priv PrivateKey) Scheme() sign.Scheme {
+	return sch
+}
+
+
+func (pub PublicKey) Scheme() sign.Scheme {
+	return sch
+}
+
 
 func (priv PrivateKey) MarshalBinary() (data []byte, err error) {
 	privateKey := make(PrivateKey, PrivateKeySize)
@@ -123,11 +139,13 @@ func (priv PrivateKey) MarshalBinary() (data []byte, err error) {
 	return privateKey, nil
 }
 
+
 func (pub PublicKey) MarshalBinary() (data []byte, err error) {
 	publicKey := make(PublicKey, PublicKeySize)
 	copy(publicKey, pub)
 	return publicKey, nil
 }
+
 
 // Sign creates a signature of a message given a key pair.
 // This function supports all the two signature variants defined in RFC-8032,
@@ -137,11 +155,7 @@ func (pub PublicKey) MarshalBinary() (data []byte, err error) {
 // Use an Options struct to pass a bool indicating that the ed448Ph variant
 // should be used.
 // The struct can also be optionally used to pass a context string for signing.
-func (priv PrivateKey) Sign(
-	rand io.Reader,
-	message []byte,
-	opts crypto.SignerOpts,
-) (signature []byte, err error) {
+func (priv PrivateKey) Sign(rand io.Reader, message []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	var ctx string
 	var scheme SchemeID
 
@@ -159,6 +173,7 @@ func (priv PrivateKey) Sign(
 		return nil, errors.New("ed448: bad hash algorithm")
 	}
 }
+
 
 // GenerateKey generates a public/private key pair using entropy from rand.
 // If rand is nil, crypto/rand.Reader will be used.
@@ -179,6 +194,7 @@ func GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error) {
 	return publicKey, privateKey, nil
 }
 
+
 // NewKeyFromSeed calculates a private key from a seed. It will panic if
 // len(seed) is not SeedSize. This function is provided for interoperability
 // with RFC 8032. RFC 8032's private keys correspond to seeds in this
@@ -188,6 +204,7 @@ func NewKeyFromSeed(seed []byte) PrivateKey {
 	newKeyFromSeed(privateKey, seed)
 	return privateKey
 }
+
 
 func newKeyFromSeed(privateKey, seed []byte) {
 	if l := len(seed); l != SeedSize {
@@ -204,6 +221,7 @@ func newKeyFromSeed(privateKey, seed []byte) {
 	copy(privateKey[:SeedSize], seed)
 	_ = goldilocks.Curve{}.ScalarBaseMult(s).ToBytes(privateKey[SeedSize:])
 }
+
 
 func signAll(signature []byte, privateKey PrivateKey, message, ctx []byte, preHash bool) {
 	if len(ctx) > ContextMaxSize {
@@ -271,6 +289,7 @@ func signAll(signature []byte, privateKey PrivateKey, message, ctx []byte, preHa
 	copy(signature[paramB:], S[:])
 }
 
+
 // Sign signs the message with privateKey and returns a signature.
 // This function supports the signature variant defined in RFC-8032: Ed448,
 // also known as the pure version of EdDSA.
@@ -280,6 +299,7 @@ func Sign(priv PrivateKey, message []byte, ctx string) []byte {
 	signAll(signature, priv, message, []byte(ctx), false)
 	return signature
 }
+
 
 // SignPh creates a signature of a message given a keypair.
 // This function supports the signature variant defined in RFC-8032: Ed448ph,
@@ -291,6 +311,7 @@ func SignPh(priv PrivateKey, message []byte, ctx string) []byte {
 	signAll(signature, priv, message, []byte(ctx), true)
 	return signature
 }
+
 
 func verify(public PublicKey, message, signature, ctx []byte, preHash bool) bool {
 	if len(public) != PublicKeySize ||
@@ -339,6 +360,7 @@ func verify(public PublicKey, message, signature, ctx []byte, preHash bool) bool
 	return bytes.Equal(R, encR)
 }
 
+
 // VerifyAny returns true if the signature is valid. Failure cases are invalid
 // signature, or when the public key cannot be decoded.
 // This function supports all the two signature variants defined in RFC-8032,
@@ -364,6 +386,7 @@ func VerifyAny(public PublicKey, message, signature []byte, opts crypto.SignerOp
 	}
 }
 
+
 // Verify returns true if the signature is valid. Failure cases are invalid
 // signature, or when the public key cannot be decoded.
 // This function supports the signature variant defined in RFC-8032: Ed448,
@@ -371,6 +394,7 @@ func VerifyAny(public PublicKey, message, signature []byte, opts crypto.SignerOp
 func Verify(public PublicKey, message, signature []byte, ctx string) bool {
 	return verify(public, message, signature, []byte(ctx), false)
 }
+
 
 // VerifyPh returns true if the signature is valid. Failure cases are invalid
 // signature, or when the public key cannot be decoded.
@@ -382,12 +406,14 @@ func VerifyPh(public PublicKey, message, signature []byte, ctx string) bool {
 	return verify(public, message, signature, []byte(ctx), true)
 }
 
+
 func deriveSecretScalar(s *goldilocks.Scalar, h []byte) {
 	h[0] &= 0xFC        // The two least significant bits of the first octet are cleared,
 	h[paramB-1] = 0x00  // all eight bits the last octet are cleared, and
 	h[paramB-2] |= 0x80 // the highest bit of the second to last octet is set.
 	s.FromBytes(h[:paramB])
 }
+
 
 // isLessThanOrder returns true if 0 <= x < order and if the last byte of x is zero.
 func isLessThanOrder(x []byte) bool {
@@ -398,6 +424,7 @@ func isLessThanOrder(x []byte) bool {
 	}
 	return x[paramB-1] == 0 && x[i] < order[i]
 }
+
 
 func writeDom(h io.Writer, ctx []byte, preHash bool) {
 	dom4 := "SigEd448"
@@ -410,3 +437,6 @@ func writeDom(h io.Writer, ctx []byte, preHash bool) {
 	}
 	_, _ = h.Write(ctx)
 }
+
+
+// #end

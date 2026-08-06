@@ -1,5 +1,8 @@
 // Package sign provides unified interfaces for signature schemes.
-
+//
+// A register of schemes is available in the package
+//
+//	github.com/cloudflare/circl/sign/schemes
 package sign
 
 import (
@@ -33,6 +36,12 @@ type PrivateKey interface {
 	crypto.Signer
 	crypto.PrivateKey
 	encoding.BinaryMarshaler
+}
+
+// A private key that retains the seed with which it was generated.
+type Seeded interface {
+	// returns the seed if retained, otherwise nil
+	Seed() []byte
 }
 
 // A Scheme represents a specific instance of a signature scheme.

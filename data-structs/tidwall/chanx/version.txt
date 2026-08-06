@@ -1,3 +1,0 @@
-github.com/tidwall/chanx @head.20231212
-
-go 1.13

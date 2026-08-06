@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ AUTH / MODEL ]
 
 // REQUIRE: go 1.19 or later
@@ -142,8 +142,14 @@ func (p *AuthDataProvider) ParseAndValidateAuthUserRecord(authUserName string, a
 	} //end if
 	record.UserName = authUserName
 	record.PassHash = StrTrimWhitespaces(arrRecord.Get("passhash").String())
-	if(arrRecord.Get("passalgo").Exists()) {
-		record.PassAlgo = uint8(arrRecord.Get("passalgo").Uint())
+	objPassAlgo := arrRecord.Get("passalgo")
+	if(objPassAlgo.Exists()) {
+		thePassAlgo := objPassAlgo.Int()
+		if((thePassAlgo >= 0) && (thePassAlgo <= 255)) {
+			record.PassAlgo = uint8(thePassAlgo)
+		} else {
+			record.PassAlgo = 0 // wrong ...
+		} //end if else
 	} else {
 		record.PassAlgo = ALGO_PASS_SMART_SAFE_SF_PASS // fallback if the `algo` field does not exists
 	} //end if
@@ -199,7 +205,11 @@ func (p *AuthDataProvider) ParseAndValidateAuthUserRecord(authUserName string, a
 		for key, val := range metaData {
 			key = StrToLower(StrTrimWhitespaces(key))
 			if(key != "") {
-				record.MetaData[key] = StrTrimWhitespaces(val.String())
+				strVal, errStrVal := InterfaceToString(val)
+				if(errStrVal != nil) {
+					strVal = ""
+				} //end if
+				record.MetaData[key] = StrTrimWhitespaces(strVal)
 			} //end if
 		} //end for
 	} //end if

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -437,6 +437,114 @@ func DateFromTime(t time.Time) string { // YYYY-MM-DD HH:II:SS +ZZZZ
 func TimeNowUnix() int64 { // unix timestamp UTC ; no need to apply UTC() on it ; this is fixed, does not depend on a timezone
 	//--
 	return time.Now().Unix()
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func DateTimeDiffSeconds(dateTimePast string, dateTimeFuture string) (error, uint64) {
+	//--
+	dateTimePast   = StrTrimWhitespaces(dateTimePast) 		// YYYY-MM-DD HH:ii:ss
+	dateTimeFuture = StrTrimWhitespaces(dateTimeFuture) 	// YYYY-MM-DD HH:ii:ss
+	//--
+	if(dateTimePast == "") {
+		return NewError("Past Date/Time is Empty"), 0
+	} //end if
+	dPast, errPast := time.Parse(DATE_TIME_FMT_ISO_STD_GO_EPOCH, dateTimePast)
+	if(errPast != nil) {
+		return errPast, 0
+	} //end if
+	//--
+	if(dateTimeFuture == "") {
+		return NewError("Future Date/Time is Empty"), 0
+	} //end if
+	dFuture, errFuture := time.Parse(DATE_TIME_FMT_ISO_STD_GO_EPOCH, dateTimeFuture)
+	if(errFuture != nil) {
+		return errFuture, 0
+	} //end if
+	//--
+	diff := dPast.Sub(dFuture)
+	//--
+	var seconds float64 = math.Abs(math.Round(diff.Seconds())) // use round
+	if(seconds < 0) {
+		seconds = 0
+	} //end if
+	//--
+	return nil, uint64(seconds)
+	//--
+} //END FUNCTION
+
+
+func DateTimeDiffMinutes(dateTimePast string, dateTimeFuture string) (error, uint64) {
+	//--
+	err, seconds := DateTimeDiffSeconds(dateTimePast, dateTimeFuture)
+	if(err != nil) {
+		return err, 0
+	} //end if
+	//--
+	if(seconds <= 0) {
+		return nil, 0
+	} //end if
+	//--
+	var minutes float64 = math.Ceil(float64(seconds) / 60) // use ceil not floor
+	//--
+	return nil, uint64(minutes)
+	//--
+} //END FUNCTION
+
+
+func DateTimeDiffHours(dateTimePast string, dateTimeFuture string) (error, uint64) {
+	//--
+	err, minutes := DateTimeDiffMinutes(dateTimePast, dateTimeFuture)
+	if(err != nil) {
+		return err, 0
+	} //end if
+	//--
+	if(minutes <= 0) {
+		return nil, 0
+	} //end if
+	//--
+	var hours float64 = math.Ceil(float64(minutes) / 60) // use ceil not floor
+	//--
+	return nil, uint64(hours)
+	//--
+} //END FUNCTION
+
+
+func DateTimeDiffDays(dateTimePast string, dateTimeFuture string) (error, uint64) {
+	//--
+	err, hours := DateTimeDiffHours(dateTimePast, dateTimeFuture)
+	if(err != nil) {
+		return err, 0
+	} //end if
+	//--
+	if(hours <= 0) {
+		return nil, 0
+	} //end if
+	//--
+	var days float64 = math.Ceil(float64(hours) / 24) // use ceil not floor
+	//--
+	return nil, uint64(days)
+	//--
+} //END FUNCTION
+
+
+func DateTimeDiffYears(dateTimePast string, dateTimeFuture string) (error, uint64) {
+	//--
+	err, days := DateTimeDiffDays(dateTimePast, dateTimeFuture)
+	if(err != nil) {
+		return err, 0
+	} //end if
+	//--
+	if(days <= 0) {
+		return nil, 0
+	} //end if
+	//--
+	var years float64 = math.Floor(float64(days) / 365) // use floor not ceil
+	//--
+	return nil, uint64(years)
 	//--
 } //END FUNCTION
 

@@ -1,13 +1,12 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
-	"log"
 	"net/http"
 
 	"io"
@@ -77,10 +76,10 @@ var RouteHandlerFaviconStream HttpHandlerFunc = func(r *http.Request, headPath s
 		return
 	} //end if
 	response.ContentFileName = fName
-	response.ContentStream = func() (ioReadStream io.Reader) {
+	response.ContentStream = func() (ioReadStream io.ReadCloser, errInttStream error) {
 		ioReadStream, fErr := os.Open(fPath)
 		if(fErr != nil) {
-			log.Println("[ERROR]", "Streaming Handler File `" + fPath + "` Open Error", fErr)
+			errInttStream = smart.NewError("Streaming Handler File `" + fPath + "` Open Error: " + fErr.Error())
 			return
 		} //end if
 		return

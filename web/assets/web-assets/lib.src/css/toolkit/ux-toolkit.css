@@ -2,7 +2,7 @@
 
 /*
 License: BSD
-	extended by unixman, (stable.20260208), (c) 2015-present unix-world.org
+	extended by unixman, (stable.20260806), (c) 2015-present unix-world.org
 	based on Pure.css v.1.0 :: https://github.com/pure-css/pure # (c) 2013 Yahoo! Inc.
 	based on w3.css :: https://www.w3schools.com/w3css/4/w3.css # (c) 2021 w3schools.com
 */
@@ -877,6 +877,29 @@ since IE8 won't execute CSS that contains a CSS3 selector.
 	outline: thin solid #129FEA;
 	/* @alternate */ outline: 1px auto #129FEA; /* mark as alternate for google closures stylesheet */
 }
+
+.ux-form input[type="text"]:required:focus,
+.ux-form input[type="password"]:required:focus,
+.ux-form input[type="email"]:required:focus,
+.ux-form input[type="url"]:required:focus,
+.ux-form input[type="date"]:required:focus,
+.ux-form input[type="month"]:required:focus,
+.ux-form input[type="time"]:required:focus,
+.ux-form input[type="datetime"]:required:focus,
+.ux-form input[type="datetime-local"]:required:focus,
+.ux-form input[type="week"]:required:focus,
+.ux-form input[type="number"]:required:focus,
+.ux-form input[type="search"]:required:focus,
+.ux-form input[type="tel"]:required:focus,
+.ux-form input[type="color"]:required:focus,
+.ux-form textarea:required:focus,
+.ux-form select:required:focus,
+.ux-select:required:focus,
+.ux-field:required:focus {
+	outline: 0;
+	border-color: #ED2559;
+}
+
 .ux-form .ux-checkbox,
 .ux-form .ux-radio {
 	margin: 0.5rem 0;
@@ -1115,11 +1138,17 @@ since IE8 won't execute CSS that contains a CSS3 selector.
 	font-size: 0.875rem;
 }
 
-.ux-form ::-webkit-input-placeholder {
-	color: #BBBBBB;
+.ux-form ::placeholder,
+.ux-field::placeholder {
+	color: #CCCCCC;
+	font-size: 0.875rem;
 }
-.ux-form ::-moz-placeholder {
-	color: #999999;
+.ux-form ::-moz-placeholder,
+.ux-field::-moz-placeholder,
+.ux-form ::-webkit-input-placeholder,
+.ux-field::-webkit-input-placeholder {
+	color: #CCCCCC;
+	font-size: 0.875rem;
 }
 
 /*** Cards (by Unixman) ***/

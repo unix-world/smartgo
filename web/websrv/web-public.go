@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Web-Public :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -104,6 +104,7 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		smarthttputils.HttpStatus404(w, r, "WP Request File is Not Accessible", true)
 		return 404
 	} //end if
+	var fileRealSize uint64 = uint64(fileSize)
 	//--
 	t := time.Unix(fileMTime, 0)
 	//--
@@ -129,16 +130,18 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		smarthttputils.HttpHeadersCacheControl(w, r, cExp, cMod, cCtl)
 		w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_TYPE, contentType)
 		w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_DISP, contentDisposition)
-		w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_LEN, smart.ConvertInt64ToStr(fileSize))
+		if(smarthttputils.HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+			w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_LEN, smart.ConvertUInt64ToStr(fileRealSize))
+		} //end if
 		w.WriteHeader(200) // status code must be after set headers
 		return 200
 	} //end if
 	//--
-	if(fileSize <= smarthttputils.MAX_SIZE_ETAG) { // {{{SYNC-SIZE-MAX-ETAG}}} ; manage eTag only for content size <= 1MB ; for larger file serve stream, below
-		log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Small Public File: `" + path + "` ; Size:", fileSize, "bytes")
+	if(fileRealSize <= smarthttputils.MAX_SIZE_ETAG) { // {{{SYNC-SIZE-MAX-ETAG}}} ; manage eTag only for content size <= 1MB ; for larger file serve stream, below
+		log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Small Public File: `" + path + "` ; Size:", fileRealSize, "bytes")
 		var fileContent string = ""
 		var errRead error = nil
-		if(fileSize > 0) {
+		if(fileRealSize > 0) {
 			fileContent, errRead = smart.SafePathFileRead(path, false)
 		} //end if
 		if(errRead != nil) {
@@ -150,24 +153,27 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		return 200
 	} //end if
 	//--
-	streamBytes, errStream := os.Open(path)
-	if(errStream != nil) {
-		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 410 :: Web Public Stream File is Unavailable for Serving: `" + path + "` ; Error:", errStream)
+	streamBytes, errRdStream := os.Open(path)
+	if(errRdStream != nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 410 :: Web Public Stream File is Unavailable for Serving: `" + path + "` ; Error:", errRdStream)
 		smarthttputils.HttpStatus410(w, r, "WP Request File is Unavailable for Serving", true)
 		return 410
 	} //end if
 	defer streamBytes.Close()
-	log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Stream Public File: `" + path + "` ; Size:", fileSize, "bytes")
+	log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Stream Public File: `" + path + "` ; Size:", fileRealSize, "bytes")
 	//--
 	smarthttputils.HttpHeadersCacheControl(w, r, cExp, cMod, cCtl)
 	w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_DISP, contentDisposition)
-	w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_LEN, smart.ConvertInt64ToStr(fileSize))
+	if(smarthttputils.HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+		w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_LEN, smart.ConvertUInt64ToStr(fileRealSize))
+	} //end if
 	w.WriteHeader(200) // status code must be after set headers
-//	_, errStream := io.Copy(w, streamBytes) // transfer stream to web socket
-	if _, errStream := streamBytes.WriteTo(w); errStream != nil {
-		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Failed to Serve Stream Public File: `" + path + "` ; Size:", fileSize, "bytes", "; Error:", errStream)
-		fmt.Fprintf(w, "%s", errStream) // write error also on stream ...
+//	_, errWrStream := io.Copy(w, streamBytes) // transfer stream to web socket
+	_, errWrStream := streamBytes.WriteTo(w) // better then above line, having control inside reader
+	if(errWrStream != nil) {
+		log.Println("[ERROR]", smart.CurrentFunctionName() + ": Failed to Serve Stream Public File: `" + path + "` ; Size:", fileRealSize, "bytes", "; Error:", errWrStream)
+		fmt.Fprintf(w, "%s", errWrStream) // write error also on stream ...
 		return 500 // {{{SYNC-HTTP-STREAM-ERR}}} ; on this error the status code cannot be changed, it must be written before the stream starts
 	} //end if
 	return 200

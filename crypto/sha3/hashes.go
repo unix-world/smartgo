@@ -4,12 +4,14 @@
 
 //--------
 // contains fixes by unixman
-// r.20231202.2358
+// r.20260216.2358
 //--------
 // includes modifications by unixman in:
 //	* hashes.go # see the comments in the file
 //		+ New* methods re-adapted to return hash.Hash (required by HMac) ; original New* methods suffixed with S
 //		+ re-added (but commented out): NewLegacyKeccak256 ; NewLegacyKeccak512 ; + S suffixed
+//		+ added X114 type and method for use with Edx448 to replace Shake256 variable length of 57/114 bytes
+//		+ removed xor unaligned, was using unsafe
 //--------
 
 package sha3
@@ -61,6 +63,9 @@ func New512() hash.Hash { // fix by unixman to work with HMac
 func New512S() State {
 	return State{rate: 72, outputLen: 64, dsbyte: 0x06}
 }
+func New512X114() State { // used by Edx448
+	return State{rate: 72, outputLen: 114, dsbyte: 0x06}
+}
 
 /*
 // NewLegacyKeccak256 creates a new Keccak-256 hash.
@@ -102,6 +107,12 @@ func Sum384(data []byte) (digest [48]byte) {
 // Sum512 returns the SHA3-512 digest of the data.
 func Sum512(data []byte) (digest [64]byte) {
 	h := New512()
+	_, _ = h.Write(data)
+	h.Sum(digest[:0])
+	return
+}
+func Sum512X114(data []byte) (digest [114]byte) { // used by Edx448
+	h := New512X114()
 	_, _ = h.Write(data)
 	h.Sum(digest[:0])
 	return

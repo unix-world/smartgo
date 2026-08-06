@@ -1,6 +1,6 @@
-github.com/cloudflare/circl v1.5.0 # upd.20241101
+github.com/cloudflare/circl v1.5.0 # upd.20260216
 
 go 1.22
 
-adapted by unixman, with fixes: 20250107
+adapted by unixman, with fixes: 20260216
 

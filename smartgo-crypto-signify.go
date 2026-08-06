@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ CRYPTO / SIGNIFY ]
 
 // REQUIRE: go 1.19 or later
@@ -17,10 +17,10 @@ import (
 //-----
 
 const (
-	SignifyErrInvalidSignature = "Signify (Ed25519) Signature is Invalid, Verification Failed, does Not Match Data"
+	SignifyErrInvalidSignature string = "Signify (Ed25519) Signature is Invalid, Verification Failed, does Not Match Data"
 )
 
-//-----
+//----- how to verify detached signature: signify -C -p signify-key.pub -x signify-signature.sig file1 file2 ... fileN
 
 
 func SignifyGenerateKeys(privKeyPass []byte, allowEmptyPass bool) (string, string, error) { // pubKey, privKey, err
@@ -98,8 +98,7 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 		return NewError("Public Key Text is Empty, Null")
 	} //end if
 	//--
-	signatureText = BytTrimWhitespaces(signatureText)
-	if(signatureText == nil) {
+	if(BytTrimWhitespaces(signatureText) == nil) {
 		return NewError("Signature Text is Empty")
 	} //end if
 	//-- DO NOT TRIM dataToCheck, it may be binary data !
@@ -162,14 +161,11 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 		} //end if
 		dataToCheck = arrData[1]
 		arrData = nil
-		dataToCheck = BytTrimWhitespaces(dataToCheck) // embedded data must be trimmed, is not detached, so can be only safe text data
 		if(BytTrimWhitespaces(dataToCheck) == nil) {
 			return NewError("Parse Signature with Data Text Failed: Invalid Data Part")
 		} //end if
 		//--
 	} //end if
-	//--
-	dataToCheck = append(dataToCheck, '\n') // verified data also must end with a single LF ; this is for all cases: binary/detached or embedded
 	//--
 	signature, errSgn := signify.ParseSignature(dataBytSgn)
 	if(errSgn != nil) {
@@ -236,7 +232,7 @@ func SignifySign(privKeyTxt []byte, privKeyPass []byte, pubkeyTxt []byte, dataTo
 		return NewError("Private Key Parsing Failed, Null"), ""
 	} //end if
 	//--
-	signature := signify.Sign(privKey, BytesConcatenate(dataToSign, []byte("\n"))) // {{{SYNC-SIGNIFY-SIGN-FIX-APPEND-LF}}}
+	signature := signify.Sign(privKey, dataToSign)
 	if(signature == nil) {
 		return NewError("Sign Failed, Null"), ""
 	} //end if
@@ -259,8 +255,6 @@ func SignifySign(privKeyTxt []byte, privKeyPass []byte, pubkeyTxt []byte, dataTo
 	} else {
 		signedData = BytTrimWhitespaces(signedData)
 	} //end if
-	//--
-	signedData = append(signedData, []byte("\n")...) // fix: add endline LF terminator to be compatible with OpenBSD's Signify
 	//--
 	dataToVfy := dataToSign
 	if(isDetached == false) {

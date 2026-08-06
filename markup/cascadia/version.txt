@@ -1,0 +1,4 @@
+github.com/andybalholm/cascadia @ v1.3.3 @head.20260224
+
+go 1.16
+

@@ -2,9 +2,6 @@
 // this source code is governed by a BSD-style license that can be found in the
 // LICENSE file.
 
-//go:build appengine
-// +build appengine
-
 package websocket
 
 func maskBytes(key [4]byte, pos int, b []byte) int {

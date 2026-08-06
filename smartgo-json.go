@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ JSON ]
 
 // REQUIRE: go 1.19 or later
@@ -9,14 +9,11 @@ package smartgo
 
 import (
 //	"log"
-
 	"bytes"
 	"strings"
-
 	"encoding/json"
 
-	"github.com/unix-world/smartgo/data-structs/fastjson"
-	"github.com/unix-world/smartgo/data-structs/tidwall/gjson"
+	"github.com/unix-world/smartgo/data-structs/askjson"
 )
 
 const (
@@ -57,6 +54,28 @@ func ConvertJsonNumberToFloat64(data interface{}) (float64, error) {
 //-----
 
 
+func JsonBytEncode(data interface{}, prettyprint bool, htmlsafe bool) ([]byte, error) {
+	//--
+	defer PanicHandler()
+	//-- no need any panic handler
+	out := bytes.Buffer{}
+	//--
+	encoder := json.NewEncoder(&out)
+	encoder.SetEscapeHTML(htmlsafe)
+	if(prettyprint == true) {
+		encoder.SetIndent("", "    ") // 4 spaces
+	} //end if
+	//--
+	err := encoder.Encode(data)
+	if(err != nil) {
+		return nil, err
+	} //end if
+	//--
+	return BytTrimWhitespaces(out.Bytes()), nil // must trim as will add a new line at the end ...
+	//--
+} //END FUNCTION
+
+
 func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, error) {
 	//--
 	defer PanicHandler()
@@ -79,11 +98,28 @@ func JsonEncode(data interface{}, prettyprint bool, htmlsafe bool) (string, erro
 } //END FUNCTION
 
 
+func JsonNoErrChkBytEncode(data interface{}, prettyprint bool, htmlsafe bool) []byte {
+	//--
+	defer PanicHandler()
+	//-- no need any panic handler
+	byts, err := JsonBytEncode(data, prettyprint, htmlsafe)
+	if(err != nil) {
+		return nil
+	} //end if
+	//--
+	return byts
+	//--
+} //END FUNCTION
+
+
 func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) string {
 	//--
 	defer PanicHandler()
 	//-- no need any panic handler
-	str, _ := JsonEncode(data, prettyprint, htmlsafe)
+	str, err := JsonEncode(data, prettyprint, htmlsafe)
+	if(err != nil) {
+		return ""
+	} //end if
 	//--
 	return str
 	//--
@@ -91,7 +127,6 @@ func JsonNoErrChkEncode(data interface{}, prettyprint bool, htmlsafe bool) strin
 
 
 //-----
-
 
 func JsonObjDecode(data string) (map[string]interface{}, error) { // can parse just a JSON Object as {"key1":..., "key2":...}
 	//--
@@ -201,59 +236,91 @@ func JsonScalarDecodeToStr(data string) (string, error) { // can parse the follo
 //-----
 
 
-func JsonGetValueByKeyPath(json string, path string) gjson.Result {
+func JsonGetValueByKeyPath(json string, path string) *askjson.Answer {
 	//--
 	defer PanicHandler()
 	//--
 	// to return the full json as root, use an empty path: ""
 	// path can be: "3" ; "a" ; "0.id" ; "a.b.c.7"
 	// will return type Result
-	// Result type can be converted to: .String() | .Bool() | .Int() as int64 | .Uint() as uint64 | .Float() as float64 | .Time() as time.Time | .Array() as []Result | .Map() as [string]Result
-	// Result can be checked as: .Exists(), .IsObject(), .IsArray(), .IsBool()
-	// Sub-Results can get by gjson.Result.Get(path)
+	// Result type can be converted to: .String() | .Bool() | .Int() as int64 | .Uint() as uint64 | .Float() as float64 | .Slice() as []Result | .Map() as [string]Result
+	// Result can be checked as: .Exists()
+	// Sub-Results can get by askjson.Path(path)
+	//--
+	emptyAnswer := &askjson.Answer{}
 	//--
 	if(StrTrimWhitespaces(json) == "") {
-		return gjson.Result{}
+		return emptyAnswer // return empty answer
 	} //end if
 	//--
-	if(gjson.Valid(json) != true) {
-		return gjson.Result{}
+	var object interface{}
+	var err error = nil
+	//--
+	object, err = JsonObjDecode(json) // associative array
+	if(err != nil) {
+		object, err = JsonArrDecode(json) // list array
+		if(err != nil) {
+			return emptyAnswer // return empty answer
+		} //end if
 	} //end if
 	//--
 	if(StrTrimWhitespaces(path) == "") {
-		return gjson.Parse(json) // get the root of json
+		root := askjson.RootObject(object) // get the root of json
+		if(root == nil) {
+			return emptyAnswer // return empty answer
+		} //end if
+		return root // return the root of json
 	} //end if
 	//--
-	return gjson.Get(json, path) // get the path of json
+	data := askjson.For(object, path) // get the path of json
+	if(data == nil) {
+		return emptyAnswer // return empty answer
+	} //end if
+	return data // return the answer
 	//--
 } //END FUNCTION
 
 
-func JsonGetValueByKeysPath(json string, keys ...string) (*fastjson.Value, error) {
+func JsonGetValueByKeysPath(json string, keys ...interface{}) (*askjson.Answer, error) {
 	//--
 	defer PanicHandler()
 	//--
 	// to return the full json as root, use no keys
-	// keys can be: "3" ; "a" ; "0", "id" ; "a", "b", "c", "7"
+	// keys can be: "3" ; "a" ; "0" (or 0), "id" ; "a", "b", "c", "7" (or 7)
 	// will return type *Value
-	// Result type can be converted to: .GetScalarAsString() | .GetStringBytes() | .GetBool() | .GetInt() as int32 | .GetInt64() as int64 | .GetUint() as uint32 | .GetUint64() as uint64 | .GetFloat64() as float64 | .GetArray() as []*Value | .GetObject() as *Object
+	// Result type can be converted to: .String() | .Bool() | .Int() as int64 | .Uint() as uint64 | .Float() as float64 | .Slice() as []Result | .Map() as [string]Result
 	// Result can be checked as: .Exists()
 	//--
+	emptyAnswer := &askjson.Answer{}
+	//--
 	if(StrTrimWhitespaces(json) == "") {
-		return nil, NewError("JSON is Empty") // return null and an empty type error
+		return emptyAnswer, NewError("JSON is Empty") // return empty answer and error
 	} //end if
 	//--
-	var p fastjson.Parser
-	jsonVal, jsonErr := p.Parse(json)
-	if(jsonErr != nil) {
-		return nil, jsonErr // return null and the parsing error
+	var object interface{}
+	var err error = nil
+	//--
+	object, err = JsonObjDecode(json) // associative array
+	if(err != nil) {
+		object, err = JsonArrDecode(json) // list array
+		if(err != nil) {
+			return emptyAnswer, err // return empty answer and error
+		} //end if
 	} //end if
 	//--
 	if(len(keys) <= 0) {
-		return jsonVal, nil // return the root of json, no error
+		root := askjson.RootObject(object)
+		if(root == nil) {
+			return emptyAnswer, nil // return empty answer, no error
+		} //end if
+		return root, nil // return the root of json, no error
 	} //end if
 	//--
-	return jsonVal.Get(keys...), nil // return the path of json, no error
+	data := askjson.ForArgs(object, keys...)
+	if(data == nil) {
+		return emptyAnswer, nil // return empty answer, no error
+	} //end if
+	return data, nil // return the answer, no error
 	//--
 } //END FUNCTION
 
@@ -267,101 +334,91 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 	//--
 	defer PanicHandler()
 	//--
+	emptyAnswer := map[string]interface{}{}
+	//--
 	jsonStr = StrTrimWhitespaces(jsonStr)
 	if(jsonStr == "") {
-		return map[string]interface{}{}, NewError("Json string is Empty")
+		return emptyAnswer, NewError("Json string is Empty")
 	} //end if
 	if(len(jsonStr) > 65535) {
-		return map[string]interface{}{}, NewError("Json string is OverSized")
+		return emptyAnswer, NewError("Json string is OverSized")
 	} //end if
 	//--
 	const regexValidKey string = `[a-zA-Z0-9\-]{1,64}`
 	//--
 	dataKey = StrTrimWhitespaces(dataKey)
 	if((dataKey == "") || (!StrRegexMatch(regexValidKey, dataKey))) {
-		return map[string]interface{}{}, NewError("DataKey is Empty or Invalid")
+		return emptyAnswer, NewError("DataKey is Empty or Invalid")
 	} //end if
 	//--
 	jsonArray, err := JsonObjDecode(jsonStr)
 	if(err != nil) {
-		return map[string]interface{}{}, NewError("Json is Invalid: " + err.Error())
+		return emptyAnswer, NewError("Json is Invalid: " + err.Error())
 	} //end if
 	if(len(jsonArray) <= 0) {
-		return map[string]interface{}{}, NewError("Json is Empty")
+		return emptyAnswer, NewError("Json is Empty")
 	} //end if
 	if(len(jsonArray) > 16384) {
-		return map[string]interface{}{}, NewError("Json is OverSized")
+		return emptyAnswer, NewError("Json is OverSized")
 	} //end if
-	//--
-	var convertToStringSlice = func(m []interface{}) ([]string, error) {
-		var result []string
-		for i:=0; i<len(m); i++ {
-			str, ok := m[i].(string)
-			if(!ok) {
-				return []string{}, NewError("Failed to convert a slice to string")
-			} //end if
-			result = append(result, str)
-		} //end for
-		return result, nil
-	} //end fx
 	//--
 	arr := make(map[string]interface{})
 	for key, val := range jsonArray {
 		//--
 		if(!StrRegexMatch(regexValidKey, key)) {
-			return map[string]interface{}{}, NewError("a Key is Invalid")
+			return emptyAnswer, NewError("a Key is Invalid")
 		} //end if
 		//--
 		valMap, ok2 := val.(map[string]interface{})
 		if(!ok2) {
-			return map[string]interface{}{}, NewError("a Value is Invalid")
+			return emptyAnswer, NewError("a Value is Invalid")
 		} //end if
 		//--
 		_, ok3 := valMap["#"]
 		if(!ok3) {
-			return map[string]interface{}{}, NewError("Failed to get # Values Map")
+			return emptyAnswer, NewError("Failed to get # Values Map")
 		} //end if
 		//--
 		hashMap, ok4 := valMap["#"].(map[string]interface{})
 		if(!ok4) {
-			return map[string]interface{}{}, NewError("Failed to get # Hash Map")
+			return emptyAnswer, NewError("Failed to get # Hash Map")
 		} //end if
 		//--
 		levels, ok5 := hashMap["levels"]
 		if(!ok5) {
-			return map[string]interface{}{}, NewError("Failed to get # Levels")
+			return emptyAnswer, NewError("Failed to get # Levels")
 		} //end if
 		levelsInt, errLevels := ConvertJsonNumberToInt64(levels)
 		if((errLevels != nil) || (levelsInt < 0)) { // can be zero if there is no nested data, but no lower than zero
-			return map[string]interface{}{}, NewError("The # Levels must not be lower than zero")
+			return emptyAnswer, NewError("The # Levels must not be lower than zero")
 		} //end if
 		keys, ok6 := hashMap["keys"]
 		if(!ok6) {
-			return map[string]interface{}{}, NewError("Failed to get # Keys")
+			return emptyAnswer, NewError("Failed to get # Keys")
 		} //end if
 		keysInt, errKeys := ConvertJsonNumberToInt64(keys)
 		if((errKeys != nil) || (keysInt <= 0)) { // cannot be zero or lower
-			return map[string]interface{}{}, NewError("The # Keys must be higher than zero")
+			return emptyAnswer, NewError("The # Keys must be higher than zero")
 		} //end if
 		//--
 		size, ok7 := hashMap["size"]
 		if(!ok7) {
-			return map[string]interface{}{}, NewError("Failed to get # Size")
+			return emptyAnswer, NewError("Failed to get # Size")
 		} //end if
 		sizeInt, errSize := ConvertJsonNumberToInt64(size)
 		if((errSize != nil) || (sizeInt <= 0)) { // cannot be zero or lower
-			return map[string]interface{}{}, NewError("The # Size must be higher than zero")
+			return emptyAnswer, NewError("The # Size must be higher than zero")
 		} //end if
 		//--
 		dataKeyVal, ok8 := valMap[dataKey].(map[string]interface{})
 		if(!ok8) {
-			return map[string]interface{}{}, NewError("Failed to get the Values Map")
+			return emptyAnswer, NewError("Failed to get the Values Map")
 		} //end if
 		if(len(dataKeyVal) <= 0) {
-			return map[string]interface{}{}, NewError("The Values Map is Empty")
+			return emptyAnswer, NewError("The Values Map is Empty")
 		} //end if
 		if(int64(len(dataKeyVal)) != keysInt) {
-			return map[string]interface{}{}, NewError("The Values Map length must match the # Keys")
+			return emptyAnswer, NewError("The Values Map length must match the # Keys")
 		} //end if
 		//--
 		var lData int = 0
@@ -374,34 +431,34 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 			vvStr, okVvStr := vv.(string)
 			if(okVvArr) {
 				if(len(vvArr) > 1024) {
-					return map[string]interface{}{}, NewError("An item value type List is OverSized")
+					return emptyAnswer, NewError("An item value type List is OverSized")
 				} //end if
-				items[string(kk)], errConvert = convertToStringSlice(vvArr)
+				items[kk], errConvert = InterfaceToStringSlice(vvArr)
 				if(errConvert != nil) {
-					return map[string]interface{}{}, NewError("Failed to convert an item value to List: " + errConvert.Error())
+					return emptyAnswer, NewError("Failed to convert an item value to List: " + errConvert.Error())
 				} //end if
 			} else if(okVvMap) {
 				if(len(vvMap) > 512) {
-					return map[string]interface{}{}, NewError("An item value type Map is OverSized")
+					return emptyAnswer, NewError("An item value type Map is OverSized")
 				} //end if
 				data[string(kk)] = vvMap
 				lData += len(vvMap)
 			} else if(okVvStr) {
 				if(len(vvStr) > 8192) {
-					return map[string]interface{}{}, NewError("An item value type String is OverSized")
+					return emptyAnswer, NewError("An item value type String is OverSized")
 				} //end if
-				data[string(kk)] = vvStr
+				data[kk] = vvStr
 				lData++
 			} else {
-				return map[string]interface{}{}, NewError("Failed to convert an item value to String or List")
+				return emptyAnswer, NewError("Failed to convert an item value to String or List")
 			} //end if else
 		} //end for
 		//--
 		if(len(items) > 512) {
-			return map[string]interface{}{}, NewError("Items List is OverSized")
+			return emptyAnswer, NewError("Items List is OverSized")
 		} //end if
 		if(len(data) > 512) {
-			return map[string]interface{}{}, NewError("Data List is OverSized")
+			return emptyAnswer, NewError("Data List is OverSized")
 		} //end if
 		//--
 		arr[key] = data
@@ -410,7 +467,7 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 			//--
 			total := len(data) + len(items)
 			if(int64(total) != keysInt) {
-				return map[string]interface{}{}, NewError("The @ total must match the # Keys")
+				return emptyAnswer, NewError("The @ total must match the # Keys")
 			} //end if
 			//--
 			var diff int64 = sizeInt - int64(lData)
@@ -419,13 +476,13 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 			var intDelta int64 = int64(delta)
 			//log.Println("[DEBUG]", "key", key, "diff", diff, "len(data)", len(data), data, "delta", delta, "lenItems", int64(len(items)), (diff % int64(len(items))))
 			if((delta < 0) || (intDelta < 0) || (IsInteger(strDelta, false) != true) || ((diff % int64(len(items))) != 0)) { // check: the diff size divided to number of items must be an integer, that ~ means each item have the same size
-				return map[string]interface{}{}, NewError("The Items Delta is Invalid")
+				return emptyAnswer, NewError("The Items Delta is Invalid")
 			} //end if
 			//--
 			ikeys := make([]string, 0) // expects non-associative array (list)
 			for ik, iv := range items {
 				if(int64(len(iv)) != intDelta) {
-					return map[string]interface{}{}, NewError("An Item length does not match the Delta")
+					return emptyAnswer, NewError("An Item length does not match the Delta")
 				} //end if
 				ikeys = append(ikeys, ik)
 			} //end for
@@ -447,6 +504,10 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 		} //end if
 		//--
 	} //end for
+	//--
+	if(arr == nil) { // avoid return nil
+		return emptyAnswer, nil
+	} //end if
 	//--
 	return arr, nil
 	//--

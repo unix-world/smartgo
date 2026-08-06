@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -197,6 +197,23 @@ func listAuthSkipRoutes() []string {
 	sort.Strings(skipAuthRoutes)
 	//--
 	return skipAuthRoutes
+	//--
+} //END FUNCTION
+
+
+func listRoutes() []string {
+	//--
+	var theRoutes []string = []string{}
+	//--
+	if((urlHandlersMap != nil) && (len(urlHandlersMap) > 0)) {
+		for route, _ := range urlHandlersMap {
+			theRoutes = append(theRoutes, "`" + route + "`")
+		} //end for
+	} //end if
+	//--
+	sort.Strings(theRoutes)
+	//--
+	return theRoutes
 	//--
 } //END FUNCTION
 

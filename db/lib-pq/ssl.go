@@ -1,9 +1,10 @@
 package pq
 
+// contains fixes by unixman
+
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -165,7 +166,7 @@ func sslCertificateAuthority(tlsConf *tls.Config, o values) error {
 			cert = []byte(sslrootcert)
 		} else {
 			var err error
-			cert, err = ioutil.ReadFile(sslrootcert)
+			cert, err = os.ReadFile(sslrootcert) // fix by unixman: instead of deprecated io-util ReadFile, use os ReadFile
 			if err != nil {
 				return err
 			}

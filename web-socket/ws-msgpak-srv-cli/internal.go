@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Internal :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20251216.2358 :: STABLE
+// r.20260726.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20251216.2358"
+	VERSION string = "r.20260726.2358"
 
 	CERTIFICATES_DEFAULT_PATH string = "./ssl"
 	CERTIFICATE_PEM_CRT string = "cert.crt"
@@ -366,6 +366,10 @@ func msgPakComposeMessage(cmd string, data string, sharedPrivateKey string, shar
 	//--
 	defer smart.PanicHandler()
 	//--
+	if(data == "") {
+		return "", "MsgPak: Data is empty"
+	} //end if
+	//--
 	cmd = smart.StrTrimWhitespaces(cmd)
 	if(cmd == "") {
 		return "", "MsgPak: Command is empty"
@@ -376,7 +380,15 @@ func msgPakComposeMessage(cmd string, data string, sharedPrivateKey string, shar
 		return "", "MsgPak: Poly Checksum Failed: " + errPoly.Error()
 	} //end if
 	//--
-	var dataEnc string = smart.StrTrimWhitespaces(smart.ThreefishEncryptCBC(smart.DataArchive(data), sharedPrivateKey + "\v" + smart.Sh3a512B64(cmd + "\v" + sharedSecret + "\v" + polySum), false, true)) // randomize
+	archData, errArch := smart.DataArchive(data, true) // verify compressed data
+	if(errArch != nil) {
+		return "", "MsgPak: Data Archive Failed: " + errArch.Error()
+	} //end if
+	if(archData == "") {
+		return "", "MsgPak: Data Archive Failed, Empty"
+	} //end if
+	//--
+	var dataEnc string = smart.StrTrimWhitespaces(smart.ThreefishEncryptCBC(archData, sharedPrivateKey + "\v" + smart.Sh3a512B64(cmd + "\v" + sharedSecret + "\v" + polySum), false, true)) // randomize
 	if(dataEnc == "") {
 		return "", "MsgPak: Encrypt Failed: Empty Data"
 	} //end if
@@ -451,7 +463,12 @@ func msgPakParseMessage(msg string, sharedPrivateKey string, sharedSecret string
 		sMsg = messagePack{} // reset
 		return sMsg, "MsgPak: Decrypt Failed: empty data"
 	} //end if
-	sMsg.Data = smart.DataUnArchive(sMsg.Data)
+	var unarchErr error = nil
+	sMsg.Data, unarchErr = smart.DataUnarchive(sMsg.Data)
+	if(unarchErr != nil) {
+		sMsg = messagePack{} // reset
+		return sMsg, "MsgPak: Unarchive Failed: error: " + unarchErr.Error()
+	} //end if
 	if(sMsg.Data == "") {
 		sMsg = messagePack{} // reset
 		return sMsg, "MsgPak: Unarchive Failed: empty data"

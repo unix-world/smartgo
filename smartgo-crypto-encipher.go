@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ CRYPTO / ENCIPHER ]
 
 // REQUIRE: go 1.19 or later
@@ -23,7 +23,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
-	"github.com/unix-world/smartgo/crypto/sha3" // {{{SYNC-SMARTGO-SHA3}}} ; this is a better version than golang.org/x/crypto/sha3, works without amd64 ASM - non harware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
+	"github.com/unix-world/smartgo/crypto/sha3" // {{{SYNC-SMARTGO-SHA3}}} ; this is a better version than golang.org/x/crypto/sha3, works without amd64 ASM - non hardware optimized on amd64 version ; from cloudflare: github.com/cloudflare/circl/internal/sha3
 
 	"github.com/unix-world/smartgo/crypto/pbkdf2"
 	"github.com/unix-world/smartgo/crypto/blowfish"

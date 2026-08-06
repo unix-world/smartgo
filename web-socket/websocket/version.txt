@@ -6,3 +6,5 @@ go 1.20
 @require
     golang.org/x/net
 
+modified by unixman: remove mask.go (using "unsafe")
+

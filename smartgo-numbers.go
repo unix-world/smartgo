@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260806.2358 :: STABLE
 // [ NUMBERS ]
 
 // REQUIRE: go 1.19 or later
@@ -12,6 +12,7 @@ import (
 
 	"strconv"
 	"math"
+	"math/big"
 )
 
 const (
@@ -281,23 +282,174 @@ func ParseStrAsUInt64(s string) uint64 {
 //-----
 
 
-func Float64ToFixedDecimals(num float64, precision int) float64 { // converts a float64 number to fixed decimals
+func Float64ToMaxDecimals(num float64, d uint8) float64 { // converts a float64 number to max decimals, not fixed ; for float64 keeping 0 trailing decimal (fixed decimals) is not possible
 	//--
-	if(precision < 0) {
-		return 0
-	} //end if
+	// this method should be used just for display, it is not safe for arithmetics in combination with other Go methods, it uses Rounds Half Up as in PHP
 	//--
-	output := math.Pow(10, float64(precision))
-	if(output <= 0) {
+	if(d < 1) {
+		d = 1
+	} else if(d > 8) {
+		d = 8
+	} //end if else
+	//--
+	factor := math.Pow(10, float64(d))
+	if(factor <= 0) {
 		return 0 // safety check: avoid below division by zero
 	} //end if
 	//--
-	return float64(int(num * output + math.Copysign(0.5, num * output))) / output
+//	return float64(int(num * factor + math.Copysign(0.5,        num * factor))) / factor // Go  Compatible, HalfDown  1.005 = 1.00 or 1
+	return float64(int(num * factor + math.Copysign(0.50000001, num * factor))) / factor // PHP Compatible, HalfUp    1.005 = 1.01 ; {{{SYNC-ROUND-HALF-UP-AS-PHP}}}
+	//--
+} //END FUNCTION
+
+
+func Float64StrToMaxDecimalsStr(s string, d uint8) string { // converts a float64 string to max decimals, not fixed
+	//--
+	// this method should be used just for display, it is not safe for arithmetics in combination with other Go methods, it uses Rounds Half Up as in PHP
+	//--
+	if(d < 1) {
+		d = 1
+	} else if(d > 8) {
+		d = 8
+	} //end if else
+	//--
+	s = StrTrimWhitespaces(s)
+	if(s == "") {
+		s = "0"
+	} //end if
+	//--
+	ss := Float64StrToFixedDecimalsStr(s, d) // PHP Compatible, HalfUp    1.005 = 1.01 ; {{{SYNC-ROUND-HALF-UP-AS-PHP}}}
+	//--
+	s = StrTrimRight(StrTrimRight(ss, "0"), ".")
+	if(s == "") {
+		s = "0"
+	} //end if
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func Float64StrToFixedDecimalsStr(s string, d uint8) string { // converts a float64 string to fixed decimals, not fixed
+	//--
+	// this method should be used just for display, it is not safe for arithmetics in combination with other Go methods, it uses Rounds Half Up as in PHP
+	//--
+	if(d < 1) {
+		d = 1
+	} else if(d > 8) {
+		d = 8
+	} //end if else
+	//--
+	s = StrTrimWhitespaces(s)
+	if(s == "") {
+		s = "0"
+	} //end if
+	//--
+	factor := math.Pow(10, float64(d))
+	if(factor <= 0) {
+		return "0" // safety check: avoid below division by zero
+	} //end if
+	//--
+	xf, _, err := big.ParseFloat(s, 10, 53, big.ToNearestEven) // only use 53 bits of precision (float64)
+	if(err != nil) {
+		return "0"
+	} //end if
+	fixed, _ := new(big.Float).Mul(xf, big.NewFloat(factor)).Float64()
+//	var num float64 = math.Round(fixed) / factor 				// Go  Compatible, HalfDown  1.005 = 1.00 or 1
+	var num float64 = Float64ToMaxDecimals(fixed / factor, d) 	// PHP Compatible, HalfUp    1.005 = 1.01 ; {{{SYNC-ROUND-HALF-UP-AS-PHP}}}
+	//--
+	s = ConvertFloat64ToStr(num)
+	//--
+	if(StrContains(s, ".") != true) {
+		s += "."
+	} //end if
+	arr := Explode(".", s)
+	if(len(arr) < 1) {
+		arr[0] = "0"
+	} //end if
+	if(len(arr) < 2) {
+		arr[1] = ""
+	} //end if
+	arr[1] = StrPad2LenRight(arr[1], "0", int(d))
+	s = Implode(".", arr)
+	//--
+	return s
 	//--
 } //END FUNCTION
 
 
 //-----
+
+
+func NumberFormat(strNum string, decimals uint8, decPoint string, thousandsSep string) string {
+	//--
+	// this method should be used just for display, it is not safe for arithmetics in combination with other Go methods, it uses Rounds Half Up as in PHP
+	//--
+	strNum = StrTrimWhitespaces(strNum)
+	if(strNum == "") {
+		strNum = "0"
+	} //end if
+	//--
+	var origDecimals uint8 = decimals
+	if(decimals < 1) {
+		decimals = 1
+	} else if(decimals > 8) {
+		decimals = 8
+	} //end if else
+	//--
+	decPoint = StrTrimWhitespaces(decPoint)
+	if(len(decPoint) != 1) {
+		decPoint = "."
+	} //end if
+	//--
+//	thousandsSep = StrTrimWhitespaces(thousandsSep) // do not trim, can be a space !
+	if(len(thousandsSep) > 1) {
+		thousandsSep = ""
+	} //end if
+	//--
+	if(decPoint == thousandsSep) {
+		thousandsSep = ""
+	} //end if
+	//--
+	ss := Float64StrToFixedDecimalsStr(strNum, decimals) // PHP Compatible, HalfUp    1.005 = 1.01 ; {{{SYNC-ROUND-HALF-UP-AS-PHP}}}
+	//--
+	if(thousandsSep != "") {
+		//--
+		if(StrContains(ss, ".") != true) {
+			ss += "."
+		} //end if
+		arr := Explode(".", ss)
+		if(len(arr) < 1) {
+			arr[0] = "0"
+		} //end if
+		if(len(arr) < 2) {
+			arr[1] = ""
+		} //end if
+		//--
+		var rvs string = StrRev(arr[0])
+		var nst string = ""
+		for i := 0; i < len(rvs); i++ {
+			s := StrSubstr(rvs, i, i+1)
+			nst += s
+			if((i % 3) == 2) {
+				nst += thousandsSep
+			} //end if
+		} //end for
+		nst = StrTrimRight(nst, thousandsSep)
+		arr[0] = StrRev(nst)
+		//--
+		if(origDecimals <= 0) {
+			arr[1] = ""
+		} //end if
+		//--
+		ss = Implode(".", arr)
+		ss = StrTrimRight(ss, ".")
+		//--
+	} //end if
+	//--
+	return ss
+	//--
+} //END FUNCTION
 
 
 // #END

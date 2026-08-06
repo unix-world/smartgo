@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / JWT :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260216.2358 :: STABLE
+// r.20260801.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -121,8 +121,10 @@ func JwtExtractData(tokenString string) JwtTokenData {
 		return jwtData
 	} //end if
 	//--
-	var tkType string = smart.StrTrimWhitespaces(smart.JsonGetValueByKeyPath(jsonPartHdr, "typ").String())
-	var tkAlgo string = smart.StrTrimWhitespaces(smart.JsonGetValueByKeyPath(jsonPartHdr, "alg").String())
+	objJsonHdr := smart.JsonGetValueByKeyPath(jsonPartHdr, "")
+	//--
+	var tkType string = smart.StrTrimWhitespaces(objJsonHdr.Get("typ").String())
+	var tkAlgo string = smart.StrTrimWhitespaces(objJsonHdr.Get("alg").String())
 	//--
 	if(tkType != "JWT") {
 		jwtData.Error = smart.NewError("Invalid Token Type: Not JWT")
@@ -153,19 +155,26 @@ func JwtExtractData(tokenString string) JwtTokenData {
 		return jwtData
 	} //end if
 	//--
-	gjsonObj := smart.JsonGetValueByKeyPath(jsonPartTxt, "")
+	objJsonTxtPart := smart.JsonGetValueByKeyPath(jsonPartTxt, "")
 	//--
-	var serial string = smart.StrTrimWhitespaces(gjsonObj.Get("jti").String())
+	var serial string = smart.StrTrimWhitespaces(objJsonTxtPart.Get("jti").String())
 	if((serial == "") || (len(serial) != 21) || (!smart.StrRegexMatch(JwtRegexSerial, serial))) { // {{{SYNC-JWT-SMART-SERIAL-VALIDATION}}}
 		jwtData.Error = smart.NewError("Token Data contains an Invalid Serial")
 		return jwtData
 	} //end if
 	//--
-	arrAudience := gjsonObj.Get("aud").Array()
+	arrAudience := objJsonTxtPart.Get("aud").Slice()
 	var audience []string = []string{}
-	if(len(arrAudience) > 0) {
+	if((arrAudience != nil) && (len(arrAudience) > 0)) {
 		for i:=0; i<len(arrAudience); i++ {
-			audience = append(audience, arrAudience[i].String())
+			strVal, errStrVal := smart.InterfaceToString(arrAudience[i])
+			if(errStrVal != nil) {
+				strVal = ""
+			} //end if
+			strVal = smart.StrTrimWhitespaces(strVal)
+			if(strVal != "") {
+				audience = append(audience, strVal)
+			} //end if
 		} //end for
 	} //end if
 	jwtAudience := JwtParseAudience(audience)
@@ -175,25 +184,25 @@ func JwtExtractData(tokenString string) JwtTokenData {
 	} //end if
 	var isDefaultArea bool = JwtAudienceIsDefaultArea(jwtAudience)
 	//--
-	var issuer string = smart.StrTrimWhitespaces(gjsonObj.Get("iss").String())
+	var issuer string = smart.StrTrimWhitespaces(objJsonTxtPart.Get("iss").String())
 	if(issuer == "") {
 		jwtData.Error = smart.NewError("Token Data contains an Empty Issuer")
 		return jwtData
 	} //end if
 	//--
 	var created string = ""
-	var createdAt int64 = gjsonObj.Get("iat").Int()
+	var createdAt int64 = objJsonTxtPart.Get("iat").Int()
 	if(createdAt > 0) {
 		created = smart.DateFromUnixTimeUtc(createdAt)
 	} //end if
 	//--
 	var expires string = ""
-	var expireAt int64 = gjsonObj.Get("exp").Int()
+	var expireAt int64 = objJsonTxtPart.Get("exp").Int()
 	if(expireAt > 0) {
 		expires = smart.DateFromUnixTimeUtc(expireAt)
 	} //end if
 	//--
-	var userName string = smart.StrTrimWhitespaces(gjsonObj.Get("usr").String())
+	var userName string = smart.StrTrimWhitespaces(objJsonTxtPart.Get("usr").String())
 	if((userName == "") || (smart.AuthIsValidExtUserName(userName) != true)) { // allow extended user name check for further developments ; if more restricted us needed use after checks
 		jwtData.Error = smart.NewError("Token Data contains an Empty or Invalid UserName")
 		return jwtData
@@ -1192,7 +1201,15 @@ func JwtAudienceXtrasExtractUserId(area string, key string, authData smart.AuthD
 		return ""
 	} //end if
 	//--
-	var userId string = smart.JsonGetValueByKeyPath(`{` + arrJwtAudX[1], key).String()
+	objJson, errObjJson := smart.JsonGetValueByKeysPath(`{` + arrJwtAudX[1])
+	if(errObjJson != nil) {
+		return ""
+	} //end if
+	if(objJson == nil) {
+		return ""
+	} //end if
+	var userId string = objJson.GetArgs(key).String()
+//	log.Println("[DEBUG]", smart.CurrentFunctionName(), "key", key)
 	if(smart.StrTrimWhitespaces(userId) == "") {
 		return ""
 	} //end if

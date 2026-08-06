@@ -1,12 +1,13 @@
 package pq
 
+// contains fixes by unixman
+
 import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 )
 
@@ -176,7 +177,7 @@ func (cn *conn) cancel(ctx context.Context) error {
 
 	// Read until EOF to ensure that the server received the cancel.
 	{
-		_, err := io.Copy(ioutil.Discard, c)
+		_, err := io.Copy(io.Discard, c) // fix by unixman: instead of deprecated io-util Discard, use io Discard
 		return err
 	}
 }

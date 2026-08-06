@@ -1,3 +1,0 @@
-github.com/tidwall/bfile @head.20231212
-
-go 1.17
