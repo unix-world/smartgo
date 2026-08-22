@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -19,7 +19,7 @@ import (
 	uid 			"github.com/unix-world/smartgo/crypto/uuid"
 	smart 			"github.com/unix-world/smartgo"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
-	smartcache 		"github.com/unix-world/smartgo/data-structs/simplecache"
+	smartcache 		"github.com/unix-world/smartgo/utils/smart-memcache"
 	webdav 			"github.com/unix-world/smartgo/web/webdav" // a modified version of [golang.org / x / net / webdav]: added extra path security checks
 )
 

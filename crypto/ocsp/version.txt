@@ -1,0 +1,4 @@
+v.20260216
+Go 1.22 or later
+
+golang.org/x/crypto v0.48.0

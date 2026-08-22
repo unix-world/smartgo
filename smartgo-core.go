@@ -1,17 +1,21 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 // [ SMART.CORE ]
 
 // REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but stable only since go 1.19)
 package smartgo
 
 import (
+	"fmt"
 	"log"
 	"errors"
 
 	"strings"
+
+	"sort"
+	natsort "github.com/unix-world/smartgo/textproc/natsort"
 
 	"runtime"
 	"runtime/debug"
@@ -148,6 +152,195 @@ func MemoryStats() runtime.MemStats {
 	runtime.ReadMemStats(&memStats)
 	//--
 	return memStats
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ObjectPrint(o interface{}) string { // pretty print an object
+	//--
+	return fmt.Sprintf("%#v", o)
+	//--
+} //END FUNCTION
+
+
+func ObjectToString(o interface{}) string { // converts any object to string
+	//--
+	return fmt.Sprint(o) // this is much better and safe than using cast as: o.(string)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+type aKV struct {
+	Key string
+	Val any
+}
+
+func SortedArrOfAnyByStringKey(arr map[string]any) []aKV {
+	//--
+	if(arr == nil) {
+		return nil
+	} //end if
+	//--
+	var ss []aKV
+	//--
+	if(len(arr) <= 0) {
+		return ss
+	} //end if
+	//--
+	for k, v := range arr {
+		ss = append(ss, aKV{Key:k, Val:v})
+	} //end for
+	//--
+	sort.Slice(ss, func(i, j int) bool {
+		return natsort.Less(ss[i].Key, ss[j].Key) // strings, natsort
+	})
+	//--
+	return ss
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+type sKV struct {
+	Key string
+	Val string
+}
+
+func SortedArrOfStringsByVal(arr map[string]string, useNatSort bool) []sKV {
+	//--
+	if(arr == nil) {
+		return nil
+	} //end if
+	//--
+	var ss []sKV
+	//--
+	if(len(arr) <= 0) {
+		return ss
+	} //end if
+	//--
+	for k, v := range arr {
+		ss = append(ss, sKV{Key:k, Val:v})
+	} //end for
+	//--
+	sort.Slice(ss, func(i, j int) bool {
+		if(useNatSort == true) {
+			return natsort.Less(ss[i].Val, ss[j].Val) // strings, natsort
+		} else {
+			if(strings.Compare(ss[i].Val, ss[j].Val) < 0) { // strings, sort ; -1 : Less
+				return true
+			} //end if
+			return false
+		} //end if else
+	})
+	//--
+	return ss
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+type iKV struct {
+	Key string
+	Val int64
+}
+
+func SortedArrOfIntegersByVal(arr map[string]int64) []iKV {
+	//--
+	if(arr == nil) {
+		return nil
+	} //end if
+	//--
+	var ss []iKV
+	//--
+	if(len(arr) <= 0) {
+		return ss
+	} //end if
+	//--
+	for k, v := range arr {
+		ss = append(ss, iKV{Key:k, Val:v})
+	} //end for
+	//--
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].Val > ss[j].Val // this works for numeric sort
+	})
+	//--
+	return ss
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+type fKV struct {
+	Key string
+	Val float64
+}
+
+func SortedArrOfFloatsByVal(arr map[string]float64) []fKV {
+	//--
+	if(arr == nil) {
+		return nil
+	} //end if
+	//--
+	var ss []fKV
+	//--
+	if(len(arr) <= 0) {
+		return ss
+	} //end if
+	//--
+	for k, v := range arr {
+		ss = append(ss, fKV{Key:k, Val:v})
+	} //end for
+	//--
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].Val > ss[j].Val // this works for numeric sort
+	})
+	//--
+	return ss
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+type bKV struct {
+	Key string
+	Val bool
+}
+
+func SortedArrOfBooleansByVal(arr map[string]bool) []bKV {
+	//--
+	if(arr == nil) {
+		return nil
+	} //end if
+	//--
+	var ss []bKV
+	//--
+	if(len(arr) <= 0) {
+		return ss
+	} //end if
+	//--
+	for k, v := range arr {
+		ss = append(ss, bKV{Key:k, Val:v})
+	} //end for
+	//--
+	sort.Slice(ss, func(i, j int) bool {
+		return ConvertBoolToUInt8(ss[i].Val) > ConvertBoolToUInt8(ss[j].Val) // this works for numeric sort
+	})
+	//--
+	return ss
 	//--
 } //END FUNCTION
 

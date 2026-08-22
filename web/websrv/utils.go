@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -9,7 +9,6 @@ package websrv
 import (
 	"bytes"
 	"time"
-	"net/url"
 	"net/http"
 	"mime/multipart"
 
@@ -56,6 +55,15 @@ func GetCookie(r *http.Request, name string) string {
 } //END FUNCTION
 
 
+func ParseUrlRawQuery(urlQuery string) map[string][]string {
+	//--
+	defer smart.PanicHandler()
+	//--
+	return smart.ParseUrlRawQuery(urlQuery)
+	//--
+} //END FUNCTION
+
+
 func RequestHaveQueryString(r *http.Request) bool {
 	//--
 	defer smart.PanicHandler()
@@ -67,26 +75,9 @@ func RequestHaveQueryString(r *http.Request) bool {
 
 func GetUrlRawQuery(r *http.Request) string { // get the url raw query as string from request, except the ? ; ex: from `?a=b&c=d` will get `a=b&c=d`
 	//--
-	return r.URL.RawQuery
-	//--
-} //END FUNCTION
-
-
-func ParseUrlRawQuery(urlQuery string) map[string][]string {
-	//--
 	defer smart.PanicHandler()
 	//--
-	urlQuery = smart.StrTrimWhitespaces(urlQuery)
-	if(urlQuery == "") {
-		return nil
-	} //end if
-	//--
-	vals, err := url.ParseQuery(urlQuery)
-	if(err != nil) {
-		return nil
-	} //end if
-	//--
-	return vals
+	return r.URL.RawQuery
 	//--
 } //END FUNCTION
 
@@ -120,6 +111,8 @@ func GetUrlQueryVars(r *http.Request, key string) []string { // get an url param
 
 
 func GetAllUrlQueryVars(r *http.Request) map[string][]string { // get all url params from request
+	//--
+	// {{{SYNC-URL-QUERY-PARSE-VS-BUILD}}} ; ex: `?a=b&a=c&b[]=z&b[]=q&frm[a]=2&frm[b]=3` will parse as: `map[ a:[b c] b[]:[z q] frm[a]:[2] frm[b]:[3] ]`
 	//--
 	defer smart.PanicHandler()
 	//--

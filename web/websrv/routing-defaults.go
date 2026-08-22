@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -113,7 +113,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 		isMobile = "yes"
 	} //end if
 	response.StatusCode = 208
-	const title string = "Service Info"
+	const title string = "WebService / Info"
 	var headHtml string = assets.HTML_META_ROBOTS_NOINDEX + "\n" + assets.HTML_CSS_STYLE_PREFER_COLOR_DARK
 	var bodyHtml string = `<h1 style="display:inline-block;">`
 //	bodyHtml += `<i class="sfi sfi-info sfi-3x" style="color:#DDDDDD!important;"></i>` // Sfi Font is N/A on standalone assets template
@@ -154,7 +154,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	bodyHtml += `<hr>`
 	bodyHtml += `<div style="font-size:0.75rem; color:#CCCCDD; text-align:right;">&copy; 2023-` + smart.EscapeHtml(GetCurrentYear()) + ` unix-world.org</div>`
 	response.ContentBody = assets.HtmlStandaloneTemplate(title, headHtml, bodyHtml, true) // load js assets
-	response.ContentFileName = "index.html"
+	response.ContentFileName = "info.html"
 	//-- optionals
 	response.ContentDisposition = smarthttputils.DISP_TYPE_INLINE // "" is equivalent to smarthttputils.DISP_TYPE_INLINE ; or smarthttputils.DISP_TYPE_ATTACHMENT
 	response.CacheExpiration = -1
@@ -178,7 +178,7 @@ var RouteHandlerStatusPage HttpHandlerFunc = func(r *http.Request, headPath stri
 	defer smart.PanicHandler() // safe recovery handler
 	//--
 	response.StatusCode = 202
-	const title string = "Service Status: Up and Running ..."
+	const title string = "WebService / Status: Up and Running ..."
 	var headHtml string = assets.HTML_META_ROBOTS_NOINDEX + "\n" + assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.status { text-align:center; margin:10px; cursor:help; }" + "\n" + "div.signature { background:#778899; color:#FFFFFF; font-size:2rem; font-weight:bold; text-align:center; border-radius:3px; padding:10px; margin:20px; }" + "\n" + "</style>"
 	var bodyHtml string = `<div class="status"><img alt="status:svg" title="` + smart.EscapeHtml(title) + `" width="48" height="48" src="` + smart.EscapeHtml(assets.GetSvgAsset("lib/framework/img/loading-spin.svg", false)) + `"></div>` + "\n" + `<div class="signature">` + "\n" + "<pre>" + "\n" + `<i class="sfi sfi-info"></i> &nbsp; ` + smart.EscapeHtml(TheStrSignature) + " ... is running" + "\n" + smart.EscapeHtml(smart.DateNowUtc()) + "</pre>" + "\n" + "</div>"
 	response.ContentBody = srvassets.HtmlServerTemplate(title, headHtml, bodyHtml, false) // skip js ; contains SFI Icons
@@ -207,9 +207,10 @@ var RouteHandlerVersionPage HttpHandlerFunc = func(r *http.Request, headPath str
 	//--
 	response.StatusCode = 203
 	json := versionStruct{
+		MetaInfo: 	"WebService / Version",
+		Version: 	VERSION,
 		Platform: 	"`" + smart.NAME + " (" + smart.DESCRIPTION + ") " + smart.VERSION + "`",
 		Server: 	TheStrName,
-		Version: 	VERSION,
 		GoVersion: 	smart.CurrentRuntimeVersion(),
 		OsName: 	smart.CurrentOSName(),
 		OsArch: 	smart.CurrentOSArch(),

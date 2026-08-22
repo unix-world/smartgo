@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ NUMBERS ]
 
 // REQUIRE: go 1.19 or later
@@ -145,6 +145,19 @@ func ConvertInt8ToStr(i int8) string {
 func ConvertUInt8ToStr(i uint8) string {
 	//--
 	return ConvertUInt64ToStr(uint64(i))
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ConvertBoolToUInt8(i bool) uint8 {
+	//--
+	if(i == true) {
+		return 1
+	} //end if
+	return 0
 	//--
 } //END FUNCTION
 

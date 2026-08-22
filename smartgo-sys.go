@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ SYS (OS SYSTEM) ]
 
 // REQUIRE: go 1.19 or later
@@ -34,7 +34,9 @@ const (
 //-----
 
 
-func HandleAbortCtrlC(delay uint32) {
+type ShutdownFn func()
+
+func handleDoAbortCtrlC(delay uint32, sFn ShutdownFn) {
 	//--
 	if(delay < 0) {
 		delay = 0
@@ -46,6 +48,9 @@ func HandleAbortCtrlC(delay uint32) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
+		if(sFn != nil) {
+			sFn()
+		} //end if
 		if(AppGetRunInBackground()) { // no colors ; weird characters should not appear in logs ...
 			fmt.Println(LINE_FEED + "»»»»»»»»", "[ Hammer (Abort) ]", "... KILL.SIGNAL ...", "[ Exit Delay: " + ConvertUInt32ToStr(delay) + " sec. ]", "««««««««" + LINE_FEED)
 		} else {
@@ -55,6 +60,20 @@ func HandleAbortCtrlC(delay uint32) {
 		time.Sleep(time.Duration(int(delay)) * time.Second)
 		os.Exit(1)
 	}()
+	//--
+} //END FUNCTION
+
+
+func HandleAbortCtrlCWithShutdownHandler(delay uint32, sFn ShutdownFn) {
+	//--
+	handleDoAbortCtrlC(delay, sFn)
+	//--
+} //END FUNCTION
+
+
+func HandleAbortCtrlC(delay uint32) {
+	//--
+	handleDoAbortCtrlC(delay, nil)
 	//--
 } //END FUNCTION
 

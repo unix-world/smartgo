@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ S-MARKDOWN ]
 
 // REQUIRE: go 1.19 or later
@@ -14,7 +14,7 @@ import (
 )
 
 const(
-	mkdwVersion string = "smart.markdown:parser@v.2.2.8-r.20251216"
+	mkdwVersion string = "smart.markdown:parser@v.2.2.8-r.20260808"
 )
 
 
@@ -1778,7 +1778,8 @@ func (m *SMarkdownParser) renderHtmlMediaOnly(extractedMediaOnlyArr []string, li
 		if(m.lazyLoadImgDefault != "") {
 			src = StrTrimWhitespaces(m.lazyLoadImgDefault)
 		} else {
-			src = ""
+		//	src = "" // fix below, avoid warnings from Tidy as image src is empty, instead use a blank svg
+			src = DATA_URL_SVG_IMAGE_PREFIX + EscapeUrl(SVG_BLANK_CODE)
 		} //end if
 		dataSrc = mediaSrc
 	} else {

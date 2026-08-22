@@ -1,25 +1,26 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260726.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
 
 import (
-	"sync"
-
-	"log"
 	"fmt"
+	"log"
+
 	"time"
 
 	"net/http"
+
+	"sync"
 
 	smart 			"github.com/unix-world/smartgo"
 	assets 			"github.com/unix-world/smartgo/web/assets/web-assets"
 	srvassets 		"github.com/unix-world/smartgo/web/assets/srv-assets"
 	smarthttputils 	"github.com/unix-world/smartgo/web/httputils"
-	smartcache 		"github.com/unix-world/smartgo/data-structs/simplecache"
+	smartcache 		"github.com/unix-world/smartgo/utils/smart-memcache"
 
 	dhkx 			"github.com/unix-world/smartgo/crypto/dhkx"
 	websocket 		"github.com/unix-world/smartgo/web-socket/websocket"
@@ -89,14 +90,12 @@ func MsgPakSetServerTaskCmd(cmd string, data string, timeoutSec uint32, tlsMode 
 	uri += ":" + smart.ConvertUInt16ToStr(httpPort)
 	uri += "/msgsend"
 	//--
-	var reqArr map[string][]string = map[string][]string{
+	var postArr map[string][]string = map[string][]string{
 		"cmd": { cmd },
 		"data": { data },
 	}
-	//--
-
-	//--
-	httpResult := smarthttputils.HttpClientDoRequestPOST(uri, tlsServerCerts, tlsInsecureSkipVerify, nil, reqArr, timeoutSec, smarthttputils.HTTP_CLI_DEF_BODY_READ_SIZE, 0, authUsername, authPassword)
+	const allowPostFiles bool = false
+	httpResult := smarthttputils.HttpClientDoRequestPOST(uri, tlsServerCerts, tlsInsecureSkipVerify, nil, nil, allowPostFiles, postArr, timeoutSec, smarthttputils.HTTP_CLI_DEF_BODY_READ_SIZE, 0, authUsername, authPassword)
 	//--
 	if(httpResult.Errors != "") {
 		return "SET Error # " + httpResult.Errors
@@ -269,7 +268,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			//--
 			numConnCli++
 			//--
-			k := string(fmt.Sprint(kk)) // convert from type interface to string
+			k := smart.ObjectToString(kk) // convert from type interface to string
 			if(DEBUG == true) {
 				log.Println("[DEBUG] Task Command: Connected Client found # UUID:", k)
 			} //end if
@@ -430,7 +429,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 			cliShardIntf, cliShardExst := dhkxSrvKeysClients.Load(rAddr)
 			var cliShardStr string = ""
 			if(cliShardExst) {
-				cliShardStr = string(fmt.Sprint(cliShardIntf)) // convert from type interface to string
+				cliShardStr = smart.ObjectToString(cliShardIntf) // convert from type interface to string
 			} //end if
 			if(smart.StrTrimWhitespaces(cliShardStr) == "") {
 				log.Println("[WARNING] @@@ Broadcasting # Client{" + rAddr + "} Shared Key is Empty")
@@ -628,7 +627,7 @@ func MsgPakServerRun(serverID string, useTLS bool, certifPath string, httpAddr s
 				cliShardIntf, cliShardExst := dhkxSrvKeysClients.Load(r.RemoteAddr)
 				var cliShardStr string = ""
 				if(cliShardExst) {
-					cliShardStr = string(fmt.Sprint(cliShardIntf)) // convert from type interface to string
+					cliShardStr = smart.ObjectToString(cliShardIntf) // convert from type interface to string
 				} //end if
 				if(smart.StrTrimWhitespaces(cliShardStr) == "") {
 					log.Println("[WARNING] Client Shared Key is Empty")

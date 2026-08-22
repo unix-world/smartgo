@@ -1,7 +1,7 @@
 
 /*
 Smart.Framework - r.8.7 / smart.framework.v.8.7 - Icons (Iconic Font)
-version: 1.8.7 # r.20260208
+version: 1.8.7 # r.20260814
 (c) 2019-present unix-world.org
 License: BSD
 
@@ -20,7 +20,7 @@ Font Generator: iconly.io
 
 @font-face {
 	font-family: 'sf-icons';
-	src: url('fonts/sf-icons.woff2?v.1.8.7-20260204') format('woff2'), url('fonts/sf-icons.ttf?v.1.8.7-20260204') format('truetype');
+	src: url('fonts/sf-icons.woff2?v.1.8.7-20260814') format('woff2'), url('fonts/sf-icons.ttf?v.1.8.7-20260814') format('truetype');
 	font-style: normal;
 	font-weight: 400;
 }

@@ -1,7 +1,7 @@
 
 // Go IO Extend
 // (c) 2026-present, unix-world.org
-// r.20260223.2358
+// r.20260821.2358
 
 package iox
 

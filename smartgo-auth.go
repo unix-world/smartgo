@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ AUTH ]
 
 // REQUIRE: go 1.19 or later
@@ -45,6 +45,7 @@ const (
 	REGEX_SAFE_AUTH_AREA 		string 	= `^[A-Z0-9\-\.]{4,48}` 							// this must not allow [] to conflict with the default area ; {{{SYNC-AUTH-EXT-AREA-REGEX}}}
 	REGEX_VALID_PRIV_RESTR_KEY 	string 	= `^([a-z]{1}[a-z0-9\-\:]{0,20}[a-z0-9]{1})$` 		// valid name for one privilege key from list of privileges ; a valid privilege key can have 2..22 characters and can contain only: `a-z`, `0-9`, `:` and `-` ; must start with `a-z` only ; must not end with `:` or `-`
 
+	REGEX_SAFE_USER_UNIX_NAME 		string = `^[a-z0-9_]{5,25}$` 							// Safe Unix Auth UserName Regex ; used for various purposes, ex GraphQL dedicated partition
 	REGEX_SAFE_HTTP_USER_NAME 		string = `^[a-z0-9\.]{5,25}$` 							// Safe HTTP Auth UserName Regex ; intended as a safe user ID for all cases
 	REGEX_SAFE_AUTH_EMAIL_ADDRESS 	string = `^[_a-z0-9\-\.]{1,41}@[a-z0-9\-\.]{3,30}$` 	// Safe Auth Email regex ; internet email@(subdomain.)domain.name ; max 72 ; practical
 	REGEX_SAFE_AUTH_USER_NAME 		string = `^[_a-z0-9\-\.@]{5,72}$` 						// Safe Auth Username Regex ; cover boths above
@@ -727,6 +728,52 @@ func AuthIsValidExtUserName(user string) bool {
 	} //end if
 	//--
 	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func AuthValidUserNameToUnixName(user string) (string, error) {
+	//--
+	user = StrTrimWhitespaces(user)
+	if(user == "") {
+		return "", NewError("UserName is Empty")
+	} //end if
+	//--
+	if(StrLen(user) < 5) { // pre-check ; std max username length is 25 ; min is 5 ; {{{SYNC-SMART-USERNAME-LENGTH}}}
+		return "", NewError("UserName is Too Short")
+	} //end if
+	if(StrLen(user) > 25) { // pre-check ; std max username length is 25 ; min is 5 ; {{{SYNC-SMART-USERNAME-LENGTH}}}
+		return "", NewError("UserName is Too Long")
+	} //end if
+	//--
+	if(StrContains(user, "_")) { // pre-check
+		return "", NewError("UserName contains disallowed characters")
+	} //end if
+	//--
+	if(AuthIsValidUserName(user) != true) {
+		return "", NewError("UserName is Not Valid")
+	} //end if
+	//--
+	user = StrReplaceAll(user, ".", "_")
+	//--
+	if(StrContains(user, "__")) {
+		return "", NewError("UnixName contains an Invalid Character Sequence")
+	} //end if
+	if(StrStartsWith(user, "_")) {
+		return "", NewError("UnixName starts with an Invalid Character")
+	} //end if
+	if(StrEndsWith(user, "_")) {
+		return "", NewError("UnixName ends with an Invalid Character")
+	} //end if
+	//--
+	if(!StrRegexMatch(REGEX_SAFE_USER_UNIX_NAME, user)) {
+		return "", NewError("UnixName is Not Valid")
+	} //end if
+	//--
+	return user, nil
 	//--
 } //END FUNCTION
 

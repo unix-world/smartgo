@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ MARKUP ]
 
 // REQUIRE: go 1.19 or later
@@ -33,10 +33,6 @@ import (
 const (
 	MAX_DOC_SIZE_VALIDATE_HTML 	uint64 = SIZE_BYTES_16M * 4 	// {{{SYNC-HTML-VALIDATOR-MAX-SIZE}}} 	; 64MB
 	MAX_DOC_SIZE_MARKDOWN 		uint64 = SIZE_BYTES_16M 		// {{{SYNC-MARKDOWN-MAX-SIZE}}} 		; 16MB
-
-	REGEX_HTML_LITERAL_ENTITY 	string = `(?i)&([a-z]+);`
-	REGEX_HTML_NUMERIC_ENTITY 	string = `(?i)&\#(x?[a-f0-9]+);`
-	REGEX_HTML_ANY_ENTITY 		string = `(?i)&\#?(x?[a-z0-9]+);`
 )
 
 

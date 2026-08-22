@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -33,7 +33,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20260801.2358"
+	VERSION string = "r.20260822.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -62,9 +62,10 @@ const apiErrorDefaultCode uint16 = 65535
 const apiErrorDefaultMsg  string = "Unknown Error"
 
 type versionStruct struct {
+	MetaInfo  string `json:"metainfo"`
+	Version   string `json:"version"`
 	Platform  string `json:"platform"`
 	Server    string `json:"server"`
-	Version   string `json:"version"`
 	GoVersion string `json:"goVersion"`
 	OsName    string `json:"osName"`
 	OsArch    string `json:"osArch"`
@@ -454,8 +455,6 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		} //end if
 		//--
 		//== serving area (in order): assets (public) ; routes (depends how a route is set by urlHandlersSkipAuth) ; public files (public or n/a, depends if public files serving is enabled or not)
-		//-- uuid
-		manageSessUUIDCookie(w, r) // manage session UUID Cookie
 		//-- shiftPath
 		headPath, tailPaths := getUrlPathSegments(urlPath) // head path or tail paths must not contain slashes !!
 		if(len(tailPaths) > 128) { // {{{SYNC-HTTP-WEBSRV-MAX-PATH-SEGMENTS}}} ; max supported path segments: 128
@@ -503,7 +502,6 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			return
 		} //end if else
 		//-- manage handlers
-
 		var sr smartRoute = smartRoute{}
 		var okInternalRoute bool = false
 		var testPath string = ""
@@ -527,6 +525,8 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			cycles++
 		} //end for
 	//	sr, okInternalRoute := urlHandlersMap["/"+headPath] // previous, original code, replaced with the above
+		//-- session UUID cookie (moved below, it was just after webDAV), required also by AUTH, must be set before serving, but after assets, before below which also serves WEB-PUBLIC
+		manageSessUUIDCookie(w, r) // manage session UUID Cookie
 		//-- serve public routes (no authentication) ; if the current route is not inside the internal ones, try ...
 		if(okInternalRoute != true) { // if not an internal route, try to see if it is an existing web public path, if not, exit with 404
 			if(r.Method == "OPTIONS") {

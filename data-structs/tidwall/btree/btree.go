@@ -116,7 +116,7 @@ func (tr *BTree) DeleteHint(key any, hint *PathHint) (prev any) {
 	if key == nil {
 		return nil
 	}
-	v, ok := tr.base.DeleteHint(key, nil)
+	v, ok := tr.base.DeleteHint(key, hint)
 	if !ok {
 		return nil
 	}
@@ -349,6 +349,22 @@ func (tr *BTree) Iter() Iter {
 
 func (tr *BTree) IterMut() Iter {
 	return Iter{tr.base.IterMut()}
+}
+
+// Seek searches for an item that's greater than or equal to the specified item in tree.
+// It returns the item found and a boolean indicating if it was found.
+// If the item is not found, the returned item will be empty and ok will be false.
+func (tr *BTree) Seek(item any) (result any, ok bool) {
+	iter := tr.Iter()
+	if !iter.Seek(item) {
+		iter.Release()
+		return
+	}
+
+	result = iter.Item()
+	ok = true
+	iter.Release()
+	return
 }
 
 // Seek to item greater-or-equal-to key.

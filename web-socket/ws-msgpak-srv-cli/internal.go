@@ -1,16 +1,17 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Internal :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260726.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
 
 import (
-	"sync"
-
 	"log"
+
 	"time"
+
+	"sync"
 
 	smart 			"github.com/unix-world/smartgo"
 	uid 			"github.com/unix-world/smartgo/crypto/uuid"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20260726.2358"
+	VERSION string = "r.20260822.2358"
 
 	CERTIFICATES_DEFAULT_PATH string = "./ssl"
 	CERTIFICATE_PEM_CRT string = "cert.crt"

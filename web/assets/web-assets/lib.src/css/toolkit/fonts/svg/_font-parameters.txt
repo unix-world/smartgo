@@ -1,4 +1,5 @@
 
+r.20260814
 https://iconly.io
 Project sf-icons:
 	* Class Prefix: 	sfi

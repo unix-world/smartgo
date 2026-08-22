@@ -1,19 +1,19 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Client :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260726.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
 
 import (
+	"log"
+
+	"time"
+
 	"os"
 	"os/signal"
 	"sync"
-
-	"log"
-	"fmt"
-	"time"
 
 	fifolist 		"container/list"
 
@@ -204,7 +204,7 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 				srvShardIntf, srvShardExst := dhkxCliKeysServers.Load(theServerAddr)
 				var srvShardStr string = ""
 				if(srvShardExst) {
-					srvShardStr = string(fmt.Sprint(srvShardIntf)) // convert from type interface to string
+					srvShardStr = smart.ObjectToString(srvShardIntf) // convert from type interface to string
 				} //end if
 				if(firstMessageCompleted == true) {
 					if(smart.StrTrimWhitespaces(srvShardStr) == "") {
@@ -366,7 +366,7 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 			srvShardIntf, srvShardExst := dhkxCliKeysServers.Load(addr)
 			var srvShardStr string = ""
 			if(srvShardExst) {
-				srvShardStr = string(fmt.Sprint(srvShardIntf)) // convert from type interface to string
+				srvShardStr = smart.ObjectToString(srvShardIntf) // convert from type interface to string
 			} //end if
 			//--
 			select {
@@ -385,7 +385,7 @@ func MsgPakClientRun(clientID string, serverPool []string, tlsMode string, certi
 						log.Println("[DEBUG] ≡≡≡≡≡≡≡ Task Commands Queue Length:", cliCustomMsgs.Len(), "≡≡≡≡≡≡≡")
 						if(cliCustomMsgs.Len() > 0) {
 							tmpMsg := cliCustomMsgs.Front() // get 1st element
-							tmpValMsg := string(fmt.Sprint(tmpMsg.Value)) // convert from type interface to string
+							tmpValMsg := smart.ObjectToString(tmpMsg.Value) // convert from type interface to string
 							tmpArrMsg := smart.ExplodeWithLimit("|", smart.StrTrimWhitespaces(tmpValMsg), 3) // cmd | data | dtime
 							if(len(tmpArrMsg) == 3) {
 								crrCliCmd = smart.Base64Decode(tmpArrMsg[0])

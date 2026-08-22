@@ -1,0 +1,6 @@
+github.com/go-test/deep @head.20260816
+
+version: v1.1.1
+
+go 1.16
+

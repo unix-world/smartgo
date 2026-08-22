@@ -1,12 +1,24 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ TEXT / HTML ]
 
 // REQUIRE: go 1.19 or later
 package smartgo
 
+const (
+	REGEX_HTML_LITERAL_ENTITY 	string = `(?i)&([a-z]+);`
+	REGEX_HTML_NUMERIC_ENTITY 	string = `(?i)&\#(x?[a-f0-9]+);`
+	REGEX_HTML_ANY_ENTITY 		string = `(?i)&\#?(x?[a-z0-9]+);`
+
+	DATA_URL_EMPTY_PREFIX 		string = "data:,"
+	DATA_URL_CSS_PREFIX 		string = "data:text/css,"
+	DATA_URL_JS_PREFIX 			string = "data:application/javascript,"
+	DATA_URL_SVG_IMAGE_PREFIX 	string = "data:image/svg+xml,"
+
+	SVG_BLANK_CODE 				string = `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1" height="1"></svg>`
+)
 
 //-----
 

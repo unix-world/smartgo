@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Auth :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -20,6 +20,8 @@ import (
 
 const (
 	DEBUG_AUTH bool = false // DO NOT SET this to TRUE in production environments ! it is meant just for development purposes
+
+	AUTH_AREA_RESTRICTION string = "<auth/->" // will restrict `/auth/*` areas, not the `/auth`
 )
 
 type authMetaNfo struct {
@@ -233,7 +235,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentBody = ApiResponseJsonOK(nfo)
 			} else {
 				var bwPath string = GetCurrentBrowserPath(r)
-				var title = "Auth Info"
+				var title = "Auth / Info"
 				var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n"
 				var bodyHtml string = "<h1>" + smart.EscapeHtml(title) + "</h1>" + "\n"
 				bodyHtml += `<div class="operation_hint">API access point &nbsp;<i class="sfi sfi-lock-alt" title="Requires Authentication" style="cursor:help;"></i> [Accept: ` + smart.EscapeHtml(smarthttputils.MIME_TYPE_JSON) + `]: <i>` + smart.EscapeHtml("`" + bwPath + "`") + `</i></div>` + "\n"
@@ -299,6 +301,12 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "403.html"
 				return
 			} //end if
+			if(smart.AuthSafeTestPrivsRestr(authData.Restrictions, AUTH_AREA_RESTRICTION) == true) { // if auth/* is restricted, deny
+				response.StatusCode = 403
+				response.ContentBody = "Authentication Restrictions are Not Accepted for this URL"
+				response.ContentFileName = "403.html"
+				return
+			} //end if
 		//	if(smart.Auth2FACookieIsEnabled() != true) {
 		//		response.StatusCode = 501
 		//		response.ContentBody = "2FA Authentication is Disabled"
@@ -344,7 +352,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "500.html"
 				return
 			} //end if
-			var title = "Auth 2FA TOTP Generator"
+			var title = "Auth:2FA / TOTP Generator"
 		//	var headHtml string = "<style>img.svg { margin:10px; border:1px #EFEFEF solid; }</style>" + "\n"
 			var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>img.svg { margin:10px; }</style>" + "\n"
 			var bodyHtml string = "<h1>" + smart.EscapeHtml(title) + "</h1>" + "\n"
@@ -390,6 +398,10 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			} //end if
 			if(smart.AuthSafeTestPrivsRestr(authData.Privileges, smart.HTTP_AUTH_ADMIN_PRIV) != true) { // restrict to admins only ; the rest will have to use Oauth2
 				response.ContentBody = ApiResponseJsonERR(403, "Authentication Privileges are Not Accepted for this URL", nil)
+				return
+			} //end if
+			if(smart.AuthSafeTestPrivsRestr(authData.Restrictions, AUTH_AREA_RESTRICTION) == true) { // if auth/* is restricted, deny
+				response.ContentBody = ApiResponseJsonERR(403, "Authentication Restrictions are Not Accepted for this URL", nil)
 				return
 			} //end if
 			if(AuthTokenJwtIsEnabled() != true) {
@@ -487,7 +499,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "auth-token.json"
 			} else {
 				var bwPath string = GetCurrentBrowserPath(r)
-				var title = "JWT Access Token Generator"
+				var title = "Auth:JWT / Access Token Generator"
 				var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n"
 				var bodyHtml string = "<h1>" + smart.EscapeHtml(title) + "</h1>" + "\n"
 				bodyHtml += `<hr>` + "\n"

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ DATE / TIME ]
 
 // REQUIRE: go 1.19 or later
@@ -12,6 +12,7 @@ import (
 
 	"time"
 	"math"
+	"math/big"
 	mrand "math/rand"
 )
 
@@ -441,6 +442,15 @@ func TimeNowUnix() int64 { // unix timestamp UTC ; no need to apply UTC() on it 
 } //END FUNCTION
 
 
+func TimeNowHexUnix() string {
+	//--
+	tnu := TimeNowUnix()
+	//--
+	return Int64ToHex(tnu, false) // disallow negative timestamps, make non-sense
+	//--
+} //END FUNCTION
+
+
 //-----
 
 
@@ -611,6 +621,66 @@ func NanoTimeRandInt63N(min int64, max int64) uint64 {
 	rnd := TimeUnixNanoMathRandHandler()
 	//--
 	return uint64(rnd.Int63n(max-min) + min)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SafeCheckTimeDifferenceFromNow(isFutureTime bool, timeHex string, diffSeconds int64) bool {
+	//--
+	// This method is able to safe check if diffSeconds passed and no more since timeHex (which is in hex format to avoid uint64 overflow if comes from untrusted sources, ex Csrf cookie)
+	// to compare diffSeconds with a Future Time, if the diff seconds from now will not go beyond timeHex in the Future, set isFutureTime = TRUE
+	// to compare diffSeconds with a Past   Time, if the diff seconds from now will not go beyond timeHex in the Past,   set isFutureTime = FALSE
+	// diffSeconds must be a positive number >= 1
+	// timeHex: expects timestamp converted to Hex as from TimeNowHexUnix()
+	//--
+	timeHex = StrToLower(StrTrimWhitespaces(timeHex))
+	if(timeHex == "") {
+		return false
+	} //end if
+	if(len(timeHex) > 64) { // max uint256 is hex 64 characters with 0x prefix representation: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+		return false
+	} //end if
+	if(!StrRegexMatch(REGEX_SAFE_HEX_STR, timeHex)) { // safety check, must contain only 0-9 a-f (only positive numbers are allowed) ; must not use the 0x prefix !
+		return false
+	} //end if
+	//--
+	if(diffSeconds < 1) {
+		return false
+	} //end if
+	//--
+	zero := big.NewInt(0)
+	//--
+	b10N := new(big.Int)
+	b10N.SetString(timeHex, 16)
+	if(b10N.Cmp(zero) <= 0) { // if hex is malformed or the above method fails will return zero, not acceptable
+		return false
+	} //end if
+	//--
+	now := time.Now().Unix()
+	now10N := big.NewInt(now)
+	//--
+	diff10N := new(big.Int)
+	diff10N.Sub(now10N, b10N)
+	//--
+	if(diff10N.Cmp(zero) <= 0) { // diff must be positive
+		return false
+	} //end if
+	//--
+	limit := big.NewInt(diffSeconds)
+	if(isFutureTime == true) { // future
+		if(limit.Cmp(diff10N) >= 0) { // the difference in seconds must not be more than diffSeconds ; must be negative
+			return false
+		} //end if
+	} else { // past
+		if(limit.Cmp(diff10N) <= 0) { // the difference in seconds must not be more than diffSeconds ; must be positive
+			return false
+		} //end if
+	} //end if else
+	//--
+	return true // OK
 	//--
 } //END FUNCTION
 

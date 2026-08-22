@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / JWT :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -122,6 +122,10 @@ func JwtExtractData(tokenString string) JwtTokenData {
 	} //end if
 	//--
 	objJsonHdr := smart.JsonGetValueByKeyPath(jsonPartHdr, "")
+	if(objJsonHdr == nil) {
+		jwtData.Error = smart.NewError("Token Header segment is Invalid")
+		return jwtData
+	} //end if
 	//--
 	var tkType string = smart.StrTrimWhitespaces(objJsonHdr.Get("typ").String())
 	var tkAlgo string = smart.StrTrimWhitespaces(objJsonHdr.Get("alg").String())
@@ -156,6 +160,10 @@ func JwtExtractData(tokenString string) JwtTokenData {
 	} //end if
 	//--
 	objJsonTxtPart := smart.JsonGetValueByKeyPath(jsonPartTxt, "")
+	if(objJsonTxtPart == nil) {
+		jwtData.Error = smart.NewError("Token Data segment is Invalid")
+		return jwtData
+	} //end if
 	//--
 	var serial string = smart.StrTrimWhitespaces(objJsonTxtPart.Get("jti").String())
 	if((serial == "") || (len(serial) != 21) || (!smart.StrRegexMatch(JwtRegexSerial, serial))) { // {{{SYNC-JWT-SMART-SERIAL-VALIDATION}}}

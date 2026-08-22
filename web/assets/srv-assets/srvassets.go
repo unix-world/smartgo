@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20260806.2358"
+	VERSION string = "r.20260821.2358"
 )
 
 var (
@@ -30,31 +30,69 @@ var (
 
 
 type uxmAjaxFormReply struct {
-	Completed 			string 		`json:"completed"`
-	Status 				string 		`json:"status"`
-	Action 				string 		`json:"action"`
-	Title  				string 		`json:"title"`
-	Message 			string 		`json:"message"`
-	JsEvalCode 			string 		`json:"js_evcode"`
-	RedirectUrl 		string 		`json:"redirect"`
-	ReplaceDiv 			string 		`json:"replace_div"`
-	ReplaceHtml 		string 		`json:"replace_html"`
-	HideFormOnSuccess	string 		`json:"hide_form_on_success"`
+	Completed 			string 		`json:"completed"` 				// this should be always `DONE`
+	Status 				string 		`json:"status"` 				// `OK` | `INFO` | `HINT` | `NOTICE` | `WARN` | `ERROR` | `FAIL` | `FATAL` | `UNKNOWN` (cannot be empty)
+	Action 				string 		`json:"action"` 				// action button label ; if status is OK, button label is OK, otherwise it is set to Cancel
+	Title  				string 		`json:"title"` 					// text
+	Message 			string 		`json:"message"` 				// html code
+	JsEvalCode 			string 		`json:"js_evcode"` 				// js code
+	RedirectUrl 		string 		`json:"redirect"` 				// redirect url
+	ReplaceDiv 			string 		`json:"replace_div"` 			// div element id, to be replaced by replace html
+	ReplaceHtml 		string 		`json:"replace_html"` 			// html code
+	HideFormOnSuccess	string 		`json:"hide_form_on_success"` 	// flag: `` | `hide`
 }
 
 
-func JsonAjaxFormReply(status string, action string, title string, message string, isHtmlMessage bool, js_evcode string, redirect string, replace_div string, replace_html string, hide_form_on_success bool) string {
+func JsonAjaxFormStdReply(status string, title string, message string, isHtmlMessage bool, redirect string, hideFormOnSuccess bool, jsEvalCode string) string {
+	//--
+	return JsonAjaxFormReply(status, "", title, message, isHtmlMessage, jsEvalCode, redirect, "", "", hideFormOnSuccess)
+	//--
+} //END FUNCTION
+
+
+func JsonAjaxFormReply(status string, action string, title string, message string, isHtmlMessage bool, jsEvalCode string, redirect string, replaceDivId string, replaceDivHtml string, hideFormOnSuccess bool) string {
+	//--
+	// sync with SF.PHP/ViewHelpers
 	//--
 	defer smart.PanicHandler()
+	//--
+	status = smart.StrToUpper(smart.StrTrimWhitespaces(status))
+	//--
+	switch(status) {
+		case "OK": 			fallthrough
+		case "INFO": 		fallthrough
+		case "HINT": 		fallthrough
+		case "NOTICE": 		fallthrough
+		case "WARN": 		fallthrough
+		case "WARNING": 	fallthrough
+		case "ERR": 		fallthrough
+		case "ERROR": 		fallthrough
+		case "FAIL": 		fallthrough
+		case "FAILED":
+			break
+		case "FATAL": 		fallthrough
+		case "": 			fallthrough
+		default:
+			status = "FATAL"; // cannot be empty or anything else
+	} //end switch
+	//--
+	action = smart.StrTrimWhitespaces(action)
+	if(action == "") {
+		if(status == "OK") {
+			action = "OK"
+		} else {
+			action = "Cancel"
+		} //end if else
+	} //end if
 	//--
 	title = smart.EscapeHtml(title)
 	if(!isHtmlMessage) {
 		message = smart.Nl2Br(smart.EscapeHtml(message))
 	} //end if
 	//--
-	var hideFormOnSuccess string = ""
-	if(hide_form_on_success) {
-		hideFormOnSuccess = "hide"
+	var strHideFormOnSuccess string = ""
+	if(hideFormOnSuccess) {
+		strHideFormOnSuccess = "hide"
 	} //end if
 	//--
 	data := uxmAjaxFormReply{}
@@ -64,11 +102,11 @@ func JsonAjaxFormReply(status string, action string, title string, message strin
 	data.Action 			= smart.StrTrimWhitespaces(action)
 	data.Title 				= smart.StrTrimWhitespaces(title)
 	data.Message 			= smart.StrTrimWhitespaces(message)
-	data.JsEvalCode 		= smart.StrTrimWhitespaces(js_evcode)
+	data.JsEvalCode 		= smart.StrTrimWhitespaces(jsEvalCode)
 	data.RedirectUrl 		= smart.StrTrimWhitespaces(redirect)
-	data.ReplaceDiv 		= smart.StrTrimWhitespaces(replace_div)
-	data.ReplaceHtml 		= smart.StrTrimWhitespaces(replace_html)
-	data.HideFormOnSuccess 	= smart.StrTrimWhitespaces(hideFormOnSuccess)
+	data.ReplaceDiv 		= smart.StrTrimWhitespaces(replaceDivId)
+	data.ReplaceHtml 		= smart.StrTrimWhitespaces(replaceDivHtml)
+	data.HideFormOnSuccess 	= smart.StrTrimWhitespaces(strHideFormOnSuccess)
 	//--
 	return smart.JsonNoErrChkEncode(data, false, true)
 	//--
@@ -147,6 +185,58 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 
 
 //-----
+
+
+func HtmlPdfIframe(pdfRaw []byte, docName string, closeModalOrPopup bool, ifrmId string) string {
+	//--
+	// this needs server template not standalone ; in standalone mode the PDF download does not work and also SFIcons are N/A
+	//--
+	if(pdfRaw == nil) {
+		return assets.HtmlNotificationMessage("warn", false, "PDF is Empty") // text
+	} //end if
+	if(!smart.BytStartsWith(pdfRaw, []byte("%PDF-"))) { // {{{SYNC-PDF-FILE-TEST}}}
+		return assets.HtmlNotificationMessage("error", false, "PDF is Invalid") // text
+	} //end if
+	//--
+	docName = smart.StrTrimWhitespaces(docName)
+	if(docName != "") {
+		docName = smart.StrCreateSlug(docName)
+	} //end if
+	if(len(docName) > 128) {
+		docName = "" // invalid
+	} //end if
+	//--
+	var closeMP string = "0"
+	if(closeModalOrPopup == true) {
+		closeMP = "1"
+	} //end if
+	//--
+	ifrmId = smart.StrTrimWhitespaces(ifrmId)
+	if(ifrmId == "") {
+		ifrmId = "smart-pdf-view"
+	} //end if
+	//--
+	return smart.RenderMarkersTpl(assets.ReadWebAsset("lib/tpl/iframe-pdf-view-download.inc.mtpl.htm"), map[string]string{
+		//--
+		"CLOSE-MP": 	closeMP, // if set to 1 will close modal/popup on download
+		"IFRM-ID": 		ifrmId,
+		//--
+		"WIDTH": 		"98vw",
+		"HEIGHT": 		"98vh",
+		//--
+		"TOP": 			"75px",
+		"RIGHT": 		"75px",
+		//--
+		"DOC-NAME": 	docName, // skip .pdf extension
+		"PDF-B64": 		string(smart.Base64BytEncode(pdfRaw)), // B64 of PDF raw data
+		//--
+	})
+	//--
+} //END FUNCTION
+
+
+//-----
+
 
 func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string, loadjs bool) string { // require: a HTTP or HTTPS service, serving assets as: /lib/*
 	//--

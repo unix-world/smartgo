@@ -1,0 +1,49 @@
+<!-- Partial Template: Core.PdfViewDownload v.20260806 -->
+<center>
+<iframe id="[###IFRM-ID|htmid|html###]" sandbox="allow-downloads allow-scripts allow-modals" frameborder="0" style="width:[###WIDTH|html###]; height:[###HEIGHT|html###]; font-family:Helvetica!important;" src="data:application/pdf;base64,[###PDF-B64|html###]"></iframe>
+<script>
+const downloadPdf = () => {
+	const alertEmpty = (code) => {
+		smartJ$Browser.AlertDialog('<h6>Data is Empty (' + smartJ$Utils.escape_html(code) + ')</h6>', null, 'B64 PDF', 320, 160);
+	};
+	const lenB64 = [###PDF-B64|len|int###];
+	if(lenB64 <= 0) {
+		alertEmpty(1);
+		return;
+	}
+	let dataB64 = smartJ$Utils.stringPureVal(jQuery('iframe#[###IFRM-ID|htmid|js###]').attr('src') || '', true);
+	if(dataB64.length <= 0) {
+		alertEmpty(2);
+		return;
+	}
+	if(dataB64.length > 0) {
+		const b64Separator = ';base64,';
+		const idx = dataB64.indexOf(b64Separator) + b64Separator.length;
+		dataB64 = dataB64.substring(idx, dataB64.length);
+	}
+	if(dataB64.length <= 0) {
+		alertEmpty(3);
+		return;
+	}
+	if(dataB64.length !== lenB64) {
+		alertEmpty(4);
+		return;
+	}
+	smartJ$Browser.VirtualFileDownload(smartJ$Utils.b64Dec(dataB64, true), '[###DOC-NAME|js###].pdf', '', null, true);
+	const closeModalOrPopup = [###CLOSE-MP|int###];
+	if(closeModalOrPopup === 1) {
+		if((smartJ$Browser.WindowIsPopup() === true) || (smartJ$Browser.WindowIsiFrame() === true)) {
+			setTimeout(() => { smartJ$Browser.CloseModalPopUp() }, 1000);
+		}
+	}
+};
+</script>
+[%%%IF:DOC-NAME:!=;%%%]
+<div style="position:fixed; top:[###TOP|html###]; right:[###RIGHT|html###]; z-index:88888;">
+	<button type="button" class="ux-button ux-button-small ux-button-special" onclick="downloadPdf(); jQuery(this).prop('disabled', true); return false;" title="Download PDF: `[###DOC-NAME|html###].pdf`[%%%IF:CLOSE-MP:==1;%%%] [x][%%%/IF:CLOSE-MP%%%]"><i class="sfi sfi-lg sfi-cloud-download"><hr><i class="sfi sfi-file-pdf"></i></i></button>
+</div>
+[%%%ELSE:DOC-NAME%%%]
+<!-- DocName: N/A, no PDF download -->
+[%%%/IF:DOC-NAME%%%]
+</center>
+<!-- #END :: Partial Template: Core.PdfViewDownload -->

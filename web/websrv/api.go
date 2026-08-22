@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / API :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -14,7 +14,7 @@ import (
 	"net/http"
 
 	smart 		"github.com/unix-world/smartgo"
-	smartcache 	"github.com/unix-world/smartgo/data-structs/simplecache"
+	smartcache 	"github.com/unix-world/smartgo/utils/smart-memcache"
 )
 
 const (
@@ -168,6 +168,15 @@ func ApiResponseJsonOK(data any) string {
 	}
 	//--
 	return smart.JsonNoErrChkEncode(resp, false, false) // do not format on OK answer to preserve bandwidth, these may be much longer answers than err above
+	//--
+} //END FUNCTION
+
+
+func ApiResponseJsonRaw(data any) string {
+	//--
+	defer smart.PanicHandler() // safe recovery handler
+	//--
+	return smart.JsonNoErrChkEncode(data, false, false) // do not format on OK answer to preserve bandwidth, these may be much longer answers than err above
 	//--
 } //END FUNCTION
 

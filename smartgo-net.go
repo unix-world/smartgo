@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ NET ]
 
 // REQUIRE: go 1.19 or later
@@ -11,6 +11,7 @@ import (
 	"log"
 
 	"strings"
+	"sort"
 
 	"net"
 	"net/url"
@@ -33,11 +34,6 @@ const (
 
 	HTTP_PROTO_PREFIX_HTTP  string = "http://"
 	HTTP_PROTO_PREFIX_HTTPS string = "https://"
-
-	DATA_URL_EMPTY_PREFIX string = "data:,"
-	DATA_URL_CSS_PREFIX string = "data:text/css,"
-	DATA_URL_JS_PREFIX string = "data:application/javascript,"
-	DATA_URL_SVG_IMAGE_PREFIX string = "data:image/svg+xml,"
 
 	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
 	DEFAULT_FAKE_HOSTPORT_SERVER string = "256.256.256.256:65535"
@@ -500,6 +496,42 @@ func GetHttpProtocolFromRequest(r *http.Request) (proto string) {
 } //END FUNCTION
 
 
+func GetHttpDomainAndPortFromHostOrHostPort(hostPort string) (string, string, error) {
+	//--
+	// hostPort can be: `host:port` or just `host` ; where `host` is a valid domain name or a valid IPv4 / IPv6
+	// if hostPort is just `host` will be fixed below to avoid parse error in net.SplitHostPort
+	//--
+	defer PanicHandler()
+	//--
+	hostPort = StrTrimWhitespaces(hostPort)
+	if(hostPort == "") {
+		return "", "", NewError("Host:Port is Empty")
+	} //end if
+	//-- fix: avoid parse error below in SplitHostPort if port is missing
+	const fakePortNum string = ":65535"
+	var fakePortAdded bool = false
+	if(StrStartsWith(hostPort, "[") && StrEndsWith(hostPort, "]")) { // Ipv6
+		if(!StrContains(hostPort, "]:")) {
+			hostPort += fakePortNum
+			fakePortAdded = true
+		} //end if
+	} else { // host or Ipv4
+		if(!StrContains(hostPort, ":")) {
+			hostPort += fakePortNum
+			fakePortAdded = true
+		} //end if
+	} //end if else
+	//--
+	domain, portNum, errSplit := net.SplitHostPort(hostPort) // if port is missing will raise return an error as `missing port in address`, thus fix this above
+	if(fakePortAdded == true) {
+		portNum = "" // fix, set port back to empty as it was not provided
+	} //end if
+	//--
+	return domain, portNum, errSplit
+	//--
+} //END FUNCTION
+
+
 // domain can be: domain or IPv4 / IPv6
 func GetHttpDomainAndPortFromRequest(r *http.Request) (domain string, portNum string, err error) {
 	//--
@@ -806,6 +838,8 @@ func GetUserAgentBrowserClassOs(signature string) (bw string, cls string, os str
 
 func ParseUrl(u string) (*url.URL, error) {
 	//--
+	defer PanicHandler()
+	//--
 	u = StrTrimWhitespaces(u)
 	if(u == "") {
 		return nil, NewError("URL is Empty")
@@ -831,7 +865,279 @@ func ParseUrl(u string) (*url.URL, error) {
 //-----
 
 
+func ParseUrlRawQuery(urlQuery string) map[string][]string {
+	//--
+	defer PanicHandler()
+	//--
+	urlQuery = StrTrimWhitespaces(urlQuery)
+	if(urlQuery == "") {
+		return nil
+	} //end if
+	//--
+	vals, err := url.ParseQuery(urlQuery)
+	if(err != nil) {
+		return nil
+	} //end if
+	//--
+	return vals
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func UrlBuildQueryParams(qParams map[string][]string) string {
+	//--
+	// Encode encodes the values into “RawURL encoded” form
+	// ("bar=baz&foo=quux") sorted by key. ; this is similar with url Values.Encode() but it uses RawUrlEncode instead of UrlEncode
+	//--
+	// {{{SYNC-URL-QUERY-PARSE-VS-BUILD}}} ; ex: `?a=b&a=c&b[]=z&b[]=q&frm[a]=2&frm[b]=3` will parse as: `map[ a:[b c] b[]:[z q] frm[a]:[2] frm[b]:[3] ]`
+	//--
+	defer PanicHandler()
+	//--
+	if(qParams == nil) {
+		return ""
+	} //end if
+	if(len(qParams) <= 0) {
+		return ""
+	} //end if
+	//--
+	var queryUrl string = ""
+	//--
+	var keys []string = []string{}
+	for kk, _ := range (qParams) {
+		keys = append(keys, kk)
+	} //end for
+	sort.Strings(keys)
+	for ki:=0; ki<len(keys); ki++ {
+		originalKey := keys[ki]
+		key := StrTrimWhitespaces(StrNormalizeSpaces(originalKey))
+		if(key == "[]") { // {{{SYNC-QUERY-URL-INVALID-KEY-BRACKETSONLY}}}
+			key = "" // invalid, reset
+		} //end if
+		if(StrEndsWith(key, "[]")) { // if ends with [] must remove, this is reserved for array valuues, will be added below if necessary
+			key = StrTrimWhitespaces(StrSubstr(key, 0, len(key) - 2))
+			if(key == "[]") { // {{{SYNC-QUERY-URL-INVALID-KEY-BRACKETSONLY}}}
+				key = "" // invalid, reset
+			} //end if
+		} //end if
+		if(key != "") { // do not escape key qith url.QueryEscape() because it does wrong, will `frm[]` encode as `frm%5B%5D` and `frm[abc]` as `frm%5Babc%5D`
+			if((!StrContains(key, "?")) && (!StrContains(key, "&")) && (!StrContains(key, "=")) && (!StrContains(key, " "))) {
+				if(ArrMapKeyExists(originalKey, qParams)) {
+					val := qParams[originalKey]
+					if(len(val) <= 0) {
+						val = []string{ "" } // need to preserve variable in query, init with an empty value
+					} //end if
+					for i:=0; i<len(val); i++ {
+						if(queryUrl != "") {
+							queryUrl += "&"
+						} //end if
+						queryUrl += key
+						if(len(val) > 1) {
+							queryUrl += "[]"
+						} //end if
+						queryUrl += "="
+						queryUrl += RawUrlEncode(val[i])
+					} //end for
+				} //end if
+			} //end if
+		} //end if
+	} //end for
+	//--
+	return queryUrl
+	//--
+} //END FUNCTION
+
+
+func UrlRemoveQueryParams(url string, params []string) string {
+	//--
+	defer PanicHandler()
+	//--
+	url = StrTrimWhitespaces(url)
+	if(url == "") {
+		return ""
+	} //end if
+	//--
+	if(params == nil) {
+		return url
+	} //end if
+	if(len(params) <= 0) {
+		return url
+	} //end if
+	//--
+	if(!StrContains(url, "?")) {
+		return url // no queryURL, nothing to remove
+	} //end if
+	//--
+	var baseUrl  string = url
+	var queryUrl string = ""
+	var hashFrag string = ""
+	arr := ExplodeWithLimit("?", url, 2)
+	if(len(arr) == 2) {
+		baseUrl  = StrTrimWhitespaces(arr[0]) // URL without query Url
+		queryUrl = StrTrimWhitespaces(arr[1]) // query Url
+		if(StrContains(queryUrl, "#")) { // contains also hash fragment
+			hArr := ExplodeWithLimit("#", queryUrl, 2)
+			if(len(hArr) == 2) {
+				queryUrl = StrTrimWhitespaces(hArr[0]) // query Url
+				hashFrag = StrTrimWhitespaces(hArr[1]) // hash fragment
+			} //end if
+		} //end if
+	} //end if
+	if(queryUrl == "") {
+		return baseUrl // url only had ? suffix, but nothing else on queryUrl
+	} //end if
+	//--
+	qArr := ParseUrlRawQuery(queryUrl)
+	queryUrl = "" // reset
+	if(qArr != nil) {
+		if(len(qArr) > 0) {
+			var qParams map[string][]string = map[string][]string{}
+			for key, val := range qArr {
+				key = StrTrimWhitespaces(key)
+				if(key == "[]") { // {{{SYNC-QUERY-URL-INVALID-KEY-BRACKETSONLY}}}
+					key = "" // invalid, reset
+				} //end if
+				if(key != "") {
+					//--
+					lKey := "" // this is used to remove `frm` from all `frm[]`  instances if any and used so
+					if(StrContains(key, "[]")) {
+						lArr := ExplodeWithLimit("[]", key, 2)
+						if(len(lArr) == 2) {
+							lKey = StrTrimWhitespaces(lArr[0])
+						} //end if
+					} //end if
+					//--
+					aKey := "" // this is used to remove `frm` from all `frm[a]` instances if any and used so
+					theLKey := key
+					if(lKey != "") {
+						theLKey = lKey
+					} //end if
+					if(StrContains(theLKey, "[")) {
+						aArr := ExplodeWithLimit("[", theLKey, 2)
+						if(len(aArr) == 2) {
+							aKey = StrTrimWhitespaces(aArr[0])
+						} //end if
+					} //end if
+					//--
+					isOkToKeep := true
+					//--
+					if(InListArr(key, params)) {
+						isOkToKeep = false
+					} //end if
+					if(InListArr(key + "[]", params)) {
+						isOkToKeep = false
+					} //end if
+					//--
+					if((lKey != "") && (InListArr(lKey, params))) {
+						isOkToKeep = false
+					} //end if
+					if((lKey != "") && (InListArr(lKey + "[]", params))) {
+						isOkToKeep = false
+					} //end if
+					//--
+ 					if((aKey != "") && (InListArr(aKey, params))) {
+						isOkToKeep = false
+					} //end if
+					if((aKey != "") && (InListArr(aKey + "[]", params))) {
+						isOkToKeep = false
+					} //end if
+					//--
+					if(isOkToKeep == true) {
+						qParams[key] = val
+					} //end if
+					//--
+				} //end if
+			} //end for
+			if(len(qParams) > 0) {
+				queryUrl = StrTrimWhitespaces(UrlBuildQueryParams(qParams))
+			} //end if
+		} //end if
+	} //end if
+	//--
+	var reBuiltUrl string = baseUrl
+	if(queryUrl != "") {
+		//--
+		reBuiltUrl += "?" + queryUrl
+		//--
+		if(DEBUG) {
+			log.Println("[DEBUG]", CurrentFunctionName(), "queryUrl:Parsed", ParseUrlRawQuery(queryUrl))
+		} //end if
+		//--
+	} //end if
+	if(hashFrag != "") {
+		reBuiltUrl += "#" + hashFrag
+	} //end if
+	//--
+	return reBuiltUrl
+	//--
+} //END FUNCTION
+
+
+func UrlAddQueryParams(url string, qParams map[string][]string) string {
+	//--
+	defer PanicHandler()
+	//--
+	url = StrTrimWhitespaces(url)
+	if(url == "") {
+		return ""
+	} //end if
+	//--
+	if(qParams == nil) {
+		return url
+	} //end if
+	if(len(qParams) <= 0) {
+		return url
+	} //end if
+	//--
+	var urlPlusQuery string = url
+	var hashFrag     string = ""
+	if(StrContains(url, "#")) { // contains also hash fragment
+		arr := ExplodeWithLimit("#", url, 2)
+		if(len(arr) == 2) {
+			urlPlusQuery  = StrTrimWhitespaces(arr[0]) // URL without queryUrl
+			hashFrag      = StrTrimWhitespaces(arr[1]) // hash fragment
+		} //end if
+	} //end if
+	//--
+	var queryUrl string = StrTrimWhitespaces(UrlBuildQueryParams(qParams))
+	//--
+	var reBuiltUrl string = urlPlusQuery
+	if(queryUrl != "") {
+		//--
+		if(!StrContains(reBuiltUrl, "?")) {
+			reBuiltUrl += "?"
+		} else {
+			reBuiltUrl += "&"
+		} //end if else
+		reBuiltUrl += queryUrl
+		//--
+		if(!StrContains(reBuiltUrl, "?")) {
+			log.Println("[ERROR]", CurrentFunctionName(), "reBuiltUrl is missing `?` but queryUrl exists", reBuiltUrl)
+		} else {
+			if(DEBUG) {
+				dbgArr := ExplodeWithLimit("?", reBuiltUrl, 2)
+				log.Println("[DEBUG]", CurrentFunctionName(), "queryUrl:Parsed", ParseUrlRawQuery(dbgArr[1]))
+			} //end if else
+		} //end if
+		//--
+	} //end if
+	if(hashFrag != "") {
+		reBuiltUrl += "#" + hashFrag
+	} //end if
+	//--
+	return reBuiltUrl
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
 func IsNetValidHttpUrl(u string) bool {
+	//--
+	defer PanicHandler()
 	//--
 	u = StrTrimWhitespaces(u)
 	if(u == "") {

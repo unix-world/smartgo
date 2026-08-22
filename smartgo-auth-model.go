@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ AUTH / MODEL ]
 
 // REQUIRE: go 1.19 or later
@@ -133,6 +133,9 @@ func (p *AuthDataProvider) ParseAndValidateAuthUserRecord(authUserName string, a
 		return defRecord, NewError("JSON data record is Empty")
 	} //end if
 	arrRecord := JsonGetValueByKeyPath(jsonRecord, "")
+	if(arrRecord == nil) {
+		return defRecord, NewError("JSON data record is Invalid")
+	} //end if
 	//--
 	record := AuthUserRecord{}
 	record.Exists 	= true
@@ -255,6 +258,9 @@ func (p *AuthDataProvider) ParseAndValidateAuthTokenRecord(authUserName string, 
 		return defToken, NewError("JSON data record is Empty")
 	} //end if
 	arrRecord := JsonGetValueByKeyPath(jsonRecord, "")
+	if(arrRecord == nil) {
+		return defToken, NewError("JSON data record is Invalid")
+	} //end if
 	//--
 	theToken := AuthUserToken{}
 	theToken.Exists = true

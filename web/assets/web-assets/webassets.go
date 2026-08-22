@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20260806.2358"
+	VERSION string = "r.20260821.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2026-08-06 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2026-08-21 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
@@ -321,12 +321,75 @@ func ReadWebAsset(path string) string { // OK
 		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` #", err) // mostly will cover 404
 		return ""
 	} //end if
+	if(content == nil) {
+		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` # Content is Empty") // will also cover 404
+		return ""
+	} //end if
 	//--
 	if(DEBUG == true) {
 		log.Println("[DATA]", smart.CurrentFunctionName(), "# Reading Asset: `" + path + "` [DONE] :: ContentLength=", len(content), "bytes")
 	} //end if
 	//--
 	return string(content)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func HtmlNotificationMessage(typ string, isHtml bool, msg string) string {
+	//--
+	typ = smart.StrToLower(smart.StrTrimWhitespaces(typ))
+	//--
+	if(isHtml == false) {
+		msg = smart.EscapeHtml(msg)
+	} //end if
+	//--
+	var cssClass string = ""
+	switch(typ) {
+		case "question":
+			cssClass = "operation_question"
+			break
+		case "notice":
+			cssClass = "operation_notice"
+			break
+		case "ok": fallthrough
+		case "info":
+			cssClass = "operation_info"
+			break
+		case "warn":
+			cssClass = "operation_warn"
+			break
+		case "fail": fallthrough
+		case "error":
+			cssClass = "operation_error"
+			break
+		case "success":
+			cssClass = "operation_success"
+			break
+		case "important":
+			cssClass = "operation_important"
+			break
+		case "result":
+			cssClass = "operation_result"
+			break
+		case "display":
+			cssClass = "operation_display"
+			break
+		case "hint":
+			cssClass = "operation_hint"
+			break
+		default:
+			cssClass = "" // N/A
+			log.Println("[WARNING]", smart.CurrentFunctionName(), "Invalid Type: `" + typ + "`")
+	} //end switch
+	//--
+	return smart.RenderMarkersTpl(HTML_TPL_NOTIFICATION, map[string]string{
+		"TYPE": 		typ,
+		"CSS-CLASS": 	cssClass,
+		"MESSAGE-HTML": msg,
+	})
 	//--
 } //END FUNCTION
 
@@ -494,6 +557,8 @@ const (
 	TAG_CSS_END string = `">`
 	TAG_JS_START string = `<script src="` + smart.DATA_URL_JS_PREFIX
 	TAG_JS_END string = `"></script>`
+
+	HTML_TPL_NOTIFICATION = `<!-- require: notifications.css --><div title="[###TYPE|ucfirst|html###]" class="[###CSS-CLASS|html###]">[###MESSAGE-HTML###]</div>`
 
 	HTML_TPL_STATUS string = `<!DOCTYPE html>
 <!-- TPL.SmartGo.STATUS -->

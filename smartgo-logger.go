@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 // [ LOGGER ]
 
 // REQUIRE: go 1.19 or later
@@ -28,11 +28,11 @@ const (
 //func FatalError(logMessages ...interface{}) {
 func FatalError(logMessages ...any) {
 	//--
-//	log.Println("[ERROR]", "! FATAL !", fmt.Sprint(logMessages...))
+//	log.Println("[ERROR]", "! FATAL !", ObjectToString(logMessages...))
 	//-- fix for above, does not expand with between spaces
 	var txtLog string = ""
 	for _, e := range logMessages {
-		txtLog += fmt.Sprint(e) + " "
+		txtLog += ObjectToString(e) + " "
 	} //end for
 	log.Println("[ERROR]", "! FATAL !", StrTrimWhitespaces(txtLog))
 	//--
@@ -135,13 +135,13 @@ func (writer logWriterWithColors) Write(bMsg []byte) (int, error) {
 	var hdrMsg string = StrToUpper(StrSubstr(theMsg, 0, 16))
 	//--
 	if(logColoredOnConsole) {
-		if(StrStartsWith(hdrMsg, "[PANIC]") == true) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+		if((StrStartsWith(hdrMsg, "[FATAL]") == true) || (StrStartsWith(hdrMsg, "[PANIC]") == true)) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 			theMsg = color.MagentaString(StrTrimWhitespaces(string(bMsg))) // for data preserve the string how it is, except trim ! ; brown
-		} else if(StrStartsWith(hdrMsg, "[ERROR]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[ERROR]") == true) || (StrStartsWith(hdrMsg, "[ERR]") == true) || (StrStartsWith(hdrMsg, "[FAIL]") == true)) {
 			theMsg = color.RedString(theMsg)
-		} else if(StrStartsWith(hdrMsg, "[WARNING]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[WARNING]") == true) || (StrStartsWith(hdrMsg, "[WARN]") == true)) {
 			theMsg = color.HiRedString(theMsg)
-		} else if(StrStartsWith(hdrMsg, "[OK]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[OK]") == true) || (StrStartsWith(hdrMsg, "[DONE]") == true) || (StrStartsWith(hdrMsg, "[SUCCESS]") == true)) {
 			theMsg = color.HiGreenString(theMsg)
 		} else if(StrStartsWith(hdrMsg, "[LOG]") == true) {
 			theMsg = color.WhiteString(theMsg)
@@ -201,22 +201,22 @@ func (writer logWriterFile) Write(bMsg []byte) (int, error) {
 	//--
 	var theType string = ""
 	var colorMsg string = theMsg
-	if(StrStartsWith(hdrMsg, "[PANIC]") == true) {
+	if((StrStartsWith(hdrMsg, "[FATAL]") == true) || (StrStartsWith(hdrMsg, "[PANIC]") == true)) {
 		theType = "panic"
 		if(logColoredOnConsole) {
 			colorMsg = color.MagentaString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[ERROR]") == true) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+	} else if((StrStartsWith(hdrMsg, "[ERROR]") == true) || (StrStartsWith(hdrMsg, "[ERR]") == true) || (StrStartsWith(hdrMsg, "[FAIL]") == true)) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 		theType = "error"
 		if(logColoredOnConsole) {
 			colorMsg = color.RedString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[WARNING]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[WARNING]") == true) || (StrStartsWith(hdrMsg, "[WARN]") == true)) {
 		theType = "warning"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiRedString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[OK]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[OK]") == true) || (StrStartsWith(hdrMsg, "[DONE]") == true) || (StrStartsWith(hdrMsg, "[SUCCESS]") == true)) {
 		theType = "ok"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiGreenString(colorMsg)
@@ -339,30 +339,38 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 	//--
 	level = StrToUpper(StrTrimWhitespaces(level))
 	//--
-	var mLevel string = "PANIC"
-	if(level == "ERROR") {
-		mLevel = "ERROR"
-	} else if(level == "WARNING") {
-		mLevel = "WARNING"
-	} else if(level == "OK") {
-		mLevel = "OK"
-	} else if(level == "LOG") {
-		mLevel = "LOG"
-	} else if(level == "INFO") {
-		mLevel = "INFO"
-	} else if(level == "NOTICE") {
-		mLevel = "NOTICE"
-	} else if(level == "META") {
-		mLevel = "META"
-	} else if(level == "DATA") {
-		mLevel = "DATA"
-	} else if(level == "DEBUG") {
-		mLevel = "DEBUG"
-	} //end if else
+	switch(level) {
+		case "DEBUG": 		fallthrough
+		case "DATA": 		fallthrough
+		case "META": 		fallthrough
+		case "NOTICE": 		fallthrough
+		case "INFO": 		fallthrough
+		case "LOG":
+			// keep as is
+			break
+		case "DONE": 		fallthrough
+		case "SUCCESS": 	fallthrough
+		case "OK":
+			level = "OK" // remap to ok
+			break
+		case "WARN": 		fallthrough
+		case "WARNING":
+			level = "WARNING" // remap to warning
+			break
+		case "FAIL": 	fallthrough
+		case "ERR": 	fallthrough
+		case "ERROR":
+			level = "ERROR" // remap to error
+			break
+		case "FATAL": fallthrough
+		case "PANIC":
+		default:
+			level = "FATAL" // remap to fatal
+	} //end switch
 	//--
 	filter := &logutils.LevelFilter{
-		Levels: []logutils.LogLevel{"DEBUG", "DATA", "META", "NOTICE", "INFO", "LOG", "OK", "WARNING", "ERROR", "PANIC"},
-		MinLevel: logutils.LogLevel(mLevel),
+		Levels: []logutils.LogLevel{"DEBUG", "DATA", "META", "NOTICE", "INFO", "LOG", "OK", "WARNING", "ERROR", "FATAL"},
+		MinLevel: logutils.LogLevel(level),
 		Writer: output,
 	}
 	//--

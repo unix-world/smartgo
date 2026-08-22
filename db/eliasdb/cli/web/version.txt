@@ -1,0 +1,6 @@
+graphiql 2.2.7 @ 20260818.2358 [MIN]
+
+url prefix: /assets/
+
+db prefix: https://127.0.0.1:9090/db/v1/graphql/main
+

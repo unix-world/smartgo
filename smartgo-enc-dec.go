@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260806.2358 :: STABLE
+// r.20260821.2358 :: STABLE
 // [ ENCODERS / DECODERS ]
 
 // REQUIRE: go 1.19 or later
@@ -10,6 +10,8 @@ package smartgo
 import (
 	"log"
 	"fmt"
+
+	"strconv"
 
 	"encoding/hex"
 	"encoding/base64"
@@ -23,7 +25,9 @@ import (
 )
 
 const (
+	REGEX_SAFE_HEX_NUM  string = `^[0-9a-f\-]+$` // as the go have internal, all lowercase, have minus sign for negative numbers ; if only positive numbers are allowed validate with REGEX_SAFE_HEX_STR
 	REGEX_SAFE_HEX_STR  string = `^[0-9a-f]+$` // as the go have internal, all lowercase
+	REGEX_SAFE_B62_STR  string = `^[a-zA-Z0-9]+$`
 	REGEX_SAFE_B64_STR  string = `^[a-zA-Z0-9\+\/\=]+$`
 	REGEX_SAFE_B64S_STR string = `^[a-zA-Z0-9\-_\.]+$`
 )
@@ -464,7 +468,117 @@ func Base64uDecode(data string) string {
 
 func UInt64ToHex(num uint64) string {
 	//--
-	return fmt.Sprintf("%x", num)
+	defer PanicHandler()
+	//--
+	hx := fmt.Sprintf("%x", num)
+	//--
+	if(StrStartsWith(hx, "-")) { // check, just in case
+		hx = "0"
+	} //end if
+	//--
+	if((len(hx) % 2) != 0) {
+		hx = "0" + hx // sync with PHP SF
+	} //end if
+	//--
+	return hx
+	//--
+} //END FUNCTION
+
+
+func HexToUInt64(hx string) uint64 {
+	//--
+	defer PanicHandler()
+	//--
+	hx = StrTrimWhitespaces(hx)
+	if(hx == "") {
+		return 0
+	} //end if
+	if(!StrRegexMatch(REGEX_SAFE_HEX_STR, hx)) { // safety check, must contain only 0-9 a-f (only positive numbers are allowed) ; must not use the 0x prefix !
+		return 0
+	} //end if
+	//--
+	var num uint64 = 0
+	conv, err := strconv.ParseUint(hx, 16, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	return num
+	//--
+} //END FUNCTION
+
+
+func Int64ToHex(num int64, allowNegatives bool) string {
+	//--
+	defer PanicHandler()
+	//--
+	if(allowNegatives == false) {
+		if(num < 0) {
+			num = 0
+		} //end if
+	} //end if
+	//--
+	hx := fmt.Sprintf("%x", num)
+	//--
+	var isNegative bool = false
+	if(StrStartsWith(hx, "-")) {
+		isNegative = true
+	} //end if
+	//--
+	if(allowNegatives == false) {
+		if(isNegative) {
+			hx = "0"
+		} //end if
+	} else {
+		hx = StrTrimLeft(hx, "-")
+	} //end if else
+	//--
+	if((len(hx) % 2) != 0) {
+		hx = "0" + hx // sync with PHP SF
+	} //end if
+	//--
+	if(allowNegatives == true) {
+		if(isNegative) {
+			hx = "-" + hx
+		} //end if
+	} //end if
+	//--
+	return hx
+	//--
+} //END FUNCTION
+
+
+func HexToInt64(hx string, allowNegatives bool) int64 {
+	//--
+	defer PanicHandler()
+	//--
+	hx = StrTrimWhitespaces(hx)
+	if(hx == "") {
+		return 0
+	} //end if
+	if(allowNegatives == false) {
+		if(!StrRegexMatch(REGEX_SAFE_HEX_STR, hx)) { // safety check, must contain only 0-9 a-f (only positive numbers are allowed) ; must not use the 0x prefix !
+			return 0
+		} //end if
+	} else {
+		if(!StrRegexMatch(REGEX_SAFE_HEX_NUM, hx)) { // safety check, must contain only 0-9 a-f and - (negative numbers are allowed) ; must not use the 0x prefix !
+			return 0
+		} //end if
+	} //end if else
+	//--
+	var num int64 = 0
+	conv, err := strconv.ParseInt(hx, 16, 64)
+	if(err == nil) {
+		num = conv
+	} //end if else
+	//--
+	if(num < 0) {
+		if(allowNegatives == false) {
+			num = 0
+		} //end if
+	} //end if
+	//--
+	return num
 	//--
 } //END FUNCTION
 

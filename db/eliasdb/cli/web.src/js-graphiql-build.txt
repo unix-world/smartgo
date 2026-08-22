@@ -1,0 +1,59 @@
+
+$ git clone https://github.com/graphql/graphiql
+
+# replace default graphiql endpoint, from:
+https://graphql.earthdata.nasa.gov/api
+to:
+/graphql/db/main
+or:
+https://127.0.0.1:9090/db/v1/graphql/main
+in examples/graphiql-vite/src/App.jsx
+
+# add to examples/graphiql-vite/vite.config.mjs the following, to avoid minify:
+  build: {
+    cssMinify: false,
+    minify: false,
+    format: {
+      comments: true,
+    },
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/[name].js`,
+        chunkFileNames: `assets/[name].js`,
+        assetFileNames: `assets/[name].[ext]`
+      }
+    },
+  },
+
+
+$ yarn install
+$ yarn build
+
+# the build files are in:
+examples/graphiql-vite/dist
+
+# sample insert, eliasdb
+```
+mutation {
+  Line(storeNode : {
+    key : 4,
+    name : "Circle Line 456"
+  }, key : 4) {
+    key
+    name
+  }
+}
+```
+
+# sample query, eliasdb
+```
+{
+  Line {
+    key
+    name
+  }
+}
+```
+
+## see eliasdb docs/tutorial for more ...
+

@@ -1,7 +1,7 @@
 
 // SmartGo Captcha
 // (c) 2024-present unix-world.org
-// v.20250214.2358
+// v.20260811.2358
 // license: BSD
 
 package captcha
@@ -97,6 +97,9 @@ func GetCaptchaHtmlAndCode(mode string, ckName string, clientIdentUidHash string
 	//--
 	json := smart.JsonNoErrChkEncode(arrMode, false, false)
 	gJsonRes := smart.JsonGetValueByKeyPath(json, "")
+	if(gJsonRes == nil) {
+		return captchaStruct, smart.NewError("Invalid Captcha Structure")
+	} //end if
 	//--
 	switch(arrMode[0]) {
 		case "ascii": // ascii:palette:size:chars:pool

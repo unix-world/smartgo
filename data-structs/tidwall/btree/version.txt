@@ -1,3 +1,4 @@
-github.com/tidwall/btree @head.20240929
+github.com/tidwall/btree @head.20260816
 
-go 1.19
+go 1.20
+

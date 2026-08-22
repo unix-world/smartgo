@@ -1,0 +1,12 @@
+<!-- Unveil, lazy load images :: TPL r.20260128 -->
+<script defer src="lib/js/jquery/jquery.unveil.js"></script>
+<script>
+jQuery(() => {
+	jQuery(window).on('refreshunveil', () => { jQuery('.unveil').off('unveil').unveil(); });
+	setTimeout(() => { jQuery(window).trigger('refreshunveil'); }, [%%%IF:TIMEOUT:>0;%%%][###TIMEOUT|int###][%%%ELSE:TIMEOUT%%%]250[%%%/IF:TIMEOUT%%%]);[%%%COMMENT%%%] // default timeout is 250 ; call for init or dom changes that include unveil elements (can include also unhide unveil elements)[%%%/COMMENT%%%]
+[%%%COMMENT%%%]
+	//jQuery(window).trigger('lookup'); // call after unhide unveil elements
+[%%%/COMMENT%%%]
+});
+</script>
+<!-- # -->

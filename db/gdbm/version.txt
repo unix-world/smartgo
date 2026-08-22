@@ -1,0 +1,6 @@
+github.com/graygnuorg/go-gdbm @head.20260808
+
+go 1.16
+
+includes build fixes on openbsd and other platforms, by unixman
+

@@ -1,5 +1,6 @@
-github.com/mattn/go-sqlite3 @ v1.14.32.1 @ head.20251208
+github.com/mattn/go-sqlite3 @ v1.14.50 @ head.20260817
 
-go 1.19
+sqlite3 lib v.3.53.4
 
+go 1.21
 

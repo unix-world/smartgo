@@ -1,8 +1,9 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260801.2358 :: STABLE
+// r.20260822.2358 :: STABLE
 
+// Req: go 1.17 or later (time NanoSecond is N/A on Go 1.16 or lower)
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package httputils
 
@@ -30,9 +31,9 @@ import (
 	"github.com/unix-world/smartgo/utils/time-rate"
 
 	smart 		 "github.com/unix-world/smartgo"
-	smartcache 	 "github.com/unix-world/smartgo/data-structs/simplecache"
 	assets 		 "github.com/unix-world/smartgo/web/assets/web-assets"
 	smartcaptcha "github.com/unix-world/smartgo/web/captcha"
+	smartcache 	 "github.com/unix-world/smartgo/utils/smart-memcache"
 	filelock 	 "github.com/unix-world/smartgo/utils/filelock"
 	pbar 		 "github.com/unix-world/smartgo/ui/progressbar"
 )
@@ -41,7 +42,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20260801.2358"
+	VERSION string = "r.20260822.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -114,7 +115,11 @@ const (
 	//--
 	MAX_SIZE_ETAG uint64 = smart.SIZE_BYTES_1M // 1MB 1048576 bytes ; 100% of assets match this criteria ; for the rest (ex: public files), Weak ETag is not worth ...
 	//--
-	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-\.\:\#]+$` // original: `^[a-zA-Z0-9_\-]+$` ; allow extended as PHP supports
+
+	//--
+	// MUST NOT ALLOW the `@` character because `@` is reserved as a prefix for POST FILE fields as in CURL and may be a security issue ; using of `@file` type parameters must be explicit enabled in a client POST due to security considerations
+	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-\.\:\#]+$` // original: `^[a-zA-Z0-9_\-]+$` ; allow extended as PHP supports, allow also: `.`, `:`
+	// MUST NOT ALLOW `[` or `]`, this is not a query URL it is a post form and is build acordingly by the Go internals, `[` and `]` will be added as needed by Go
 	//--
 
 	//--
@@ -152,6 +157,10 @@ const (
 	HTTP_STATUS_503 string = "503 Service Unavailable"
 	HTTP_STATUS_504 string = "504 Gateway Timeout"
 	HTTP_STATUS_507 string = "507 Insufficient Storage"
+	//--
+
+	//--
+	HTTP_HEADER_REFERER string = "referer"
 	//--
 
 	//--
@@ -274,6 +283,7 @@ type HttpClientRequest struct {
 	MaxDownloadSize       uint64            `json:"maxDownloadSize,string"`
 	HttpMethod            string            `json:"httpMethod"`
 	AuthUserName          string            `json:"authUserName"`
+	AuthPassLen           int               `json:"authPassLen"`
 	Uri                   string            `json:"uri"`
 	RedirectLocation      string            `json:"redirectLocation"`
 	MaxRedirects          uint8             `json:"maxRedirects,string"`
@@ -307,23 +317,28 @@ type HttpClientRequest struct {
 //-----
 
 
-func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "HEAD"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
 // IMPORTANT: will not rewrite the download file if exists ... must be previous deleted !
 // can handle: GET or POST
-func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, postArr map[string][]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
+	// NOTICE: NOT Possible to use POST variable keys starting with `@` with this method, is specific disabled below by extraFlag ; {{{SYNC-POST-VARS-@-VARS}}}
+	//--
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	//--
 	downloadLocalDirPath = smart.StrTrimWhitespaces(downloadLocalDirPath)
@@ -332,25 +347,28 @@ func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string,
 		downloadLocalDirPath = "./downloads/" // dissalow empty directory ; for downloads a directory is mandatory ; dissalow download in the same dir as executable is, there is a risk to rewrite the executable !!!
 	} //end if
 	//--
+	var extraFlag uint16 = 0 // default
 	method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
-	if(method != "POST") {
-		method = "GET"
+	if((postArr != nil) && (len(postArr) > 0)) {
+		method = "POST"
 	} //end if
-	if(reqArr == nil) {
+	if(method != "POST") {
 		method = "GET"
 	} //end if
 	//--
 	var maxBytesRead uint64 = 0 // there is no limit when saving to a file ...
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "GET"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	//--
@@ -358,14 +376,23 @@ func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVeri
 		maxBytesRead = HTTP_CLI_MAX_BODY_READ_SIZE
 	} //end if
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, allowPostFiles bool, postArr map[string][]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+	//--
+	// SECURITY NOTICE: ALL POST variable keys starting with `@` will be considered file paths as CURL POST parameters ; {{{SYNC-POST-VARS-@-VARS}}}
+	// to ENABLE @file POST fields the allowPostFiles must be explicit set to TRUE, otherwise for security reasons set to FALSE
+	//--
+	var extraFlag uint16 = 0 // default
+	if(allowPostFiles == true) {
+		extraFlag = 1
+	} //end if
 	//--
 	var method string = "POST"
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	//--
@@ -373,161 +400,183 @@ func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVer
 		maxBytesRead = HTTP_CLI_DEF_BODY_READ_SIZE
 	} //end if
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestPOSTBody(postMime string, postBody string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestPSTBody(postMime string, postBody string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+	//--
+	// Have NO POST Variables, but POST Body
 	//--
 	var method string = "PUT"
-	var reqArr map[string][]string = map[string][]string{
-		"@put:data":   { postBody },
-		"@put:method": { "POST" },
-		"@put:ctype":  { postMime },
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = map[string]string{
+		"|put:data|":   postBody,
+		"|put:method|": "POST",
+		"|put:ctype|":  postMime,
 	}
 	postBody = "" // free mem
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestPUTFile(upldLocalFilePath string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestPUTFile(upldLocalFilePath string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PUT"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PUT"
-	var reqArr map[string][]string = map[string][]string{
-		"@put:data": { putData },
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = map[string]string{
+		"|put:data|": putData,
 	}
 	putData = "" // free mem
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestPATCH(patchData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestPATCH(patchData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PATCH"
-	var reqArr map[string][]string = map[string][]string{
-		"@patch:data": { patchData },
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = map[string]string{
+		"|patch:data|": patchData,
 	}
 	patchData = "" // free mem
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "MKCOL"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "DELETE"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "COPY"
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
 	var strOverwrite string = "F"
 	if(overwrite == true) {
 		strOverwrite = "T"
 	} //end if
-	var reqArr map[string][]string = map[string][]string{
-		"@copy:destination": { destinationUri },
-		"@copy:overwrite":   { strOverwrite },
+	var optsArr map[string]string = map[string]string{
+		"|copy:destination|": destinationUri,
+		"|copy:overwrite|":   strOverwrite,
 	}
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "MOVE"
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
 	var strOverwrite string = "F"
 	if(overwrite == true) {
 		strOverwrite = "T"
 	} //end if
-	var reqArr map[string][]string = map[string][]string{
-		"@move:destination": { destinationUri },
-		"@move:overwrite":   { strOverwrite },
+	var optsArr map[string]string = map[string]string{
+		"|move:destination|": destinationUri,
+		"|move:overwrite|":   strOverwrite,
 	}
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "PROPFIND"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
 
-func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
+func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
 	var method string = "OPTIONS"
-	var reqArr map[string][]string = nil
+	var extraFlag uint16 = 0 // default
+	var postArr map[string][]string = nil
+	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
 	var maxBytesRead uint64 = HTTP_CLI_DEF_BODY_READ_SIZE
 	//--
-	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, ckyArr, reqArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
+	return httpClientDoRequest(method, uri, tlsServerPEM, tlsInsecureSkipVerify, optsArr, hdrsArr, ckyArr, extraFlag, postArr, upldLocalFilePath, downloadLocalDirPath, timeoutSec, maxBytesRead, maxRedirects, authUsername, authPassword)
 	//--
 } //END FUNCTION
 
@@ -535,15 +584,55 @@ func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkip
 //-----
 
 
-func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *bytes.Buffer, multipartType string) {
+func IsValidPostFormParameterName(key string) bool {
+	//--
+	if(smart.StrTrimWhitespaces(key) == "") {
+		return false
+	} //end if
+	//--
+	if(!smart.StrRegexMatch(REGEX_SAFE_HTTP_FORM_VAR_NAME, key)) { // check, 1st security level check
+		return false
+	} //end if
+	//--
+	if(IsPostFormFileUploadTypeParameterName(key)) { // extra check, just in case, 2nd security level check
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func IsPostFormFileUploadTypeParameterName(key string) bool {
+	//--
+	key = smart.StrTrimWhitespaces(key)
+	if(key == "") {
+		return false
+	} //end if
+	//--
+	if(!smart.StrStartsWith(key, "@")) { // form file, similar with CURL
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func postArrToHttpFormData(postArr map[string][]string, extraFlag uint16) (err string, formData *bytes.Buffer, multipartType string) {
 	//--
 	defer smart.PanicHandler()
 	//--
 	// This will create the form data or multi/part form data by reading all files in memory
+	// SECURITY NOTICE: ALL POST variable keys starting with `@` will be considered file paths as CURL POST parameters ; {{{SYNC-POST-VARS-@-VARS}}}
+	// to ENABLE @file POST fields the extraFlag must be explicit set to 1, otherwise for security reasons set to 0 ; other values are not handled yet ... reserved for the future
 	//--
-	postData  := bytes.Buffer{}
+	postData := bytes.Buffer{}
 	//--
-	if(reqArr == nil) {
+	if(postArr == nil) {
 		return "", nil, ""
 	} //end if
 	//--
@@ -552,10 +641,72 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *byt
 	//--
 	var validPostVarsOrFiles int = 0
 	//--
-	for key, val := range reqArr {
+	for key, val := range postArr {
 		key = smart.StrTrimWhitespaces(key)
 		if(key != "") {
-			if(smart.StrRegexMatch(REGEX_SAFE_HTTP_FORM_VAR_NAME, key)) { // form field
+			if(IsPostFormFileUploadTypeParameterName(key)) { // form file, similar with CURL
+				if(extraFlag == 1) { // only works if this flag is set to 1 to specific allow CURL @file specific post fields !
+					fkey := smart.StrTrimWhitespaces(smart.StrTrimLeft(key, "@"))
+					if(IsValidPostFormParameterName(fkey)) {
+						for z:=0; z<len(val); z++ {
+							var uploadFilePath string = val[z]
+							if(!smart.PathIsSafeValidPath(uploadFilePath)) {
+								return "ERR: The POST File Path is Invalid or Unsafe: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							if(smart.PathIsEmptyOrRoot(uploadFilePath)) {
+								return "ERR: The POST File Path is Empty or is Root: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							if(smart.PathIsAbsolute(uploadFilePath)) {
+								return "ERR: The POST File Path is Absolute, must be Relative: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							if(smart.PathIsBackwardUnsafe(uploadFilePath)) {
+								return "ERR: The POST File Path is Backward Unsafe: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							if(!smart.PathExists(uploadFilePath)) {
+								return "ERR: The POST File Path does NOT Exists: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							if(smart.PathIsDir(uploadFilePath)) {
+								return "ERR: The POST File Path is a Directory: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							if(!smart.PathIsFile(uploadFilePath)) {
+								return "ERR: The POST File Path is NOT a File: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							var fName string = smart.StrTrimWhitespaces(smart.PathBaseName(uploadFilePath))
+							if((fName == "") || (!smart.PathIsSafeValidFileName(fName))) {
+								return "ERR: FAILED to detect the File Name from the POST File Path: `" + uploadFilePath + "`", nil, ""
+							} //end if
+							f, ef := w.CreateFormFile(fkey, fName)
+							if(ef != nil) {
+								return "ERR: FAILED to add the POST File Path: `" + uploadFilePath + "`: " + ef.Error(), nil, ""
+							} //end if
+							stat, errStat := os.Stat(uploadFilePath)
+							if(errStat != nil) {
+								return "ERR: FAILED to stat the POST File Path: `" + uploadFilePath + "`: " + errStat.Error(), nil, ""
+							} //end if
+							if(stat.Size() > int64(HTTP_CLI_MAX_POST_FILE_SIZE)) {
+								return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: File is Oversized: " + smart.ConvertInt64ToStr(stat.Size()), nil, ""
+							} //end if
+							file, errOpen := os.Open(uploadFilePath)
+							if(errOpen != nil) {
+								return "ERR: FAILED to open for read the POST File Path: `" + uploadFilePath + "`: " + errOpen.Error(), nil, ""
+							} //end if
+							_, errCopy := io.Copy(f, file)
+							file.Close()
+							if(errCopy != nil) {
+								return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: " + errCopy.Error(), nil, ""
+							} //end if
+							validPostVarsOrFiles++
+							if(DEBUG == true) {
+								log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
+							} //end if
+						} //end for
+					} else {
+						return "ERR: Invalid File Key in Request Arr Data: `" + key + "` as `" + fkey + "`", nil, ""
+					} //end if else
+				} else {
+					return "ERR: @File POST Fields are Disallowed by Extra Flag in Request Arr Data for key: `" + key + "`", nil, ""
+				} //end if else
+			} else if(IsValidPostFormParameterName(key)) { // form field
 				for z:=0; z<len(val); z++ {
 					if(int64(len(val[z])) > int64(HTTP_CLI_MAX_POST_VAL_SIZE)) {
 						return "ERR: FAILED to Add Post Form Variable: `" + key + "`: `" + smart.ConvertIntToStr(len(val[z])) + "` bytes ; Oversized #" + smart.ConvertIntToStr(z), nil, ""
@@ -570,64 +721,6 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *byt
 						log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post Form Variable Add: `" + key + "`: `" + val[z] + "` #", z)
 					} //end if
 				} //end for
-			} else if(smart.StrStartsWith(key, "@")) { // form file, similar with CURL
-				fkey := smart.StrTrimWhitespaces(smart.StrTrimLeft(key, "@"))
-				if(smart.StrRegexMatch(REGEX_SAFE_HTTP_FORM_VAR_NAME, fkey)) {
-					for z:=0; z<len(val); z++ {
-						var uploadFilePath string = val[z]
-						if(!smart.PathIsSafeValidPath(uploadFilePath)) {
-							return "ERR: The POST File Path is Invalid or Unsafe: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						if(smart.PathIsEmptyOrRoot(uploadFilePath)) {
-							return "ERR: The POST File Path is Empty or is Root: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						if(smart.PathIsAbsolute(uploadFilePath)) {
-							return "ERR: The POST File Path is Absolute, must be Relative: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						if(smart.PathIsBackwardUnsafe(uploadFilePath)) {
-							return "ERR: The POST File Path is Backward Unsafe: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						if(!smart.PathExists(uploadFilePath)) {
-							return "ERR: The POST File Path does NOT Exists: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						if(smart.PathIsDir(uploadFilePath)) {
-							return "ERR: The POST File Path is a Directory: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						if(!smart.PathIsFile(uploadFilePath)) {
-							return "ERR: The POST File Path is NOT a File: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						var fName string = smart.StrTrimWhitespaces(smart.PathBaseName(uploadFilePath))
-						if((fName == "") || (!smart.PathIsSafeValidFileName(fName))) {
-							return "ERR: FAILED to detect the File Name from the POST File Path: `" + uploadFilePath + "`", nil, ""
-						} //end if
-						f, ef := w.CreateFormFile(fkey, fName)
-						if(ef != nil) {
-							return "ERR: FAILED to add the POST File Path: `" + uploadFilePath + "`: " + ef.Error(), nil, ""
-						} //end if
-						stat, errStat := os.Stat(uploadFilePath)
-						if(errStat != nil) {
-							return "ERR: FAILED to stat the POST File Path: `" + uploadFilePath + "`: " + errStat.Error(), nil, ""
-						} //end if
-						if(stat.Size() > int64(HTTP_CLI_MAX_POST_FILE_SIZE)) {
-							return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: File is Oversized: " + smart.ConvertInt64ToStr(stat.Size()), nil, ""
-						} //end if
-						file, errOpen := os.Open(uploadFilePath)
-						if(errOpen != nil) {
-							return "ERR: FAILED to open for read the POST File Path: `" + uploadFilePath + "`: " + errOpen.Error(), nil, ""
-						} //end if
-						_, errCopy := io.Copy(f, file)
-						file.Close()
-						if(errCopy != nil) {
-							return "ERR: FAILED to read the POST File Path: `" + uploadFilePath + "`: " + errCopy.Error(), nil, ""
-						} //end if
-						validPostVarsOrFiles++
-						if(DEBUG == true) {
-							log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Post File Add: `" + uploadFilePath + "` @ Size:", stat.Size() ,"bytes #", z)
-						} //end if
-					} //end for
-				} else {
-					return "ERR: Invalid File Key in Request Arr Data: `" + key + "` as `" + fkey + "`", nil, ""
-				} //end if else
 			} else {
 				return "ERR: Invalid Key in Request Arr Data: `" + key + "`", nil, ""
 			} //end if else
@@ -650,7 +743,10 @@ func reqArrToHttpFormData(reqArr map[string][]string) (err string, formData *byt
 
 // If Auth User/Pass is set will dissalow redirects, by auto-setting maxRedirects=0 !
 // Min Read Limit is 10MB (set maxBytesRead=0 as default) ; Max Read Limit is 1GB (because is in memory !)
-func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, ckyArr map[string]string, reqArr map[string][]string, upldLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult HttpClientRequest) {
+func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, optsArr map[string]string, hdrsArr map[string][]string, ckyArr map[string]string, extraFlag uint16, postArr map[string][]string, upldLocalFilePath string, downloadLocalDirPath string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) (httpResult HttpClientRequest) {
+	//--
+	// optsArr is an internal parameter used for options ; never allow this parameter come from a public method, it needs to be controlled internally
+	// extraFlag is an internal, general purpose flag ; by now is used just for POST method ; extraFlag=0 (disallow @file post fields) ; extraFlag=1 (allow @file post fields)
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -732,23 +828,37 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	switch(method) {
 		case "HEAD":
+			//--
 			isHead = true
+			//--
 			break
 		case "GET":
+			//--
 			isGet = true
+			//--
 			break
 		case "POST":
-			if(reqArr != nil) {
+			//--
+			if(postArr != nil) {
+				//--
 				isPost = true
+				//--
 			} else { // if no POST data, fallback to GET method
+				//--
 				method = "GET"
 				isGet = true
+				//--
 			} //end if else
+			//--
 			break
 		case "PUT":
+			//--
 			upldLocalFilePath = smart.StrTrimWhitespaces(upldLocalFilePath)
+			//--
 			if(upldLocalFilePath != "") {
+				//--
 				isFilePut = true
+				//--
 				if(!smart.PathIsSafeValidPath(upldLocalFilePath)) {
 					httpResult.Errors = "ERR: The PUT File Path is Invalid or Unsafe: `" + upldLocalFilePath + "`"
 					httpResult.HttpStatus = -701
@@ -801,22 +911,27 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 					httpResult.HttpStatus = -710
 					return
 				} //end if
+				//--
 				uri = smart.StrTrimRight(uri, "/") + "/" + smart.EscapeUrl(fName)
+				//--
 				httpResult.Uri = uri
 				httpResult.UploadFileName = fName
 				httpResult.UploadDataSize = putFSize
+				//--
 			} else { // put body
-				if(reqArr == nil) {
-					httpResult.Errors = "ERR: Empty PUT data"
+				//--
+				if(optsArr == nil) {
+					httpResult.Errors = "ERR: PUT data is Null"
 					httpResult.HttpStatus = -711
 					return
 				} //end if
-				if(len(reqArr["@put:data"]) != 1) {
-					httpResult.Errors = "ERR: Invalid PUT data structure ... It must contain only one value"
+				//--
+				if(optsArr["|put:data|"] == "") { // DO NOT TRIM ! If non-empty need to be sent as is
+					httpResult.Errors = "ERR: The Body of the PUT data is Empty"
 					httpResult.HttpStatus = -712
 					return
 				} //end if
-				var lenPutData int = len(reqArr["@put:data"][0])
+				var lenPutData int = len(optsArr["|put:data|"])
 				if(lenPutData <= 0) { // DO NOT TRIM ! If non-empty need to be sent as is
 					httpResult.Errors = "ERR: The Body Size of the PUT data must be Greater than Zero"
 					httpResult.HttpStatus = -713
@@ -826,51 +941,64 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 					httpResult.HttpStatus = -714
 					return
 				} //end if
+				//--
 			} //end if else
+			//--
 			isPut = true
+			//--
 			break
 		case "PATCH": // patch: body only, no file implementation ...
-			if(reqArr == nil) {
-				httpResult.Errors = "ERR: Empty PATCH data"
-				httpResult.HttpStatus = -711
+			//--
+			if(optsArr == nil) {
+				httpResult.Errors = "ERR: PATCH data is Null"
+				httpResult.HttpStatus = -715
 				return
 			} //end if
-			if(len(reqArr["@patch:data"]) != 1) {
-				httpResult.Errors = "ERR: Invalid PATCH data structure ... It must contain only one value"
-				httpResult.HttpStatus = -712
+			//--
+			if(optsArr["|patch:data|"] == "") {
+				httpResult.Errors = "ERR: The Body of the PATCH data is Empty"
+				httpResult.HttpStatus = -716
 				return
 			} //end if
-			var lenPatchData int = len(reqArr["@patch:data"][0])
+			var lenPatchData int = len(optsArr["|patch:data|"])
 			if(lenPatchData <= 0) { // DO NOT TRIM ! If non-empty need to be sent as is
 				httpResult.Errors = "ERR: The Body Size of the PATCH data must be Greater than Zero"
-				httpResult.HttpStatus = -713
+				httpResult.HttpStatus = -717
 				return
 			} else if(int64(lenPatchData) > int64(HTTP_CLI_MAX_POST_DATA_SIZE)) {
 				httpResult.Errors = "ERR: The Body Size of the PATCH data must be lower than: " + smart.ConvertUInt64ToStr(HTTP_CLI_MAX_POST_DATA_SIZE)
-				httpResult.HttpStatus = -714
+				httpResult.HttpStatus = -718
 				return
 			} //end if
+			//--
 			isPatch = true
+			//--
 			break
 		case "MKCOL":
+			//--
 			isMkCol = true
+			//--
 			break
 		case "DELETE":
+			//--
 			isDelete = true
+			//--
 			break
 		case "COPY":
-			if(reqArr == nil) {
-				httpResult.Errors = "ERR: Empty COPY data"
+			//--
+			if(optsArr == nil) {
+				httpResult.Errors = "ERR: COPY data is Null"
 				httpResult.HttpStatus = -601
 				return
 			} //end if
-			if(len(reqArr["@copy:destination"]) != 1) {
-				httpResult.Errors = "ERR: Invalid COPY destination structure ... It must contain only one value"
+			//--
+			if(optsArr["|copy:destination|"] == "") {
+				httpResult.Errors = "ERR: The String of the COPY destination is Empty"
 				httpResult.HttpStatus = -602
 				return
 			} //end if
-			reqArr["@copy:destination"][0] = smart.StrTrimWhitespaces(reqArr["@copy:destination"][0])
-			var lenCopyData int = len(reqArr["@copy:destination"][0])
+			optsArr["|copy:destination|"] = smart.StrTrimWhitespaces(optsArr["|copy:destination|"])
+			var lenCopyData int = len(optsArr["|copy:destination|"])
 			if(lenCopyData <= 0) { // DO NOT TRIM ! If non-empty need to be sent as is
 				httpResult.Errors = "ERR: The String Size of the COPY destination must be Greater than Zero"
 				httpResult.HttpStatus = -603
@@ -880,32 +1008,42 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				httpResult.HttpStatus = -604
 				return
 			} //end if
-			if(len(reqArr["@copy:overwrite"]) != 1) {
-				httpResult.Errors = "ERR: Invalid COPY overwrite structure ... It must contain only one value"
+			//--
+			if(optsArr["|copy:overwrite|"] == "") {
+				httpResult.Errors = "ERR: The String of the COPY overwrite is Empty"
 				httpResult.HttpStatus = -605
 				return
 			} //end if
-			reqArr["@copy:overwrite"][0] = smart.StrToUpper(smart.StrTrimWhitespaces(reqArr["@copy:overwrite"][0]))
-			if((reqArr["@copy:overwrite"][0] != "T") && (reqArr["@copy:overwrite"][0] != "F")) { // T = true ; F = false
-				httpResult.Errors = "ERR: Invalid COPY overwrite value ... It must be `T` as true or `F` as false"
+			optsArr["|copy:overwrite|"] = smart.StrToUpper(smart.StrTrimWhitespaces(optsArr["|copy:overwrite|"]))
+			var lenCopyOverwrite int = len(optsArr["|copy:overwrite|"])
+			if(lenCopyOverwrite <= 0) {
+				httpResult.Errors = "ERR: The String Size of the COPY overwrite must be Greater than Zero"
 				httpResult.HttpStatus = -606
 				return
+			} else if((optsArr["|copy:overwrite|"] != "T") && (optsArr["|copy:overwrite|"] != "F")) { // T = true ; F = false
+				httpResult.Errors = "ERR: Invalid COPY overwrite ... It must be `T` as true or `F` as false"
+				httpResult.HttpStatus = -607
+				return
 			} //end if
+			//--
 			isCopy = true
+			//--
 			break
 		case "MOVE":
-			if(reqArr == nil) {
-				httpResult.Errors = "ERR: Empty MOVE data"
+			//--
+			if(optsArr == nil) {
+				httpResult.Errors = "ERR: MOVE data is Null"
 				httpResult.HttpStatus = -611
 				return
 			} //end if
-			if(len(reqArr["@move:destination"]) != 1) {
-				httpResult.Errors = "ERR: Invalid MOVE destination structure ... It must contain only one value"
+			//--
+			if(optsArr["|move:destination|"] == "") {
+				httpResult.Errors = "ERR: The String of the MOVE destination is Empty"
 				httpResult.HttpStatus = -612
 				return
 			} //end if
-			reqArr["@move:destination"][0] = smart.StrTrimWhitespaces(reqArr["@move:destination"][0])
-			var lenMoveData int = len(reqArr["@move:destination"][0])
+			optsArr["|move:destination|"] = smart.StrTrimWhitespaces(optsArr["|move:destination|"])
+			var lenMoveData int = len(optsArr["|move:destination|"])
 			if(lenMoveData <= 0) { // DO NOT TRIM ! If non-empty need to be sent as is
 				httpResult.Errors = "ERR: The String Size of the MOVE destination must be Greater than Zero"
 				httpResult.HttpStatus = -613
@@ -915,18 +1053,26 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				httpResult.HttpStatus = -614
 				return
 			} //end if
-			if(len(reqArr["@move:overwrite"]) != 1) {
-				httpResult.Errors = "ERR: Invalid MOVE overwrite structure ... It must contain only one value"
+			//--
+			if(optsArr["|move:overwrite|"] == "") {
+				httpResult.Errors = "ERR: The String of the MOVE overwrite is Empty"
 				httpResult.HttpStatus = -615
 				return
 			} //end if
-			reqArr["@move:overwrite"][0] = smart.StrToUpper(smart.StrTrimWhitespaces(reqArr["@move:overwrite"][0]))
-			if((reqArr["@move:overwrite"][0] != "T") && (reqArr["@move:overwrite"][0] != "F")) { // T = true ; F = false
-				httpResult.Errors = "ERR: Invalid MOVE overwrite value ... It must be `T` as true or `F` as false"
+			optsArr["|move:overwrite|"] = smart.StrToUpper(smart.StrTrimWhitespaces(optsArr["|move:overwrite|"]))
+			var lenMoveOverwrite int = len(optsArr["|move:overwrite|"])
+			if(lenMoveOverwrite <= 0) {
+				httpResult.Errors = "ERR: The String Size of the MOVE overwrite must be Greater than Zero"
 				httpResult.HttpStatus = -616
 				return
+			} else if((optsArr["|move:overwrite|"] != "T") && (optsArr["|move:overwrite|"] != "F")) { // T = true ; F = false
+				httpResult.Errors = "ERR: Invalid MOVE overwrite value ... It must be `T` as true or `F` as false"
+				httpResult.HttpStatus = -617
+				return
 			} //end if
+			//--
 			isMove = true
+			//--
 			break
 		case "PROPFIND":
 			isPropFind = true
@@ -1042,19 +1188,21 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			useAuth = smart.HTTP_AUTH_MODE_BASIC
 		} //end if else
 		httpResult.AuthUserName = authUsername
+		httpResult.AuthPassLen = len(authPassword)
 	} else {
 		httpResult.AuthUserName = ""
+		httpResult.AuthPassLen = 0
 	} //end if else
 	//--
-	if(useAuth > smart.HTTP_AUTH_MODE_NONE) { // if use auth (any)
+//	if(useAuth > smart.HTTP_AUTH_MODE_NONE) { // if use auth (any)
+//		maxRedirects = 0 // do not reset here (some requests do not work), this should be controller specific by calling method params, if auth is used and no redirects allowed this can be specific called as param
+//	} else { // safe redirects if 301/302 if no auth/credentials ; min: 0 ; max: 10 ; {{{SYNC-SAFE-HTTP-REDIRECT-POLICY}}}
+	if(maxRedirects < 0) {
 		maxRedirects = 0
-	} else { // safe redirects if 301/302 if no auth/credentials ; min: 0 ; max: 10 ; {{{SYNC-SAFE-HTTP-REDIRECT-POLICY}}}
-		if(maxRedirects < 0) {
-			maxRedirects = 0
-		} else if(maxRedirects > HTTP_CLI_MAX_REDIRECTS) {
-			maxRedirects = HTTP_CLI_MAX_REDIRECTS
-		} //end if else
+	} else if(maxRedirects > HTTP_CLI_MAX_REDIRECTS) {
+		maxRedirects = HTTP_CLI_MAX_REDIRECTS
 	} //end if else
+//	} //end if else
 	httpResult.MaxRedirects = maxRedirects
 	//--
 	safeCheckRedirect := func(req *http.Request, numReqs []*http.Request) error { // default behavior in GoLang : HTTP client will follow 10 redirects, and then it will return an error
@@ -1092,7 +1240,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	if(isPost == true) { // POST must have some data to post
 		var formData *bytes.Buffer = nil
-		errData, formData, multipartType = reqArrToHttpFormData(reqArr)
+		errData, formData, multipartType = postArrToHttpFormData(postArr, extraFlag) // just for POST, DO NOT USE for other methods ; the extraFlag must be set to 1 to allow @file post fields, as key values starting with @ (as in CURL)
 		if(errData != "") {
 			httpResult.Errors = "ERR: Invalid POST Form Data: " + errData
 			httpResult.HttpStatus = -102
@@ -1124,13 +1272,13 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			stat, errStat := os.Stat(upldLocalFilePath)
 			if(errStat != nil) {
 				httpResult.Errors = "ERR: FAILED to stat the PUT File Path: `" + upldLocalFilePath + "`: " + errStat.Error()
-				httpResult.HttpStatus = -715
+				httpResult.HttpStatus = -901
 				return
 			} //end if
 			file, errOpen := os.Open(upldLocalFilePath)
 			if(errOpen != nil) {
 				httpResult.Errors = "ERR: FAILED to open for read the PUT File Path: `" + upldLocalFilePath + "`: " + errOpen.Error()
-				httpResult.HttpStatus = -716
+				httpResult.HttpStatus = -902
 				return
 			} //end if
 			defer file.Close()
@@ -1153,13 +1301,13 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			blackholePBar = bytes.Buffer{} // free
 			log.Println("[INFO]", smart.CurrentFunctionName(), ": Upload File [" + httpResult.UploadFileName + "]: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(putDataLen)) + ")")
 		} else { // body
-			if(len(reqArr["@put:ctype"]) == 1) {
-				cTypeHdr = reqArr["@put:ctype"][0]
+			if(optsArr["|put:ctype|"] != "") {
+				cTypeHdr = optsArr["|put:ctype|"]
 			} //end if
-			res := bytes.NewBuffer([]byte(reqArr["@put:data"][0]))
-			putDataLen = int64(len(reqArr["@put:data"][0]))
-			if(len(reqArr["@put:method"]) == 1) {
-				if(reqArr["@put:method"][0] == "POST") {
+			res := bytes.NewBuffer([]byte(optsArr["|put:data|"]))
+			putDataLen = int64(len(optsArr["|put:data|"]))
+			if(optsArr["|put:method|"] != "") {
+				if(optsArr["|put:method|"] == "POST") {
 					method = "POST"
 				} //end if
 			} //end if
@@ -1182,8 +1330,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			log.Println("[INFO]", smart.CurrentFunctionName(), ": Upload Data: `" + httpResult.LastUri + "` @ Size:", putDataLen, "bytes (" + smart.PrettyPrintBytes(uint64(putDataLen)) + ")")
 		} //end if else
 	} else if(isPatch == true) { // body only, no file implementation
-		res := bytes.NewBuffer([]byte(reqArr["@patch:data"][0]))
-		patchDataLen = int64(len(reqArr["@patch:data"][0]))
+		res := bytes.NewBuffer([]byte(optsArr["|patch:data|"]))
+		patchDataLen = int64(len(optsArr["|patch:data|"]))
 		if(DEBUG == true) {
 			log.Println("[DEBUG]", smart.CurrentFunctionName(), ": PATCH Data ; Size:", patchDataLen, "bytes")
 		} //end if
@@ -1215,7 +1363,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 //	req.Header = map[string][]string{} // init, reset
 	req.Header = http.Header{} // init, reset
-	cTypeHdr = HttpSafeHeaderValue(smart.StrToLower(cTypeHdr))
+	cTypeHdr = HttpSafeHeaderValue(smart.StrToLower(smart.StrTrimWhitespaces(cTypeHdr)))
 	if(cTypeHdr != "") {
 		req.Header.Set(HTTP_HEADER_CONTENT_TYPE, cTypeHdr)
 	} //end if
@@ -1249,11 +1397,11 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		req.TransferEncoding = []string{"identity"} // forces to change from the default chunked transfer encoding to linear or gzip (support wider servers)
 		req.ContentLength = patchDataLen
 	} else if(isCopy == true) {
-		req.Header.Set(HTTP_HEADER_DAV_DESTINATION, reqArr["@copy:destination"][0])
-		req.Header.Set(HTTP_HEADER_DAV_OVERWRITE, reqArr["@copy:overwrite"][0])
+		req.Header.Set(HTTP_HEADER_DAV_DESTINATION, optsArr["|copy:destination|"])
+		req.Header.Set(HTTP_HEADER_DAV_OVERWRITE, optsArr["|copy:overwrite|"])
 	} else if(isMove == true) {
-		req.Header.Set(HTTP_HEADER_DAV_DESTINATION, reqArr["@move:destination"][0])
-		req.Header.Set(HTTP_HEADER_DAV_OVERWRITE, reqArr["@move:overwrite"][0])
+		req.Header.Set(HTTP_HEADER_DAV_DESTINATION, optsArr["|move:destination|"])
+		req.Header.Set(HTTP_HEADER_DAV_OVERWRITE, optsArr["|move:overwrite|"])
 	} //end if
 	//--
 	if(useAuth == smart.HTTP_AUTH_MODE_BASIC) { // only for Basic Auth ; Example: `authorization: Basic B64(user:pass)` ; header will be created below, as a safe value
@@ -1311,18 +1459,61 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		} //end if
 	} //end if
 	//--
-	// TODO: allow a custom UA Signature to be set
-	req.Header.Set(HTTP_HEADER_USER_AGENT, uaSignature)
+	var userAgentIsSet bool = false
+	if(hdrsArr != nil) {
+		if(len(hdrsArr) > 0) {
+			var acceptedHeaders []string = []string{
+				HTTP_HEADER_USER_AGENT,
+				HTTP_HEADER_CONTENT_X_REQUESTED_WITH,
+				HTTP_HEADER_ACCEPT_MIMETYPE,
+				HTTP_HEADER_CONTENT_AENC,
+			}
+			for hdrsKey, hdrsVal := range hdrsArr {
+				if(len(hdrsVal) > 0) {
+					hdrsKey = smart.StrToLower(smart.StrTrimWhitespaces(hdrsKey))
+					if(hdrsKey != "") {
+						if(smart.InListArr(hdrsKey, acceptedHeaders)) {
+							for hdrsI:=0; hdrsI<len(hdrsVal); hdrsI++ {
+								var hdrsCrrVal string = HttpSafeHeaderValue(smart.StrTrimWhitespaces(hdrsVal[hdrsI]))
+								if(hdrsCrrVal != "") {
+									if(hdrsKey == HTTP_HEADER_USER_AGENT) {
+										userAgentIsSet = true
+									} //end if
+									req.Header.Add(hdrsKey, hdrsCrrVal)
+									if(DEBUG == true) {
+										log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Add Header: `" + hdrsKey + ": " + hdrsCrrVal + "`")
+									} //end if
+								} //end if
+							} //end for
+						} //end if
+					} //end if
+				} //end if
+			} //end for
+		} //end if
+	} //end if
+	if(userAgentIsSet == false) {
+		req.Header.Set(HTTP_HEADER_USER_AGENT, uaSignature)
+		if(DEBUG == true) {
+			log.Println("[DEBUG]", smart.CurrentFunctionName(), ": Set Header: `" + HTTP_HEADER_USER_AGENT + ": " + uaSignature + "`")
+		} //end if
+	} //end if
 	//--
 	resp, errResp := client.Do(req)
-	if(errResp != nil) {
-		httpResult.Errors = "ERR: Invalid Response: " + errResp.Error()
-		httpResult.HttpStatus = -106
+	httpResult.HttpStatus = -106 // init
+	if(resp != nil) {
+		if(resp.StatusCode > 0) {
+			httpResult.HttpStatus = resp.StatusCode // get real code
+		} //end if
+	} //end if
+	if(errResp != nil) { // this may be non-Null on 3xx responses that do not provide a body and maybe other cases, capture the Http Status above this error
+		var respErr string = smart.StrTrimWhitespaces(errResp.Error())
+		httpResult.Errors = "ERR: Invalid Response"
+		if(respErr != "") {
+			httpResult.Errors += ": " + respErr
+		} //end if
 		return
 	} //end if
 	defer resp.Body.Close()
-	//--
-	var statusCode int = resp.StatusCode
 	//--
 	headData, rdHeadErr := httputil.DumpResponse(resp, false) // if true will include also the body
 	if(rdHeadErr != nil) {
@@ -1335,7 +1526,6 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		resp.ContentLength = 0 // undefined ; avoid use default as -1 because conversion to uint64 for PrettyPrintBytes() ...
 	} //end if
 	//--
-	httpResult.HttpStatus = statusCode
 	httpResult.RedirectLocation = smart.StrTrimWhitespaces(resp.Header.Get(HTTP_HEADER_REDIRECT_LOCATION))
 	httpResult.ContentLength = resp.ContentLength
 	httpResult.LastModified = smart.StrTrimWhitespaces(resp.Header.Get(HTTP_HEADER_CACHE_LMOD))
@@ -1447,8 +1637,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		} //end if
 		//--
 		dFileName = dFileName + "." + dFileExt
-		if((statusCode < 200) || (statusCode >= 300)) {
-			dFileName = "file-err-" + smart.ConvertIntToStr(statusCode) + ".download"
+		if((httpResult.HttpStatus < 200) || (httpResult.HttpStatus >= 300)) {
+			dFileName = "file-err-" + smart.ConvertIntToStr(httpResult.HttpStatus) + ".download"
 		} //end if
 		//-- do minimalistict safety checks, the rest of checks were made above
 		dFileName = smart.StrTrimWhitespaces(dFileName)
@@ -1480,10 +1670,11 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		} //end if
 		//--
 		lockFDwn := filelock.LockFile{
-			Path: 		dFullPath,  // path that needs to be locked, not the lock file path !
-			Timeout: 	timeoutSec, // seconds
+			Path: 		dFullPath,  		// path that needs to be locked, not the lock file path !
+			Timeout: 	timeoutSec * 1000, 	// milliseconds
 		}
-		errDwnLock := lockFDwn.Lock()
+		const tryNumCycles uint8 = 255 // this is the maximum, each cycle is 100 ms, will result in a total to try as of 25.6 seconds
+		errDwnLock := lockFDwn.Lock(tryNumCycles) // fixed, OK
 		if(errDwnLock != nil) {
 			httpResult.Errors = "ERR: Failed to get an exclusive Lock for the Download File: `" + dFullPath + "` (file may be already in use by another concurrent process): " + errDwnLock.Error()
 			httpResult.HttpStatus = -820
@@ -1578,12 +1769,13 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	//--
 	httpResult.Errors = ""
 	httpResult.BodyData = string(bodyData.Bytes())
+	bodyData = bytes.Buffer{} // free mem
 	httpResult.BodyDataSize = uint64(len(httpResult.BodyData))
 	if(useB64Encoding == true) {
 		httpResult.BodyDataEncoding = "base64"
 		httpResult.BodyData = smart.Base64Encode(httpResult.BodyData)
 	} //end if else
-	blackholePBar = bytes.Buffer{} // free
+	blackholePBar = bytes.Buffer{} // free mem
 	return
 	//--
 } //END FUNCTION
@@ -2480,6 +2672,13 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 			} else {
 				content = title // use title only if the messageText is empty ; otherwise may be json or xml, don't use ...
 			} //end if
+			if(smart.StrStartsWith(smart.StrTrimWhitespaces(content), "{") && smart.StrEndsWith(smart.StrTrimWhitespaces(content), "}")) { // last minute JSON detection
+				if _, errJson := smart.JsonObjDecode(content); errJson == nil {
+					contentType = assets.JSON_CONTENT_HEADER
+				} //end if
+			} else if(smart.StrIStartsWith(smart.StrTrimWhitespaces(content), "<?xml ")) { // last minute XML detection
+				contentType = assets.XML_CONTENT_HEADER
+			} //end if
 		} //end if else
 		content += "\n"
 	} //end if else
@@ -2535,7 +2734,7 @@ func GetClientIdentUidHash(r *http.Request, suffix string) string { // used for 
 		pk += smart.FORM_FEED + suffix
 	} //end if
 	//--
-	return smart.Base64ToBase64s(smart.Sh3a512B64(pk))
+	return smart.Base64ToBase64u(smart.Sh3a512B64(pk))
 	//--
 } //END FUNCTION
 
@@ -2704,14 +2903,15 @@ const(
 )
 
 type CookieData struct {
-	Name     string
-	Value    string
-	Expires  int64
-	Path     string
-	Domain   string
-	SameSite CookieSameSiteType
-	Secure   bool
-	HttpOnly bool
+	Name        string
+	Value       string
+	Expires     int64
+	Path        string
+	Domain      string
+	SameSite    CookieSameSiteType
+	Secure      bool
+	HttpOnly    bool
+	Partitioned bool
 }
 
 const CookieDefaultPath   string = "/"
@@ -2750,13 +2950,31 @@ func HttpRequestSetCookies(w http.ResponseWriter, r *http.Request, arrSetCookies
 func HttpRequestSetCookieWithDefaults(w http.ResponseWriter, r *http.Request, name string, value string, expires int64) error {
 	//--
 	defer smart.PanicHandler()
-	//--
+	//-- unpartitioned (default)
 	return HttpRequestSetCookie(w, r, name, value, expires, CookieDefaultPath, CookieDefaultDomain, CookieSameSiteDefault, false, false)
 	//--
 } //END FUNCTION
 
 
 func HttpRequestSetCookie(w http.ResponseWriter, r *http.Request, name string, value string, expires int64, path string, domain string, samesite CookieSameSiteType, secure bool, httpOnly bool) error {
+	//--
+	defer smart.PanicHandler()
+	//-- unpartitioned (default)
+	return httpRequestSetWithOptionalPartitionCookie(w, r, name, value, expires, path, domain, samesite, secure, httpOnly, false)
+	//--
+} //END FUNCTION
+
+
+func HttpRequestSetPartitionedCookie(w http.ResponseWriter, r *http.Request, name string, value string, expires int64, path string, domain string, samesite CookieSameSiteType, secure bool, httpOnly bool) error {
+	//--
+	defer smart.PanicHandler()
+	//-- partitioned
+	return httpRequestSetWithOptionalPartitionCookie(w, r, name, value, expires, path, domain, samesite, secure, httpOnly, true)
+	//--
+} //END FUNCTION
+
+
+func httpRequestSetWithOptionalPartitionCookie(w http.ResponseWriter, r *http.Request, name string, value string, expires int64, path string, domain string, samesite CookieSameSiteType, secure bool, httpOnly bool, partitioned bool) error {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -2859,6 +3077,11 @@ func HttpRequestSetCookie(w http.ResponseWriter, r *http.Request, name string, v
 		ck.HttpOnly = true
 	} //end if
 	//--
+	// A partitioned cookie (using CHIPS) is bound to the top-level site where it is embedded.
+	// Choose a partitioned cookie if you run embedded widgets (like chat, maps, or auth) that need state per site.
+	// Choose unpartitioned for standard first-party use or shared cross-site tracking (where permitted)
+	ck.Partitioned = partitioned
+	//--
 	http.SetCookie(w, &ck)
 	//--
 	return nil
@@ -2907,6 +3130,29 @@ func HttpRequestGetCookie(r *http.Request, name string) string {
 
 
 //-----
+
+
+func HttpRequestReferer(r *http.Request, withQueryUrl bool) string {
+	//--
+	hdrReferer := smart.StrTrimWhitespaces(HttpRequestGetHeaderStr(r, HTTP_HEADER_REFERER))
+	//--
+	if(hdrReferer == "") {
+		return ""
+	} //end if
+	//--
+	if(withQueryUrl == false) {
+		if(smart.StrContains(hdrReferer, "?")) {
+			arr := smart.ExplodeWithLimit("?", hdrReferer, 2)
+			if(len(arr) < 1) {
+				return "" // something failed
+			} //end if
+			hdrReferer = smart.StrTrimWhitespaces(arr[0])
+		} //end if
+	} //end if
+	//--
+	return hdrReferer
+	//--
+} //END FUNCTION
 
 
 func IsAjaxRequest(r *http.Request) bool {
