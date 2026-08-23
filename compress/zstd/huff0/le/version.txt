@@ -1,0 +1,4 @@
+github.com/klauspost/compress/le @head.20260822
+
+go 1.24
+

@@ -486,7 +486,7 @@ func TestLimit(t *testing.T) {
 func TestSuffix(t *testing.T) {
 	sufmatch := func(t *testing.T, str, pat string, exstr, expat string, exok bool) {
 		t.Helper()
-		rstr, rpat, rok := matchTrimSuffix(str, pat)
+		rstr, rpat, rok := matchTrimSuffix(str, pat, false)
 		if rstr != exstr || rpat != expat || rok != exok {
 			t.Fatalf(
 				"for '%s' '%s', expected '%s' '%s' '%t', got '%s' '%s' '%t'",
@@ -502,4 +502,25 @@ func TestSuffix(t *testing.T) {
 	sufmatch(t, "f?ello", "*\\?ello", "f", "*", true)
 	sufmatch(t, "f?ello", "**\\?ello", "f", "**", true)
 	sufmatch(t, "f?el*o", "**\\?el\\*o", "f", "**", true)
+}
+
+func TestNoCase(t *testing.T) {
+	if Match("Hello", "*hello") {
+		t.Fatal()
+	}
+	if !MatchNoCase("Hello", "*hello") {
+		t.Fatal()
+	}
+	if !MatchNoCase("hello", "*hello") {
+		t.Fatal()
+	}
+	if !MatchNoCase("HElLO", "*LL*") {
+		t.Fatal()
+	}
+	if !MatchNoCase("HelLO", "*eLL*") {
+		t.Fatal()
+	}
+	if !MatchNoCase("HelLO", "****eLL****") {
+		t.Fatal()
+	}
 }

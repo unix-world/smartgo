@@ -1,15 +1,12 @@
 <p align="center">
+<a href="https://github.com/simonnilsson/ask/releases"><img src="https://img.shields.io/github/release/simonnilsson/ask" alt="Version"></a>
 <a href="https://pkg.go.dev/github.com/simonnilsson/ask"><img src="https://pkg.go.dev/badge/github.com/simonnilsson/ask" alt="PkgGoDev"></a>
-<a href="https://goreportcard.com/report/github.com/simonnilsson/ask"><img src="https://goreportcard.com/badge/github.com/simonnilsson/ask" alt="Go Report Card"></a>
 <a href="https://raw.githack.com/wiki/simonnilsson/ask/coverage.html"><img src="https://github.com/simonnilsson/ask/wiki/coverage.svg" alt="Go Coverage"></a>
-<a href="https://github.com/avelino/awesome-go#json"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Go"></a>  
+<a href="https://github.com/avelino/awesome-go#json"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Go"></a>
 <br>
 and you shall receive.
 </p>
 Ask provides a simple way of accessing nested properties in maps and slices. Works great in combination with encoding/json and other packages that "Unmarshal" arbitrary data into Go data-types. Inspired by the get function in the lodash javascript library.
-<br><br>
-
-:warning: From version `v0.3.0`, the package requires [Go 1.17+](https://golang.org/doc/install), due to the usage of new additions to the reflect package.
 
 ## Use
 
@@ -55,7 +52,6 @@ Additional paths can be traversed by calling Path()/PathArgs() on the resulting 
 (a *Answer) Path(path string) *Answer
 (a *Answer) PathArgs(parts ...interface{}) *Answer
 ```
-
 
 ### Type assertion
 

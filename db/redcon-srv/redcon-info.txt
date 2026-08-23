@@ -1,0 +1,3 @@
+RedCon is a minimal implementation server / client of the Redis protocol in pure golang.
+It only supply the basic methods like Set / Get.
+

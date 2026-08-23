@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260822.2358 :: STABLE
+// r.20260823.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -33,7 +33,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20260822.2358"
+	VERSION string = "r.20260823.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -124,7 +124,7 @@ func WebServerSetMaxPostSize(size uint64) bool {
 
 
 // IMPORTANT: If using Proxy with different PROXY_HTTP_BASE_PATH than "/" (ex: "/api/") the Proxy MUST strip back PROXY_HTTP_BASE_PATH to "/" for this backend
-func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int, enableGzip bool) int16 {
+func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSecure bool, certifPath string, httpAddr string, httpPort uint16, timeoutSeconds uint32, allowedIPs string, authRealm string, authUser string, authPass string, authToken string, customAuthCheck smarthttputils.HttpAuthCheckFunc, rateLimit int, rateBurst int, compressMode string) int16 {
 
 	//--
 	// this method should return (error codes) just int16, only positive, values and zero if ok ; negative values are reserved for outsite managers
@@ -152,10 +152,21 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//--
 
 	//--
-	if(enableGzip == true) {
-		log.Println("[NOTICE]", "Web Server: GZip Handler:", "ON")
+	compressMode = smart.StrToLower(smart.StrTrimWhitespaces(compressMode))
+	//--
+	switch(compressMode) { // {{{SYNC-WEB-SERVER-COMPRESS-MODE}}}
+		case "zstd": fallthrough // zstd
+		case "gzip": fallthrough // gzip
+		case "any":              // zstd, gzip, uncompressed (in this order)
+			break
+		default:
+			compressMode = "" // empty or invalid, reset
+	} //end switch
+	//--
+	if(compressMode != "") {
+		log.Println("[NOTICE]", "Web Server: Compression Handler:", "Compression:" + compressMode)
 	} else {
-		log.Println("[NOTICE]", "Web Server: GZip Handler:", "OFF")
+		log.Println("[NOTICE]", "Web Server: Plain Handler:", "Compression:OFF")
 	} //end if else
 	//--
 
@@ -777,11 +788,19 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//--
 	} //end fx
 
-	if(enableGzip == true) {
-		mux.HandleFunc("/", gzipHandler(defHandler))
-	} else {
-		mux.HandleFunc("/", defHandler)
-	} //end if else
+	switch(compressMode) { // {{{SYNC-WEB-SERVER-COMPRESS-MODE}}}
+		case "any": // zstd, gzip, uncompressed (in this order)
+			mux.HandleFunc("/", anyHandler(defHandler))
+			break
+		case "zstd":
+			mux.HandleFunc("/", zstdHandler(defHandler))
+			break
+		case "gzip":
+			mux.HandleFunc("/", gzipHandler(defHandler))
+			break
+		default:
+			mux.HandleFunc("/", defHandler)
+	} //end switch
 
 	//-- serve logic: is better to manage outside the async calls because extra monitoring logic can be implemented !
 

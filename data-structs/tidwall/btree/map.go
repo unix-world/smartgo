@@ -1,9 +1,12 @@
+
 // Copyright 2020 Joshua J Baker. All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 package btree
 
-import "sync/atomic"
+import (
+    "sync/atomic"
+)
 
 type ordered interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
@@ -1210,3 +1213,5 @@ func (tr *Map[K, V]) Clear() {
 	tr.count = 0
 	tr.root = nil
 }
+
+// #end

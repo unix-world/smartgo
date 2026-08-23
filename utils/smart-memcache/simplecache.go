@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Smart (in-Memory) Cache :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260822.2358 :: STABLE
+// r.20260823.2358 :: STABLE
 
 // inspired from: forPelevin/go-cache/main/local.go # license: (golang, default) Apache
 
@@ -20,7 +20,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20260822.2358"
+	VERSION string = "r.20260823.2358"
 
 	LOG_INTERVAL_SEC uint16 = 60 // log every 60 seconds
 )

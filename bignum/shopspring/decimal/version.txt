@@ -1,0 +1,11 @@
+github.com/shopspring/decimal v.1.4.0 @ head.20260822
+
+last upstream patch:
+    * "fix: ExpTaylor race condition (#414)" : ca4740823783f3bc026235a5ed3515aca626da92
+
+even if the go implemented in last versions the math/big, still missing one valuable component,
+supplied by this package: Decimal 128, which is mndatory for financial computations,
+and this package is well tested in many production environments
+
+go 1.13
+

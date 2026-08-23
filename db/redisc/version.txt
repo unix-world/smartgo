@@ -1,6 +1,7 @@
-github.com/mna/redisc
+github.com/mna/redisc @head.20260822
 
 go 1.16
 
 require
 	github.com/gomodule/redigo
+

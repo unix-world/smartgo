@@ -1,9 +1,12 @@
+
 // Copyright 2020 Joshua J Baker. All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 package btree
 
-import "sync"
+import (
+    "sync"
+)
 
 type BTreeG[T any] struct {
 	isoid        uint64
@@ -1884,3 +1887,5 @@ func NewGenericOptions[T any](less func(a, b T) bool, opts Options,
 func (tr *Generic[T]) Copy() *Generic[T] {
 	return &Generic[T]{tr.BTreeG.Copy()}
 }
+
+// #end

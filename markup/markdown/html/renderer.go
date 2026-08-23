@@ -214,7 +214,7 @@ func NewRenderer(opts RendererOptions) *Renderer {
 		opts.CitationFormatString = `<sup>[%s]</sup>`
 	}
 	if opts.Generator == "" {
-		opts.Generator = `  <meta name="GENERATOR" content="smartgoext/markup/markdown processor for Go`
+		opts.Generator = `  <meta name="GENERATOR" content="smartgo/markup/markdown processor for Go`
 	}
 
 	return &Renderer{

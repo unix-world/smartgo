@@ -1,7 +1,7 @@
 
 // Simple (Safe) File Locking
 // (c) 2025-present unix-world.org
-// r.20260822.2358
+// r.20260823.2358
 
 //========
 // it uses a dual locking mechanism:
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20260822.2358"
+	VERSION string = "r.20260823.2358"
 
 	MIN_LOCK_MS_TIME uint32 =            1 	// milliseconds, used to compare with file stamp ; {{{SYNC-TIMEOUT-FILE-MTIME-COMPARE}}} ; min  1 millisecond
 	MAX_LOCK_MS_TIME uint32 = 1000 * 86400 	// milliseconds, used to compare with file stamp ; {{{SYNC-TIMEOUT-FILE-MTIME-COMPARE}}} ; max 24 hours

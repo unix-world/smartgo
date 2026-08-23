@@ -1,8 +1,10 @@
 
 // (c) 2026-present, unix-world.org
 // License: BSD
-// r.20260218.2358
+// r.20260823.2358
 // the original package was modified by unixman to handle numeric string key as int and many other optimizations
+// patches from upstream:
+// 		* Replace boolean return values with idiomatic go errors: 03cb73ba7e1664706865bbe7e67234640c7ba186
 
 // (c) 2020 Simon Nilsson
 // Package ask provides a simple way of accessing nested properties in maps and arrays.
@@ -13,6 +15,7 @@
 package askjson
 
 import (
+	"errors"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -27,6 +30,9 @@ var tokenMatcher = regexp.MustCompile(`([^[]+)?(?:\[(\d+)])?`)
 var mapType = reflect.TypeOf(map[string]interface{}{})
 var sliceType = reflect.TypeOf([]interface{}{})
 
+var ErrNotFound = errors.New("not found")
+var ErrWrongType = errors.New("wrong type")
+
 
 // Answer holds result of call to For, use one of its methods to extract a value.
 type Answer struct {
@@ -34,21 +40,21 @@ type Answer struct {
 }
 
 
-func handleIntPart(current interface{}, part int) (interface{}, bool) {
+func handleIntPart(current interface{}, part int) (interface{}, error) {
 	val := reflect.ValueOf(current)
 	if val.IsValid() && val.CanConvert(sliceType) {
 		s := val.Convert(sliceType).Interface().([]interface{})
 		if part >= 0 && part < len(s) {
-			return s[part], false
+			return s[part], nil
 		}
 	}
-	return current, true
+	return current, ErrNotFound
 }
 
 
-func handleStringPart(current interface{}, part string) (interface{}, bool) {
+func handleStringPart(current interface{}, part string) (interface{}, error) {
 
-	notFound := false
+	var err error = nil
 	match := tokenMatcher.FindStringSubmatch(strings.TrimSpace(part))
 
 	if len(match) == 3 {
@@ -57,7 +63,7 @@ func handleStringPart(current interface{}, part string) (interface{}, bool) {
 			if val.IsValid() && val.CanConvert(mapType) {
 				current = val.Convert(mapType).Interface().(map[string]interface{})[match[1]]
 			} else {
-				notFound = true
+				err = ErrNotFound
 			}
 		}
 		if match[2] != "" {
@@ -66,7 +72,7 @@ func handleStringPart(current interface{}, part string) (interface{}, bool) {
 		}
 	}
 
-	return current, notFound
+	return current, err
 }
 
 
@@ -82,20 +88,20 @@ func RootObject(source interface{}) *Answer {
 func For(source interface{}, path string) *Answer {
 
 	parts := strings.Split(path, ".")
-	notFound := false
+	var err error = nil
 	current := source
 
 	for _, part := range parts {
 		//-- unixman
 		if digitCheck.MatchString(part) {
 			index, _ := strconv.Atoi(part)
-			current, notFound = handleIntPart(current, int(index))
+			current, err = handleIntPart(current, int(index))
 		} else {
 		//-- (original)
-			current, notFound = handleStringPart(current, part)
+			current, err = handleStringPart(current, part)
 		}
 		//-- #
-		if notFound {
+		if err != nil {
 			return &Answer{}
 		}
 	}
@@ -108,27 +114,27 @@ func For(source interface{}, path string) *Answer {
 func ForArgs(source interface{}, parts ...interface{}) *Answer {
 
 	current := source
-	notFound := false
+	var err error = nil
 
 	for _, part := range parts {
 		switch vt := part.(type) {
 			case uint, uint8, uint16, uint32, uint64, int, int8, int16, int32, int64:
 				index := reflect.ValueOf(vt).Int()
-				current, notFound = handleIntPart(current, int(index))
-				if notFound {
+				current, err = handleIntPart(current, int(index))
+				if err != nil {
 					return &Answer{}
 				}
 			case string:
 				//-- unixman
 				if digitCheck.MatchString(vt) {
 					index, _ := strconv.Atoi(vt)
-					current, notFound = handleIntPart(current, int(index))
+					current, err = handleIntPart(current, int(index))
 				} else {
 				//-- (original)
-					current, notFound = handleStringPart(current, vt)
+					current, err = handleStringPart(current, vt)
 				}
 				//-- #
-				if notFound {
+				if err != nil {
 					return &Answer{}
 				}
 		}
@@ -175,12 +181,15 @@ func (a *Answer) RootObject(source interface{}) *Answer {
 // Slice attempts asserting answer as a []interface{}.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XSlice(d []interface{}) ([]interface{}, bool) {
+func (a *Answer) XSlice(d []interface{}) ([]interface{}, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	val := reflect.ValueOf(a.value)
 	if val.IsValid() && val.CanConvert(sliceType) {
-		return val.Convert(sliceType).Interface().([]interface{}), true
+		return val.Convert(sliceType).Interface().([]interface{}), nil
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) Slice() []interface{} { // by unixman
@@ -193,12 +202,15 @@ func (a *Answer) Slice() []interface{} { // by unixman
 // Map attempts asserting answer as a map[string]interface{}.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XMap(d map[string]interface{}) (map[string]interface{}, bool) {
+func (a *Answer) XMap(d map[string]interface{}) (map[string]interface{}, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	val := reflect.ValueOf(a.value)
 	if val.IsValid() && val.CanConvert(mapType) {
-		return val.Convert(mapType).Interface().(map[string]interface{}), true
+		return val.Convert(mapType).Interface().(map[string]interface{}), nil
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) Map() map[string]interface{} { // by unixman
@@ -211,34 +223,37 @@ func (a *Answer) Map() map[string]interface{} { // by unixman
 // String attempts asserting answer as a string.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XString(d string) (string, bool) {
+func (a *Answer) XString(d string) (string, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	//-- unixman
 	switch vt := a.value.(type) {
 		case json.Number:
 			jNum, okJNum := a.value.(json.Number)
 			if(okJNum != true) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
-			return jNum.String(), true
+			return jNum.String(), nil
 		case complex64, complex128:
 			c := reflect.ValueOf(vt).Complex()
-			return strconv.FormatComplex(c, 'g', 14, 128), true // use precision 14 as in PHP
+			return strconv.FormatComplex(c, 'g', 14, 128), nil // use precision 14 as in PHP
 		case float32, float64, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64: // byte is alias for uint8 ; rune is alias for int32
 			f := reflect.ValueOf(vt).Float()
-			return strconv.FormatFloat(f, 'g', 14, 64), true // use precision 14 as in PHP ; keep in sync with SmartGo.ConvertFloat64ToStr()
+			return strconv.FormatFloat(f, 'g', 14, 64), nil // use precision 14 as in PHP ; keep in sync with SmartGo.ConvertFloat64ToStr()
 		case bool:
 			b := reflect.ValueOf(vt).Bool()
 			if(b == true) {
-				return "true", true
+				return "true", nil
 			}
-			return "false", true
+			return "false", nil
 	}
 	//-- #
 	str, ok := a.value.(string)
 	if ok {
-		return str, ok
+		return str, nil
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) String() string { // by unixman
@@ -251,37 +266,40 @@ func (a *Answer) String() string { // by unixman
 // Int attempts asserting answer as a int64. Casting from other number types will be done if necessary.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XInt(d int64) (int64, bool) {
+func (a *Answer) XInt(d int64) (int64, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	switch vt := a.value.(type) {
 		case json.Number:
 			jNum, okJNum := a.value.(json.Number)
 			if(okJNum != true) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
 			numInt64, errInt64 := jNum.Int64()
 			if(errInt64 != nil) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
-			return numInt64, true
+			return numInt64, nil
 		case int, int8, int16, int32, int64:
-			return reflect.ValueOf(vt).Int(), true
+			return reflect.ValueOf(vt).Int(), nil
 		case uint, uint8, uint16, uint32, uint64:
 			val := reflect.ValueOf(vt).Uint()
 			if val <= math.MaxInt64 {
-				return int64(val), true
+				return int64(val), nil
 			}
 		case float32, float64:
 			val := reflect.ValueOf(vt).Float()
 			if val >= math.MinInt64 && val <= math.MaxInt64 {
-				return int64(val), true
+				return int64(val), nil
 			}
 		//-- unixman
 		case bool:
 			val := reflect.ValueOf(vt).Bool()
 			if(val == true) {
-				return 1, true
+				return 1, nil
 			}
-			return 0, true
+			return 0, nil
 		case string:
 			s := reflect.ValueOf(vt).String()
 			f, err := strconv.ParseFloat(s, 64)
@@ -289,12 +307,12 @@ func (a *Answer) XInt(d int64) (int64, bool) {
 				s = strconv.FormatFloat(math.Round(f), 'g', 14, 64)
 				num, err2 := strconv.ParseInt(s, 10, 64)
 				if(err2 == nil) {
-					return num, true
+					return num, nil
 				}
 			}
 		//-- #
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) Int() int64 { // by unixman
@@ -307,40 +325,43 @@ func (a *Answer) Int() int64 { // by unixman
 // Uint attempts asserting answer as a uint64. Casting from other number types will be done if necessary.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XUint(d uint64) (uint64, bool) {
+func (a *Answer) XUint(d uint64) (uint64, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	switch vt := a.value.(type) {
 		case json.Number:
 			jNum, okJNum := a.value.(json.Number)
 			if(okJNum != true) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
 			numInt64, errInt64 := jNum.Int64()
 			if(errInt64 != nil) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
 			if(numInt64 < 0) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
-			return uint64(numInt64), true
+			return uint64(numInt64), nil
 		case int, int8, int16, int32, int64:
 			val := reflect.ValueOf(vt).Int()
 			if val >= 0 {
-				return uint64(val), true
+				return uint64(val), nil
 			}
 		case uint, uint8, uint16, uint32, uint64:
-			return reflect.ValueOf(vt).Uint(), true
+			return reflect.ValueOf(vt).Uint(), nil
 		case float32, float64:
 			val := reflect.ValueOf(vt).Float()
 			if val >= 0 && val <= math.MaxUint64 {
-				return uint64(val), true
+				return uint64(val), nil
 			}
 		//-- unixman
 		case bool:
 			val := reflect.ValueOf(vt).Bool()
 			if(val == true) {
-				return 1, true
+				return 1, nil
 			}
-			return 0, true
+			return 0, nil
 		case string:
 			s := reflect.ValueOf(vt).String()
 			f, err := strconv.ParseFloat(s, 64)
@@ -348,12 +369,12 @@ func (a *Answer) XUint(d uint64) (uint64, bool) {
 				s = strconv.FormatFloat(math.Round(f), 'g', 14, 64)
 				num, err2 := strconv.ParseUint(s, 10, 64)
 				if(err2 == nil) {
-					return num, true
+					return num, nil
 				}
 			}
 		//-- #
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) Uint() uint64 { // by unixman
@@ -366,42 +387,45 @@ func (a *Answer) Uint() uint64 { // by unixman
 // Float attempts asserting answer as a float64. Casting from other number types will be done if necessary.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XFloat(d float64) (float64, bool) {
+func (a *Answer) XFloat(d float64) (float64, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	switch vt := a.value.(type) {
 		case json.Number:
 			jNum, okJNum := a.value.(json.Number)
 			if(okJNum != true) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
 			numFlt64, errFlt64 := jNum.Float64()
 			if(errFlt64 != nil) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
-			return numFlt64, true
+			return numFlt64, nil
 		case int, int8, int16, int32, int64:
-			return float64(reflect.ValueOf(vt).Int()), true
+			return float64(reflect.ValueOf(vt).Int()), nil
 		case uint, uint8, uint16, uint32, uint64:
-			return float64(reflect.ValueOf(vt).Uint()), true
+			return float64(reflect.ValueOf(vt).Uint()), nil
 		case float32:
-			return float64(vt), true
+			return float64(vt), nil
 		case float64:
-			return vt, true
+			return vt, nil
 		//-- unixman
 		case bool:
 			val := reflect.ValueOf(vt).Bool()
 			if(val == true) {
-				return 1, true
+				return 1, nil
 			}
-			return 0, true
+			return 0, nil
 		case string:
 			s := reflect.ValueOf(vt).String()
 			f, err := strconv.ParseFloat(s, 64)
 			if(err == nil) {
-				return f, true
+				return f, nil
 			}
 		//-- #
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) Float() float64 { // by unixman
@@ -414,41 +438,44 @@ func (a *Answer) Float() float64 { // by unixman
 // Bool attempts asserting answer as a bool.
 // The first return value is the result, and the second indicates if the operation was successful.
 // If not successful the first return value will be set to the d parameter.
-func (a *Answer) XBool(d bool) (bool, bool) {
+func (a *Answer) XBool(d bool) (bool, error) {
+	if a.value == nil {
+		return d, ErrNotFound
+	}
 	//-- unixman
 	switch vt := a.value.(type) {
 		case json.Number:
 			jNum, okJNum := a.value.(json.Number)
 			if(okJNum != true) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
 			numFlt64, errFlt64 := jNum.Float64()
 			if(errFlt64 != nil) {
-				return d, false
+				return d, ErrWrongType
 			} //end if
 			if(numFlt64 != 0) {
-				return true, true
+				return true, nil
 			}
-			return false, true
+			return false, nil
 		case float32, float64, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 			f := reflect.ValueOf(vt).Float()
 			if(f != 0) {
-				return true, true
+				return true, nil
 			}
-			return false, true
+			return false, nil
 		case string:
 			s := reflect.ValueOf(vt).String()
 			if(s != "") {
-				return true, true
+				return true, nil
 			}
-			return false, true
+			return false, nil
 	}
 	//-- #
 	res, ok := a.value.(bool)
 	if ok {
-		return res, ok
+		return res, nil
 	}
-	return d, false
+	return d, ErrWrongType
 }
 
 func (a *Answer) Bool() bool { // by unixman

@@ -1,3 +1,4 @@
+
 package btree
 
 type Set[K ordered] struct {
@@ -177,3 +178,5 @@ func (tr *Set[K]) Keys() []K {
 func (tr *Set[K]) Clear() {
 	tr.base.Clear()
 }
+
+// #end

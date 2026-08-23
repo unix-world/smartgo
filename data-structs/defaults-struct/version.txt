@@ -1,4 +1,4 @@
-github.com/creasty/defaults @head.20240814
+github.com/creasty/defaults @head.20260822
 
 go 1.14
 
