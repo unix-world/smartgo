@@ -2,7 +2,17 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## *Unreleased*
+## unix-world rolling release
+
+## [2.3.1.uxm.20260915] - 2026-09-15
+
+### Content Digest
+
+## [2.3.1.uxm.20241128] - 2024-11-28
+
+### XOAUTH2
+
+### Content Digest
 
 ## [2.3.1] - 2018-11-12
 

@@ -3,6 +3,8 @@
 // like structures and maps.
 package deep
 
+// modified by unixman
+
 import (
 	"errors"
 	"fmt"
@@ -101,7 +103,13 @@ func Equal(a, b interface{}, flags ...interface{}) []string {
 		flag:        map[byte]bool{},
 	}
 	for i := range flags {
-		c.flag[flags[i].(byte)] = true
+		//-- unixman
+	//	c.flag[flags[i].(byte)] = true
+		cKey, okAssert := flags[i].(byte)
+		if(okAssert) {
+			c.flag[cKey] = true
+		}
+		//-- #
 	}
 	if a == nil && b == nil {
 		return nil

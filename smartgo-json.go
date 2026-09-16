@@ -1,14 +1,15 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ JSON ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
 //	"log"
+
 	"bytes"
 	"strings"
 	"encoding/json"
@@ -24,11 +25,16 @@ const (
 //-----
 
 
-func ConvertJsonNumberToStr(data interface{}) string { // after convert to string can be re-converted into int64 / float64 / ...
+func ConvertJsonNumberToStr(data interface{}) (string, error) { // after convert to string can be re-converted into int64 / float64 / ...
 	//--
 	defer PanicHandler()
 	//--
-	return data.(json.Number).String()
+	val, okAssert := data.(json.Number) // safe assert
+	if(!okAssert) {
+		return "0", NewError("Cast Failed, Type")
+	} //end if
+	//--
+	return val.String(), nil
 	//--
 } //END FUNCTION
 
@@ -37,7 +43,12 @@ func ConvertJsonNumberToInt64(data interface{}) (int64, error) {
 	//--
 	defer PanicHandler()
 	//--
-	return data.(json.Number).Int64()
+	val, okAssert := data.(json.Number) // safe assert
+	if(!okAssert) {
+		return 0, NewError("Cast Failed, Type")
+	} //end if
+	//--
+	return val.Int64()
 	//--
 } //END FUNCTION
 
@@ -46,7 +57,12 @@ func ConvertJsonNumberToFloat64(data interface{}) (float64, error) {
 	//--
 	defer PanicHandler()
 	//--
-	return data.(json.Number).Float64()
+	val, okAssert := data.(json.Number) // safe assert
+	if(!okAssert) {
+		return 0, NewError("Cast Failed, Type")
+	} //end if
+	//--
+	return val.Float64()
 	//--
 } //END FUNCTION
 
@@ -329,7 +345,7 @@ func JsonGetValueByKeysPath(json string, keys ...interface{}) (*askjson.Answer, 
 
 
 func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]interface{}, error) {
-	//-- r.20241226.2358
+	//-- r.20241226.2358 # rev.20260829
 	// normalize serialized form data from jQuery.serializeArray(), created by smartJ$Browser.SerializeFormAsObject()
 	//--
 	defer PanicHandler()
@@ -362,14 +378,14 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 		return emptyAnswer, NewError("Json is OverSized")
 	} //end if
 	//--
-	arr := make(map[string]interface{})
+	var arr map[string]interface{} = map[string]interface{}{}
 	for key, val := range jsonArray {
 		//--
 		if(!StrRegexMatch(regexValidKey, key)) {
 			return emptyAnswer, NewError("a Key is Invalid")
 		} //end if
 		//--
-		valMap, ok2 := val.(map[string]interface{})
+		valMap, ok2 := val.(map[string]interface{}) // safe assert
 		if(!ok2) {
 			return emptyAnswer, NewError("a Value is Invalid")
 		} //end if
@@ -379,7 +395,7 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 			return emptyAnswer, NewError("Failed to get # Values Map")
 		} //end if
 		//--
-		hashMap, ok4 := valMap["#"].(map[string]interface{})
+		hashMap, ok4 := valMap["#"].(map[string]interface{}) // safe assert
 		if(!ok4) {
 			return emptyAnswer, NewError("Failed to get # Hash Map")
 		} //end if
@@ -410,7 +426,7 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 			return emptyAnswer, NewError("The # Size must be higher than zero")
 		} //end if
 		//--
-		dataKeyVal, ok8 := valMap[dataKey].(map[string]interface{})
+		dataKeyVal, ok8 := valMap[dataKey].(map[string]interface{}) // safe assert
 		if(!ok8) {
 			return emptyAnswer, NewError("Failed to get the Values Map")
 		} //end if
@@ -422,13 +438,13 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 		} //end if
 		//--
 		var lData int = 0
-		data  := make(map[string]interface{})
-		items := make(map[string][]string)
+		var data map[string]interface{} = map[string]interface{}{}
+		var items map[string][]string = map[string][]string{}
 		var errConvert error = nil
 		for kk, vv := range dataKeyVal {
-			vvArr, okVvArr := vv.([]interface{})
-			vvMap, okVvMap := vv.(map[string]interface{})
-			vvStr, okVvStr := vv.(string)
+			vvArr, okVvArr := vv.([]interface{}) // safe assert
+			vvMap, okVvMap := vv.(map[string]interface{}) // safe assert
+			vvStr, okVvStr := vv.(string) // safe assert
 			if(okVvArr) {
 				if(len(vvArr) > 1024) {
 					return emptyAnswer, NewError("An item value type List is OverSized")
@@ -479,7 +495,7 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 				return emptyAnswer, NewError("The Items Delta is Invalid")
 			} //end if
 			//--
-			ikeys := make([]string, 0) // expects non-associative array (list)
+			ikeys := []string{} // expects non-associative array (list)
 			for ik, iv := range items {
 				if(int64(len(iv)) != intDelta) {
 					return emptyAnswer, NewError("An Item length does not match the Delta")
@@ -487,19 +503,21 @@ func ConformSerializedJsObjectForm(jsonStr string, dataKey string) (map[string]i
 				ikeys = append(ikeys, ik)
 			} //end for
 			//--
-			arr[key+":@"] = make([]map[string]string, intDelta)
+			var entries []map[string]string = []map[string]string{}
+			//--
 			var i int64 = 0
 			for i=0; i<intDelta; i++ {
 				//--
-				item := make(map[string]string)
-				//--
+				var item map[string]string = map[string]string{}
 				for _, itk := range ikeys {
 					item[itk] = items[itk][i]
 				} //end for
 				//--
-				arr[key+":@"].([]map[string]string)[i] = item
+				entries = append(entries, item)
 				//--
 			} //end for
+			//--
+			arr[key+":@"] = entries
 			//--
 		} //end if
 		//--

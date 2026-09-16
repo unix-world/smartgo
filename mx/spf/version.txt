@@ -1,0 +1,6 @@
+github.com/asggo/spf @head.20260829
+
+modified by unixman r.20260829
+
+go 1.13
+

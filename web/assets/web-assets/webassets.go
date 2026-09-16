@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (static) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260821.2358 :: STABLE
+// r.20260903.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower versions)
 package webassets
@@ -19,9 +19,9 @@ var assets embed.FS
 //-----
 
 const(
-	VERSION string = "r.20260821.2358"
+	VERSION string = "r.20260903.2358"
 
-	LAST_MODIFIED_DATE_TIME string = "2026-08-21 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
+	LAST_MODIFIED_DATE_TIME string = "2026-09-03 23:58:07" // must be UTC time, (string) assets last modified ; UPDATE THIS AFTER EACH TIME THE ASSETS ARE MODIFIED !
 
 	CACHED_EXP_TIME_SECONDS uint32 = 2 * 3600 // (int) cache time of assets ; 2h
 )
@@ -29,6 +29,119 @@ const(
 var (
 	DEBUG bool = smart.DEBUG
 )
+
+//-----
+
+
+func RenderSrvMainHtmlMarkersFileTpl(mtplAssetFile string, arrobj map[string]string, arrpobj map[string]string, semaphores []string) (string, error) {
+	//--
+	// this is a server-side template, cannot be used as static, needs a web server to serve the svg/css/js dynamic load assets from the template
+	//--
+	defer smart.PanicHandler()
+	//--
+	if(arrobj == nil) {
+		arrobj = map[string]string{}
+	} //end if
+	_, keySemExists := arrobj["SEMAPHORE"]
+	if(keySemExists == true) {
+		return "", smart.NewError("The `SEMAPHORE` key is special and all semaphores must be set via method `semaphores` parameter")
+	} //end if
+	//--
+	if(arrpobj == nil) {
+		arrpobj = map[string]string{}
+	} //end if
+	_, keyRTExists := arrpobj["RENDER-DATE-TIME"]
+	if(keyRTExists == true) {
+		return "", smart.NewError("The `RENDER-DATE-TIME` placeholder key is special and reserved for TPL rendering DateTime placeholder")
+	} //end if
+	//--
+	defaultKeys := []string {
+		"APP-REALM",
+		"FAVICON",
+		"TITLE",
+		"HEAD-META",
+		"HEAD-CSS",
+		"HEAD-JS",
+		"ALIGN-CENTER",
+		"HEADER",
+		"MAIN",
+		"ASIDE",
+		"FOOTER",
+		"COOKIE-LIFETIME", // default is: 0 (session)
+		"COOKIE-DOMAIN", // defaul is empty
+		"COOKIE-SAMESITE", // default is: Lax
+		"MODAL-BOX-PROTECTED",
+		"NOTIFY-LOAD-ERROR",
+		"AUTORUN-DELAY-MSEC", // milliseconds ; this is used just in TPL QUnit by now, set it default to 0 as no-autorun (seconds)
+		"TIMEOUT-EXECUTION-SEC", // seconds ; this is used just in TPL QUnit by now, set it default to 120 (seconds)
+		"DEBUG-MODE",
+	}
+	//--
+	for _, v := range defaultKeys {
+		_, keyExists := arrobj[v]
+		if(keyExists == false) {
+			arrobj[v] = "" // if key does not exists initialize
+		} //end if
+	} //end if
+	//--
+	if(arrobj["APP-REALM"] == "") {
+		appNameSpace, _ := smart.AppGetNamespace()
+		arrobj["APP-REALM"] = appNameSpace
+	} //end if
+	//--
+	if(arrobj["COOKIE-LIFETIME"] == "") {
+		arrobj["COOKIE-LIFETIME"] = "0"
+	} //end if
+	if(arrobj["COOKIE-DOMAIN"] == "") {
+		arrobj["COOKIE-DOMAIN"] = smart.GetCookieDefaultDomain()
+	} //end if
+	if(arrobj["COOKIE-SAMESITE"] == "") {
+		arrobj["COOKIE-SAMESITE"] = smart.GetCookieDefaultSameSitePolicy()
+	} //end if
+	//--
+	if(arrobj["MODAL-BOX-PROTECTED"] != "false") {
+		arrobj["MODAL-BOX-PROTECTED"] = "true"
+	} //end if
+	if(arrobj["NOTIFY-LOAD-ERROR"] != "true") {
+		arrobj["NOTIFY-LOAD-ERROR"] = "false"
+	} //end if
+	//--
+	if(arrobj["AUTORUN-DELAY-MSEC"] == "") {
+		arrobj["AUTORUN-DELAY-MSEC"] = "0" // milliseconds ; zero means no autorun
+	} //end if
+	if(arrobj["TIMEOUT-EXECUTION-SEC"] == "") {
+		arrobj["TIMEOUT-EXECUTION-SEC"] = "120" // seconds
+	} //end if
+	//--
+	if(arrobj["DEBUG-MODE"] == "") {
+		if((DEBUG == true) || (smart.DEBUG == true)) {
+			arrobj["DEBUG-MODE"] = "yes"
+		} //end if
+	} //end if
+	//--
+	arrobj["BASE-HREF"] = smart.GetHttpProxyBasePath() // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use HTML BasePath as prefix (default is /), to work with advanced tail dirs routing
+	arrobj["SEMAPHORE"] = smart.StrToLower(smart.StrTrimWhitespaces(smart.SmartArrToList(semaphores, false))) // this key is special and is controlled separately
+	arrobj["LANG"] = smart.StrToLower(smart.DEFAULT_LANGUAGE)
+	arrobj["RELEASE-HASH"] = smart.Crc32bB36(smart.VERSION + smart.ASCII_BELL + smart.DateNowNoTimeUtc())
+	arrobj["TIME-DATE-START"] = smart.DateNowLocal()
+	//--
+	arrpobj["RENDER-DATE-TIME"] = smart.EscapeHtml(smart.DateNowUtc()) // placeholders are not escaped !
+	//--
+	return smart.RenderMainHtmlMarkersFileTpl(smart.EFS_PREFIX + mtplAssetFile, arrobj, arrpobj, &assets)
+	//--
+} //END FUNCTION
+
+
+func RenderSrvMarkersFileTpl(mtplAssetFile string, arrobj map[string]string) (string, error) {
+	//--
+	// this is a server-side template, cannot be used as static, needs a web server to serve the svg/css/js dynamic load assets from the template
+	//--
+	defer smart.PanicHandler()
+	//--
+	return smart.RenderMarkersFileTpl(smart.EFS_PREFIX + mtplAssetFile, arrobj, &assets)
+	//--
+} //END FUNCTION
+
 
 //-----
 
@@ -316,7 +429,7 @@ func ReadWebAsset(path string) string { // OK
 		return ""
 	} //end if
 	//--
-	content, err := assets.ReadFile(path)
+	content, err := smart.SafePathEmbedFileRead(&assets, path)
 	if(err != nil) {
 		log.Println("[LOG]", smart.CurrentFunctionName(), "# Failed to Read Asset: `" + path + "` #", err) // mostly will cover 404
 		return ""
@@ -494,35 +607,35 @@ func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml st
 	// No SF Icons in this template !
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/default.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
+		assetsAll = append(assetsAll, TAG_DATA_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_DATA_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
+		assetsAll = append(assetsAll, TAG_DATA_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_DATA_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/css/toolkit/ux-toolkit-responsive.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
+		assetsAll = append(assetsAll, TAG_DATA_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_DATA_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/custom.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
+		assetsAll = append(assetsAll, TAG_DATA_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_DATA_CSS_END)
 	} //end if
 	theCss = smart.StrTrimWhitespaces(ReadWebAsset("lib/core/css/notifications.css"))
 	if(theCss != "") {
-		assetsAll = append(assetsAll, TAG_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_CSS_END)
+		assetsAll = append(assetsAll, TAG_DATA_CSS_START + smart.EscapeHtml(smart.EscapeUrl(theCss)) + TAG_DATA_CSS_END)
 	} //end if
 	theCss = "" // clear
 	//-- # end: sync with app-go.css
 	if(loadjs == true) {
 		var jsSmarSettings string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/settings.js"))
-		assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmarSettings)) + TAG_JS_END)
+		assetsAll = append(assetsAll, TAG_DATA_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmarSettings)) + TAG_DATA_JS_END)
 		var jsSmartUtilsCore string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/core_utils.js"))
-		assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCore)) + TAG_JS_END)
+		assetsAll = append(assetsAll, TAG_DATA_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCore)) + TAG_DATA_JS_END)
 		var jsSmartUtilsDate string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/date_utils.js"))
-		assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsDate)) + TAG_JS_END)
+		assetsAll = append(assetsAll, TAG_DATA_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsDate)) + TAG_DATA_JS_END)
 		var jsSmartUtilsCrypt string = smart.StrTrimWhitespaces(ReadWebAsset("lib/js/framework/src/crypt_utils.js"))
-		assetsAll = append(assetsAll, TAG_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCrypt)) + TAG_JS_END)
+		assetsAll = append(assetsAll, TAG_DATA_JS_START + smart.EscapeHtml(smart.EscapeUrl(jsSmartUtilsCrypt)) + TAG_DATA_JS_END)
 	} else {
 		assetsAll = append(assetsAll, `<!-- JS: skip -->`)
 	} //end if
@@ -544,30 +657,42 @@ func htmlStandaloneChooseTemplate(titleText string, headHtml string, bodyHtml st
 
 
 const (
-	TEXT_CONTENT_HEADER string = "text/plain; charset=" + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
-	HTML_CONTENT_HEADER string = "text/html; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
-	JSON_CONTENT_HEADER string = "application/json; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
-	XML_CONTENT_HEADER  string = "application/xml; charset="  + smart.CHARSET // keep separate, can be used also by HTTP Headers: Content-Type
+	TEXT_CONTENT_HEADER string = "text/plain; charset=" + smart.CHARSET 		// keep separate, can be used also by HTTP Headers: Content-Type
+	HTML_CONTENT_HEADER string = "text/html; charset="  + smart.CHARSET 		// keep separate, can be used also by HTTP Headers: Content-Type
+	JSON_CONTENT_HEADER string = "application/json; charset="  + smart.CHARSET 	// keep separate, can be used also by HTTP Headers: Content-Type
+	XML_CONTENT_HEADER 	string = "application/xml; charset="  + smart.CHARSET 	// keep separate, can be used also by HTTP Headers: Content-Type
 
-	HTML_META_FAVICON   string = `<link rel="icon" href="` + smart.DATA_URL_EMPTY_PREFIX + `">`
-	HTML_META_VIEWPORT  string = `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
-	HTML_META_CHAREQUIV string = `<meta charset="` + smart.CHARSET + `"><meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">`
+	HTML_META_CHAREQUIV string = `<meta charset="` + smart.CHARSET + `">` + "\n" + `<meta http-equiv="Content-Type" content="` + HTML_CONTENT_HEADER + `">`
+	HTML_META_VIEWPORT 	string = `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
+	HTML_META_GENERATOR string = `<meta name="generator" content="Smart.Framework.Go">`
+	HTML_META_FAVICON 	string = `<link rel="icon" href="` + smart.DATA_URL_EMPTY_PREFIX + `">`
 
-	TAG_CSS_START string = `<link rel="stylesheet" type="text/css" href="` + smart.DATA_URL_CSS_PREFIX
-	TAG_CSS_END string = `">`
-	TAG_JS_START string = `<script src="` + smart.DATA_URL_JS_PREFIX
-	TAG_JS_END string = `"></script>`
+	TAG_BASE_HREF_START string = `<base href="`
+	TAG_BASE_HREF_END 	string = `">`
 
-	HTML_TPL_NOTIFICATION = `<!-- require: notifications.css --><div title="[###TYPE|ucfirst|html###]" class="[###CSS-CLASS|html###]">[###MESSAGE-HTML###]</div>`
+	TAG_CSS_START 		string = `<link rel="stylesheet" type="text/css" href="`
+	TAG_CSS_END 		string = `" media="all">`
+	TAG_JS_START 		string = `<script src="`
+	TAG_JS_END 			string = `"></script>`
+
+	TAG_DATA_CSS_START 	string = TAG_CSS_START + smart.DATA_URL_CSS_PREFIX
+	TAG_DATA_CSS_END 	string = TAG_CSS_END
+	TAG_DATA_JS_START 	string = TAG_JS_START + smart.DATA_URL_JS_PREFIX
+	TAG_DATA_JS_END 	string = TAG_JS_END
+
+	TAG_COMMENT_HEAD_JS_CSS string = "<!-- Head: Css / Js -->"
+
+	HTML_TPL_NOTIFICATION 	string = `<!-- require: notifications.css --><div title="[###TYPE|ucfirst|html###]" class="[###CSS-CLASS|html###]">[###MESSAGE-HTML###]</div>`
 
 	HTML_TPL_STATUS string = `<!DOCTYPE html>
 <!-- TPL.SmartGo.STATUS -->
 <html>
 <head>
 ` + HTML_META_CHAREQUIV + `
+` + HTML_META_VIEWPORT + `
+` + HTML_META_GENERATOR + `
 ` + HTML_META_FAVICON + `
 <title>[###TITLE-TEXT|html###]</title>
-` + HTML_META_VIEWPORT + `
 <style>
 * { font-family: 'IBM Plex Sans', 'Noto Sans', arial, sans-serif; font-smooth: always; }
 body { background-color: #FFFFFF; color: #333333; }
@@ -600,9 +725,10 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <html>
 <head>
 ` + HTML_META_CHAREQUIV + `
-` + HTML_META_FAVICON + `
-<title>[###TITLE|html###]</title>
 ` + HTML_META_VIEWPORT + `
+` + HTML_META_GENERATOR + `
+<title>[###TITLE|html###]</title>
+` + HTML_META_FAVICON + `
 [:::HEAD-CSS-JS:::]
 [###HEAD-HTML###]
 </head>
@@ -618,9 +744,10 @@ div.message { line-height: 36px; text-align: left; font-size: 1.25rem; font-weig
 <html>
 <head>
 ` + HTML_META_CHAREQUIV + `
-` + `<link rel="icon" href="[###FAVICON|html###]">` + `
-<title>[###TITLE|html###]</title>
 ` + HTML_META_VIEWPORT + `
+` + HTML_META_GENERATOR + `
+<title>[###TITLE|html###]</title>
+` + `<link rel="icon" href="[###FAVICON|html###]">` + `
 [:::HEAD-CSS-JS:::]
 [###HEAD-HTML###]
 </head>

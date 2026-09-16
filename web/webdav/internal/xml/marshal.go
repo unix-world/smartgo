@@ -1,6 +1,5 @@
-
 // SmartGo :: WebDAV / XML :: Marshal
-// r.20250214.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2011 The Go Authors. All rights reserved.
@@ -551,9 +550,9 @@ func (p *printer) setAttrPrefix(prefix, url string) {
 } //END FUNCTION
 
 var (
-	marshalerType     = reflect.TypeOf((*Marshaler)(nil)).Elem()
-	marshalerAttrType = reflect.TypeOf((*MarshalerAttr)(nil)).Elem()
-	textMarshalerType = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+	marshalerType     = reflect.TypeFor[Marshaler]()
+	marshalerAttrType = reflect.TypeFor[MarshalerAttr]()
+	textMarshalerType = reflect.TypeFor[encoding.TextMarshaler]()
 )
 
 // marshalValue writes one or more XML elements representing val.

@@ -1,13 +1,15 @@
+
 /*
-// theme/uxm.css
-// codemirror: v.5.61.1
+// theme/uxm.css (default viewer)
+// codemirror: v.5.65.18
+// maintained by unixman # r.20260824
 */
 
 /*
-	UXM Write theme, inspired from MDN-LIKE Theme - Mozilla
-	Ported to CodeMirror by Peter Kroon <plakroon@gmail.com>, Report bugs/issues here: https://github.com/codemirror/CodeMirror/issues, GitHub: @peterkroon
-	The mdn-like theme is inspired on the displayed code examples at: https://developer.mozilla.org/en-US/docs/Web/CSS/animation
-	Inspired by mdn-like theme, modified by unixman, (c) 2016-2021 unix-world.org
+UXM Write theme, inspired from MDN-LIKE Theme - Mozilla
+Ported to CodeMirror by Peter Kroon <plakroon@gmail.com>, Report bugs/issues here: https://github.com/codemirror/CodeMirror/issues, GitHub: @peterkroon
+The mdn-like theme is inspired on the displayed code examples at: https://developer.mozilla.org/en-US/docs/Web/CSS/animation
+Inspired by mdn-like theme, modified by unixman, (c) 2016-present unix-world.org
 */
 
 .cm-s-uxm.CodeMirror { color: #333333; background-color: #FFFFFF; }

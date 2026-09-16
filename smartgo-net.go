@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ NET ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -19,37 +19,37 @@ import (
 )
 
 const (
-	REGEX_SAFE_VAR_NAME string 				= `^[_a-zA-Z0-9]+$` 				// Safe VarName Regex
+	REGEX_SAFE_VAR_NAME 							string = `^[_a-zA-Z0-9]+$` 									// Safe VarName Regex
 
-	REGEX_SMART_SAFE_BASE_PATH string 		= `^[_a-z0-9\-\/]+$` 				// CONFORMANCE: SUPPORT ONLY THESE CHARACTERS IN HTML BASE PATHS
+	REGEX_SMART_SAFE_BASE_PATH 						string = `^[_a-z0-9\-\/]+$` 								// CONFORMANCE: SUPPORT ONLY THESE CHARACTERS IN HTML BASE PATHS
 
-	REGEX_SMART_SAFE_NET_HOSTNAME string 	= `^[_a-z0-9\-\.]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
-	REGEX_SMART_SAFE_HTTP_HEADER_KEY string = `^[A-Za-z0-9\-]+$` 				// SAFETY: SUPPORT ONLY THESE CHARACTERS IN HEADER KEY VALUES
+	REGEX_SMART_SAFE_NET_HOSTNAME 					string = `^[_a-z0-9\-\.]+$` 								// SAFETY: SUPPORT ONLY THESE CHARACTERS IN NET HOST NAMES AS RFC ; if a hostname have upper characters must be converted to all lower characters ; if a hostname have unicode characters must be converted using punnycode ...
+	REGEX_SMART_SAFE_HTTP_HEADER_KEY 				string = `^[A-Za-z0-9\-]+$` 								// SAFETY: SUPPORT ONLY THESE CHARACTERS IN HEADER KEY VALUES
 
-	REGEX_SMART_SAFE_EMAIL_ADDRESS string 	= `^[_a-zA-Z0-9\-\.\+~]{1,63}@[a-z0-9\-\.]{3,63}$` 	// internet email@(subdomain.)domain.name
-	REGEX_SMART_SAFE_NET_USERNAME  string 	= `^[_a-zA-Z0-9\-\.\+~@]{3,127}$` 					// general characters accepted in a username
+	REGEX_SMART_SAFE_EMAIL_ADDRESS 					string = `^[_a-zA-Z0-9\-\.\+~]{1,63}@[a-z0-9\-\.]{3,63}$` 	// internet email@(subdomain.)domain.name
+	REGEX_SMART_SAFE_NET_USERNAME  					string = `^[_a-zA-Z0-9\-\.\+~@]{3,127}$` 					// general characters accepted in a username
 
-	MAX_HOSTNAME_FULL_LENGTH int    = 253 // The entire hostname, including the delimiting dots, has a maximum of 253 ASCII characters
-	MAX_HOSTNAME_SEGMENT_LENGTH int =  63 // For example, "en.wikipedia.org" is a hostname. Each label must be 1 to 63 octets long
+	MAX_HOSTNAME_FULL_LENGTH 						int = 253 													// The entire hostname, including the delimiting dots, has a maximum of 253 ASCII characters
+	MAX_HOSTNAME_SEGMENT_LENGTH 					int =  63 													// For example, "en.wikipedia.org" is a hostname. Each label must be 1 to 63 octets long
 
-	HTTP_PROTO_PREFIX_HTTP  string = "http://"
-	HTTP_PROTO_PREFIX_HTTPS string = "https://"
+	HTTP_PROTO_PREFIX_HTTP 							string = "http://"
+	HTTP_PROTO_PREFIX_HTTPS 						string = "https://"
 
-	DEFAULT_FAKE_IP_CLIENT string = "0.0.0.0"
-	DEFAULT_FAKE_HOSTPORT_SERVER string = "256.256.256.256:65535"
+	DEFAULT_FAKE_IP_CLIENT 							string = "0.0.0.0"
+	DEFAULT_FAKE_HOSTPORT_SERVER 					string = "256.256.256.256:65535"
 
-	DEFAULT_BROWSER_UA string = "NetSurf/3.11 (Sf.Go/" + VERSION + ")"
+	DEFAULT_BROWSER_UA 								string = "NetSurf/3.11 (Sf.Go/" + VERSION + ")"
 )
 
 var (
-	httpProxyBasePath string = "/" 												// for Proxy Mode only ; Serving HTML Document BasePath (used also in 301/302 redirects) ; when Golang is behind Haproxy, ex: under `/api/` path, this have to be changed accordingly as `/api/` instead of default `/` ; to work with assets this path must be rewritten back from ex: `/api/` to `/` by haproxy request rewrites
-	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP string = "" 							// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Client-Ip" or "X-Real-Ip" or "X-Forwarded-For" or ... ; can be set only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
-	ini_SMART_FRAMEWORK_SRVPROXY_SERVER_PROTO string = "" 						// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Proto" ; expects: `http` | `https` 										; can be set only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
-	ini_SMART_FRAMEWORK_SRVPROXY_SERVER_HOSTPORT  string = "" 					// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Host"  ; expects: `dom.ext:443` | Ipv4 `127.0.0.1:80` | [Ipv6] [::1]:80 	; can be set only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
+	httpProxyBasePath 								string = "/" 												// for Proxy Mode only ; Serving HTML Document BasePath (used also in 301/302 redirects) ; when Golang is behind Haproxy, ex: under `/api/` path, this have to be changed accordingly as `/api/` instead of default `/` ; to work with assets this path must be rewritten back from ex: `/api/` to `/` by haproxy request rewrites
+	ini_SMART_FRAMEWORK_SRVPROXY_CLIENT_IP 			string = "" 												// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Client-Ip" or "X-Real-Ip" or "X-Forwarded-For" or ... ; can be set only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
+	ini_SMART_FRAMEWORK_SRVPROXY_SERVER_PROTO 		string = "" 												// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Proto" ; expects: `http` | `https` 										; can be set only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
+	ini_SMART_FRAMEWORK_SRVPROXY_SERVER_HOSTPORT 	string = "" 												// CASE SENSITIVE, CAMEL CASE (in golang !) ; by default is empty (no proxy) ; if a proxy is used it can be set as: "X-Forwarded-Host"  ; expects: `dom.ext:443` | Ipv4 `127.0.0.1:80` | [Ipv6] [::1]:80 	; can be set only once before using any methods that is referencing this ; changing more than once would not be safe and can lead to many security flaws
 
-	sessionUUIDCookieName string = "" 											// [2..16 characters ; valid REGEX_SAFE_VAR_NAME] ; default is EMPTY, to enable anonymous UUID tracking cookie set to ~ "Sf_UUID" ; this is intended to provide a unique session anonymous tracking UUID
-	ini_SMART_FRAMEWORK_COOKIES_DEFAULT_SAMESITE string = "Lax" 				// default cookies policy ; can be: Lax / Strict / None / Empty
-	ini_SMART_FRAMEWORK_COOKIES_DEFAULT_DOMAIN string = "" 						// default cookies domain ; (empty) `` for the current subdomain as `sdom.domain.tld` ; set it as `*` or explicit `domain.tld` for all sub-domains of domain.tld
+	sessionUUIDCookieName 							string = "" 												// [2..16 characters ; valid REGEX_SAFE_VAR_NAME] ; default is EMPTY, to enable anonymous UUID tracking cookie set to ~ "Sf_UUID" ; this is intended to provide a unique session anonymous tracking UUID
+	ini_SMART_FRAMEWORK_COOKIES_DEFAULT_SAMESITE 	string = "Lax" 												// default cookies policy ; can be: Lax / Strict / None / Empty
+	ini_SMART_FRAMEWORK_COOKIES_DEFAULT_DOMAIN 		string = "" 												// default cookies domain ; (empty) `` for the current subdomain as `sdom.domain.tld` ; set it as `*` or explicit `domain.tld` for all sub-domains of domain.tld
 )
 
 //-----

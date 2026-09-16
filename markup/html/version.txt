@@ -1,4 +1,4 @@
-v.20260224
+v.20260828
 Go 1.24 or later
 
 golang.org/x/net/html v0.50.0

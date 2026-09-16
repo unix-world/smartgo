@@ -4,3 +4,4 @@ go 1.24
 
 refactored by unixman as: github.com/unix-world/smartgoext/compress/zstd @ r.20260822
 
+modified by unixman

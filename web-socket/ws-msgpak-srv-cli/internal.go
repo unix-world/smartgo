@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / WebSocket Message Pack - Internal :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websocketsrvclimsgpak
@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	VERSION string = "r.20260823.2358"
+	VERSION string = "r.20260829.2358"
 
 	CERTIFICATES_DEFAULT_PATH string = "./ssl"
 	CERTIFICATE_PEM_CRT string = "cert.crt"
@@ -448,9 +448,9 @@ func msgPakParseMessage(msg string, sharedPrivateKey string, sharedSecret string
 	} //end if
 	//--
 	sMsg = messagePack{
-		Cmd: D["cmd"].(string),
-		Data: D["data"].(string),
-		CheckSum: D["checksum"].(string),
+		Cmd:      smart.ObjectToString(D["cmd"]),
+		Data:     smart.ObjectToString(D["data"]),
+		CheckSum: smart.ObjectToString(D["checksum"]),
 	}
 	//--
 	polySum, errPoly := smart.Poly1305(smart.Md5(sharedSecret + "\v" + sharedPrivateKey), sharedSecret + "\v" + sMsg.Cmd + "\v" + sharedPrivateKey, true)
@@ -475,7 +475,7 @@ func msgPakParseMessage(msg string, sharedPrivateKey string, sharedSecret string
 		return sMsg, "MsgPak: Unarchive Failed: empty data"
 	} //end if
 	//--
-	hMac, errHmac := smart.HashHmac("sha3-384", D["data"].(string) + "\v" + sMsg.Cmd, D["data"].(string) + "\v" + sMsg.Data, true)
+	hMac, errHmac := smart.HashHmac("sha3-384", smart.ObjectToString(D["data"]) + "\v" + sMsg.Cmd, smart.ObjectToString(D["data"]) + "\v" + sMsg.Data, true)
 	if(errHmac != nil) {
 		sMsg = messagePack{} // reset
 		return sMsg, "MsgPak: Hmac Checksum Failed: " + errHmac.Error()

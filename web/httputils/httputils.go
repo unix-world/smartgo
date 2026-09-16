@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web HTTP Utils :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.17 or later (time NanoSecond is N/A on Go 1.16 or lower)
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
@@ -42,7 +42,7 @@ import (
 //-----
 
 const (
-	VERSION string = "r.20260823.2358"
+	VERSION string = "r.20260829.2358"
 
 	//--
 	DEFAULT_CLIENT_UA string = smart.DEFAULT_BROWSER_UA
@@ -72,37 +72,61 @@ const (
 	//--
 	HTTP_SRV_IDLE_TIMEOUT uint32 = 60 // standard, as Apache
 	//--
+
+	//--
 	DISP_TYPE_INLINE string 	= "inline"
 	DISP_TYPE_ATTACHMENT string = "attachment"
 	//--
+
+	//--
 	MIME_TYPE_ANY string 		= "*/*" // reserved just for request accept header, never use for responses
-	MIME_TYPE_DEFAULT string 	= "application/octet-stream"
-	MIME_TYPE_TEXT string 		= "text/plain"
-	MIME_TYPE_HTML string 		= "text/html"
-	MIME_TYPE_CSS string 		= "text/css"
-	MIME_TYPE_JS string 		= "application/javascript"
-	MIME_TYPE_JSON string 		= "application/json"
-	MIME_TYPE_XML string 		= "application/xml"
-	MIME_TYPE_SVG string 		= "image/svg+xml"
-	MIME_TYPE_PNG string 		= "image/png"
-	MIME_TYPE_GIF string 		= "image/gif"
-	MIME_TYPE_JPEG string 		= "image/jpeg"
-	MIME_TYPE_WEBP string 		= "image/webp"
-	MIME_TYPE_CSV string 		= "text/csv"
-	MIME_TYPE_EMAIL_MSG string 	= "message/rfc822"
-	MIME_TYPE_ICALENDAR string 	= "text/calendar"
-	MIME_TYPE_VCARD string 		= "text/x-vcard"
-	MIME_TYPE_SIG_GPG string 	= "application/pgp-signature"
-	MIME_TYPE_PDF string 		= "application/pdf"
-	MIME_TYPE_AUDIO_OGG string 	= "audio/ogg"
-	MIME_TYPE_VIDEO_OGV string 	= "video/ogg"
+	//--
+
+	//-- {{{SYNC-SMARTGO-MIME-TYPES}}} ; below are the most common types, mostly the types that a browser can display or interpret
+	MIME_TYPE_DEFAULT 	 string = "application/octet-stream"
+	MIME_TYPE_MARKDOWN 	 string = "text/markdown"
+	MIME_TYPE_TEXT 		 string = "text/plain"
+	MIME_TYPE_HTML 		 string = "text/html"
+	MIME_TYPE_CSS 		 string = "text/css"
+	MIME_TYPE_JS 		 string = "application/javascript"
+	MIME_TYPE_JSON 		 string = "application/json"
+	MIME_TYPE_XML 		 string = "application/xml"
+	MIME_TYPE_SVG 		 string = "image/svg+xml"
+	MIME_TYPE_PNG 		 string = "image/png"
+	MIME_TYPE_GIF 		 string = "image/gif"
+	MIME_TYPE_JPEG 		 string = "image/jpeg"
+	MIME_TYPE_WEBP 		 string = "image/webp"
+	MIME_TYPE_WOFF2 	 string = "application/x-font-woff2"
+	MIME_TYPE_WOFF1 	 string = "application/x-font-woff"
+	MIME_TYPE_TTF 		 string = "application/x-font-ttf"
+	MIME_TYPE_FAVICON 	 string = "image/vnd.microsoft.icon"
+	MIME_TYPE_EMAIL_MSG  string = "message/rfc822"
+	MIME_TYPE_ICALENDAR  string = "text/calendar"
+	MIME_TYPE_VCARD 	 string = "text/x-vcard"
+	MIME_TYPE_CSV 		 string = "text/csv"
+	MIME_TYPE_PEM 		 string = "application/x-pem-file"
+	MIME_TYPE_SIG_GPG 	 string = "application/pgp-signature"
+	MIME_TYPE_PDF 		 string = "application/pdf"
+	MIME_TYPE_AUDIO_OGG  string = "audio/ogg"
+	MIME_TYPE_VIDEO_OGV  string = "video/ogg"
 	MIME_TYPE_VIDEO_WEBM string = "video/webm"
+	MIME_TYPE_VIDEO_WEBA string = "video/weba"
+	MIME_TYPE_AUDIO_MP4  string = "audio/mp4"
+	MIME_TYPE_VIDEO_MP4  string = "video/mp4"
 	MIME_TYPE_AUDIO_MPEG string = "audio/mpeg"
 	MIME_TYPE_VIDEO_MPEG string = "video/mpeg"
-	MIME_TYPE_WOFF2 string 		= "application/x-font-woff2"
-	MIME_TYPE_WOFF1 string 		= "application/x-font-woff"
-	MIME_TYPE_TTF string 		= "application/x-font-ttf"
-	MIME_TYPE_FAVICON string 	= "image/vnd.microsoft.icon"
+	MIME_TYPE_ARCH_TAR   string = "application/x-tar"
+	MIME_TYPE_ARCH_ZSTD  string = "application/zstd"
+	MIME_TYPE_ARCH_GZIP  string = "application/gzip"
+	MIME_TYPE_ARCH_XZ    string = "application/x-xz"
+	MIME_TYPE_ARCH_LZ4   string = "application/x-lz4"
+	MIME_TYPE_ARCH_SNAP  string = "application/x-snappy-framed"
+	MIME_TYPE_ARCH_BZIP2 string = "application/x-bzip2"
+	MIME_TYPE_ARCH_RAR   string = "application/x-rar-compressed"
+	MIME_TYPE_ARCH_7Z    string = "application/x-7z-compressed"
+	MIME_TYPE_ARCH_ZIP   string = "application/zip"
+	//--
+
 	//--
 	ICACHEM_CLEANUP_INTERVAL uint32 =   5 // 5 seconds
 	ICACHEM_EXPIRATION       uint32 = 300 // 300 seconds = 5 mins ; cache unsuccessful logins for 5 mins
@@ -120,6 +144,24 @@ const (
 	// MUST NOT ALLOW the `@` character because `@` is reserved as a prefix for POST FILE fields as in CURL and may be a security issue ; using of `@file` type parameters must be explicit enabled in a client POST due to security considerations
 	REGEX_SAFE_HTTP_FORM_VAR_NAME string = `^[a-zA-Z0-9_\-\.\:\#]+$` // original: `^[a-zA-Z0-9_\-]+$` ; allow extended as PHP supports, allow also: `.`, `:`
 	// MUST NOT ALLOW `[` or `]`, this is not a query URL it is a post form and is build acordingly by the Go internals, `[` and `]` will be added as needed by Go
+	//--
+
+	//-- special
+	HTTP_METHOD_TRACE 		string = "TRACE"
+	//-- standard
+	HTTP_METHOD_OPTIONS 	string = "OPTIONS"
+	HTTP_METHOD_HEAD 		string = "HEAD"
+	HTTP_METHOD_GET 		string = "GET"
+	HTTP_METHOD_POST 		string = "POST"
+	//-- api
+	HTTP_METHOD_PUT 		string = "PUT"
+	HTTP_METHOD_PATCH 		string = "PATCH"
+	HTTP_METHOD_DELETE 		string = "DELETE"
+	//-- webdav
+	HTTP_METHOD_PROPFIND 	string = "PROPFIND"
+	HTTP_METHOD_MKCOL 		string = "MKCOL"
+	HTTP_METHOD_COPY 		string = "COPY"
+	HTTP_METHOD_MOVE 		string = "MOVE"
 	//--
 
 	//--
@@ -166,7 +208,11 @@ const (
 	//--
 	HTTP_AJAX_REQUEST_SIGNATURE string = "xmlhttprequest"
 	//--
+	HTTP_CLOSE_CONNECTION_FLAG string = "close"
+	//--
 
+	//--
+	HTTP_HEADER_CONNECTION string = "connection"
 	//--
 	HTTP_HEADER_CONTENT_X_REQUESTED_WITH string = "x-requested-with"
 	//--
@@ -319,7 +365,7 @@ type HttpClientRequest struct {
 
 func HttpClientDoRequestHEAD(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "HEAD"
+	var method string = HTTP_METHOD_HEAD
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -350,10 +396,10 @@ func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string,
 	var extraFlag uint16 = 0 // default
 	method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
 	if((postArr != nil) && (len(postArr) > 0)) {
-		method = "POST"
+		method = HTTP_METHOD_POST
 	} //end if
-	if(method != "POST") {
-		method = "GET"
+	if(method != HTTP_METHOD_POST) {
+		method = HTTP_METHOD_GET
 	} //end if
 	//--
 	var maxBytesRead uint64 = 0 // there is no limit when saving to a file ...
@@ -365,7 +411,7 @@ func HttpClientDoRequestDownloadFile(downloadLocalDirPath string, method string,
 
 func HttpClientDoRequestGET(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxBytesRead uint64, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "GET"
+	var method string = HTTP_METHOD_GET
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -391,7 +437,7 @@ func HttpClientDoRequestPOST(uri string, tlsServerPEM string, tlsInsecureSkipVer
 		extraFlag = 1
 	} //end if
 	//--
-	var method string = "POST"
+	var method string = HTTP_METHOD_POST
 	var optsArr map[string]string = nil
 	var upldLocalFilePath string = ""
 	var downloadLocalDirPath string = ""
@@ -409,12 +455,12 @@ func HttpClientDoRequestPSTBody(postMime string, postBody string, uri string, tl
 	//--
 	// Have NO POST Variables, but POST Body
 	//--
-	var method string = "PUT"
+	var method string = HTTP_METHOD_PUT
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = map[string]string{
 		"|put:data|":   postBody,
-		"|put:method|": "POST",
+		"|put:method|": HTTP_METHOD_POST,
 		"|put:ctype|":  postMime,
 	}
 	postBody = "" // free mem
@@ -429,7 +475,7 @@ func HttpClientDoRequestPSTBody(postMime string, postBody string, uri string, tl
 
 func HttpClientDoRequestPUTFile(upldLocalFilePath string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "PUT"
+	var method string = HTTP_METHOD_PUT
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -443,7 +489,7 @@ func HttpClientDoRequestPUTFile(upldLocalFilePath string, uri string, tlsServerP
 
 func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "PUT"
+	var method string = HTTP_METHOD_PUT
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = map[string]string{
@@ -461,7 +507,7 @@ func HttpClientDoRequestPUT(putData string, uri string, tlsServerPEM string, tls
 
 func HttpClientDoRequestPATCH(patchData string, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "PATCH"
+	var method string = HTTP_METHOD_PATCH
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = map[string]string{
@@ -479,7 +525,7 @@ func HttpClientDoRequestPATCH(patchData string, uri string, tlsServerPEM string,
 
 func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "MKCOL"
+	var method string = HTTP_METHOD_MKCOL
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -494,7 +540,7 @@ func HttpClientDoRequestMKCOL(uri string, tlsServerPEM string, tlsInsecureSkipVe
 
 func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "DELETE"
+	var method string = HTTP_METHOD_DELETE
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -509,7 +555,7 @@ func HttpClientDoRequestDELETE(uri string, tlsServerPEM string, tlsInsecureSkipV
 
 func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "COPY"
+	var method string = HTTP_METHOD_COPY
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var strOverwrite string = "F"
@@ -531,7 +577,7 @@ func HttpClientDoRequestCOPY(destinationUri string, overwrite bool, uri string, 
 
 func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "MOVE"
+	var method string = HTTP_METHOD_MOVE
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var strOverwrite string = "F"
@@ -553,7 +599,7 @@ func HttpClientDoRequestMOVE(destinationUri string, overwrite bool, uri string, 
 
 func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "PROPFIND"
+	var method string = HTTP_METHOD_PROPFIND
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -568,7 +614,7 @@ func HttpClientDoRequestPROPFIND(uri string, tlsServerPEM string, tlsInsecureSki
 
 func HttpClientDoRequestOPTIONS(uri string, tlsServerPEM string, tlsInsecureSkipVerify bool, hdrsArr map[string][]string, ckyArr map[string]string, timeoutSec uint32, maxRedirects uint8, authUsername string, authPassword string) HttpClientRequest {
 	//--
-	var method string = "OPTIONS"
+	var method string = HTTP_METHOD_OPTIONS
 	var extraFlag uint16 = 0 // default
 	var postArr map[string][]string = nil
 	var optsArr map[string]string = nil
@@ -827,17 +873,17 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	var isOptions bool = false
 	//--
 	switch(method) {
-		case "HEAD":
+		case HTTP_METHOD_HEAD:
 			//--
 			isHead = true
 			//--
 			break
-		case "GET":
+		case HTTP_METHOD_GET:
 			//--
 			isGet = true
 			//--
 			break
-		case "POST":
+		case HTTP_METHOD_POST:
 			//--
 			if(postArr != nil) {
 				//--
@@ -845,13 +891,13 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 				//--
 			} else { // if no POST data, fallback to GET method
 				//--
-				method = "GET"
+				method = HTTP_METHOD_GET
 				isGet = true
 				//--
 			} //end if else
 			//--
 			break
-		case "PUT":
+		case HTTP_METHOD_PUT:
 			//--
 			upldLocalFilePath = smart.StrTrimWhitespaces(upldLocalFilePath)
 			//--
@@ -947,7 +993,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			isPut = true
 			//--
 			break
-		case "PATCH": // patch: body only, no file implementation ...
+		case HTTP_METHOD_PATCH: // patch: body only, no file implementation ...
 			//--
 			if(optsArr == nil) {
 				httpResult.Errors = "ERR: PATCH data is Null"
@@ -974,17 +1020,17 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			isPatch = true
 			//--
 			break
-		case "MKCOL":
+		case HTTP_METHOD_MKCOL:
 			//--
 			isMkCol = true
 			//--
 			break
-		case "DELETE":
+		case HTTP_METHOD_DELETE:
 			//--
 			isDelete = true
 			//--
 			break
-		case "COPY":
+		case HTTP_METHOD_COPY:
 			//--
 			if(optsArr == nil) {
 				httpResult.Errors = "ERR: COPY data is Null"
@@ -1029,7 +1075,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			isCopy = true
 			//--
 			break
-		case "MOVE":
+		case HTTP_METHOD_MOVE:
 			//--
 			if(optsArr == nil) {
 				httpResult.Errors = "ERR: MOVE data is Null"
@@ -1074,10 +1120,10 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			isMove = true
 			//--
 			break
-		case "PROPFIND":
+		case HTTP_METHOD_PROPFIND:
 			isPropFind = true
 			break
-		case "OPTIONS":
+		case HTTP_METHOD_OPTIONS:
 			isOptions = true
 			break
 		default:
@@ -1307,8 +1353,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 			res := bytes.NewBuffer([]byte(optsArr["|put:data|"]))
 			putDataLen = int64(len(optsArr["|put:data|"]))
 			if(optsArr["|put:method|"] != "") {
-				if(optsArr["|put:method|"] == "POST") {
-					method = "POST"
+				if(optsArr["|put:method|"] == HTTP_METHOD_POST) {
+					method = HTTP_METHOD_POST
 				} //end if
 			} //end if
 			if(DEBUG == true) {
@@ -1542,15 +1588,36 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	httpResult.HeadData = string(headData)
 	httpResult.HeadDataSize = uint64(len(headData))
 	//-- HINT: can detect content type: mimeType := http.DetectContentType(buffer) ; can determine file extension with: fext, _ := mime.ExtensionsByType(mimeType)
-	mType, mCharSet := MimeAndCharsetGetFromMimeType(resp.Header.Get(HTTP_HEADER_CONTENT_TYPE))
+	var cType string = smart.StrTrimWhitespaces(resp.Header.Get(HTTP_HEADER_CONTENT_TYPE))
+	var mType string = ""
+	var mCharSet string = ""
+	if(cType != "") {
+		mTypMime := ParseMimeContentTypeOrDisposition(cType)
+		if(mTypMime.Error != "") {
+			log.Println("[WARNING]", "MimeType Detection Failed for ContentType Header: `" + cType + "` with error: " + mTypMime.Error)
+		} else {
+			mType    = mTypMime.MediaType
+			mCharSet = mTypMime.Charset
+		} //end if
+		if(DEBUG) {
+			log.Println("[DEBUG]", smart.CurrentFunctionName(), "ContentType: `" + cType + "` ", smart.ObjectPrint(mTypMime))
+			log.Println("[DATA]", smart.CurrentFunctionName(), "Parsed ContentType:", mType, mCharSet)
+		} //end if
+	} //end if
 	var cDisp string = smart.StrTrimWhitespaces(resp.Header.Get(HTTP_HEADER_CONTENT_DISP))
 	var mFileName string = ""
 	var mDisp string = ""
 	if(cDisp != "") {
-		dispType, dispParams, dispErr := mime.ParseMediaType(cDisp)
-		if(dispErr == nil) {
-			mFileName = smart.StrTrimWhitespaces(dispParams["filename"])
-			mDisp = smart.StrToLower(smart.StrTrimWhitespaces(dispType))
+		mTypDisp := ParseMimeContentTypeOrDisposition(cDisp)
+		if(mTypDisp.Error != "") {
+			log.Println("[WARNING]", "MimeType Detection Failed for ContentDisposition Header: `" + cDisp + "` with error: " + mTypDisp.Error)
+		} else {
+			mFileName = mTypDisp.FileName
+			mDisp = mTypDisp.MediaType
+		} //end if else
+		if(DEBUG) {
+			log.Println("[DEBUG]", smart.CurrentFunctionName(), "ContentDisposition: `" + cDisp + "` ", smart.ObjectPrint(mTypDisp))
+			log.Println("[DATA]", smart.CurrentFunctionName(), "Parsed ContentDisposition:", mFileName, mDisp)
 		} //end if
 	} //end if
 	httpResult.MimeType = mType
@@ -1558,7 +1625,7 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 	httpResult.MimeDisp = mDisp
 	httpResult.MimeFileName = mFileName
 	//--
-	if(method == "HEAD") { // return everything except the body
+	if(method == HTTP_METHOD_HEAD) { // return everything except the body
 		httpResult.Errors = ""
 		return
 	} //end if
@@ -1761,8 +1828,8 @@ func httpClientDoRequest(method string, uri string, tlsServerPEM string, tlsInse
 		(httpResult.MimeType == MIME_TYPE_JS) || (httpResult.MimeType == MIME_TYPE_JSON) ||
 		(httpResult.MimeType == MIME_TYPE_XML) || (httpResult.MimeType == MIME_TYPE_SVG) ||
 		(httpResult.MimeType == MIME_TYPE_TEXT) || (httpResult.MimeType == MIME_TYPE_CSV) ||
-		(httpResult.MimeType == MIME_TYPE_EMAIL_MSG) || (httpResult.MimeType == MIME_TYPE_VCARD) ||
-		(httpResult.MimeType == MIME_TYPE_ICALENDAR) || (httpResult.MimeType == MIME_TYPE_SIG_GPG) ||
+		(httpResult.MimeType == MIME_TYPE_VCARD) || (httpResult.MimeType == MIME_TYPE_ICALENDAR) ||
+		(httpResult.MimeType == MIME_TYPE_EMAIL_MSG) || (httpResult.MimeType == MIME_TYPE_SIG_GPG) ||
 		(smart.StrStartsWith(httpResult.MimeType, "text/"))) { // other text types
 			useB64Encoding = false
 	} //end if
@@ -2086,6 +2153,7 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 		return
 	} //end if
 	//--
+	var skipContent bool = false
 	switch(code) { // {{{SMARTGO-HTTP-UTILS-STATUS-2xx-CODES}}}
 		case 200:
 			break
@@ -2095,7 +2163,9 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 			break
 		case 203:
 			break
-		// code 204 (no content) is not accepted for streams ...
+		case 204:
+			skipContent = true
+			break
 		case 208:
 			break
 		default:
@@ -2122,16 +2192,27 @@ func HttpStreamContent(w http.ResponseWriter, r *http.Request, code uint16, stre
 	//--
 	var contentType string = mimeType
 	if(mimeUseCharset == true) {
-		contentType += "; charset=" + smart.CHARSET
+		if(!smart.StrIContains(contentType, "charset=")) { // just in case, do a verification, if already have charset do not add ... normally should have the content type without from MimeDispositionEval ...
+			contentType += "; charset=" + smart.StrToLower(smart.CHARSET) // {{{SYNC-HTTPUTILS-CHARSET-DUPLICATE-CONTROL}}}
+		} //end if
 	} //end if
 	//--
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, contentDisposition)
-	// skip content length header, stream size is unknown
+	//--
+	if((skipContent == true) || (r.Method == HTTP_METHOD_HEAD)) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for head method (or other no-content methods like 204) send a connection close, there will be no body so avoid client keeping connection open to wait for body delivery ; an alternative would be to send the header content-length:0, but this may trick the browser caching
+		w.Header().Set(HTTP_HEADER_CONNECTION, HTTP_CLOSE_CONNECTION_FLAG) // {{{SYNC-HTTP-NO-CONTENT-CONNECTION-CLOSE}}} ; this is mandatory to be set when no content and no length is served ; instead of content length 0 is better serving this to avoid cache misleading if HEAD serves size zero and GET the real size
+	} else {
+		// skip content length header, stream size is unknown
+	} //end if
 	//--
 	httpOKXWriteAllowedHeaders(w, headers, smart.CurrentFunctionName())
 	//--
 	w.WriteHeader(int(code))
+	//--
+	if((skipContent == true) || (r.Method == HTTP_METHOD_HEAD)) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body ; also don't send for 204
+		return
+	} //end if
 	//--
 	log.Println("[NOTICE]", smart.CurrentFunctionName() + ": Serving Stream: `" + route + "` ; ContentType: `" + contentType + "` ; ContentDisposition: `" + contentDisposition + "` ; StatusCode:", code, "; ClientIP:", realClientIp)
 	controllerStream, errControllerStream := streamBytesFunc()
@@ -2309,7 +2390,9 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	//--
 	var contentType string = mimeType
 	if(mimeUseCharset == true) {
-		contentType += "; charset=" + smart.CHARSET
+		if(!smart.StrIContains(contentType, "charset=")) { // just in case, do a verification, if already have charset do not add ... normally should have the content type without from MimeDispositionEval ...
+			contentType += "; charset=" + smart.StrToLower(smart.CHARSET) // {{{SYNC-HTTPUTILS-CHARSET-DUPLICATE-CONTROL}}}
+		} //end if
 	} //end if
 	//--
 	isCachedContent := HttpHeadersCacheControl(w, r, cacheExpiration, cacheLastModified, cacheControl)
@@ -2333,11 +2416,12 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 		} //end if
 	} //end if
 	//--
-	if(skipContent == true) {
-		w.Header().Set(HTTP_HEADER_CONTENT_LEN,  smart.ConvertIntToStr(0)) // mandatory, for skip content to be zero
+	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
+	w.Header().Set(HTTP_HEADER_CONTENT_DISP, contentDisposition)
+	//--
+	if((skipContent == true) || (r.Method == HTTP_METHOD_HEAD)) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for head method (or other no-content methods like 204) send a connection close, there will be no body so avoid client keeping connection open to wait for body delivery ; an alternative would be to send the header content-length:0, but this may trick the browser caching
+		w.Header().Set(HTTP_HEADER_CONNECTION, HTTP_CLOSE_CONNECTION_FLAG) // {{{SYNC-HTTP-NO-CONTENT-CONNECTION-CLOSE}}} ; this is mandatory to be set when no content and no length is served ; instead of content length 0 is better serving this to avoid cache misleading if HEAD serves size zero and GET the real size
 	} else {
-		w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
-		w.Header().Set(HTTP_HEADER_CONTENT_DISP, contentDisposition)
 		if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
 			w.Header().Set(HTTP_HEADER_CONTENT_LEN,  smart.ConvertIntToStr(len(content)))
 		} //end if
@@ -2347,11 +2431,12 @@ func httpStatusOKX(w http.ResponseWriter, r *http.Request, code uint16, content 
 	//--
 	w.WriteHeader(int(code)) // status code must be after set headers
 	//--
-	if((skipContent == true) || (r.Method == "HEAD")) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body ; also don't send for 204
+	if((skipContent == true) || (r.Method == HTTP_METHOD_HEAD)) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body ; also don't send for 204
 		return
 	} //end if
 	//--
 	w.Write([]byte(content))
+	return
 	//--
 } //END FUNCTION
 
@@ -2454,13 +2539,26 @@ func httpStatus3XX(w http.ResponseWriter, r *http.Request, code uint16, redirect
 	HttpHeadersCacheControl(w, r, -1, "", CACHE_CONTROL_NOCACHE)
 	//--
 	w.Header().Set(HTTP_HEADER_REDIRECT_LOCATION, redirectUrl)
+	//--
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
-	if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
-		w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	//--
+	if(r.Method == HTTP_METHOD_HEAD) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for head method send a connection close, there will be no body so avoid client keeping connection open to wait for body delivery ; an alternative would be to send the header content-length:0, but this may trick the browser caching
+		w.Header().Set(HTTP_HEADER_CONNECTION, HTTP_CLOSE_CONNECTION_FLAG) // {{{SYNC-HTTP-NO-CONTENT-CONNECTION-CLOSE}}} ; this is mandatory to be set when no content and no length is served ; instead of content length 0 is better serving this to avoid cache misleading if HEAD serves size zero and GET the real size
+	} else {
+		if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+			w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+		} //end if
 	} //end if
+	//--
 	w.WriteHeader(int(code)) // status code must be after set headers
+	//--
+	if(r.Method == HTTP_METHOD_HEAD) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for HEAD method stop here
+		return
+	} //end if
+	//--
 	w.Write([]byte(content))
+	return
 	//--
 } //END FUNCTION
 
@@ -2687,11 +2785,23 @@ func httpStatusERR(w http.ResponseWriter, r *http.Request, code uint16, messageT
 	//--
 	w.Header().Set(HTTP_HEADER_CONTENT_TYPE, contentType)
 	w.Header().Set(HTTP_HEADER_CONTENT_DISP, DISP_TYPE_INLINE)
-	if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
-		w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+	//--
+	if(r.Method == HTTP_METHOD_HEAD) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for head method send a connection close, there will be no body so avoid client keeping connection open to wait for body delivery ; an alternative would be to send the header content-length:0, but this may trick the browser caching
+		w.Header().Set(HTTP_HEADER_CONNECTION, HTTP_CLOSE_CONNECTION_FLAG) // {{{SYNC-HTTP-NO-CONTENT-CONNECTION-CLOSE}}} ; this is mandatory to be set when no content and no length is served ; instead of content length 0 is better serving this to avoid cache misleading if HEAD serves size zero and GET the real size
+	} else {
+		if(HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
+			w.Header().Set(HTTP_HEADER_CONTENT_LEN, smart.ConvertIntToStr(len(content)))
+		} //end if
 	} //end if
+	//--
 	w.WriteHeader(int(code)) // status code must be after set headers
+	//--
+	if(r.Method == HTTP_METHOD_HEAD) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for HEAD method stop here
+		return
+	} //end if
+	//--
 	w.Write([]byte(content))
+	return
 	//--
 } //END FUNCTION
 
@@ -3621,6 +3731,22 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 				} //end if
 			} //end if
 		} //end if
+		//--
+		if(httpAuthMode == smart.HTTP_AUTH_MODE_COOKIE) {
+			if(smart.AuthCookieIsEnabled() == true) {
+				if(authCookieIsSet == true) {
+					if(smart.StrTrimWhitespaces(authCookieName) != "") {
+						if(authCookieVal != "") { // clear auth cookie if 401 and exists and non-empty
+							if(DEBUG) {
+								log.Println("[DEBUG]", smart.CurrentFunctionName(), "Unset Auth Cookie due to 401 Unauthorized response")
+							} //end if
+							HttpRequestSetCookieWithDefaults(w, r, authCookieName, " ", 0) // unset auth cookie on 1st unauthorized result
+						} //end if
+					} //end if
+				} //end if
+			} //end if
+		} //end if
+		//--
 		HttpStatus401(w, r, "Access to this area requires Authentication", outputHtml, false)
 		//--
 		if(aUser != "") { // log only if non-empty user
@@ -3644,54 +3770,85 @@ func HttpAuthCheck(w http.ResponseWriter, r *http.Request, authRealm string, aut
 
 //-----
 
+type MimeMediaType struct {
+	MediaType 	string 		// `text/html` | `attachment` / `inline` ; may be empty on parsing errors
+	Charset 	string 		// `utf-8` ; may be empty if not set
+	FileName 	string 		// `file.txt` ; available just from server headers, not from mime type database
+	Error 		string 		// just for logging purposes, keep as string for object print
+}
+
+func ParseMimeContentTypeOrDisposition(mimeOrDisposition string) MimeMediaType {
+	//--
+	// ex, for content type: `text/html; charset=utf-8; filename=file.txt`
+	// or
+	// ex, for content disposition: `attachment; filename="report.pdf"`
+	//--
+	defer smart.PanicHandler()
+	//--
+	mType := MimeMediaType{}
+	//--
+	mimeOrDisposition = smart.StrTrimWhitespaces(mimeOrDisposition)
+	if(mimeOrDisposition == "") {
+		mType.Error = "mimeOrDisposition is Empty"
+		return mType
+	} //end if
+	//--
+	mediaType, mParams, errTyp := mime.ParseMediaType(mimeOrDisposition)
+	if(errTyp != nil) {
+		mType.Error = errTyp.Error()
+		return mType
+	} //end if
+	//--
+	var okCharset bool = false
+	var charset string = ""
+	var okFname bool = false
+	var fName string = ""
+	if(mParams != nil) {
+		if(len(mParams) > 0) {
+			charset, okCharset = mParams["charset"]
+			fName, okFname = mParams["filename"]
+		} //end if
+	} //end if
+	//--
+	mType.MediaType = smart.StrToLower(smart.StrTrimWhitespaces(mediaType))
+	//--
+	if(okCharset) {
+		mType.Charset = smart.StrToLower(smart.StrTrimWhitespaces(charset))
+	} //end if
+	//--
+	if(okFname) {
+		mType.FileName = smart.StrTrimWhitespaces(smart.PathBaseName(fName)) // do not make lowercase ; just in case if by mistake is a path het just the file.ext from it
+	} //end if
+	//--
+	return mType
+	//--
+} //END FUNCTION
+
 
 func MimeTypeByFileExtension(fext string) string {
+	//--
+	defer smart.PanicHandler()
 	//--
 	fext = smart.StrTrimWhitespaces(fext) // ex: .html
 	if(fext == "") {
 		return ""
 	} //end if
 	//--
-	return mime.TypeByExtension(smart.StrToLower(fext))
+	return smart.StrToLower(smart.StrTrimWhitespaces(mime.TypeByExtension(smart.StrToLower(fext)))) // can return as `text/plain` or `text/plain; charset=utf8`
 	//--
 } //END FUNCTION
 
 
 func MimeTypeByFilePath(path string) string {
 	//--
+	defer smart.PanicHandler()
+	//--
 	path = smart.StrTrimWhitespaces(path)
 	if(path == "") {
 		return ""
 	} //end if
 	//--
-	return MimeTypeByFileExtension(smart.PathBaseExtension(path))
-	//--
-} //END FUNCTION
-
-
-//-----
-
-
-func MimeAndCharsetGetFromMimeType(mType string) (string, string) {
-	//--
-	mType = smart.StrToLower(smart.StrTrimWhitespaces(mType))
-	if(mType == "") {
-		return "", ""
-	} //end if
-	//--
-	var mCharSet string = ""
-	if(smart.StrContains(mType, ";")) {
-		mTypArr := smart.Explode(";", mType)
-		mType = smart.StrTrimWhitespaces(mTypArr[0]) // already StrToLower
-		mCharSet = smart.StrTrimWhitespaces(mTypArr[1])
-		if(smart.StrIStartsWith(mCharSet, "charset=")) {
-			mCharSet = smart.StrToUpper(smart.StrTrimWhitespaces(smart.StrSubstr(mCharSet, 8, 0)))
-		} else {
-			mCharSet = "" // clear, is invalid, may contain other things ...
-		} //end if else
-	} //end if
-	//--
-	return mType, mCharSet
+	return MimeTypeByFileExtension(smart.PathBaseExtension(path)) // can return as `text/plain` or `text/plain; charset=utf8`
 	//--
 } //END FUNCTION
 
@@ -3727,230 +3884,155 @@ func MimeDispositionEval(fpath string) (mimType string, mimUseCharset bool, mimD
 	//--
 	defer smart.PanicHandler()
 	//--
-	var mimeType string = ""
-	var mimeUseCharset bool = false
-	var mimeDisposition string = ""
-	//--
 	var file string = smart.PathBaseName(smart.StrTrimWhitespaces(fpath))
 	var lfile string = smart.StrToLower(file)
 	//--
-	var extension string = smart.StrTrimLeft(smart.PathBaseExtension(lfile), ".")
+	var dotExtension string = smart.PathBaseExtension(lfile)
+	var extension string = smart.StrTrimLeft(dotExtension, ".") // remove leading dot from extension
 	//--
-	switch(extension) {
+	var mimeDisposition string = ""
+	//--
+	switch(extension) { // {{{SYNC-SMARTGO-MIME-TYPES}}} ; IMPORTANT: this rely on the SmartGo.init method to register all the expected mime types because go have just few of them
 		//-------------- text : must be default inline
-		case "txt":
-			mimeType = MIME_TYPE_TEXT
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- html : must be default inline
-		case "html":
-			mimeType = MIME_TYPE_HTML
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- css
-		case "css":
-			mimeType = MIME_TYPE_CSS
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- javascript
-		case "js":
-			mimeType = MIME_TYPE_JS
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "json":
-			mimeType = MIME_TYPE_JSON
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- web images
+		case "txt": 		fallthrough
+		case "css": 		fallthrough
+		case "json": 		fallthrough
+		case "js": 			fallthrough
+		case "mjs": 		fallthrough
+		case "ts": 			fallthrough
+		case "tsx": 		fallthrough
+		case "html": 		fallthrough
+		case "htm": 		fallthrough
+		case "mtpl": 		fallthrough // marker tpl templating
+		case "tpl": 		fallthrough // tpl templating
+		case "twist": 		fallthrough // tpl twist
+		case "twig": 		fallthrough // twig templating
+		case "t3fluid": 	fallthrough // typo3 fluid templating
+		case "django": 		fallthrough // django templating
+		case "xml": 		fallthrough
 		case "svg":
-			mimeType = MIME_TYPE_SVG
-			mimeUseCharset = true
 			mimeDisposition = DISP_TYPE_INLINE
 			break
-		case "png":
-			mimeType = MIME_TYPE_PNG
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "gif":
-			mimeType = MIME_TYPE_GIF
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "jpeg": fallthrough
-		case "jpe": fallthrough
-		case "jpg":
-			mimeType = MIME_TYPE_JPEG
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "webp":
-			mimeType = MIME_TYPE_WEBP
-			mimeDisposition = DISP_TYPE_INLINE
-			break
+		case "webp": 		fallthrough
+		case "png": 		fallthrough
+		case "gif": 		fallthrough
+		case "jpeg": 		fallthrough
+		case "jpe": 		fallthrough
+		case "jpg": 		fallthrough
 		case "ico":
-			mimeType = MIME_TYPE_FAVICON
 			mimeDisposition = DISP_TYPE_INLINE
 			break
-		//-------------- fonts
-		case "woff2":
-			mimeType = MIME_TYPE_WOFF2
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		case "woff":
-			mimeType = MIME_TYPE_WOFF1
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
+		case "woff2": 		fallthrough
+		case "woff": 		fallthrough
 		case "ttf":
-			mimeType = MIME_TYPE_TTF
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
-		//-------------- xml
-		case "xml":
-			mimeType = MIME_TYPE_XML
-			mimeUseCharset = true
+		case "csv": 		fallthrough // csv comma
+		case "tab": 				// csv tab
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		case "vcf": 		fallthrough
+		case "ics": 		fallthrough
+		case "eml":
+			mimeDisposition = DISP_TYPE_ATTACHMENT
+			break
+		case "asc": 		fallthrough // signature
+		case "pem": 		fallthrough // PEM Certificate File
+		case "sig": 		fallthrough // Signature (ex: signify signature)
+		case "pub": 					// Public Key (ex: signify public key) ; IMPORTANT to serve inline as the Ed25519 pub key route
 			mimeDisposition = DISP_TYPE_INLINE
 			break
-		//-------------- data
-		case "csv": fallthrough // csv comma
-		case "tab": // csv tab
-			mimeType = MIME_TYPE_CSV
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- email / calendar / addressbook
-		case "eml":
-			mimeType = MIME_TYPE_EMAIL_MSG
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		case "vcf":
-			mimeType = MIME_TYPE_VCARD
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		case "ics":
-			mimeType = MIME_TYPE_ICALENDAR
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- specials
-		case "asc":
-			mimeType = MIME_TYPE_SIG_GPG
+		case "crl": 		fallthrough // Certificate Revocation List
+		case "crt": 		fallthrough // Certificate File
+		case "cer": 		fallthrough // Certificate File
+		case "key": 		fallthrough // Certificate Key File
+		case "sql": 		fallthrough // sql file
+		case "log": 					// log file
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		//-------------- portable documents
+		case "ogg": 		fallthrough // theora audio
+		case "oga": 		fallthrough // theora audio
+		case "ogv": 		fallthrough // theora video
+		case "weba": 		fallthrough // google vp8 audio
+		case "webm": 		fallthrough // google vp8 video
+		case "mp4": 		fallthrough // mp4 video (it can be also mp4 audio, but cast it as video by default)
+		case "m4v": 		fallthrough // mp4 video
+		case "mp3": 		fallthrough // mp3 audio
+		case "mp4a": 		fallthrough // mp4 audio
 		case "pdf":
-			mimeType = MIME_TYPE_PDF
-			mimeDisposition = DISP_TYPE_INLINE // DISP_TYPE_ATTACHMENT
-			break
-		//-------------- theora
-		case "ogg": fallthrough // theora audio
-		case "oga":
-			mimeType = MIME_TYPE_AUDIO_OGG
 			mimeDisposition = DISP_TYPE_INLINE
 			break
-		case "ogv": // theora video
-			mimeType = MIME_TYPE_VIDEO_OGV
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- webm
-		case "webm": // google vp8
-			mimeType = MIME_TYPE_VIDEO_WEBM
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- mp3 / mp4
-		case "mp4": fallthrough // mp4 video (it can be also mp4 audio, but cast it as video by default)
-		case "m4v": // mp4 video
-			mimeType = MIME_TYPE_VIDEO_MPEG
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		case "mp3": fallthrough // mp3 audio
-		case "mp4a": // mp4 audio
-			mimeType = MIME_TYPE_AUDIO_MPEG
-			mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- html: tpl
-		case "mtpl": fallthrough // marker tpl templating
-		case "tpl": fallthrough // tpl templating
-		case "twist": fallthrough // tpl twist
-		case "twig": fallthrough // twig templating
-		case "t3fluid": fallthrough // typo3 fluid templating
-		case "django": fallthrough // django templating
-		case "htm":
-			mimeType = MIME_TYPE_HTML
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-			break
-		//-------------- php
-		case "php":
-			mimeType = MIME_TYPE_TEXT // application/x-php is just for environments where PHP is executable, not for golang
-			mimeUseCharset = true
-			mimeDisposition = DISP_TYPE_ATTACHMENT
-		//	mimeDisposition = DISP_TYPE_INLINE
-			break
-		//-------------- plain text and development
-		case "ini": fallthrough // ini file
-		case "yml": fallthrough // yaml file
-		case "yaml": fallthrough // yaml file
-		case "md": fallthrough // markdown
-		case "markdown": fallthrough // markdown
-		case "pem": fallthrough // PEM Certificate File
-		case "sig": fallthrough // Signature (ex: signify signature)
-		case "pub": fallthrough // Public Key (ex: signify public key)
-		case "crl": fallthrough // Certificate Revocation List
-		case "crt": fallthrough // Certificate File
-		case "cer": fallthrough // Certificate File
-		case "key": fallthrough // Certificate Key File
-		case "log": fallthrough // log file
-		case "sql": fallthrough // sql file
-		case "inc": fallthrough // include file
-		case "sh": fallthrough // shell script
-		case "diff": fallthrough // Diff File
-		case "patch": fallthrough // Diff Patch
-		case "go": fallthrough // Go Lang
-		case "tcl": fallthrough // TCL
-		case "tk": fallthrough // Tk
-		case "lua": fallthrough // Lua
-		case "gjs": fallthrough // gnome js
-		case "toml": fallthrough // Tom's Obvious, Minimal Language (used with Cargo / Rust definitions)
-		case "pl": fallthrough // perl
-		case "py": fallthrough // python
-		case "phps": fallthrough // php source, assign text/plain !
-		case "rs": fallthrough // Rust Language
-		case "c": fallthrough // C Language
-		case "h": fallthrough // C/C++ Defs
-		case "cpp": fallthrough // C++ Language
-		case "vala": fallthrough // vala language
-		case "swift": fallthrough // apple swift language
-		case "java": fallthrough // java source code
-		case "pas": fallthrough // Delphi / Pascal
-		case "bash":  // bash (shell) script
-			mimeType = MIME_TYPE_TEXT
-			mimeUseCharset = true
+		case "diff": 		fallthrough // Diff File
+		case "patch": 		fallthrough // Diff Patch
+		case "go": 			fallthrough // Go Lang
+		case "php": 		fallthrough
+		case "phps": 		fallthrough // php source, assign text/plain !
+		case "py": 			fallthrough // python
+		case "pl": 			fallthrough // perl
+		case "pm": 			fallthrough // perl
+		case "ini": 		fallthrough // ini file
+		case "yml": 		fallthrough // yaml file
+		case "yaml": 		fallthrough // yaml file
+		case "md": 			fallthrough // markdown
+		case "markdown": 	fallthrough // markdown
+		case "inc": 		fallthrough // include file
+		case "tcl": 		fallthrough // TCL
+		case "tk": 			fallthrough // Tk
+		case "lua": 		fallthrough // Lua
+		case "gjs": 		fallthrough // gnome js
+		case "toml": 		fallthrough // Tom's Obvious, Minimal Language (used with Cargo / Rust definitions)
+		case "rs": 			fallthrough // Rust Language
+		case "vala": 		fallthrough // vala language
+		case "vapi": 		fallthrough // vala language
+		case "deps": 		fallthrough // vala language
+		case "swift": 		fallthrough // apple swift language
+		case "java": 		fallthrough // java source code
+		case "groovy": 		fallthrough // apache groovy
+		case "gvy": 		fallthrough // apache groovy
+		case "gy": 			fallthrough // apache groovy
+		case "gsh": 		fallthrough // apache groovy
+		case "kotlin": 		fallthrough // kotlin
+		case "kt": 			fallthrough // kotlin
+		case "ktm": 		fallthrough // kotlin
+		case "kts": 		fallthrough // kotlin
+		case "m": 			fallthrough // C/C++ macro
+		case "c": 			fallthrough // C Language
+		case "h": 			fallthrough // C/C++ Defs
+		case "y": 			fallthrough // C/C++ related
+		case "pro": 		fallthrough // C++ Language project
+		case "cpp": 		fallthrough // C++ Language
+		case "hpp": 		fallthrough // C++ Language
+		case "ypp": 		fallthrough // C++ Language
+		case "cxx": 		fallthrough // C++ Language
+		case "hxx": 		fallthrough // C++ Language
+		case "yxx": 		fallthrough // C++ Language
+		case "csh": 		fallthrough // C++ Language
+		case "pas": 		fallthrough // Delphi / Pascal
+		case "bash":  		fallthrough // bash (shell) script
+		case "sh": 						// shell script
 			mimeDisposition = DISP_TYPE_ATTACHMENT
 			break
 		//-------------- default
 		default: // others
-			mimeUseCharset = false
-			mimeType = MimeTypeByFilePath(lfile)
 			mimeDisposition = DISP_TYPE_ATTACHMENT
-			if(smart.StrContains(mimeType, ";")) {
-				mArrType := smart.Explode(";", mimeType)
-				if(len(mArrType) > 1) {
-					mimeType = smart.StrTrimWhitespaces(mArrType[0])
-					if(smart.StrIStartsWith(smart.StrTrimWhitespaces(mArrType[1]), "charset=" + smart.CHARSET)) {
-						mimeUseCharset = true
-					} //end if
-				} //end if
-			} //end if
-			if(DEBUG == true) {
-				log.Println("[DEBUG] " + smart.CurrentFunctionName() + ": Fallback on MimeType:", mimeType)
-			} //end if
 		//--------------
 	} //end switch
+	//--
+	var mimeUseCharset bool = false
+	var mimeType string = MimeTypeByFilePath(lfile) // retrieve from mime database ; can return as `text/plain` or `text/plain; charset=utf8`
+	mType := ParseMimeContentTypeOrDisposition(mimeType) // because is using mime type from mime database and is not a server content type real header can use just: mimeType and charset
+	if(mType.Error != "") {
+		log.Println("[WARNING]", "MimeType Detection Failed for FilePath: `" + fpath + "` with error: `" + mType.Error + "`")
+	} else {
+		if((mType.MediaType != "") && (mType.Charset != "") && (smart.StrToLower(mType.Charset) == smart.StrToLower(smart.CHARSET))) {
+			mimeType = mType.MediaType // {{{SYNC-HTTPUTILS-CHARSET-DUPLICATE-CONTROL}}} ; IMPORTANT: the mimeType may contain the suffix as `; charset=utf8` or whatever ; to avoid duplicating the charset entry in the header use the mime type from parsed MediaType without the charset entry !
+			mimeUseCharset = true
+		} //end if
+	} //end if else
+	if(DEBUG) {
+		log.Println("[DEBUG]", smart.CurrentFunctionName(), "MimeType by File Extension: `" + mimeType + "` for File Path: `" + fpath + "`", smart.ObjectPrint(mType))
+	} //end if
 	//--
 	if(mimeDisposition == "") {
 		mimeUseCharset = false

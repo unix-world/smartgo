@@ -1,5 +1,5 @@
 
-/* -- CSS Start :: Smart.Framework / Extra :: r.20221020 -- */
+/* -- CSS Start :: Smart.Framework / Extra :: r.20260829 -- */
 
 img#shaddow {
 	border: none;
@@ -26,14 +26,14 @@ div.math-latex {
 	width: max-content;
 }
 div.math-latex * {
-	color: #444444;
+	color: #333333;
 }
 div.math-latex,
 div.math-latex > div:not(.math-render-latex) {
-	color: #888888;
+	color: #777777;
 }
 div.math-latex > div:not(.math-render-latex) {
-	font-weight: bold;
+	font-weight: normal;
 	font-size: 0.625rem;
 	letter-spacing: 1px;
 }
@@ -46,7 +46,7 @@ div.math-latex.mathLatexRenderFail div {
 	padding-left: 4px;
 	padding-right: 4px;
 	background: #DFBFAE;
-	color: #333333;
+	color: #222222;
 }
 div.math-latex.mathLatexRenderFail div.math-render-latex {
 	display: none !important;
@@ -54,18 +54,20 @@ div.math-latex.mathLatexRenderFail div.math-render-latex {
 div.math-render-latex,
 div.math-render-latex dfn {
 	background: #D5D1C2;
-	color: #444444;
+	color: #333333;
 }
 div.math-render-latex {
-	padding: 4px;
-	margin: 3px;
 	display: block;
-	width: max-content;
-	font-weight: bold;
-	font-size: 1.063rem;
-	letter-spacing: 3px;
+	padding: 4px;
 	margin-top: 1px;
+	margin: 3px;
+	width: max-content;
+	font-size: 1.063rem;
+	letter-spacing: 1px !important;
 	cursor: help !important;
+}
+div.math-render-latex * {
+	font-weight: normal !important;
 }
 
 /* -- */

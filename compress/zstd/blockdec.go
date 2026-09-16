@@ -4,6 +4,8 @@
 
 package zstd
 
+// modified by unixman
+
 import (
 	"errors"
 	"fmt"
@@ -437,7 +439,8 @@ func (b *blockDec) decodeLiterals(in []byte, hist *history) (remain []byte, err 
 		}
 		huff := hist.huffTree
 		if huff == nil || (hist.dict != nil && huff == hist.dict.litEnc) {
-			huff = huffDecoderPool.Get().(*huff0.Scratch)
+		//	huff = huffDecoderPool.Get().(*huff0.Scratch)
+			huff, _ = huffDecoderPool.Get().(*huff0.Scratch) // unixman
 			if huff == nil {
 				huff = &huff0.Scratch{}
 			}
@@ -586,7 +589,8 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 				v := br.Uint8()
 				br.advance(1)
 				if seq.fse == nil || seq.fse.preDefined {
-					seq.fse = fseDecoderPool.Get().(*fseDecoder)
+				//	seq.fse = fseDecoderPool.Get().(*fseDecoder)
+					seq.fse, _ = fseDecoderPool.Get().(*fseDecoder) // unixman
 				}
 				symb, err := decSymbolValue(v, symbolTableX[i])
 				if err != nil {
@@ -602,7 +606,8 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 					println("Reading table for", tableIndex(i))
 				}
 				if seq.fse == nil || seq.fse.preDefined {
-					seq.fse = fseDecoderPool.Get().(*fseDecoder)
+				//	seq.fse = fseDecoderPool.Get().(*fseDecoder)
+					seq.fse, _ = fseDecoderPool.Get().(*fseDecoder) // unixman
 				}
 				err := seq.fse.readNCount(&br, uint16(maxTableSymbol[i]))
 				if err != nil {

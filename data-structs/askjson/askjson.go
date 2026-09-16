@@ -1,7 +1,7 @@
 
 // (c) 2026-present, unix-world.org
 // License: BSD
-// r.20260823.2358
+// r.20260829.2358
 // the original package was modified by unixman to handle numeric string key as int and many other optimizations
 // patches from upstream:
 // 		* Replace boolean return values with idiomatic go errors: 03cb73ba7e1664706865bbe7e67234640c7ba186
@@ -43,7 +43,10 @@ type Answer struct {
 func handleIntPart(current interface{}, part int) (interface{}, error) {
 	val := reflect.ValueOf(current)
 	if val.IsValid() && val.CanConvert(sliceType) {
-		s := val.Convert(sliceType).Interface().([]interface{})
+		s, okAssert := val.Convert(sliceType).Interface().([]interface{}) // safe assert
+		if(!okAssert) { // unixman
+			return current, ErrWrongType
+		}
 		if part >= 0 && part < len(s) {
 			return s[part], nil
 		}
@@ -61,7 +64,11 @@ func handleStringPart(current interface{}, part string) (interface{}, error) {
 		if match[1] != "" {
 			val := reflect.ValueOf(current)
 			if val.IsValid() && val.CanConvert(mapType) {
-				current = val.Convert(mapType).Interface().(map[string]interface{})[match[1]]
+				cVal, okAssert := val.Convert(mapType).Interface().(map[string]interface{})[match[1]] // safe assert
+				if(!okAssert) { // unixman
+					return current, ErrWrongType
+				}
+				current = cVal
 			} else {
 				err = ErrNotFound
 			}
@@ -187,7 +194,11 @@ func (a *Answer) XSlice(d []interface{}) ([]interface{}, error) {
 	}
 	val := reflect.ValueOf(a.value)
 	if val.IsValid() && val.CanConvert(sliceType) {
-		return val.Convert(sliceType).Interface().([]interface{}), nil
+		cVal, okAssert := val.Convert(sliceType).Interface().([]interface{}) // safe assert
+		if(!okAssert) {
+			return d, ErrWrongType
+		}
+		return cVal, nil
 	}
 	return d, ErrWrongType
 }
@@ -208,7 +219,11 @@ func (a *Answer) XMap(d map[string]interface{}) (map[string]interface{}, error) 
 	}
 	val := reflect.ValueOf(a.value)
 	if val.IsValid() && val.CanConvert(mapType) {
-		return val.Convert(mapType).Interface().(map[string]interface{}), nil
+		cVal, okAssert := val.Convert(mapType).Interface().(map[string]interface{}) // safe assert
+		if(!okAssert) {
+			return d, ErrWrongType
+		}
+		return cVal, nil
 	}
 	return d, ErrWrongType
 }
@@ -230,10 +245,10 @@ func (a *Answer) XString(d string) (string, error) {
 	//-- unixman
 	switch vt := a.value.(type) {
 		case json.Number:
-			jNum, okJNum := a.value.(json.Number)
+			jNum, okJNum := a.value.(json.Number) // safe assert
 			if(okJNum != true) {
 				return d, ErrWrongType
-			} //end if
+			}
 			return jNum.String(), nil
 		case complex64, complex128:
 			c := reflect.ValueOf(vt).Complex()
@@ -249,7 +264,7 @@ func (a *Answer) XString(d string) (string, error) {
 			return "false", nil
 	}
 	//-- #
-	str, ok := a.value.(string)
+	str, ok := a.value.(string) // safe assert
 	if ok {
 		return str, nil
 	}
@@ -272,14 +287,14 @@ func (a *Answer) XInt(d int64) (int64, error) {
 	}
 	switch vt := a.value.(type) {
 		case json.Number:
-			jNum, okJNum := a.value.(json.Number)
+			jNum, okJNum := a.value.(json.Number) // safe assert
 			if(okJNum != true) {
 				return d, ErrWrongType
-			} //end if
+			}
 			numInt64, errInt64 := jNum.Int64()
 			if(errInt64 != nil) {
 				return d, ErrWrongType
-			} //end if
+			}
 			return numInt64, nil
 		case int, int8, int16, int32, int64:
 			return reflect.ValueOf(vt).Int(), nil
@@ -331,17 +346,17 @@ func (a *Answer) XUint(d uint64) (uint64, error) {
 	}
 	switch vt := a.value.(type) {
 		case json.Number:
-			jNum, okJNum := a.value.(json.Number)
+			jNum, okJNum := a.value.(json.Number) // safe assert
 			if(okJNum != true) {
 				return d, ErrWrongType
-			} //end if
+			}
 			numInt64, errInt64 := jNum.Int64()
 			if(errInt64 != nil) {
 				return d, ErrWrongType
-			} //end if
+			}
 			if(numInt64 < 0) {
 				return d, ErrWrongType
-			} //end if
+			}
 			return uint64(numInt64), nil
 		case int, int8, int16, int32, int64:
 			val := reflect.ValueOf(vt).Int()
@@ -393,14 +408,14 @@ func (a *Answer) XFloat(d float64) (float64, error) {
 	}
 	switch vt := a.value.(type) {
 		case json.Number:
-			jNum, okJNum := a.value.(json.Number)
+			jNum, okJNum := a.value.(json.Number) // safe assert
 			if(okJNum != true) {
 				return d, ErrWrongType
-			} //end if
+			}
 			numFlt64, errFlt64 := jNum.Float64()
 			if(errFlt64 != nil) {
 				return d, ErrWrongType
-			} //end if
+			}
 			return numFlt64, nil
 		case int, int8, int16, int32, int64:
 			return float64(reflect.ValueOf(vt).Int()), nil
@@ -445,14 +460,14 @@ func (a *Answer) XBool(d bool) (bool, error) {
 	//-- unixman
 	switch vt := a.value.(type) {
 		case json.Number:
-			jNum, okJNum := a.value.(json.Number)
+			jNum, okJNum := a.value.(json.Number) // safe assert
 			if(okJNum != true) {
 				return d, ErrWrongType
-			} //end if
+			}
 			numFlt64, errFlt64 := jNum.Float64()
 			if(errFlt64 != nil) {
 				return d, ErrWrongType
-			} //end if
+			}
 			if(numFlt64 != 0) {
 				return true, nil
 			}
@@ -471,7 +486,7 @@ func (a *Answer) XBool(d bool) (bool, error) {
 			return false, nil
 	}
 	//-- #
-	res, ok := a.value.(bool)
+	res, ok := a.value.(bool) // safe assert
 	if ok {
 		return res, nil
 	}

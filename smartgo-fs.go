@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
-// [ FS (FILESYSTEM) ]
+// r.20260915.2358 :: STABLE
+// [ FS (FILESYSTEM + EFS) ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -62,6 +62,26 @@ const (
 // IMPORTANT:
 // 		filepath.Clean() 		DO NOT USE ; USE INSTEAD: SafePathFixClean() ; is OS Aware ; ex: will remove `./` as prefix or `/` as suffix from paths ; will convert `` (empty path) into `.`
 // 		filepath.ToSlash() 		DO NOT USE ; USE INSTEAD: SafePathFixSeparator() ; only works on Windows (OS Aware) ; just on Windows will convert all non-slash separators into slash
+
+
+//-----
+
+
+func PathAddSuffix(path string, suffix string) string {
+	//--
+	path   = StrTrimWhitespaces(path)
+	suffix = StrTrimWhitespaces(suffix)
+	//--
+	if((path == "") || (suffix == "")) {
+		return ""
+	} //end if
+	//--
+//	var fp string = path.Join(path, suffix) // works better on windows but is unsafe
+	var fp string = filepath.Join(path, SafePathFixSeparator(suffix))
+	//--
+	return StrTrimWhitespaces(fp)
+	//--
+} //END FUNCTION
 
 
 //-----
@@ -222,12 +242,16 @@ func PathIsEmptyOrRoot(filePath string) bool { // dissalow a path under 3 charac
 		return false
 	} //end if
 	//--
+	filePath = StrTrimWhitespaces(filePath)
+	if(filePath == "") {
+		return true
+	} //end if
+	//--
 	filePath = StrReplaceAll(filePath, "/", "")  // test for linux/unix file system
 	filePath = StrReplaceAll(filePath, "\\", "") // test for network shares or windows style path separator
 	filePath = StrReplaceAll(filePath, ":", "")  // test for windows file system
 	//--
 	filePath = StrTrimWhitespaces(filePath)
-	//--
 	if((filePath == "") || (filePath == ".") || (filePath == "..")) {
 		return true
 	} //end if
@@ -793,13 +817,11 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 	} //end if
 	//--
 	dirPath = SafePathFixClean(dirPath)
-	//--
 	if(PathIsEmptyOrRoot(dirPath) == true) {
 		return false, NewError("WARNING: Dir Path is Empty/Root"), dirs, files
 	} //end if
 	//--
 	dirPath = PathAddDirLastSlash(dirPath)
-	//--
 	if(PathIsSafeValidPath(dirPath) != true) {
 		return false, NewError("WARNING: Dir Path is Invalid Unsafe"), dirs, files
 	} //end if
@@ -871,47 +893,156 @@ func SafePathDirScan(dirPath string, recursive bool, allowAbsolutePath bool) (is
 } //END FUNCTION
 
 
+//-----
+
+
+func SafePathEmbedIsDir(efs *embed.FS, dirPath string) (string, bool, error) {
+	//--
+	defer PanicHandler()
+	//--
+	if(efs == nil) {
+		return "", false, NewError("ERROR: EFS is Null")
+	} //end if
+	//-- {{{SYNC-EFS-DIR-DETECTION}}}
+	dirPath = StrTrimWhitespaces(dirPath)
+	if(dirPath == "") {
+		return "", false, NewError("WARNING: DirPath is Empty")
+	} //end if
+	//--
+	dirPath = SafePathFixClean(dirPath)
+	dirPath = StrTrimRight(dirPath, "/") // embed paths cannot ends in a slash ; path clean above make unix type separators only, right-trim all
+	dirPath = StrTrimWhitespaces(dirPath)
+	if(PathIsEmptyOrRoot(dirPath) == true) {
+		return "", false, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//--
+	// DO NOT re-add last slash suffix, embedded paths does not supports this way
+	if(PathIsSafeValidPath(dirPath) != true) {
+		return "", false, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//--
+	if(PathIsBackwardUnsafe(dirPath) == true) {
+		return "", false, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//--
+	if(PathIsAbsolute(dirPath) == true) {
+		return "", false, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//--
+	if(StrEndsWith(dirPath, "/")) { // embedd file system does not support the ending slash
+		return "", false, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//-- #end:sync
+	_, err := efs.ReadDir(dirPath)
+	if(err != nil) {
+		return "", false, err
+	} //end if
+	//--
+	return dirPath, true, nil
+	//--
+} //END FUNCTION
+
+
 // ex call (req. go ambed fs assets): SafePathEmbedDirScan(&assets, "assets/", true)
 func SafePathEmbedDirScan(efs *embed.FS, dirPath string, recursive bool) (isSuccess bool, err error, arrDirs []string, arrFiles []string) {
 	//--
 	defer PanicHandler()
 	//--
-	if(dirPath == "") {
-		return false, nil, nil, nil
+	var dirs  []string
+	var files []string
+	//--
+	if(efs == nil) {
+		return false, NewError("ERROR: EFS is Null"), dirs, files
 	} //end if
-	dirPath = StrTrimWhitespaces(dirPath)
-	dirPath = SafePathFixClean(dirPath) // embed paths are supposed to use unix type separators only
-	dirPath = StrTrimRight(dirPath, "/")
-	dirPath = StrTrimWhitespaces(dirPath)
-	if(dirPath == "") {
-		return false, nil, nil, nil
+	//--
+	var dirExists bool = false
+	var dirDetectErr error = nil
+	dirPath, dirExists, dirDetectErr = SafePathEmbedIsDir(efs, dirPath)
+	if(dirDetectErr != nil) {
+		return false, dirDetectErr, dirs, files
+	} //end if
+	if(!dirExists) {
+		return false, nil, dirs, files
+	} //end if
+	if(StrTrimWhitespaces(dirPath) == "") {
+		return false, NewError("DirPath is Non-Compliant"), dirs, files
 	} //end if
 	//--
 	entries, err := efs.ReadDir(dirPath)
 	if(err != nil) {
-		return false, err, nil, nil
+		return false, err, dirs, files
 	} //end if
 	//--
 	for _, entry := range entries {
-	//	fp := path.Join(dirPath, entry.Name()) // works better on windows but is unsafe
-		fp := filepath.Join(dirPath, SafePathFixSeparator(entry.Name()))
-		if(entry.IsDir()) {
-			arrDirs = append(arrDirs, fp)
-			if(recursive) {
-				rIsSuccess, rErr, rArrDirs, rArrFiles := SafePathEmbedDirScan(efs, fp, recursive)
-				if(!rIsSuccess || rErr != nil) {
-					return false, rErr, nil, nil
+		fp := PathAddSuffix(dirPath, entry.Name())
+		if(fp != "") {
+			if(entry.IsDir()) {
+				arrDirs = append(arrDirs, fp)
+				if(recursive) {
+					rIsSuccess, rErr, rArrDirs, rArrFiles := SafePathEmbedDirScan(efs, fp, recursive)
+					if(!rIsSuccess || rErr != nil) {
+						return false, rErr, dirs, files
+					} //end if
+					arrDirs  = append(arrDirs,  rArrDirs...)
+					arrFiles = append(arrFiles, rArrFiles...)
+					continue
 				} //end if
-				arrDirs  = append(arrDirs,  rArrDirs...)
-				arrFiles = append(arrFiles, rArrFiles...)
-				continue
-			} //end if
-		} else {
-			arrFiles = append(arrFiles, fp)
-		} //end if else
+			} else {
+				arrFiles = append(arrFiles, fp)
+			} //end if else
+		} //end if
 	} //end for
 	//--
 	return true, nil, arrDirs, arrFiles
+	//--
+} //END FUNCTION
+
+
+func SafePathEmbedIsFile(efs *embed.FS, filePath string) (string, bool, error) {
+	//--
+	_, err := SafePathEmbedFileRead(efs, filePath)
+	if(err != nil) {
+		return "", false, err
+	} //end if
+	//--
+	return filePath, true, nil
+	//--
+} //END FUNCTION
+
+
+func SafePathEmbedFileRead(efs *embed.FS, filePath string) ([]byte, error) {
+	//--
+	defer PanicHandler()
+	//--
+	if(efs == nil) {
+		return nil, NewError("EFS is Null")
+	} //end if
+	//--
+	filePath = StrTrimWhitespaces(filePath)
+	if(filePath == "") {
+		return nil, NewError("FilePath is Empty")
+	} //end if
+	//--
+	filePath = SafePathFixClean(filePath)
+	if(PathIsEmptyOrRoot(filePath) == true) {
+		return nil, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//--
+	if(PathIsSafeValidPath(filePath) != true) {
+		return nil, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	if(PathIsBackwardUnsafe(filePath) == true) {
+		return nil, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	if(PathIsAbsolute(filePath) == true) {
+		return nil, nil // do not return an error, this is supposed to work for web so entry argument dir may be malformed and result in an empty path after clean
+	} //end if
+	//--
+	if(StrEndsWith(filePath, "/")) { // cannot test PathIsDir in embedd file system, will check just not to end with a slash ; also embedd file system does not support the ending slash
+		return nil, NewError("WARNING: File Path is a Directory not a File")
+	} //end if
+	//--
+	return efs.ReadFile(filePath)
 	//--
 } //END FUNCTION
 
@@ -1145,7 +1276,6 @@ func SafePathFileBytRead(filePath string, allowAbsolutePath bool) ([]byte, error
 	} //end if
 	//--
 	filePath = SafePathFixClean(filePath)
-	//--
 	if(PathIsEmptyOrRoot(filePath) == true) {
 		return nil, NewError("WARNING: File Path is Empty/Root")
 	} //end if
@@ -1153,11 +1283,9 @@ func SafePathFileBytRead(filePath string, allowAbsolutePath bool) ([]byte, error
 	if(PathIsSafeValidPath(filePath) != true) {
 		return nil, NewError("WARNING: File Path is Invalid Unsafe")
 	} //end if
-	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
 		return nil, NewError("WARNING: File Path is Backward Unsafe")
 	} //end if
-	//--
 	if(allowAbsolutePath != true) {
 		if(PathIsAbsolute(filePath) == true) {
 			return nil, NewError("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")
@@ -1203,7 +1331,6 @@ func SafePathFileBytWrite(filePath string, wrMode string, allowAbsolutePath bool
 	} //end if
 	//--
 	filePath = SafePathFixClean(filePath)
-	//--
 	if(PathIsEmptyOrRoot(filePath) == true) {
 		return false, NewError("WARNING: File Path is Empty/Root")
 	} //end if
@@ -1211,11 +1338,9 @@ func SafePathFileBytWrite(filePath string, wrMode string, allowAbsolutePath bool
 	if(PathIsSafeValidPath(filePath) != true) {
 		return false, NewError("WARNING: File Path is Invalid Unsafe")
 	} //end if
-	//--
 	if(PathIsBackwardUnsafe(filePath) == true) {
 		return false, NewError("WARNING: File Path is Backward Unsafe")
 	} //end if
-	//--
 	if(allowAbsolutePath != true) {
 		if(PathIsAbsolute(filePath) == true) {
 			return false, NewError("NOTICE: File Path is Absolute but not allowed to be absolute by the calling parameters")

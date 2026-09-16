@@ -1,0 +1,4 @@
+github.com/emersion/go-sasl @head.20260831
+
+go 1.12
+

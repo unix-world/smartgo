@@ -1,7 +1,8 @@
+
 /*
 // theme/zenburn.css
 // codemirror: v.5.61.1
-// modified by unixman
+// modified by unixman # r.20260824
 */
 
 /**
@@ -10,6 +11,25 @@
  * Also using parts of https://github.com/xavi/coderay-lighttable-theme
  * From: https://github.com/wisenomad/zenburn-lighttable-theme/blob/master/zenburn.css
  */
+
+.CodeMirror.cm-s-zenburn {
+	border-top: 0 !important;
+}
+.CodeMirror-SmartMenu-Bar-zenburn {
+	background-color: #2E2E2E !important;
+}
+.CodeMirror-SmartMenu-Bar-zenburn,
+.CodeMirror-SmartMenu-Bar-zenburn * {
+	color: #FFFFFF !important;
+}
+.CodeMirror-SmartMenu-Bar-zenburn img {
+	filter: invert(1) !important;
+}
+
+.cm-s-zenburn.CodeMirror {
+	background: linear-gradient(to bottom, #3f3f3f, #3f3f3f 50%, #414141 50%, #414141);
+	background-size: 100% 7px;
+}
 
 .cm-s-zenburn .CodeMirror-gutters { background: #3f3f3f !important; border-right: 2px solid #5f5f5f; }
 .cm-s-zenburn .CodeMirror-foldgutter-open, .CodeMirror-foldgutter-folded { color: #999999; }

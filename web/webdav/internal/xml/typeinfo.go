@@ -1,6 +1,5 @@
-
 // SmartGo :: WebDAV / XML :: TypeInfo
-// r.20250214.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2011 The Go Authors. All rights reserved.
@@ -49,7 +48,7 @@ const (
 var tinfoMap = make(map[reflect.Type]*typeInfo)
 var tinfoLock sync.RWMutex
 
-var nameType = reflect.TypeOf(Name{})
+var nameType = reflect.TypeFor[Name]()
 
 // getTypeInfo returns the typeInfo structure with details necessary
 // for marshalling and unmarshalling typ.
@@ -261,13 +260,6 @@ func lookupXMLName(typ reflect.Type) (xmlname *fieldInfo) {
 		break
 	}
 	return nil
-} //END FUNCTION
-
-func min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
 } //END FUNCTION
 
 // addFieldInfo adds finfo to tinfo.fields if there are no

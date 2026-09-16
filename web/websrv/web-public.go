@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Web-Public :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -28,9 +28,12 @@ import (
 // by example, if the `/` route is not registered, will serve: ./web-public/index.html as the home page
 func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // serves the Public Files for a HTTP(S) server under the path: `/web-public/*`
 	//--
+	// allowed methods: HEAD / GET
+	// route /* ; serves the static content from the `web-public/` folder ; the registered internal routes take precedence over the routes that may be served by the public web folder
+	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
-	if((r.Method != "GET") && (r.Method != "HEAD")) {
+	if((r.Method != HttpMethodGET) && (r.Method != HttpMethodHEAD)) {
 		log.Println("[ERROR]", smart.CurrentFunctionName(), "HTTP Status 405 :: Invalid Web Public Request Method: `" + r.Method + "`")
 		smarthttputils.HttpStatus405(w, r, "Invalid WP Request Method", true)
 		return 405
@@ -126,13 +129,11 @@ func webPublicHttpHandler(w http.ResponseWriter, r *http.Request) uint16 { // se
 		contentType += "; charset=" + smart.CHARSET
 	} //end if
 	//--
-	if(r.Method == "HEAD") { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body
+	if(r.Method == HttpMethodHEAD) { // {{{SYNC-HTTP-HEAD-DO-NOT-SEND-BODY}}} ; for 2xx codes if the method is HEAD don't send body
 		smarthttputils.HttpHeadersCacheControl(w, r, cExp, cMod, cCtl)
 		w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_TYPE, contentType)
 		w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_DISP, contentDisposition)
-		if(smarthttputils.HttpIsSetContentEncoding(w) != true) { // if there is any encoding, don't set content length ! (ex: gzip) ; {{{SYNC-CONTENT-LENGTH-BY-ENCODING}}}
-			w.Header().Set(smarthttputils.HTTP_HEADER_CONTENT_LEN, smart.ConvertUInt64ToStr(fileRealSize))
-		} //end if
+		w.Header().Set(smarthttputils.HTTP_HEADER_CONNECTION, smarthttputils.HTTP_CLOSE_CONNECTION_FLAG) // {{{SYNC-HTTP-NO-CONTENT-CONNECTION-CLOSE}}} ; this is mandatory to be set when no content and no length is served ; instead of content length 0 is better serving this to avoid cache misleading if HEAD serves size zero and GET the real size
 		w.WriteHeader(200) // status code must be after set headers
 		return 200
 	} //end if

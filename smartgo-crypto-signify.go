@@ -1,15 +1,16 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ CRYPTO / SIGNIFY ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
 	cryptorand "crypto/rand"
 
+	"crypto/ed25519"
 	signify "github.com/unix-world/smartgo/crypto/signify"
 )
 
@@ -93,9 +94,12 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 	//--
 	defer PanicHandler()
 	//--
-	pubkeyTxt = BytTrimWhitespaces(pubkeyTxt)
-	if(pubkeyTxt == nil) {
-		return NewError("Public Key Text is Empty, Null")
+	errParsePubKey, pubKey := SignifyParsePublicKey(pubkeyTxt)
+	if(errParsePubKey != nil) {
+		return errParsePubKey
+	} //end if
+	if(pubKey == nil) {
+		return NewError("Failed to Parse Public Key, Null")
 	} //end if
 	//--
 	if(BytTrimWhitespaces(signatureText) == nil) {
@@ -110,26 +114,6 @@ func SignifyVerify(pubkeyTxt []byte, signatureText []byte, isDetached bool, data
 		if(dataToCheck == nil) {
 			return NewError("Data is Empty for Detached Signature")
 		} //end if
-	} //end if
-	//--
-	commentPubKey, sRawPubKey, errRdSgn := signify.ReadData(pubkeyTxt)
-	if(errRdSgn != nil) {
-		return NewError("Parse Public Key Text Failed: " + errRdSgn.Error())
-	} //end if
-	if(sRawPubKey == nil) {
-		return NewError("Parse Public Key Text Failed: PubKey is Null")
-	} //end if
-	commentPubKey = StrTrimWhitespaces(commentPubKey)
-	if(commentPubKey == "") {
-		return NewError("Parse Public Key Text Failed: Comment is Empty")
-	} //end if
-	//--
-	pubKey, errPubKey := signify.ParsePublicKey(sRawPubKey)
-	if(errPubKey != nil) {
-		return NewError("Parse Public Key Failed: " + errPubKey.Error())
-	} //end if
-	if(pubKey == nil) {
-		return NewError("Parse Public Key Failed: PubKey is Null")
 	} //end if
 	//--
 	commentData, dataBytSgn, errRdData := signify.ReadData(signatureText)
@@ -192,26 +176,17 @@ func SignifySign(privKeyTxt []byte, privKeyPass []byte, pubkeyTxt []byte, dataTo
 	//--
 	defer PanicHandler()
 	//--
-	privKeyTxt = BytTrimWhitespaces(privKeyTxt)
-	if(privKeyTxt == nil) {
-		return NewError("Private Key Text is Empty, Null"), ""
+	errParsePrivKey, privKey := SignifyParsePrivateKey(privKeyTxt, privKeyPass)
+	if(errParsePrivKey != nil) {
+		return errParsePrivKey, ""
+	} //end if
+	if(privKey == nil) {
+		return NewError("Failed to Parse Private Key, Null"), ""
 	} //end if
 	//--
 	pubkeyTxt = BytTrimWhitespaces(pubkeyTxt)
 	if(pubkeyTxt == nil) {
 		return NewError("Public Key Text is Empty, Null"), ""
-	} //end if
-	//--
-	commentPrivKey, sRawPrivKey, errRdSgn := signify.ReadData(privKeyTxt)
-	if(errRdSgn != nil) {
-		return NewError("Parse Private Key Text Failed: " + errRdSgn.Error()), ""
-	} //end if
-	if(sRawPrivKey == nil) {
-		return NewError("Parse Private Key Text Failed: PrivKey is Null"), ""
-	} //end if
-	commentPrivKey = StrTrimWhitespaces(commentPrivKey)
-	if(commentPrivKey == "") {
-		return NewError("Parse Private Key Text Failed: Comment is Empty"), ""
 	} //end if
 	//--
 	if(dataToSign == nil) {
@@ -222,14 +197,6 @@ func SignifySign(privKeyTxt []byte, privKeyPass []byte, pubkeyTxt []byte, dataTo
 	comment = StrTrimWhitespaces(comment)
 	if(len(comment) > 87) {
 		return NewError("Comment is Too Long"), ""
-	} //end if
-	//--
-	privKey, errPrivKey := signify.ParsePrivateKey(sRawPrivKey, privKeyPass)
-	if(errPrivKey != nil) {
-		return errPrivKey, ""
-	} //end if
-	if(privKey == nil) {
-		return NewError("Private Key Parsing Failed, Null"), ""
 	} //end if
 	//--
 	signature := signify.Sign(privKey, dataToSign)
@@ -266,6 +233,140 @@ func SignifySign(privKeyTxt []byte, privKeyPass []byte, pubkeyTxt []byte, dataTo
 	} //end if
 	//--
 	return nil, string(signedData)
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SignifyParsePrivateKey(privKeyTxt []byte, privKeyPass []byte) (error, *signify.PrivateKey) { // RAW Format
+	//--
+	defer PanicHandler()
+	//--
+	privKeyTxt = BytTrimWhitespaces(privKeyTxt)
+	if(privKeyTxt == nil) {
+		return NewError("Private Key Text is Empty, Null"), nil
+	} //end if
+	//--
+	commentPrivKey, sRawPrivKey, errRdSgn := signify.ReadData(privKeyTxt)
+	if(errRdSgn != nil) {
+		return NewError("Parse Private Key Text Failed: " + errRdSgn.Error()), nil
+	} //end if
+	if(sRawPrivKey == nil) {
+		return NewError("Parse Private Key Text Failed: PrivKey is Null"), nil
+	} //end if
+	if(len(sRawPrivKey) <= 0) {
+		return NewError("Parse Private Key Text Failed: PrivKey is Empty"), nil
+	} //end if
+	commentPrivKey = StrTrimWhitespaces(commentPrivKey)
+	if(commentPrivKey == "") {
+		return NewError("Parse Private Key Text Failed: Comment is Empty"), nil
+	} //end if
+	//--
+	privKey, errPrivKey := signify.ParsePrivateKey(sRawPrivKey, privKeyPass)
+	if(errPrivKey != nil) {
+		return errPrivKey, nil
+	} //end if
+	if(privKey == nil) {
+		return NewError("Private Key Parsing Failed, Null"), nil
+	} //end if
+	//--
+	return nil, privKey
+	//--
+} //END FUNCTION
+
+
+func SignifyGetPrivateKey(privKeyTxt []byte, privKeyPass []byte) (error, ed25519.PrivateKey, ed25519.PublicKey) { // PEM format
+	//--
+	defer PanicHandler()
+	//--
+	errParsePrivKey, privKey := SignifyParsePrivateKey(privKeyTxt, privKeyPass)
+	if(errParsePrivKey != nil) {
+		return errParsePrivKey, nil, nil
+	} //end if
+	if(privKey == nil) {
+		return NewError("Failed to Parse Private Key, Null"), nil, nil
+	} //end if
+	//--
+	ed25519PrivKey := ed25519.PrivateKey(privKey.Bytes[:])
+	if(ed25519PrivKey == nil) {
+		return NewError("Failed to Assert Private Key, Null"), nil, nil
+	} //end if
+	//--
+	var ed25519PubKey ed25519.PublicKey
+	var okAssert bool = false
+	ed25519PubKey, okAssert = ed25519PrivKey.Public().(ed25519.PublicKey)
+	if(!okAssert) {
+		return NewError("Failed to Assert Public Key"), nil, nil
+	} //end if
+	if(ed25519PubKey == nil) {
+		return NewError("Failed to Assert Public Key, Null"), nil, nil
+	} //end if
+	//--
+	return nil, ed25519PrivKey, ed25519PubKey
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func SignifyParsePublicKey(pubkeyTxt []byte) (error, *signify.PublicKey) { // RAW Format
+	//--
+	defer PanicHandler()
+	//--
+	pubkeyTxt = BytTrimWhitespaces(pubkeyTxt)
+	if(pubkeyTxt == nil) {
+		return NewError("Public Key Text is Empty, Null"), nil
+	} //end if
+	//--
+	commentPubKey, sRawPubKey, errRdSgn := signify.ReadData(pubkeyTxt)
+	if(errRdSgn != nil) {
+		return NewError("Parse Public Key Text Failed: " + errRdSgn.Error()), nil
+	} //end if
+	if(sRawPubKey == nil) {
+		return NewError("Parse Public Key Text Failed: PubKey is Null"), nil
+	} //end if
+	if(len(sRawPubKey) <= 0) {
+		return NewError("Parse Public Key Text Failed: PubKey is Empty"), nil
+	} //end if
+	commentPubKey = StrTrimWhitespaces(commentPubKey)
+	if(commentPubKey == "") {
+		return NewError("Parse Public Key Text Failed: Comment is Empty"), nil
+	} //end if
+	//--
+	pubKey, errPubKey := signify.ParsePublicKey(sRawPubKey)
+	if(errPubKey != nil) {
+		return NewError("Parse Public Key Failed: " + errPubKey.Error()), nil
+	} //end if
+	if(pubKey == nil) {
+		return NewError("Parse Public Key Failed: PubKey is Null"), nil
+	} //end if
+	//--
+	return nil, pubKey
+	//--
+} //END FUNCTION
+
+
+func SignifyGetPublicKey(pubkeyTxt []byte) (error, ed25519.PublicKey) { // PEM format
+	//--
+	defer PanicHandler()
+	//--
+	errParsePubKey, pubKey := SignifyParsePublicKey(pubkeyTxt)
+	if(errParsePubKey != nil) {
+		return errParsePubKey, nil
+	} //end if
+	if(pubKey == nil) {
+		return NewError("Failed to Parse Public Key, Null"), nil
+	} //end if
+	//--
+	ed25519PubKey := ed25519.PublicKey(pubKey.Bytes[:])
+	if(ed25519PubKey == nil) {
+		return NewError("Failed to Assert Public Key, Null"), nil
+	} //end if
+	//--
+	return nil, ed25519PubKey
 	//--
 } //END FUNCTION
 

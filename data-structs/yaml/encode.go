@@ -15,6 +15,8 @@
 
 package yaml
 
+// modified by unixman
+
 import (
 	"encoding"
 	"fmt"
@@ -383,7 +385,10 @@ func (e *encoder) uintv(tag string, in reflect.Value) {
 }
 
 func (e *encoder) timev(tag string, in reflect.Value) {
-	t := in.Interface().(time.Time)
+	//--
+//	t := in.Interface().(time.Time)
+	t, _ := in.Interface().(time.Time) // unixman
+	//--
 	s := t.Format(time.RFC3339Nano)
 	e.emitScalar(s, "", tag, yaml_PLAIN_SCALAR_STYLE, nil, nil, nil, nil)
 }
@@ -426,7 +431,8 @@ func (e *encoder) emitScalar(value, anchor, tag string, style yaml_scalar_style_
 }
 
 func (e *encoder) nodev(in reflect.Value) {
-	e.node(in.Interface().(*Node), "")
+	cVal, _ := in.Interface().(*Node) // unixman, added safe assert instead of dirrect attribution bellow
+	e.node(cVal, "")
 }
 
 func (e *encoder) node(node *Node, tail string) {

@@ -1,11 +1,12 @@
-v.20250214.2358
+v.20260829.2358
 
 unixman: contains modifications:
 	* added extra path security checks
 	* removed locking system + memFS
 	* implement global locking system (independent of running instance or running path) to handle different instances (ex: user dirs)
+	* logger extended with status code
 
-Go 1.18 or later
+Go 1.24 or later
 
-golang.org/x/net/webdav v0.34.0 @ r.20250207
+golang.org/x/net/webdav v0.50.0 @ r.20260209
 

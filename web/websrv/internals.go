@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Internals :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -77,13 +77,13 @@ func listActiveWebAuthProviders() []string {
 
 func listMethods(methods []string) string {
 	//--
-	var options string = "OPTIONS"
+	var options string = HttpMethodOPTIONS
 	//--
 	if((methods != nil) && (len(methods) > 0)) {
 		sort.Strings(methods)
 		for _, method := range methods {
 			method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
-			if(method != "OPTIONS") {
+			if(method != HttpMethodOPTIONS) {
 				options += ", " + method
 			} //end if
 		} //end for

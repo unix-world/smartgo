@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ APP ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	DEFAULT_LANGUAGE string = "EN"
+
 	REGEX_SAFE_APP_NAMESPACE string = `^[_a-z0-9\-\.]+$` 		// Safe App Namespace Regex
 )
 
@@ -32,19 +34,19 @@ func AppSetSecurityKey(key string) bool {
 	key = StrTrimWhitespaces(key)
 	//--
 	if(key == "") {
-		log.Println("[WARNING]", CurrentFunctionName(), "SmartGo Security Key is Empty, will use the Default Built-in Key ...")
+		log.Println("[WARN]", CurrentFunctionName(), "SmartGo Security Key is Empty, will use the Default Built-in Key ...")
 		return false
 	} //end if
 	//--
 	var kLen int = len(key)
 	if((kLen < 16) || (kLen > 256)) { // {{{SYNC-GO-SMART-CRYPTO-SECURITY-KEY-OR-AUTH-PKEY}}}
-		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo Security Key must be between 16 and 255 caracters long ...")
+		log.Println("[ERR]", CurrentFunctionName(), "SmartGo Security Key must be between 16 and 255 caracters long ...")
 		return false
 	} //end if
 	//--
 	app_SMART_FRAMEWORK_SECURITY_KEY = key
 	//--
-	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Security Key was Set (size is `" + ConvertIntToStr(len(app_SMART_FRAMEWORK_SECURITY_KEY)) + "` bytes): Success")
+	log.Println("[INF]", CurrentFunctionName(), "SmartGo Security Key was Set (size is `" + ConvertIntToStr(len(app_SMART_FRAMEWORK_SECURITY_KEY)) + "` bytes): Success")
 	//--
 	return true
 	//--
@@ -92,17 +94,17 @@ func AppSetNamespace(ns string) bool {
 	ns = StrTrimWhitespaces(ns)
 	var nLen int = len(ns)
 	if((nLen < 4) || (nLen > 63)) {
-		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo App Namespace must be between 4 and 63 caracters long ...")
+		log.Println("[ERR]", CurrentFunctionName(), "SmartGo App Namespace must be between 4 and 63 caracters long ...")
 		return false
 	} //end if
 	if(!StrRegexMatch(REGEX_SAFE_APP_NAMESPACE, ns)) {
-		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo App Namespace contains invalid characters ...")
+		log.Println("[ERR]", CurrentFunctionName(), "SmartGo App Namespace contains invalid characters ...")
 		return false
 	} //end if
 	//--
 	app_SMART_SOFTWARE_NAMESPACE = ns
 	//--
-	log.Println("[INFO]", CurrentFunctionName(), "SmartGo App Namespace was Set to `" + app_SMART_SOFTWARE_NAMESPACE + "`: Success")
+	log.Println("[INF]", CurrentFunctionName(), "SmartGo App Namespace was Set to `" + app_SMART_SOFTWARE_NAMESPACE + "`: Success")
 	//--
 	return true
 	//--

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Assets (server) :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260821.2358 :: STABLE
+// r.20260903.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package srvassets
@@ -19,7 +19,7 @@ import (
 //-----
 
 const(
-	VERSION string = "r.20260821.2358"
+	VERSION string = "r.20260903.2358"
 )
 
 var (
@@ -122,7 +122,7 @@ func WebAssetsHttpHandler(w http.ResponseWriter, r *http.Request, cacheMode stri
 	//--
 	var path string = smart.GetHttpPathFromRequest(r)
 	//--
-	if((r.Method != "GET") && (r.Method != "HEAD")) {
+	if((r.Method != smarthttputils.HTTP_METHOD_GET) && (r.Method != smarthttputils.HTTP_METHOD_HEAD)) {
 		log.Println("[META]", smart.CurrentFunctionName(), "# StatusCode: 405 # Failed to Serve Asset: `" + path + "`", "# Invalid Method:", r.Method)
 		smarthttputils.HttpStatus405(w, r, "Invalid Request Method [" + r.Method + "] for Asset: `" + path + "`", true) // html
 		return 405
@@ -240,19 +240,19 @@ func HtmlPdfIframe(pdfRaw []byte, docName string, closeModalOrPopup bool, ifrmId
 
 func HtmlServerTemplate(titleText string, headHtml string, bodyHtml string, loadjs bool) string { // require: a HTTP or HTTPS service, serving assets as: /lib/*
 	//--
-	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, "", loadjs)
+	return htmlServerSelectTemplate(titleText, headHtml, bodyHtml, "", loadjs)
 	//--
 } //END FUNCTION
 
 
 func HtmlServerFaviconTemplate(titleText string, headHtml string, bodyHtml string, loadjs bool, favicon string) string { // require: a HTTP or HTTPS service, serving assets as: /lib/* and a favicon
 	//--
-	return htmlServerChooseTemplate(titleText, headHtml, bodyHtml, favicon, loadjs)
+	return htmlServerSelectTemplate(titleText, headHtml, bodyHtml, favicon, loadjs)
 	//--
 } //END FUNCTION
 
 
-func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string, favicon string, loadjs bool) string {
+func htmlServerSelectTemplate(titleText string, headHtml string, bodyHtml string, favicon string, loadjs bool) string {
 	//--
 	defer smart.PanicHandler()
 	//--
@@ -279,43 +279,39 @@ func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string
 		arr["FAVICON"] = favicon
 		theTpl = assets.HTML_TPL_FAVICON_DEF
 	}
-	//--
-	var headCssJs string = TAG_COMMENT_HEAD_JS_CSS
-	headCssJs += TAG_BASE_HREF_START + smart.EscapeHtml(smart.GetHttpProxyBasePath()) + TAG_BASE_HREF_END // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use HTML BasePath as prefix (default is /), to work with advanced tail dirs routing
+	//-- {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use HTML BasePath as prefix (default is /), to work with advanced tail dirs routing
+	var headCssJs string = assets.TAG_COMMENT_HEAD_JS_CSS + "\n" + assets.TAG_BASE_HREF_START + smart.EscapeHtml(smart.GetHttpProxyBasePath()) + assets.TAG_BASE_HREF_END
 	//--
 	var assetsAll []string
 	assetsAll = append(assetsAll, headCssJs)
 	//--
-	var cssStartTag string 	= TAG_CSS_START // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use ONLY relative paths, because Base Tag will fix them
-	var cssEndTag string 	= TAG_CSS_END
-	var jsStartTag string 	= TAG_JS_START // {{{SYNC-SRV-ASSETS-BASEPATH}}} ; must use ONLY relative paths, because Base Tag will fix them
-	var jsEndTag string		= TAG_JS_END
-	//--
 	const cssAppGo string = "lib/app-go.css"
-	assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssAppGo) + cssEndTag)
+	assetsAll = append(assetsAll, assets.TAG_CSS_START + smart.EscapeHtml(cssAppGo) + assets.TAG_CSS_END)
 	//--
 	if(loadjs == true) {
+		//--
 		const jsJQueryBase string = "lib/js/jquery/jquery.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryBase) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsJQueryBase) + assets.TAG_JS_END)
 		const jsJQuerySettings string = "lib/js/jquery/settings-jquery.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySettings) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsJQuerySettings) + assets.TAG_JS_END)
 		const jsJQuerySmartCompat string = "lib/js/jquery/jquery.smart.compat.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQuerySmartCompat) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsJQuerySmartCompat) + assets.TAG_JS_END)
 		//--
 		const cssJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.css"
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryGrowl) + cssEndTag)
+		assetsAll = append(assetsAll, assets.TAG_CSS_START + smart.EscapeHtml(cssJQueryGrowl) + assets.TAG_CSS_END)
 		const jsJQueryGrowl string = "lib/js/jquery/growl/jquery.toastr.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryGrowl) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsJQueryGrowl) + assets.TAG_JS_END)
 		//--
 		const cssJQueryAlertable string = "lib/js/jquery/jquery.alertable.css"
-		assetsAll = append(assetsAll, cssStartTag + smart.EscapeHtml(cssJQueryAlertable) + cssEndTag)
+		assetsAll = append(assetsAll, assets.TAG_CSS_START + smart.EscapeHtml(cssJQueryAlertable) + assets.TAG_CSS_END)
 		const jsJQueryAlertable string = "lib/js/jquery/jquery.alertable.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsJQueryAlertable) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsJQueryAlertable) + assets.TAG_JS_END)
 		//--
 		const jsSfSettings string = "lib/js/framework/smart-framework-settings.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfSettings) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsSfSettings) + assets.TAG_JS_END)
 		const jsSfPak string = "lib/js/framework/smart-framework.pak.js"
-		assetsAll = append(assetsAll, jsStartTag + smart.EscapeHtml(jsSfPak) + jsEndTag)
+		assetsAll = append(assetsAll, assets.TAG_JS_START + smart.EscapeHtml(jsSfPak) + assets.TAG_JS_END)
+		//--
 	} else {
 		assetsAll = append(assetsAll, `<!-- JS: skip -->`)
 	} //end if else
@@ -332,19 +328,6 @@ func htmlServerChooseTemplate(titleText string, headHtml string, bodyHtml string
 	//--
 } //END FUNCTION
 
-
-//-----
-
-
-const (
-	TAG_COMMENT_HEAD_JS_CSS string 	= "<!-- Head: Css / Js -->"
-	TAG_BASE_HREF_START string 		= `<base href="`
-	TAG_BASE_HREF_END string 		= `">`
-	TAG_CSS_START string 			= `<link rel="stylesheet" type="text/css" href="`
-	TAG_CSS_END string 				= `">`
-	TAG_JS_START string 			= `<script src="`
-	TAG_JS_END string 				= `"></script>`
-)
 
 //-----
 

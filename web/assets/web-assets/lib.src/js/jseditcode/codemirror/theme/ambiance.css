@@ -1,11 +1,25 @@
+
 /*
 // theme/ambiance.css
 // codemirror: v.5.61.1
+// modified by unixman # r.20260824
 */
 
-/* Ambiance theme for CodeMirror */
-
 /* Color scheme */
+
+.CodeMirror.cm-s-ambiance {
+	border-top: 0 !important;
+}
+.CodeMirror-SmartMenu-Bar-ambiance {
+	background-color: #3C3022 !important;
+}
+.CodeMirror-SmartMenu-Bar-ambiance,
+.CodeMirror-SmartMenu-Bar-ambiance * {
+	color: #FFFFFF !important;
+}
+.CodeMirror-SmartMenu-Bar-ambiance img {
+	filter: invert(1) !important;
+}
 
 .cm-s-ambiance .cm-header { color: blue; }
 .cm-s-ambiance .cm-quote { color: #24C2C7; }

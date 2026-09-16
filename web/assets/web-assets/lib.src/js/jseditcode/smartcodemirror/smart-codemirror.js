@@ -1,6 +1,6 @@
 // Smart Code Mirror JS
-// (c) 2016-2023 unix-world.org
-// r.20231107
+// (c) 2016-present unix-world.org
+// r.20260824
 // supports the Smart.Markdown flavour of Markdown
 
 const SmartCodeMirror_Initialize = function(textarea, isReadOnly, codeType, originalWidth, originalHeight, visualTheme, lineNums, cursorRate, menu, showFold, theInstance) {
@@ -24,20 +24,24 @@ const SmartCodeMirror_Initialize = function(textarea, isReadOnly, codeType, orig
 		menu = String(menu);
 		//--
 		let innerMenu = '';
-		innerMenu += '<span style="cursor:pointer;" title="Toggle Full Screen" onClick="SmartCodeMirror_ToggleFullScreen(' + theInstance + ', jQuery(\'#' + menu + '\'), \'' + smartJ$Utils.escape_js(originalWidth) + '\');"><img src="lib/js/jseditcode/smartcodemirror/images/fullscreen.png"></span>';
+		innerMenu += '<span style="cursor:pointer;" title="Toggle Full Screen" onClick="SmartCodeMirror_ToggleFullScreen(' + theInstance + ', jQuery(\'#' + menu + '\'), \'' + smartJ$Utils.escape_js(originalWidth) + '\');"><img src="lib/js/jseditcode/smartcodemirror/images/fullscreen.svg"></span>';
 		innerMenu += ' ';
-		innerMenu += '<span style="cursor:pointer;" title="Wrap Lines Off/On"><img onClick="' + theInstance + '.setOption(\'lineWrapping\', !'+ theInstance + '.getOption(\'lineWrapping\'));" src="lib/js/jseditcode/smartcodemirror/images/wrap.png"></span>';
+		innerMenu += '<span style="cursor:pointer;" title="Wrap Lines Off/On"><img onClick="' + theInstance + '.setOption(\'lineWrapping\', !'+ theInstance + '.getOption(\'lineWrapping\'));" src="lib/js/jseditcode/smartcodemirror/images/wrap.svg"></span>';
 		innerMenu += ' ';
-		innerMenu += '<span style="cursor:pointer;" title="Search for Text ..."><img onClick="' + theInstance + '.execCommand(\'find\');" src="lib/js/jseditcode/smartcodemirror/images/find.png"></span>';
+		innerMenu += '<span style="cursor:pointer;" title="Search for Text ..."><img onClick="' + theInstance + '.execCommand(\'find\');" src="lib/js/jseditcode/smartcodemirror/images/find.svg"></span>';
 		innerMenu += ' ';
 		//--
 		if(isReadOnly === false) {
-			innerMenu += '<span style="cursor:pointer;" title="Replace Text ..."><img onClick="' + theInstance + '.execCommand(\'replace\');" src="lib/js/jseditcode/smartcodemirror/images/findreplace.png"></span>';
-			innerMenu += '<span style="cursor:pointer;" title="Undo"><img onClick="' + theInstance + '.execCommand(\'undo\');" src="lib/js/jseditcode/smartcodemirror/images/undo.png"></span>';
-			innerMenu += '<span style="cursor:pointer;" title="Redo"><img onClick="' + theInstance + '.execCommand(\'redo\');" src="lib/js/jseditcode/smartcodemirror/images/redo.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Replace Text ..."><img onClick="' + theInstance + '.execCommand(\'replace\');" src="lib/js/jseditcode/smartcodemirror/images/findreplace.svg"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Undo"><img onClick="' + theInstance + '.execCommand(\'undo\');" src="lib/js/jseditcode/smartcodemirror/images/undo.svg"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Redo"><img onClick="' + theInstance + '.execCommand(\'redo\');" src="lib/js/jseditcode/smartcodemirror/images/redo.svg"></span>';
 		} //end if else
 		//--
-		if((isReadOnly === false) && (codeType === 'text/x-markdown')) {
+		if(
+			(isReadOnly === false)
+			&&
+			(codeType === 'text/x-markdown')
+		) {
 			//--
 			innerMenu += '<div style="display:inline-block; width:24px; height:24px;"></div>';
 			//--
@@ -46,68 +50,73 @@ const SmartCodeMirror_Initialize = function(textarea, isReadOnly, codeType, orig
 			//--  h1 (h2..h6)
 			mkdw_hint = '\n# H1\n## H2\n### H3\n#### H4\n##### H5\n###### H6';
 			mkdw_code = '# ';
-			innerMenu += '<span style="cursor:pointer;" title="Heading Styles: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/style.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Heading Styles: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/style.svg"></span>';
 			//-- bold
 			mkdw_hint = '\n**Bold text**';
 			mkdw_code = '**';
-			innerMenu += '<span style="cursor:pointer;" title="Bold: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/bold.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Bold: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/bold.svg"></span>';
 			//-- italic
 			mkdw_hint = '\n==Italic text==';
 			mkdw_code = '==';
-			innerMenu += '<span style="cursor:pointer;" title="Italic: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/italic.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Italic: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/italic.svg"></span>';
 			//-- underline
 			mkdw_hint = '\n__Underlined text__';
 			mkdw_code = '__';
-			innerMenu += '<span style="cursor:pointer;" title="Underline: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/underline.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Underline: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/underline.svg"></span>';
 			//-- strike
 			mkdw_hint = '\n~~Striketrough text~~';
 			mkdw_code = '~~';
-			innerMenu += '<span style="cursor:pointer;" title="Striketrough: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/strikethrough.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Striketrough: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/strikethrough.svg"></span>';
 			//-- sub
 			mkdw_hint = '\n!!Subscript text!!';
 			mkdw_code = '!!';
-			innerMenu += '<span style="cursor:pointer;" title="Subscript: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/subscript.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Subscript: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/subscript.svg"></span>';
 			//-- sub
 			mkdw_hint = '\n^^Superscript text^^';
 			mkdw_code = '^^';
-			innerMenu += '<span style="cursor:pointer;" title="Superscript: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/superscript.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Superscript: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/superscript.svg"></span>';
 			//-- unordered list
 			mkdw_hint = '\n* List Item\n- List Item\n+ List Item\n...';
 			mkdw_code = '- ';
-			innerMenu += '<span style="cursor:pointer;" title="Unordered List: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/bullets.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Unordered List: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/bullets.svg"></span>';
 			//-- ordered list
 			mkdw_hint = '\n1. List Item\n1) List Item\n...';
 			mkdw_code = '1. ';
-			innerMenu += '<span style="cursor:pointer;" title="Ordered List: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/numbering.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Ordered List: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/numbering.svg"></span>';
 			//-- quote
 			mkdw_code = '<<<\nBlock Quote\n<<<';
 			mkdw_hint =	mkdw_code;
-			innerMenu += '<span style="cursor:pointer;" title="Quote: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/blockquote.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Quote: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'' + smartJ$Utils.escape_js(mkdw_code) + '\', \'\');" src="lib/js/jseditcode/smartcodemirror/images/blockquote.svg"></span>';
 			//-- hyperlink
 			mkdw_hint = '\n[Linked Text](http://url.link){@target=_blank}\nSimple Link: <http://www.google.com>';
 			mkdw_code = '(http://url.link)';
-			innerMenu += '<span style="cursor:pointer;" title="Hyperlink: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'[\', \']' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/link.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Hyperlink: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'cursor\', \'[\', \']' + smartJ$Utils.escape_js(mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/link.svg"></span>';
 			//-- image
-			mkdw_hint = '\nsimple ![Alt](http://image.svg.gif.png.jpg)\nwith title ![Alt](http://url/image.svg.gif.png.jpg "Title")';
-			mkdw_code = '![Alternate Text](wpub/path-to/image.svg.gif.png.jpg "Image Title")';
-			innerMenu += '<span style="cursor:pointer;" title="Image: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/image.png"></span>';
+			mkdw_hint = '\nsimple ![Alt](http://image.svg.gif.png.jpg.webp)\nwith title ![Alt](http://url/image.svg.gif.png.jpg.webp "Title")';
+			mkdw_code = '![Alternate Text](wpub/path-to/image.svg.gif.png.jpg.webp "Image Title")';
+			innerMenu += '<span style="cursor:pointer;" title="Image: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/image.svg"></span>';
 			//-- table
 			mkdw_code = '| TH 1 | TH 2 |\n| --- | --- |\n| TD 1.1 | TD 1.2 |\n| TD 2.1 | TD 2.2 |\n';
 			mkdw_hint = '| One      | Two      | Three    | Four     |\n| :------- |:--------:| --------:| -------- |\n| Cell 1.1 | Cell 1.2 | Cell 1.3 | Cell 1.4 |\n| Cell 2.1 ||| Cell 2.1-2.4 (spans over 3 cells) {@colspan=3}|';
-			innerMenu += '<span style="cursor:pointer;" title="' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/table.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/table.svg"></span>';
 			//-- hr
 			mkdw_hint = '\n- - -\n* * *';
 			mkdw_code = '- - -';
-			innerMenu += '<span style="cursor:pointer;" title="Horizontal Rule: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/rule.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Horizontal Rule: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/rule.svg"></span>';
 			//-- code
 			mkdw_code = '```\nprint(123);\n```';
 			mkdw_hint = mkdw_code;
-			innerMenu += '<span style="cursor:pointer;" title="Code Sequence: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/code.png"></span>';
+			innerMenu += '<span style="cursor:pointer;" title="Code Block: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js('\n\n' + mkdw_code) + '\');" src="lib/js/jseditcode/smartcodemirror/images/code.svg"></span>';
+			mkdw_code2 = '```print(123);```';
+			mkdw_hint = mkdw_code2;
+			innerMenu += '<span style="cursor:pointer;" title="Code Sequence: ' + smartJ$Utils.escape_html(mkdw_hint) + '"><img onClick="SmartCodeMirror_AddCode(' + theInstance + ', \'line\', \'\', \'' + smartJ$Utils.escape_js(' ' + mkdw_code2) + '\');" src="lib/js/jseditcode/smartcodemirror/images/code2.svg"></span>';
+			//--
+			innerMenu += '<img title="Syntax: Markdown" src="lib/js/jseditcode/smartcodemirror/images/markdown.svg" style="cursor:help; opacity:0.1; margin-left:25px!important;">';
 			//--
 		} //end if
 		//--
 		the_menu_div = jQuery('#' + menu);
-		the_menu_div.addClass('CodeMirror-SmartMenu-default').width(originalWidth).html(innerMenu);
+		the_menu_div.addClass('CodeMirror-SmartMenu-default CodeMirror-SmartMenu-Bar-' + visualTheme).width(originalWidth).html(innerMenu);
 		//--
 	} //end if else
 	//--
@@ -134,6 +143,9 @@ const SmartCodeMirror_Initialize = function(textarea, isReadOnly, codeType, orig
 	} else if((codeType === 'text/yaml') || (codeType === 'text/x-yaml')) {
 		useTabs = true;
 		wrapLines = true;
+	} else if((codeType === 'application/json') || (codeType === 'text/json')) {
+		useTabs = false;
+		wrapLines = false;
 	} else if(codeType === 'text/plain') {
 		wrapLines = true;
 	} //end if

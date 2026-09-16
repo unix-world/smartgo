@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / WebDAV :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -218,7 +218,7 @@ func webDavUrlPath() string {
 } //END FUNCTION
 
 
-func webDavLogger(r *http.Request, err error) {
+func webDavLogger(r *http.Request, code int, err error) {
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
@@ -227,12 +227,12 @@ func webDavLogger(r *http.Request, err error) {
 	//--
 	if(err != nil) {
 		if(os.IsNotExist(err)) {
-			log.Printf("[NOTICE] WebDAV Service :: WEBDAV.NOTFOUND: %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", err, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
+			log.Printf("[NOTICE] WebDAV Service :: WEBDAV.NOTFOUND: %d %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", code, err, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
 		} else {
-			log.Printf("[WARNING] WebDAV Service :: WEBDAV.ERROR: %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", err, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
+			log.Printf("[WARNING] WebDAV Service :: WEBDAV.ERROR: %d %s :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", code, err, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
 		} //end if
 	} else {
-		log.Printf("[LOG] WebDAV Service :: WEBDAV :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
+		log.Printf("[LOG] WebDAV Service :: WEBDAV :: %d %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", code, "*", r.Method, r.URL, r.Proto, r.Host, remoteAddr+":"+remotePort, realClientIp)
 	} //end if else
 	//--
 } //END FUNCTION
@@ -337,29 +337,29 @@ func webDavHttpHandler(w http.ResponseWriter, r *http.Request, webdavSharedStora
 					wdvAction := smart.StrToLower(smart.StrTrimWhitespaces(GetPostVar(r, "webdav_action")))
 					if(wdvAction != "upf") {
 						smarthttputils.HttpStatus405(w, r, "Invalid POST Data [Rule:WEBDAV:POST:PARAM:ACTION]: `" + GetCurrentPath(r) + "`", true)
-						webDavLogger(r, smart.NewError("Invalid WebDAV POST Data")) // important to log also this because return premature
+						webDavLogger(r, 405, smart.NewError("Invalid WebDAV POST Data")) // important to log also this because return premature
 						return
 					} //end if
 					realPath, errRealPath := wdav.FileSystem.GetRealPath(context.TODO(), wdirPath)
 					if(errRealPath != nil) {
 						smarthttputils.HttpStatus406(w, r, "Invalid POST Path [Rule:WEBDAV:POST:PATH]: `" + GetCurrentPath(r) + "`", true)
-						webDavLogger(r, smart.NewError("Invalid WebDAV POST Path")) // important to log also this because return premature
+						webDavLogger(r, 406, smart.NewError("Invalid WebDAV POST Path")) // important to log also this because return premature
 						return
 					} //end if
 					if(!smart.StrStartsWith("./"+realPath, DAV_STORAGE_RELATIVE_ROOT_PATH)) {
 						smarthttputils.HttpStatus423(w, r, "Unsafe POST Path [Rule:WEBDAV:POST:PATH]: `" + GetCurrentPath(r) + "`", true)
-						webDavLogger(r, smart.NewError("Unsafe WebDAV POST Path")) // important to log also this because return premature
+						webDavLogger(r, 423, smart.NewError("Unsafe WebDAV POST Path")) // important to log also this because return premature
 						return
 					} //end if
 					errUpload := webDavUploadHandler(r, realPath, webDavUseSmartSafeValidPaths, "file", ls)
 					if(errUpload != nil) {
 						smarthttputils.HttpStatus422(w, r, "POST File Save Failed [Rule:WEBDAV:POST:FILES:FILE]: `" + GetCurrentPath(r) + "`", true)
-						webDavLogger(r, smart.NewError("WebDAV POST File Save Failed: " + errUpload.Error())) // important to log also this because return premature
+						webDavLogger(r, 422, smart.NewError("WebDAV POST File Save Failed: " + errUpload.Error())) // important to log also this because return premature
 						log.Println("[WARNING]", "WebDAV POST File(s) Error:", errUpload)
 						return
 					} //end if
 					smarthttputils.HttpStatus201(w, r, "201 Created", "201.txt", "", -1, "", "", nil)
-					webDavLogger(r, nil)
+					webDavLogger(r, 201, nil)
 					return
 				} else { // HEAD, GET
 					r.Method = "PROPFIND" // this is a mapping for a directory from GET to PROPFIND ; TODO: it can be later supplied as a HTML Page listing all entries ; by mapping to PROPFIND will serve an XML

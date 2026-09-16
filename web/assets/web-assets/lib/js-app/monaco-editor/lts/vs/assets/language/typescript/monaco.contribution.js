@@ -1,0 +1,3 @@
+// JS-Script (UM): monaco.contribution.js @ 2026-08-30 06:27:07 +0000
+define("vs/assets/language/typescript/monaco.contribution",["exports","../../monaco.contribution4","../../editor.api"],function(e,t,i){"use strict";e.JsxEmit=t.JsxEmit;e.ModuleKind=t.ModuleKind;e.ModuleResolutionKind=t.ModuleResolutionKind;e.NewLineKind=t.NewLineKind;e.ScriptTarget=t.ScriptTarget;e.getJavaScriptWorker=t.getJavaScriptWorker;e.getTypeScriptWorker=t.getTypeScriptWorker;e.javascriptDefaults=t.javascriptDefaults;e.typescriptDefaults=t.typescriptDefaults;e.typescriptVersion=t.typescriptVersion;Object.defineProperty(e,Symbol.toStringTag,{value:"Module"})});
+// #END

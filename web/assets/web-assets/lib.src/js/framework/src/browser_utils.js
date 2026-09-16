@@ -33,7 +33,7 @@
  * @author unix-world.org
  * @license BSD
  * @file browser_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$Browser
  * @static
  * @frozen
@@ -2438,7 +2438,7 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 	 * @method SubmitFormByAjax
 	 * @static
 	 *
-	 * @param 	{String} 	the_form_id 			The form ID ; Set it to FALSE/NULL/'' (to use without a real form by emulating a form like XHR request from URL)
+	 * @param 	{String} 	the_form_id 			The form ID ; Set it to FALSE/''/NULL/OBJECT ; if OBJECT will use methdod POST ; if FALSE/''/NULL method GET ; otherwise will use the method specified by the form (to use without a real form by emulating a form like XHR request from URL)
 	 * @param 	{String} 	url 					The destination URL where form or XHR request will be sent to
 	 * @param 	{Yes/No} 	growl 					*Optional* If 'yes' will use the Growl notifications otherwise (if 'no') will use Dialog notifications ; default is set to 'auto'
 	 * @param 	{JS-Code} 	evcode 					*Optional* the JS Code to execute on SUCCESS answer (before anything else) ; params: the_form_id, url, msg
@@ -2488,6 +2488,8 @@ const smartJ$Browser = new class{constructor(){ // STATIC CLASS
 		let ajax = null;
 		if(!the_form_id) { // false, null or ''
 			ajax = AjaxRequestFromURL(url, 'GET', 'json');
+		} else if((typeof(the_form_id) === 'object')) { // important: NULL is type Object, but the case is catch above
+			ajax = AjaxRequestFromURL(url, 'POST', 'json', the_form_id);
 		} else {
 			ajax = AjaxRequestByForm(the_form_id, url, 'json');
 		} //end if else

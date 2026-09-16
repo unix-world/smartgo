@@ -1,0 +1,75 @@
+<!-- JS-UI / LightJS :: r.20260831 (go) -->
+<!-- UI Dialog -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/dialog/simple-dialog.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/dialog/simple-dialog.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%IF:SEMAPHORE:&*<load:js-ui.tabs>;%%%]
+<!-- UI Tabs -->
+<link rel="stylesheet" href="lib/js-app/tabs/jquery.tabs.css?[###RELEASE-HASH|url|html###]" type="text/css">
+<script src="lib/js-app/tabs/jquery.tabs.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No UI Tabs -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.calendar>;%%%]
+<!-- UI Calendar -->
+<link rel="stylesheet" href="lib/js-app/calendar/monthly.css?[###RELEASE-HASH|url|html###]" type="text/css">
+<script src="lib/js-app/calendar/monthly.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No UI Calendar -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.tags>;%%%]
+<!-- UI Tags -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/tags/jquery.tagedit.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/tags/jquery.tagedit.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No UI Tags -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.form-helpers>;%%%]
+<!-- Form Helpers -->
+<!-- UI Single and Multi Select List -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/listselect/css/chosen.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/listselect/chosen.jquery.js?[###RELEASE-HASH|url|html###]"></script>
+<!-- UI AutoComplete -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/autosuggest/smart-suggest.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/autosuggest/smart-suggest.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No Form Helpers -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.tree>;%%%]
+<!-- UI Tree -->
+<script src="lib/js-app/tree/simpletree.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No UI Tree -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.data-tables>;%%%]
+<!-- DataTables -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/datatables/datatables-responsive.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/datatables/datatables-responsive.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js-app/datatables/smart-datatables.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No DataTables -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.slick-grid>;%%%]
+<!-- SimplePagination -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/pager/jquery.simplePagination.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/pager/jquery.simplePagination.js?[###RELEASE-HASH|url|html###]"></script>
+<!-- SlickGrid (Smart) -->
+<script src="lib/js-app/jquery.event.drag.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js-app/jquery.event.drop.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js-app/jquery.simulate.js?[###RELEASE-HASH|url|html###]"></script>
+<link rel="stylesheet" type="text/css" href="lib/js-app/slickgrid/slick.grid.css?[###RELEASE-HASH|url|html###]">
+<link rel="stylesheet" type="text/css" href="lib/js-app/slickgrid/slick.grid-fixes.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/slickgrid/slick.grid.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js-app/slickgrid/slick.editors.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js-app/slickgrid/smart-grid.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No SlickGrid -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui.interractions>;%%%]
+<!-- UI.Interractions -->
+<link rel="stylesheet" type="text/css" href="lib/js-app/ui-interractions/jquery.ui-interractions.css?[###RELEASE-HASH|url|html###]">
+<script src="lib/js-app/ui-interractions/jquery.ui-interractions.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js-app/ui-interractions/jquery.ui-touch-punch.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- No UI.Interractions -->
+[%%%/IF:SEMAPHORE%%%]
+<!-- # -->

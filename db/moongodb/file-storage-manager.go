@@ -95,12 +95,12 @@ func initManager() error {
 
 
 type managerLockedClient struct {
+	UUID 			string
 	DbPath          string
 	LockExpireAt 	int64
 	LockFile 		*filelock.LockFile
 	DbEngine 		*lungo.Engine
 	DbClient 		lungo.IClient
-	UUID 			string
 }
 
 
@@ -207,12 +207,12 @@ func SafeOpenDB(fileBsonDBPath string) (*managerLockedClient, error) {
 	//--
 	var lockExpAtUnixTime int64 = smart.TimeNowUnix() + int64(lockTimeOutSec)
 	mLckCli := managerLockedClient{
+		UUID: 			smart.StrToLower(uid.Uuid17Seq() + "-" + uid.Uuid10Num() + "-" + uid.Uuid13Str() + "-" + uid.Uuid10Str()),
 		DbPath: 		fileBsonDBPath,
 		LockExpireAt: 	lockExpAtUnixTime, // timestamp ; {{{SYNC-TIMEOUT-LOCKFILE}}} ; must use the exact timeout in seconds as for the lock file
 		LockFile: 		&lockFile,
 		DbEngine: 		engine,
 		DbClient: 		client,
-		UUID: 			smart.StrToLower(uid.Uuid17Seq() + "-" + uid.Uuid10Num() + "-" + uid.Uuid13Str() + "-" + uid.Uuid10Str()),
 	}
 	cacheObj := smartcache.CacheEntry{
 		Id:   fileBsonDBPath,

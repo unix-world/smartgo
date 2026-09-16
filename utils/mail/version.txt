@@ -2,6 +2,15 @@
 gopkg.in/mail.v2
 github.com/go-mail/mail @ v2.3.1 # head.20241128
 
-modified by unixman: r.20241129
-	* added LoginAuth() method to export auth login
-	* added LoginXOauth2() method + structure implementation
+modified by unixman: r.20260915
+	* customization of the message boundaries by implementing different logic for different part types
+	* added LoginAuth() method to export auth login from the existing LOGIN method
+	* added LoginXOauth2() method + structure implementation of XOAUTH2 authentication protocol
+	* added LoginOAuthBearer() method + structure implementation of OAUTHBEARER authentication protocol
+	* added composer part header `Content-Digest: sha-256=::, sh3a-384=::`
+	* added message GetContent() to easy get the composed message as bytes
+	* refactoring the authentication logic to allow just CRAM-MD5 on non-encrypted connections
+	* added debug messages
+	* added DKIM support
+	* message extended with epilogue + integrity hashes
+	* implement panic handler

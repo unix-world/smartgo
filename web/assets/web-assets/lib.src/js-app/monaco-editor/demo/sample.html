@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="icon" href="data:,">
+	<title>Monaco Editor Demo, v55.1</title>
+	<link rel="stylesheet" type="text/css" href="../lts/vs/assets/font/codicon.css" media="all">
+	<link rel="stylesheet" type="text/css" href="../../../../../lib/core/plugins/fonts/typo/sans/ibm-plex-sans.css" media="all">
+	<link rel="stylesheet" type="text/css" href="../../../../../lib/core/plugins/fonts/typo/mono/ibm-plex-mono.css" media="all">
+	<style type="text/css">
+	* {
+		font-family: 'IBM Plex Sans', arial, sans-serif;
+	}
+	div#select-mode {
+		position: fixed;
+		top: 20px;
+		right: 25px;
+	}
+	div#ed-monaco-uxm,
+	div#ed-monaco-uxm * {
+		font-family: 'IBM Plex Mono', mono;
+	}
+	div#ed-monaco-uxm {
+		width: calc(100vw - 40px);
+		height: calc(100vh - 150px);
+		background: #2F3541;
+		color: #FFFFFF;
+		padding-left: 0;
+		padding-right: 0;
+		padding-top: 1rem;
+		padding-bottom: 1rem;
+	}
+	</style>
+</head>
+<body>
+<h2>Monaco Editor Demo, v55.1 [LTS]</h2>
+<script>
+const handleModeChange = (val) => {
+	val = String(val || '').trim();
+	self.location = 'sample.html' + val;
+	self.location.reload();
+};
+</script>
+<div id="select-mode">
+	<select id="select-list" onchange="handleModeChange(this.value);" autocomplete="off">
+		<option value="#!javascript">Javascript</option>
+		<option value="#!graphql">GraphQL</option>
+	</select>
+</div>
+<script>
+try {
+	document.getElementById('select-list').value = String(self.location.hash || '#!javascript');
+} catch(er){}
+</script>
+<div id="ed-monaco-uxm"></div>
+<script>
+var require = { paths: { vs: '../lts/vs' } };
+</script>
+<script src="../lts/vs/loader.js"></script>
+<script>
+const theSyntaxGQL = 'graphql';
+const theCodeGQL = `mutation {
+	Oauth2CliApp(
+		storeNode: {key: "App887", name: "This is App 887", data: "{}"}
+		key: "App887"
+	) {
+		key
+		name
+		data
+	}
+}
+
+
+{
+	Oauth2CliApp {
+		key
+		name
+		data
+	}
+}`;
+const theSyntaxJs = 'javascript';
+const theCodeJs = '\
+function $initHighlight(block, cls) {\n\
+  var myVar = false;\n\
+  var otherVar = true;\n\
+  var myObj = null;\n\
+  try {\n\
+    if (cls.search(/\\bno\-highlight\\b/) != -1)\n\
+      return process(block, true, 0x0F) +\n\
+             ` class="${cls}"`;\n\
+  } catch (e) {\n\
+    /* handle exception */\n\
+  }\n\
+  for (var i = 0 / 2; i < classes.length; i++) {\n\
+    if (checkCondition(classes[i]) === undefined)\n\
+      console.log(\'undefined\');\n\
+  }\n\
+}\n\
+export $initHighlight;\n\
+\n';
+</script>
+<script>
+require(['vs/assets/editor/editor.main'], function(){
+	try {
+		const editor = monaco.editor.create(document.getElementById('ed-monaco-uxm'), {
+			value: String(self.location.hash === '#!graphql' ? theCodeGQL : theCodeJs),
+			language: String(self.location.hash === '#!graphql' ? theSyntaxGQL : theSyntaxJs),
+			theme: 'vs-dark',
+			fontSize: 16,
+			insertSpaces: false,
+			tabSize: 4,
+			autoClosingBrackets: false,
+			autoClosingQuotes: false,
+			showUnused: true,
+			suggest: true,
+			renderWhitespace: 'all', // "all" | "none" | "boundary" | "selection" | "trailing"
+			unusualLineTerminators: 'prompt',
+			useShadowDOM: true,
+		});
+	} catch(err) {
+		console.error('Monaco Editor Init ERR:', err);
+	}
+});
+</script>
+</body>
+</html>

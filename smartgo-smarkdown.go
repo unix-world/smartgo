@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ S-MARKDOWN ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -1290,9 +1290,6 @@ func (m *SMarkdownParser) renderAltOrTitle(txt string) string { // {{{SYNC-SMART
 	//--
 	txt = m.replaceInlineTextFormatting(txt) // render syntax (will be cleared below)
 	txt = HTMLCodeStripTags(txt) // cleanup html tags ; it also restores html entities
-	//--
-	txt = StrRegexReplaceAll(REGEX_HTML_ANY_ENTITY, txt, " ") // clean any other remaining html entities
-	txt = StrRegexReplaceAll(`[ \t]+`, txt, " ") // replace multiple tabs or spaces with one space
 	//--
 	txt = StrTr(txt, map[string]string{ // ok: order does not matter ; {{{SYNC-GOLANG-UNORDERED-MAP}}}
 		"''" 	: 	"",

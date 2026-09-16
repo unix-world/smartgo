@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ CRYPTO / X509 ]
 
-// REQUIRE: go 1.22 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -37,24 +37,15 @@ import (
 	certinspect "github.com/unix-world/smartgo/crypto/x509-inspect"
 )
 
+const (
+	enableLegacySupport bool = false // if set to TRUE will enable the support for legacy, unsafe PKCS1 / EC ; default is FALSE
+)
+
 var (
 	CryptoX509UxmDebug bool = DEBUG // use the DEBUG value from main SmartGo, but can be changed later, is exported
 )
 
-const (
-	X509PemCertificateStartTag   = "-----BEGIN CERTIFICATE-----"
-	X509PemCertificateEndTag     = "-----END CERTIFICATE-----"
-
-	X509PemPrivateKeyEncStartTag = "-----BEGIN ENCRYPTED PRIVATE KEY-----"
-	X509PemPrivateKeyEncEndTag   = "-----END ENCRYPTED PRIVATE KEY-----"
-
-	X509PemPrivateKeyStartTag    = "-----BEGIN PRIVATE KEY-----"
-	X509PemPrivateKeyEndTag      = "-----END PRIVATE KEY-----"
-
-	X509PemPublicKeyStartTag     = "-----BEGIN PUBLIC KEY-----"
-	X509PemPublicKeyEndTag       = "-----END PUBLIC KEY-----"
-)
-
+type X509SignatureAlgorithm = x509.SignatureAlgorithm
 const (
 	X509PureEd25519 		= x509.PureEd25519
 
@@ -69,6 +60,30 @@ const (
 	X509Sha512WithRsa 		= x509.SHA512WithRSA
 	X509Sha384WithRsa 		= x509.SHA384WithRSA
 	X509Sha256WithRsa 		= x509.SHA256WithRSA
+)
+
+const (
+	privateKeyTypePKCS8          string = "PKCS8:priv" 		// pair with PKIX  public     [modern]
+	privateKeyTypePKCS1          string = "PKCS1:priv" 		// pair with PKCS1 public     [legacy]
+
+	privateKeyTypeEC             string = "EC:priv" 		// supported only for logging [transitional]
+
+	publicKeyTypePKIX            string = "PKIX:pub" 		// pair with PKCS8 private    [modern]
+	publicKeyTypePKCS1           string = "PKCS1:pub" 		// pair with PKCS1 private    [legacy]
+)
+
+const ( // these are only supporting the PKCS8 / PKIX new format ; old formats are using: [PKCS1: `RSA PRIVATE KEY` | `RSA PUBLIC KEY`] ; [EC: `EC PRIVATE KEY` | `EC PUBLIC KEY`]
+	X509PemCertificateStartTag   string = "-----BEGIN CERTIFICATE-----"
+	X509PemCertificateEndTag     string = "-----END CERTIFICATE-----"
+
+	X509PemPrivateKeyEncStartTag string = "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+	X509PemPrivateKeyEncEndTag   string = "-----END ENCRYPTED PRIVATE KEY-----"
+
+	X509PemPrivateKeyStartTag    string = "-----BEGIN PRIVATE KEY-----"
+	X509PemPrivateKeyEndTag      string = "-----END PRIVATE KEY-----"
+
+	X509PemPublicKeyStartTag     string = "-----BEGIN PUBLIC KEY-----"
+	X509PemPublicKeyEndTag       string = "-----END PUBLIC KEY-----"
 )
 
 
@@ -99,6 +114,12 @@ type CertX509Info struct {
 type SignX509Definition struct { // this is compatible with ASN1, but can be used without ASN1 if R is not used ...
 	R *big.Int
 	S *big.Int
+}
+
+type publicKeyInfo struct {
+	Raw       asn1.RawContent
+	Algorithm pkix.AlgorithmIdentifier
+	PublicKey asn1.BitString
 }
 
 
@@ -214,7 +235,7 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 		return NewError("Invalid PEM PublicKey Type: `" + block.Type + "`")
 	} //end if
 	//--
-	pubKey, errPKIX := x509.ParsePKIXPublicKey(block.Bytes)
+	_, pubKey, errPKIX := ParseX509PublicKey(block.Bytes, true) // for verify, use fallback ; no need to know the key type
 	if(errPKIX != nil) {
 		return NewError("Failed to parse PEM PublicKey: " + errPKIX.Error())
 	} //end if
@@ -273,7 +294,12 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 	switch(mode) { // {{{SYNC-GO-X509-SIGN-VERIFY-MODES}}}
 		case "EdDSA": // PureEd25519
 			//--
-			eddsaPbKey := pubKey.(ed25519.PublicKey)
+			var eddsaPbKey ed25519.PublicKey
+			var okAssert bool
+			eddsaPbKey, okAssert = pubKey.(ed25519.PublicKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed EdDSA PublicKey")
+			} //end if
 			if(eddsaPbKey == nil) {
 				return NewError("Invalid EdDSA PublicKey")
 			} //end if
@@ -297,7 +323,12 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 			break
 		case "EcDSA": // ECDSAWithSHA512 ; ECDSAWithSHA384 ; ECDSAWithSHA256
 			//--
-			ecdsaPbKey := pubKey.(*ecdsa.PublicKey)
+			var ecdsaPbKey *ecdsa.PublicKey
+			var okAssert bool
+			ecdsaPbKey, okAssert = pubKey.(*ecdsa.PublicKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed EcDSA PublicKey")
+			} //end if
 			if(ecdsaPbKey == nil) {
 				return NewError("Invalid EcDSA PublicKey")
 			} //end if
@@ -313,7 +344,12 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 		case "RSA": fallthrough 	// SHA512WithRSA ; SHA384WithRSA ; SHA256WithRSA
 		case "RSA-PSS": 			// SHA512WithRSAPSS ; SHA384WithRSAPSS ; SHA256WithRSAPSS
 			//--
-			rsaPbKey := pubKey.(*rsa.PublicKey)
+			var rsaPbKey *rsa.PublicKey
+			var okAssert bool
+			rsaPbKey, okAssert = pubKey.(*rsa.PublicKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed RSA PublicKey")
+			} //end if
 			if(rsaPbKey == nil) {
 				return NewError("Invalid RSA PublicKey")
 			} //end if
@@ -321,18 +357,27 @@ func VerifySignedWithX509PublicKeyPEM(mode string, pemPubKey string, data []byte
 			hashMode := crypto.SHA512 // default
 			var reqLen int = 512 // must have fix 512 bytes
 			switch(algo) { // {{{SYNC-X509-PADDING-REQ-LEN}}} ; {{{SYNC-X509-HASHING-BY-ALGO}}}
-				case "sha3-512": fallthrough
 				case "sha512":
 					// use default: crypto.SHA512, reqLen
 					break
-				case "sha3-384": fallthrough
+				case "sha3-512":
+					hashMode = crypto.SHA3_512
+					// use default: reqLen
+					break
 				case "sha384":
 					hashMode = crypto.SHA384
 					reqLen = 384
 					break
-				case "sha3-256": fallthrough
+				case "sha3-384":
+					hashMode = crypto.SHA3_384
+					reqLen = 384
+					break
 				case "sha256":
 					hashMode = crypto.SHA256
+					reqLen = 256
+					break
+				case "sha3-256":
+					hashMode = crypto.SHA3_256
 					reqLen = 256
 					break
 				case "sha1":
@@ -391,7 +436,7 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 	} //end if
 	if(passPrivKey != "") {
 		var errDecryptPrivPEM error = nil
-		errDecryptPrivPEM, pemPrivKey = DecryptPrivateKeyPEM(pemPrivKey, passPrivKey)
+		errDecryptPrivPEM, pemPrivKey = DecryptPrivateKeyPEM(pemPrivKey, passPrivKey, true) // as PEM
 		if(errDecryptPrivPEM != nil) {
 			return NewError("Failed to Decrypt the password protected PEM PrivateKey: " + errDecryptPrivPEM.Error()), ""
 		} //end if
@@ -431,9 +476,9 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 		return NewError("Invalid PEM PrivateKey Type: `" + block.Type + "`"), ""
 	} //end if
 	//--
-	privKey, errPKCS8 := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if(errPKCS8 != nil) {
-		return NewError("Failed to parse PEM PrivateKey: " + errPKCS8.Error()), ""
+	_, privKey, errParseKey := ParseX509PrivateKey(block.Bytes, false) // no fallback, signing is allowed just with modern keys in PKCS8 format ; key type is not needed here
+	if(errParseKey != nil) {
+		return NewError("Failed to parse PEM PrivateKey: " + errParseKey.Error()), ""
 	} //end if
 	if(privKey == nil) {
 		return NewError("Failed to parse PEM PrivateKey, is Null"), ""
@@ -445,7 +490,12 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 	switch(mode) { // {{{SYNC-GO-X509-SIGN-VERIFY-MODES}}}
 		case "EdDSA": // PureEd25519
 			//--
-			eddsaPvKey := privKey.(ed25519.PrivateKey)
+			var eddsaPvKey ed25519.PrivateKey
+			var okAssert bool
+			eddsaPvKey, okAssert = privKey.(ed25519.PrivateKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed EdDSA PrivateKey"), ""
+			} //end if
 			if(eddsaPvKey == nil) {
 				return NewError("Invalid EdDSA PrivateKey"), ""
 			} //end if
@@ -476,7 +526,12 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 			break
 		case "EcDSA": // ECDSAWithSHA512 ; ECDSAWithSHA384 ; ECDSAWithSHA256
 			//--
-			ecdsaPvKey := privKey.(*ecdsa.PrivateKey)
+			var ecdsaPvKey *ecdsa.PrivateKey
+			var okAssert bool
+			ecdsaPvKey, okAssert = privKey.(*ecdsa.PrivateKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed EcDSA PrivateKey"), ""
+			} //end if
 			if(ecdsaPvKey == nil) {
 				return NewError("Invalid EcDSA PrivateKey"), ""
 			} //end if
@@ -538,7 +593,12 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 		case "RSA": fallthrough 	// SHA512WithRSA ; SHA384WithRSA ; SHA256WithRSA
 		case "RSA-PSS": 			// SHA512WithRSAPSS ; SHA384WithRSAPSS ; SHA256WithRSAPSS
 			//--
-			rsaPvKey := privKey.(*rsa.PrivateKey)
+			var rsaPvKey *rsa.PrivateKey
+			var okAssert bool
+			rsaPvKey, okAssert = privKey.(*rsa.PrivateKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed RSA PrivateKey"), ""
+			} //end if
 			if(rsaPvKey == nil) {
 				return NewError("Invalid RSA PrivateKey"), ""
 			} //end if
@@ -546,17 +606,24 @@ func SignWithX509PrivateKeyPEM(mode string, pemPrivKey string, passPrivKey strin
 			hashMode := crypto.SHA512 // default
 			switch(algo) { // {{{SYNC-X509-HASHING-BY-ALGO}}}
 				//--
-				case "sha3-512": fallthrough
 				case "sha512":
 					// use default: crypto.SHA512
 					break
-				case "sha3-384": fallthrough
+				case "sha3-512":
+					hashMode = crypto.SHA3_512
+					// use default: reqLen
+					break
 				case "sha384":
 					hashMode = crypto.SHA384
 					break
-				case "sha3-256": fallthrough
+				case "sha3-384":
+					hashMode = crypto.SHA3_384
+					break
 				case "sha256":
 					hashMode = crypto.SHA256
+					break
+				case "sha3-256":
+					hashMode = crypto.SHA3_256
 					break
 			} //end witch
 			//--
@@ -674,7 +741,7 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 	if(verifyOpts != nil) {
 		if(len(verifyOpts) > 0) {
 			var keyUsages []x509.ExtKeyUsage
-		//	var certPolicies []x509.OID // compatible just with golang > 1.23
+			var certPolicies []x509.OID // compatible just with golang > 1.23
 			const inspFailed string 			= "Certificate Inspection Failed: %s != %s"
 			const inspStartsFailed string 		= "Certificate Inspection Failed: %s ^~ %s"
 			const inspContainsFailed string 	= "Certificate Inspection Failed: %s &~ %s"
@@ -873,8 +940,7 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 					case "keyUsageOCSPSigning":
 						keyUsages = append(keyUsages, x509.ExtKeyUsageOCSPSigning)
 						break
-					/* compatible just with golang > 1.23
-					case "oidPolicies": // ex: "0.4.0.194112.1.2"
+					case "oidPolicies": // compatible just with golang > 1.23 ; ex: "0.4.0.194112.1.2"
 						if(StrTrimWhitespaces(val) != "") {
 							arrOIDs := Explode(",", val)
 							for i:=0; i<len(arrOIDs); i++ {
@@ -889,7 +955,6 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 							} //end for
 						} //end if
 						break
-					*/
 					//--
 					default:
 						return NewError("Unknown Verify Option: `" + key + "`")
@@ -899,11 +964,9 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 			if(len(keyUsages) > 0) {
 				opts.KeyUsages = keyUsages
 			} //end if
-			/* compatible just with golang > 1.23
-			if(len(certPolicies) > 0) {
+			if(len(certPolicies) > 0) { // compatible just with golang > 1.23
 				opts.CertificatePolicies = certPolicies
 			} //end if
-			*/
 		} //end if
 	} //end if
 	//--
@@ -920,7 +983,245 @@ func VerifyX509CertificatePEM(pemCertificate string, verifyOpts map[string]strin
 } //END FUNCTION
 
 
-func ExtractX509PublicKeyFromCertificatePEM(pemCertificate string) (error, string) {
+//-----
+
+
+func ParseX509PrivateEd25519Key(derBytes []byte) (typ string, prvEd25519 ed25519.PrivateKey, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	var prv any
+	typ, prv, err = ParseX509PrivateKey(derBytes, false) // Ed25519 private key can only use PKCS8 format
+	//--
+	if((err != nil) || (prv == nil)) {
+		return typ, nil, err
+	} //end if
+	//--
+	var okAssert bool
+	prvEd25519, okAssert = prv.(ed25519.PrivateKey)
+	if(!okAssert) {
+		return typ, nil, NewError("Invalid Private Key Type, Not Ed25519")
+	} //end if
+	if(prvEd25519 == nil) {
+		return typ, nil, NewError("Invalid Ed25519 Private Key Type, Null")
+	} //end if
+	//--
+	typ = "Ed25519.Priv"
+	//--
+	return typ, prvEd25519, err
+	//--
+} //END FUNCTION
+
+
+func ParseX509PrivateEcdsaKey(derBytes []byte) (typ string, prvEcdsa *ecdsa.PrivateKey, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	var prv any
+	typ, prv, err = ParseX509PrivateKey(derBytes, false) // EcDSA private key can only use PKCS8 format
+	//--
+	if((err != nil) || (prv == nil)) {
+		return typ, nil, err
+	} //end if
+	//--
+	var okAssert bool
+	prvEcdsa, okAssert = prv.(*ecdsa.PrivateKey)
+	if(!okAssert) {
+		return typ, nil, NewError("Invalid Private Key Type, Not EcDSA")
+	} //end if
+	if(prvEcdsa == nil) {
+		return typ, nil, NewError("Invalid EcDSA Private Key Type, Null")
+	} //end if
+	//--
+	typ = "EcDSA.Priv"
+	//--
+	return typ, prvEcdsa, err
+	//--
+} //END FUNCTION
+
+
+func ParseX509PrivateRsaKey(derBytes []byte, fallback bool) (typ string, prvRsa *rsa.PrivateKey, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	var prv any
+	typ, prv, err = ParseX509PrivateKey(derBytes, fallback)
+	//--
+	if((err != nil) || (prv == nil)) {
+		return typ, nil, err
+	} //end if
+	//--
+	var okAssert bool
+	prvRsa, okAssert = prv.(*rsa.PrivateKey)
+	if(!okAssert) {
+		return typ, nil, NewError("Invalid Private Key Type, Not RSA")
+	} //end if
+	if(prvRsa == nil) {
+		return typ, nil, NewError("Invalid RSA Private Key Type, Null")
+	} //end if
+	//--
+	typ = "RSA.Priv"
+	//--
+	return typ, prvRsa, err
+	//--
+} //END FUNCTION
+
+
+func ParseX509PrivateKey(derBytes []byte, fallback bool) (typ string, prv any, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	if(CryptoX509UxmDebug) {
+		log.Println("[DEBUG]", CurrentFunctionName(), "Legacy Support Enabled:", ConvertBoolToStr(enableLegacySupport))
+	} //end if
+	//--
+	if((derBytes == nil) || (len(derBytes) <= 0)) {
+		return "", nil, NewError("X509 Private Key is Empty, cannot parse")
+	} //end if
+	//--
+	prv, err = x509.ParsePKCS8PrivateKey(derBytes) // modern
+	if(err == nil) {
+		typ = privateKeyTypePKCS8
+	} else if((fallback == true) && (enableLegacySupport == true)) { // legacy, only if enabled ... ; {{{SYNC-SMARTGO-X509-ENABLE-LEGACY}}}
+		prv, err = x509.ParsePKCS1PrivateKey(derBytes) // older format, RSA
+		if(err == nil) {
+			typ = privateKeyTypeEC
+		} else {
+				prv, err = x509.ParseECPrivateKey(derBytes) // older format, ECDSA
+			if(err == nil) {
+				typ = privateKeyTypePKCS1
+			} //end if
+		} //end if
+	} //end if
+	//--
+	if(err != nil) {
+		return "", nil, NewError("X509 Private Key parse Failed: " + err.Error())
+	} //end if
+	//--
+	return typ, prv, err
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ParseX509PublicEd25519Key(derBytes []byte) (typ string, pubEd25519 ed25519.PublicKey, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	var prv any
+	typ, prv, err = ParseX509PublicKey(derBytes, false) // Ed25519 public key can only use PKIX format
+	//--
+	if((err != nil) || (prv == nil)) {
+		return typ, nil, err
+	} //end if
+	//--
+	var okAssert bool
+	pubEd25519, okAssert = prv.(ed25519.PublicKey)
+	if(!okAssert) {
+		return typ, nil, NewError("Invalid Public Key Type, Not Ed25519")
+	} //end if
+	if(pubEd25519 == nil) {
+		return typ, nil, NewError("Invalid Ed25519 Public Key Type, Null")
+	} //end if
+	//--
+	typ = "Ed25519.Pub"
+	//--
+	return typ, pubEd25519, err
+	//--
+} //END FUNCTION
+
+
+func ParseX509PublicEcdsaKey(derBytes []byte) (typ string, pubEcdsa *ecdsa.PublicKey, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	var prv any
+	typ, prv, err = ParseX509PublicKey(derBytes, false) // EcDSA public key can only use PKIX format
+	//--
+	if((err != nil) || (prv == nil)) {
+		return typ, nil, err
+	} //end if
+	//--
+	var okAssert bool
+	pubEcdsa, okAssert = prv.(*ecdsa.PublicKey)
+	if(!okAssert) {
+		return typ, nil, NewError("Invalid Public Key Type, Not EcDSA")
+	} //end if
+	if(pubEcdsa == nil) {
+		return typ, nil, NewError("Invalid EcDSA Public Key Type, Null")
+	} //end if
+	//--
+	typ = "EcDSA.Pub"
+	//--
+	return typ, pubEcdsa, err
+	//--
+} //END FUNCTION
+
+
+func ParseX509PublicRsaKey(derBytes []byte, fallback bool) (typ string, pubRsa *rsa.PublicKey, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	var prv any
+	typ, prv, err = ParseX509PublicKey(derBytes, fallback)
+	//--
+	if((err != nil) || (prv == nil)) {
+		return typ, nil, err
+	} //end if
+	//--
+	var okAssert bool
+	pubRsa, okAssert = prv.(*rsa.PublicKey)
+	if(!okAssert) {
+		return typ, nil, NewError("Invalid Public Key Type, Not RSA")
+	} //end if
+	if(pubRsa == nil) {
+		return typ, nil, NewError("Invalid RSA Public Key Type, Null")
+	} //end if
+	//--
+	typ = "RSA.Pub"
+	//--
+	return typ, pubRsa, err
+	//--
+} //END FUNCTION
+
+
+func ParseX509PublicKey(derBytes []byte, fallback bool) (typ string, pub any, err error) {
+	//--
+	defer PanicHandler()
+	//--
+	if(CryptoX509UxmDebug) {
+		log.Println("[DEBUG]", CurrentFunctionName(), "Legacy Support Enabled:", ConvertBoolToStr(enableLegacySupport))
+	} //end if
+	//--
+	if((derBytes == nil) || (len(derBytes) <= 0)) {
+		return "", nil, NewError("X509 Public Key is Empty, cannot parse")
+	} //end if
+	//--
+	pub, err = x509.ParsePKIXPublicKey(derBytes) // modern
+	if(err == nil) {
+		typ = publicKeyTypePKIX
+	} else if((fallback == true) && (enableLegacySupport == true)) { // legacy, only if enabled ... ; {{{SYNC-SMARTGO-X509-ENABLE-LEGACY}}}
+		pub, err = x509.ParsePKCS1PublicKey(derBytes) // older format: RSA
+		if(err == nil) {
+			typ = publicKeyTypePKCS1
+		} //end if
+	} //end if
+	//--
+	if(err != nil) {
+		return "", nil, NewError("X509 Public Key parse Failed: " + err.Error())
+	} //end if
+	//--
+	return typ, pub, err
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func ExtractX509PublicKeyFromCertificatePEM(pemCertificate string, formatPEM bool) (error, string) {
 	//--
 	defer PanicHandler()
 	//--
@@ -949,12 +1250,43 @@ func ExtractX509PublicKeyFromCertificatePEM(pemCertificate string) (error, strin
 		return NewError("PublicKey is Null"), ""
 	} //end if
 	//--
-	pubBytes, pkcs8PubErr := x509.MarshalPKIXPublicKey(cert.PublicKey)
-	if(pkcs8PubErr != nil) {
-		return NewError("PublicKey PKIX Marshal Failed: " + pkcs8PubErr.Error()), ""
+	var mrslPkixErr error = nil
+	var mrslPkcs1Err error = nil
+	var pubBytes []byte = nil
+	var typKey string = ""
+	pubBytes, mrslPkixErr = x509.MarshalPKIXPublicKey(cert.PublicKey) // try 1st PKIX (modern format)
+	if(mrslPkixErr != nil) { // here needs falback, don't know what kind of key a certificate may have
+		var okAssert bool
+		var tryRsaCert *rsa.PublicKey
+		tryRsaCert, okAssert = cert.PublicKey.(*rsa.PublicKey) // safe assert
+		if(okAssert) {
+			if(tryRsaCert != nil) {
+				pubBytes = x509.MarshalPKCS1PublicKey(tryRsaCert) // fallback on PKCS1, legacy format
+				typKey = publicKeyTypePKCS1
+			} else {
+				mrslPkcs1Err = NewError("Invalid Certificare Type")
+			} //end if else
+		} else {
+			mrslPkcs1Err = NewError("Type Conversion Error")
+		} //end if else
+	} else {
+		typKey = publicKeyTypePKIX
+	} //end if else
+	if(mrslPkcs1Err != nil) {
+		return NewError("PublicKey PKCS1 conversion Failed: " + mrslPkixErr.Error()), ""
+	} else if(mrslPkixErr != nil) {
+		return NewError("PublicKey PKIX conversion Failed: " + mrslPkixErr.Error()), ""
 	} //end if
 	if(pubBytes == nil) {
-		return NewError("PublicKey PKIX Marshal Failed, is Null"), ""
+		if(typKey == publicKeyTypePKCS1) {
+			return NewError("PublicKey PKCS1 conversion Failed, is Null"), ""
+		} else {
+			return NewError("PublicKey PKIX conversion Failed, is Null"), ""
+		} //end if else
+	} //end if
+	//--
+	if(formatPEM == false) {
+		return nil, string(BytTrimWhitespaces(Base64BytEncode(pubBytes)))
 	} //end if
 	//--
 	pubPEM := pem.EncodeToMemory(&pem.Block{
@@ -967,7 +1299,7 @@ func ExtractX509PublicKeyFromCertificatePEM(pemCertificate string) (error, strin
 } //END FUNCTION
 
 
-func ExtractX509PublicKeyFromPrivateKeyPEM(mode string, pemPrivKey string, passPrivKey string) (error, string) {
+func ExtractX509PublicKeyFromPrivateKeyPEM(mode string, pemPrivKey string, passPrivKey string, formatPEM bool) (error, string) {
 	//--
 	defer PanicHandler()
 	//--
@@ -978,7 +1310,7 @@ func ExtractX509PublicKeyFromPrivateKeyPEM(mode string, pemPrivKey string, passP
 	//--
 	if(passPrivKey != "") {
 		var errDecryptPrivPEM error = nil
-		errDecryptPrivPEM, pemPrivKey = DecryptPrivateKeyPEM(pemPrivKey, passPrivKey)
+		errDecryptPrivPEM, pemPrivKey = DecryptPrivateKeyPEM(pemPrivKey, passPrivKey, true) // as PEM
 		if(errDecryptPrivPEM != nil) {
 			return NewError("Failed to Decrypt the password protected PEM PrivateKey: " + errDecryptPrivPEM.Error()), ""
 		} //end if
@@ -996,77 +1328,132 @@ func ExtractX509PublicKeyFromPrivateKeyPEM(mode string, pemPrivKey string, passP
 		return NewError("Invalid PEM PrivateKey Type: `" + block.Type + "`"), ""
 	} //end if
 	//--
-	privKey, errPKCS8 := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if(errPKCS8 != nil) {
-		return NewError("Failed to parse PEM PrivateKey: " + errPKCS8.Error()), ""
+	typKey, privKey, errParseKey := ParseX509PrivateKey(block.Bytes, true) // allow fallback, extract must work with 3rd party certificates
+	if(errParseKey != nil) {
+		return NewError("Failed to parse PEM PrivateKey: " + errParseKey.Error()), ""
 	} //end if
 	if(privKey == nil) {
 		return NewError("Failed to parse PEM PrivateKey, is Null"), ""
 	} //end if
 	//--
-	var pkcs8PubErr error = nil
+	var mrslErr error = nil
 	var pubBytes []byte = nil
 	switch(mode) { // {{{SYNC-GO-X509-SIGN-VERIFY-MODES}}}
 		case "EdDSA": // PureEd25519
 			//--
-			eddsaPvKey := privKey.(ed25519.PrivateKey)
+			var eddsaPvKey ed25519.PrivateKey
+			var okAssert bool
+			eddsaPvKey, okAssert = privKey.(ed25519.PrivateKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed EdDSA PublicKey conversion from PrivateKey"), ""
+			} //end if
 			if(eddsaPvKey == nil) {
 				return NewError("Invalid EdDSA PublicKey conversion from PrivateKey"), ""
 			} //end if
-			eddsaPbKey := eddsaPvKey.Public()
+			var eddsaPbKey crypto.PublicKey = eddsaPvKey.Public()
 			if(eddsaPbKey == nil) {
 				return NewError("Invalid EdDSA PublicKey"), ""
 			} //end if
 			//--
-			pubBytes, pkcs8PubErr = x509.MarshalPKIXPublicKey(eddsaPbKey)
-			if(pkcs8PubErr != nil) {
-				return NewError("EdDSA PublicKey PKIX Marshal Failed: " + pkcs8PubErr.Error()), ""
-			} //end if
+			switch(typKey) {
+				case privateKeyTypePKCS8: // OK
+					pubBytes, mrslErr = x509.MarshalPKIXPublicKey(eddsaPbKey)
+					if(mrslErr != nil) {
+						return NewError("EdDSA PublicKey PKIX conversion Failed: " + mrslErr.Error()), ""
+					} //end if
+					break
+				case privateKeyTypeEC: // KO: this is only supported for legacy EcDSA
+					return NewError("EdDSA PublicKey EC conversion Failed, unsupported type"), ""
+					break
+				case privateKeyTypePKCS1: // KO: only for legacy RSA
+					return NewError("EdDSA PublicKey PKCS1 conversion Failed, unsupported type"), ""
+					break
+				default: // KO: unknown ... should not be landing here
+					return NewError("EdDSA PublicKey conversion Failed, unknown type: " + typKey), ""
+			} //end switch
 			//--
 			break
 		case "EcDSA": // ECDSAWithSHA512 ; ECDSAWithSHA384 ; ECDSAWithSHA256
 			//--
-			ecdsaPvKey := privKey.(*ecdsa.PrivateKey)
+			var ecdsaPvKey *ecdsa.PrivateKey
+			var okAssert bool
+			ecdsaPvKey, okAssert = privKey.(*ecdsa.PrivateKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed EcDSA PublicKey conversion from PrivateKey"), ""
+			} //end if
 			if(ecdsaPvKey == nil) {
 				return NewError("Invalid EcDSA PublicKey conversion from PrivateKey"), ""
 			} //end if
-			ecdsaPbKey := &ecdsaPvKey.PublicKey
+			var ecdsaPbKey crypto.PublicKey = &ecdsaPvKey.PublicKey
 			if(ecdsaPbKey == nil) {
 				return NewError("Invalid EcDSA PublicKey"), ""
 			} //end if
 			//--
-			pubBytes, pkcs8PubErr = x509.MarshalPKIXPublicKey(ecdsaPbKey)
-			if(pkcs8PubErr != nil) {
-				return NewError("EcDSA PublicKey PKIX Marshal Failed: " + pkcs8PubErr.Error()), ""
-			} //end if
+			switch(typKey) {
+				case privateKeyTypePKCS8: // OK
+					pubBytes, mrslErr = x509.MarshalPKIXPublicKey(ecdsaPbKey)
+					if(mrslErr != nil) {
+						return NewError("EcDSA PublicKey PKIX conversion Failed: " + mrslErr.Error()), ""
+					} //end if
+					break
+				case privateKeyTypeEC: // KO: go is missing or there is not an EC marshal public key method ; go only have MarshalECPrivateKey which is for generating legacy certificates in EC format
+					return NewError("EcDSA PublicKey EC conversion Failed, unsupported type"), ""
+					break
+				case privateKeyTypePKCS1: // KO: only for legacy RSA
+					return NewError("EcDSA PublicKey PKCS1 conversion Failed, unsupported type"), ""
+					break
+				default: // KO: unknown ... should not be landing here
+					return NewError("EcDSA PublicKey conversion Failed, unknown type: " + typKey), ""
+			} //end switch
 			//--
 			break
 		case "RSA": fallthrough 	// SHA512WithRSA ; SHA384WithRSA ; SHA256WithRSA
 		case "RSA-PSS": 			// SHA512WithRSAPSS ; SHA384WithRSAPSS ; SHA256WithRSAPSS
 			//--
-			rsaPvKey := privKey.(*rsa.PrivateKey)
+			var rsaPvKey *rsa.PrivateKey
+			var okAssert bool
+			rsaPvKey, okAssert = privKey.(*rsa.PrivateKey) // safe assert
+			if(!okAssert) {
+				return NewError("Failed RSA PublicKey conversion from PrivateKey"), ""
+			} //end if
 			if(rsaPvKey == nil) {
 				return NewError("Invalid RSA PublicKey conversion from PrivateKey"), ""
 			} //end if
-			rsaPbKey := &rsaPvKey.PublicKey
+			var rsaPbKey *rsa.PublicKey = &rsaPvKey.PublicKey // cannot cast to crypto.PublicKey in this context
 			if(rsaPbKey == nil) {
 				return NewError("Invalid RSA PublicKey"), ""
 			} //end if
 			//--
-			pubBytes, pkcs8PubErr = x509.MarshalPKIXPublicKey(rsaPbKey)
-			if(pkcs8PubErr != nil) {
-				return NewError("RSA PublicKey PKIX Marshal Failed: " + pkcs8PubErr.Error()), ""
-			} //end if
+			switch(typKey) {
+				case privateKeyTypePKCS8: // OK
+					pubBytes, mrslErr = x509.MarshalPKIXPublicKey(rsaPbKey)
+					if(mrslErr != nil) {
+						return NewError("RSA PublicKey PKIX conversion Failed: " + mrslErr.Error()), ""
+					} //end if
+					break
+				case privateKeyTypeEC: // KO: this is only supported for legacy EcDSA
+					return NewError("RSA PublicKey EC conversion Failed, unsupported type"), ""
+					break
+				case privateKeyTypePKCS1: // OK, legacy
+					pubBytes = x509.MarshalPKCS1PublicKey(rsaPbKey) // there is no error control in this old method
+					break
+				default: // KO: unknown ... should not be landing here
+					return NewError("RSA PublicKey conversion Failed, unknown type: " + typKey), ""
+			} //end switch
 			//--
 			break
 		default:
 			return NewError("Invalid Mode: `" + mode + "`"), ""
 	} //end switch
-	if(pkcs8PubErr != nil) {
-		return NewError("PublicKey Failed by Unknown Reason: " + pkcs8PubErr.Error()), ""
+	if(mrslErr != nil) {
+		return NewError("PublicKey conversion Failed by Unknown Reason: " + mrslErr.Error()), ""
 	} //end if
 	if(pubBytes == nil) {
-		return NewError("PublicKey is Null"), ""
+		return NewError("PublicKey is Null after conversion"), ""
+	} //end if
+	//--
+	if(formatPEM == false) {
+		return nil, string(BytTrimWhitespaces(Base64BytEncode(pubBytes)))
 	} //end if
 	//--
 	pubPEM := pem.EncodeToMemory(&pem.Block{
@@ -1079,7 +1466,113 @@ func ExtractX509PublicKeyFromPrivateKeyPEM(mode string, pemPrivKey string, passP
 } //END FUNCTION
 
 
-func DecryptPrivateKeyPEM(pemPrivKey string, password string) (error, string) {
+func IsB64PublicKeyEqualWithPemPublicKey(b64PubKey string, pemPubKey string) bool {
+	//--
+	// DO NOT MODIFY THIS METHOD, it should use a canonize method to ensure all type of keys are validated, includding the ones from mime messages of which base64 key is splitted on multiple lines and also have a space after CRLF
+	//--
+	defer PanicHandler()
+	//--
+	b64PubKey = StrTrimWhitespaces(b64PubKey)
+	if(b64PubKey == "") {
+		return false
+	} //end if
+	pemPubKey = StrTrimWhitespaces(pemPubKey)
+	if(pemPubKey == "") {
+		return false
+	} //end if
+	//--
+	b64PubKey = StrTrimWhitespaces(StrNormalizeLineEndings(Base64NormalizeMultiLineData(b64PubKey)))
+	if(b64PubKey == "") {
+		return false
+	} //end if
+	pemPubKey = StrTrimWhitespaces(StrNormalizeLineEndings(Base64NormalizeMultiLineData(pemPubKey)))
+	if(pemPubKey == "") {
+		return false
+	} //end if
+	b64PubKey = StrTrimWhitespaces(StrTrimWhitespaces(X509PemPublicKeyStartTag) + b64PubKey + StrTrimWhitespaces(X509PemPublicKeyEndTag))
+	b64PubKey = StrTrimWhitespaces(StrNormalizeLineEndings(Base64NormalizeMultiLineData(b64PubKey)))
+	if(b64PubKey == "") {
+		return false
+	} //end if
+	if(b64PubKey != pemPubKey) {
+		return false
+	} //end if
+	//--
+	return true
+	//--
+} //END FUNCTION
+
+
+func GetB64PublicKeyFromPem(pemPubKey string) (string, error) {
+	//--
+	defer PanicHandler()
+	//--
+	pemPubKey = StrTrimWhitespaces(pemPubKey)
+	if(pemPubKey == "") {
+		return "", NewError("PEM PublicKey is Empty")
+	} //end if
+	//--
+	block, _ := pem.Decode([]byte(pemPubKey))
+	if(block == nil) {
+		return "", NewError("Failed to decode PEM PublicKey")
+	} //end if
+	if(block.Type != "PUBLIC KEY") {
+		return "", NewError("Invalid PEM PublicKey Type: `" + block.Type + "`")
+	} //end if
+	//--
+	return string(BytTrimWhitespaces(Base64BytEncode(block.Bytes))), nil
+	//--
+} //END FUNCTION
+
+
+func Asn1DecodeX509PublicKeyPKIXB64(b64PublicKey string) (error, string) {
+	//--
+	// why this method ?
+	// for Ed25519 the key length from X509 is 44 bytes instead of 32, as it is using some extra ASN.1 info, so this method will extract the real public key s of 32 bytes
+	// for EcDSA and RSA this should be working too
+	// works just for modern public keys compatible with ParsePKIXPublicKey() format
+	//--
+	defer PanicHandler()
+	//--
+	b64PublicKey = StrTrimWhitespaces(b64PublicKey)
+	if(b64PublicKey == "") {
+		return NewError("B64 Public Key is Empty"), ""
+	} //end if
+	//--
+	var rawPublicKey string = Base64Decode(b64PublicKey)
+	if(rawPublicKey == "") {
+		return NewError("Public Key is Empty after B64 Decode"), ""
+	} //end if
+	//-- unixman: below code taken and adapted from golang/crypto/x509.go # x509.ParsePKIXPublicKey()
+	var derBytes []byte = []byte(rawPublicKey)
+	var pki publicKeyInfo
+	if rest, err := asn1.Unmarshal(derBytes, &pki); err != nil {
+		return NewError("Failed to parse Public Key, ASN1 Unmarshal failed: " + err.Error()), ""
+	} else if len(rest) > 0 {
+		return NewError("Failed to parse Public Key, Trailing data after ASN.1 of PublicKey"), ""
+	} //end if
+	//-- #end
+	var b []byte = pki.PublicKey.Bytes
+	if(b == nil) {
+		return NewError("Failed to Convert the Public Key, Null"), ""
+	} //end if
+	if(len(b) <= 0) {
+		return NewError("Failed to Convert the Public Key, Empty"), ""
+	} //end if
+	b = BytTrimWhitespaces(Base64BytEncode(b))
+	if(b == nil) {
+		return NewError("Failed to B64 Encode the Public Key, Null"), ""
+	} //end if
+	if(len(b) <= 0) {
+		return NewError("Failed to B64 Encode the Public Key, Empty"), ""
+	} //end if
+	//--
+	return nil, string(b)
+	//--
+} // END FUNCTION
+
+
+func DecryptPrivateKeyPEM(pemPrivKey string, password string, formatPEM bool) (error, string) {
 	//--
 	defer PanicHandler()
 	//--
@@ -1100,6 +1593,10 @@ func DecryptPrivateKeyPEM(pemPrivKey string, password string) (error, string) {
 		return NewError("Invalid or Not an AES256 Encrypted PEM PrivateKey: " + err.Error()), ""
 	} //end if
 	//--
+	if(formatPEM == false) {
+		return nil, string(BytTrimWhitespaces(Base64BytEncode(buf)))
+	} //end if
+	//--
 	plainBlock := &pem.Block{
 		Type:  "PRIVATE KEY",
 		Bytes: buf,
@@ -1112,6 +1609,9 @@ func DecryptPrivateKeyPEM(pemPrivKey string, password string) (error, string) {
 	return nil, string(privatePlainPem)
 	//--
 } //END FUNCTION
+
+
+//-----
 
 
 func GenerateX509CertificateWithCA(certCaInfo CertX509Info, certCliInfo CertX509Info, sigAlg x509.SignatureAlgorithm) (CertX509KeyPair, CertX509KeyPair, error) {
@@ -1362,7 +1862,7 @@ func GenerateX509Certificate(certInfo CertX509Info, sigAlg x509.SignatureAlgorit
 				Bytes: decryptedBlock,
 			}
 		} //end if
-		issuerKey, err = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+		_, issuerKey, err = ParseX509PrivateKey(keyBlock.Bytes, false) // no fallback, this must be strict in PKCS8 format, when issue a new certificate
 		if(err != nil) {
 			return nil, NewError("Failed to Parse Issuer Private Key: " + err.Error())
 		} //end if
@@ -1378,7 +1878,7 @@ func GenerateX509Certificate(certInfo CertX509Info, sigAlg x509.SignatureAlgorit
 		if(keyPubBlock == nil) {
 			return nil, NewError("Failed to Parse Issuer PEM Public Key")
 		} //end if
-		issuerPubKey, err = x509.ParsePKIXPublicKey(keyPubBlock.Bytes)
+		_, issuerPubKey, err = ParseX509PublicKey(keyPubBlock.Bytes, false) // no fallback, this must be strict in PKIX format, when issue a new certificate
 		if(err != nil) {
 			return nil, NewError("Failed to Parse Issuer Public Key: " + err.Error())
 		} //end if
@@ -1582,30 +2082,78 @@ func GenerateX509Certificate(certInfo CertX509Info, sigAlg x509.SignatureAlgorit
 	//--
 	switch priv.(type) {
 		case ed25519.PrivateKey:
-			pubk = priv.(ed25519.PrivateKey).Public()
+			var theKey ed25519.PrivateKey
+			var okAssert bool
+			theKey, okAssert = priv.(ed25519.PrivateKey) // safe assert
+			if(!okAssert) {
+				return nil, NewError("Failed Issuer PrivKey Algo, Type")
+			} //end if
+			if(theKey == nil) {
+				return nil, NewError("Failed Issuer PrivKey Algo, Null")
+			} //end if
+			pubk = theKey.Public()
 			switch issuerKey.(type) {
 				case ed25519.PrivateKey:
-					derCert, err = x509.CreateCertificate(crand.Reader, &template, issuerCert, pubk, issuerKey.(ed25519.PrivateKey))
+					pvKey, okAsrt := issuerKey.(ed25519.PrivateKey) // safe assert
+					if(!okAsrt) {
+						return nil, NewError("Failed Issuer PrivKey Algo, Type: EdDSA")
+					} //end if
+					if(pvKey == nil) {
+						return nil, NewError("Failed Issuer PrivKey Algo, Null: EdDSA")
+					} //end if
+					derCert, err = x509.CreateCertificate(crand.Reader, &template, issuerCert, pubk, pvKey)
 					break
 				default:
 					return nil, NewError("Invalid Issuer PrivKey Algo")
 			} //end switch
 			break
 		case *ecdsa.PrivateKey:
-			pubk = priv.(*ecdsa.PrivateKey).Public()
+			var theKey *ecdsa.PrivateKey
+			var okAssert bool
+			theKey, okAssert = priv.(*ecdsa.PrivateKey) // safe assert
+			if(!okAssert) {
+				return nil, NewError("Failed Issuer PrivKey Algo, Type")
+			} //end if
+			if(theKey == nil) {
+				return nil, NewError("Failed Issuer PrivKey Algo, Null")
+			} //end if
+			pubk = theKey.Public()
 			switch issuerKey.(type) {
 				case *ecdsa.PrivateKey:
-					derCert, err = x509.CreateCertificate(crand.Reader, &template, issuerCert, pubk, issuerKey.(*ecdsa.PrivateKey))
+					pvKey, okAsrt := issuerKey.(*ecdsa.PrivateKey) // safe assert
+					if(!okAsrt) {
+						return nil, NewError("Failed Issuer PrivKey Algo, Type: EcDSA")
+					} //end if
+					if(pvKey == nil) {
+						return nil, NewError("Failed Issuer PrivKey Algo, Null: EcDSA")
+					} //end if
+					derCert, err = x509.CreateCertificate(crand.Reader, &template, issuerCert, pubk, pvKey)
 					break
 				default:
 					return nil, NewError("Invalid Issuer PrivKey Algo")
 			} //end switch
 			break
 		case *rsa.PrivateKey:
-			pubk = priv.(*rsa.PrivateKey).Public()
+			var theKey *rsa.PrivateKey
+			var okAssert bool
+			theKey, okAssert = priv.(*rsa.PrivateKey) // safe assert
+			if(!okAssert) {
+				return nil, NewError("Failed Issuer PrivKey Algo, Type")
+			} //end if
+			if(theKey == nil) {
+				return nil, NewError("Failed Issuer PrivKey Algo, Null")
+			} //end if
+			pubk = theKey.Public()
 			switch issuerKey.(type) {
 				case *rsa.PrivateKey:
-					derCert, err = x509.CreateCertificate(crand.Reader, &template, issuerCert, pubk, issuerKey.(*rsa.PrivateKey))
+					pvKey, okAsrt := issuerKey.(*rsa.PrivateKey) // safe assert
+					if(!okAsrt) {
+						return nil, NewError("Failed Issuer PrivKey Algo, Type: RSA")
+					} //end if
+					if(pvKey == nil) {
+						return nil, NewError("Failed Issuer PrivKey Algo, Null: RSA")
+					} //end if
+					derCert, err = x509.CreateCertificate(crand.Reader, &template, issuerCert, pubk, pvKey)
 					break
 				default:
 					return nil, NewError("Invalid Issuer PrivKey Algo")
@@ -1653,7 +2201,7 @@ func GenerateX509Certificate(certInfo CertX509Info, sigAlg x509.SignatureAlgorit
 		} //end if
 	} //end if
 	//--
-	privBytes, pkcs8PrivErr := x509.MarshalPKCS8PrivateKey(priv)
+	privBytes, pkcs8PrivErr := x509.MarshalPKCS8PrivateKey(priv) // new certificate must use PKCS8 only for the Private Key
 	if(pkcs8PrivErr != nil) {
 		return nil, pkcs8PrivErr
 	} //end if
@@ -1671,7 +2219,7 @@ func GenerateX509Certificate(certInfo CertX509Info, sigAlg x509.SignatureAlgorit
 	} //end if
 	privatePem := pem.EncodeToMemory(block)
 	//--
-	pubBytes, pkcs8PubErr := x509.MarshalPKIXPublicKey(pubk)
+	pubBytes, pkcs8PubErr := x509.MarshalPKIXPublicKey(pubk) // new certificate must use PKIX only for the Public Key
 	if(pkcs8PubErr != nil) {
 		return nil, pkcs8PubErr
 	} //end if

@@ -1,0 +1,39 @@
+<!-- Js Framework :: r.20260831 (go) -->
+<script>
+const smartJ$Options = {
+	BrowserUtils: {
+		LanguageId: '[###LANG|js###]',
+		CookieLifeTime: [###COOKIE-LIFETIME|int###],
+		CookieDomain: '[###COOKIE-DOMAIN|js###]',
+		CookieSameSitePolicy: '[###COOKIE-SAMESITE|js###]',
+		Notifications: 'growl',
+		NotificationDialogType: [%%%IF:SEMAPHORE:&*<skip:js-alertable>;%%%]'auto'[%%%ELSE:SEMAPHORE%%%]'alertable'[%%%/IF:SEMAPHORE%%%],
+		ModalBoxProtected: [###MODAL-BOX-PROTECTED|bool###],
+		NotifyLoadError: [###NOTIFY-LOAD-ERROR|bool###],
+	},
+};
+Object.freeze(smartJ$Options); // sec.
+window.smartJ$Options = smartJ$Options; // g-exp.
+</script>
+[%%%IF:SEMAPHORE:&*<use:sf-js-dev>;%%%]<!-- SF-JS (dev.src) -->
+<script src="lib/js/framework/src/core_utils.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/date_utils.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/crypt_utils.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/arch_utils.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/ifmodalbox.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/browser_check.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/browser_utils.js?[###RELEASE-HASH|url|html###]"></script>
+<script src="lib/js/framework/src/ifmodalbox_scanner.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<script src="lib/js/framework/smart-framework.pak.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%/IF:SEMAPHORE%%%][%%%IF:DEBUG-MODE:==yes;%%%][%%%|N%%%]<script>smartJ$Browser.setFlag('DebugEnabled', true);</script>[%%%/IF:DEBUG-MODE%%%]
+<script>
+(() => {
+	if(!smartJ$TestBrowser.checkCookies()) {
+		const errCokkies = 'NOTICE: Your browser does not support Cookies !';
+		console.warn(errCokkies);
+		alert(errCokkies);
+	} //end if
+})();
+</script>
+<!-- # -->

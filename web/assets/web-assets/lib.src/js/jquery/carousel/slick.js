@@ -4,7 +4,7 @@
 / __| | |/ __| |/ /  | / __|
 \__ \ | | (__|   < _ | \__ \
 |___/_|_|\___|_|\_(_)/ |___/
-				   |__/
+ 				   |__/
  Slick Carousel, v.1.5.5
  Author: Ken Wheeler
  Website: http://kenwheeler.github.io/slick

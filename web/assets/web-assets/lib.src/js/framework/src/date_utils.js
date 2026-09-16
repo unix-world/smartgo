@@ -25,7 +25,7 @@
  * @author unix-world.org
  * @license BSD
  * @file date_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$Date
  * @static
  * @frozen

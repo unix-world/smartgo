@@ -1,6 +1,6 @@
 
 // SmartGo :: WebDAV
-// r.20250214.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	VERSION string = "v.20250214.2358"
+	VERSION string = "v.20260829.2358"
 )
 
 var (
@@ -44,7 +44,8 @@ type Handler struct {
 	// LockSystem is the lock management system.
 	LockSys *LockSys
 	// Logger is an optional error logger. If non-nil, it will be called for all HTTP requests.
-	Logger func(*http.Request, error)
+//	Logger func(*http.Request, error)
+	Logger func(*http.Request, int, error) // unixman
 }
 
 func (h *Handler) stripPrefix(p string) (string, int, error) {
@@ -146,7 +147,7 @@ func (h *Handler) ServeHTTP(ww http.ResponseWriter, r *http.Request, smartSafeVa
 		log.Println("[DEBUG]", "SmartGo::WebDAV", smart.CurrentFunctionName(), "Status:", w.status, "Method:", r.Method, "Path:", r.URL.Path, errStr)
 	} //end if
 	if h.Logger != nil {
-		h.Logger(r, err)
+		h.Logger(r, w.status, err)
 	} //end if
 } //END FUNCTION
 
@@ -523,6 +524,11 @@ func (h *Handler) handlePut(w http.ResponseWriter, r *http.Request) (status int,
 
 	f, err := h.FileSystem.OpenFile(ctx, reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
+		//-- update from upstream, fix for webdav: return 409 for PUT without parent collection # ac9987996285eb37e5176356621eec4f5c9b8e83
+		if os.IsNotExist(err) {
+			return http.StatusConflict, err
+		} //end if
+		//-- #
 		//-- unixman
 	//	return http.StatusNotFound, err
 		return http.StatusUnsupportedMediaType, err

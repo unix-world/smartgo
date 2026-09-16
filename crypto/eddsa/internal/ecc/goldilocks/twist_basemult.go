@@ -1,5 +1,7 @@
 package goldilocks
 
+// modified by unixman
+
 import (
 	"crypto/subtle"
 
@@ -40,7 +42,8 @@ func (e twistCurve) ScalarBaseMult(k *Scalar) *twistPoint {
 	}
 
 	gP := c.Exp(groupMLSB{})
-	P := gP.(*twistPoint)
+//	P := gP.(*twistPoint)
+	P, _ := gP.(*twistPoint)
 	P.cneg(uint(isEven))
 	return P
 }
@@ -54,7 +57,8 @@ func (e groupMLSB) Identity() mlsb.EltG          { return twistCurve{}.Identity(
 func (e groupMLSB) NewEltP() mlsb.EltP           { return &preTwistPointAffine{} }
 func (e groupMLSB) Lookup(a mlsb.EltP, v uint, s, u int32) {
 	Tabj := &tabFixMult[v]
-	P := a.(*preTwistPointAffine)
+//	P := a.(*preTwistPointAffine)
+	P, _ := a.(*preTwistPointAffine) // unixman
 	for k := range Tabj {
 		P.cmov(&Tabj[k], uint(subtle.ConstantTimeEq(int32(k), u)))
 	}

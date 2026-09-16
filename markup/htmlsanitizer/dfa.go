@@ -1,12 +1,11 @@
+
 package htmlsanitizer
 
-// modified by unixman
+// modified by unixman r.20260829
 
 import (
-	"bytes"
 	"html"
 	"io"
-	"strings"
 	"unicode"
 )
 
@@ -65,6 +64,8 @@ type writer struct {
 	quote      byte
 	lastByte   byte // last byte for ATTRGAP
 
+	keepNonHTML bool // cached result of shouldKeepNonHTMLContent
+
 	// buf for write
 	buf []byte
 }
@@ -112,13 +113,14 @@ func (w *writer) safeAppend(p []byte) {
 	}
 }
 
-// write tag attribute and its sanitzed value if legal.
+// write tag attribute and its sanitized value if legal.
 func (w *writer) safeAppendAttr() {
 	if w.tag == nil {
 		return
 	}
 
-	attrName := bytes.ToLower(w.attr)
+	asciiLowerInPlace(w.attr)
+	attrName := w.attr
 	ok, urlAttr := w.tag.attrExists(attrName)
 	if !ok && !w.attrExists(attrName) {
 		return
@@ -142,15 +144,20 @@ func (w *writer) safeAppendAttr() {
 	w.buf = append(w.buf, '"')
 }
 
-func (w *writer) shouldKeepNonHTMLContent() bool {
-	return w.nonHTMLTag != nil && w.tag != nil && w.nonHTMLTag.Name == w.tag.Name
-}
-
 func (w *writer) isEndTagOfNonHTMLElement(p []byte) bool {
 	if w.nonHTMLTag == nil {
 		return false
 	}
-	return w.nonHTMLTag.Name == strings.ToLower(string(p))
+	name := w.nonHTMLTag.Name
+	if len(name) != len(p) {
+		return false
+	}
+	for i, b := range p {
+		if name[i] != asciiLowerByte(b) {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *writer) Write(p []byte) (n int, err error) {
@@ -233,11 +240,11 @@ func (w *writer) sNONHTML() (err error) {
 			_, err = w.flush()
 			return
 		case '>':
-			if w.shouldKeepNonHTMLContent() {
+			if w.keepNonHTML {
 				w.buf = append(w.buf, `&gt;`...)
 			}
 		default:
-			if w.shouldKeepNonHTMLContent() {
+			if w.keepNonHTML {
 				w.buf = append(w.buf, b)
 			}
 		}
@@ -257,7 +264,7 @@ func (w *writer) sLTSIGN() error {
 
 	case w.nonHTMLTag != nil:
 		w.state = sNONHTML
-		if w.shouldKeepNonHTMLContent() {
+		if w.keepNonHTML {
 			w.buf = append(w.buf, `&lt;`...)
 		}
 
@@ -279,21 +286,25 @@ func (w *writer) sLTSIGN() error {
 	return nil
 }
 
+// resolveOpenTag lowercases the accumulated tag name, looks it up, and
+// appends the opening "<tagname" to the buffer if the tag is allowed.
+func (w *writer) resolveOpenTag() {
+	asciiLowerInPlace(w.tagName)
+	name := string(w.tagName)
+	w.tag = w.FindTag(name)
+	w.nonHTMLTag = w.checkNonHTMLTag(name)
+	if w.tag != nil {
+		w.buf = append(w.buf, '<')
+		w.buf = append(w.buf, w.tag.Name...)
+	}
+}
+
 func (w *writer) sTAGNAME() error {
 	for ; w.off < len(w.data); w.off++ {
 		switch b := w.data[w.off]; b {
 		case '>':
-			w.tag = w.FindTag(w.tagName)
-			w.nonHTMLTag = w.checkNonHTMLTag(w.tagName)
-			// no w.off++
+			w.resolveOpenTag()
 			w.state = sTAGEND
-
-			if w.tag == nil {
-				return nil
-			}
-
-			w.buf = append(w.buf, '<')
-			w.buf = append(w.buf, w.tag.Name...)
 			return nil
 
 		default:
@@ -304,15 +315,7 @@ func (w *writer) sTAGNAME() error {
 			w.off++
 			w.state = sATTRGAP
 			w.lastByte = b
-
-			w.tag = w.FindTag(w.tagName)
-			w.nonHTMLTag = w.checkNonHTMLTag(w.tagName)
-			if w.tag == nil {
-				return nil
-			}
-
-			w.buf = append(w.buf, '<')
-			w.buf = append(w.buf, w.tag.Name...)
+			w.resolveOpenTag()
 			return nil
 		}
 	}
@@ -328,16 +331,15 @@ func (w *writer) sTAGEND() error {
 	if w.nonHTMLTag != nil {
 		if w.lastByte == '/' {
 			w.nonHTMLTag = nil
+			w.keepNonHTML = false
 		} else {
 			w.state = sNONHTML
+			w.keepNonHTML = w.tag != nil && w.nonHTMLTag.Name == w.tag.Name
 		}
 	}
 
 	if w.tag == nil {
-		// illegal tag, just reset the buf
-		if len(w.buf) > 0 {
-			w.buf = w.buf[:0]
-		}
+		w.buf = w.buf[:0]
 		w.lastByte = 0
 		return nil
 	}
@@ -362,11 +364,7 @@ func (w *writer) sATTRGAP() error {
 		case legalKeywordByte(b):
 			w.off++
 
-			// reset
-			if len(w.attr) > 0 {
-				w.attr = w.attr[:0]
-			}
-
+			w.attr = w.attr[:0]
 			w.attr = append(w.attr, b)
 			w.state = sATTRNAME
 			return nil
@@ -402,8 +400,10 @@ func (w *writer) sATTRNAME() error {
 			}
 
 			// name only attribute for HTML5
-			attrName := bytes.ToLower(w.attr)
-			if ok, _ := w.tag.attrExists(attrName); ok || w.attrExists(attrName) {
+			asciiLowerInPlace(w.attr)
+			attrName := w.attr
+			ok, urlAttr := w.tag.attrExists(attrName)
+			if (ok && !urlAttr) || w.attrExists(attrName) {
 				w.buf = append(w.buf, ' ')
 				w.buf = append(w.buf, attrName...)
 			}
@@ -414,10 +414,7 @@ func (w *writer) sATTRNAME() error {
 }
 
 func (w *writer) sEQUALSIGN() error {
-	// reset
-	if len(w.val) > 0 {
-		w.val = w.val[:0]
-	}
+	w.val = w.val[:0]
 
 	switch b := w.data[w.off]; {
 	case b == '>':
@@ -451,7 +448,8 @@ func (w *writer) sATTRSPACE() error {
 			continue
 		case legalKeywordByte(b), b == '>':
 			if w.tag != nil {
-				attrName := bytes.ToLower(w.attr)
+				asciiLowerInPlace(w.attr)
+				attrName := w.attr
 				ok, urlAttr := w.tag.attrExists(attrName)
 				if (ok && !urlAttr) || w.attrExists(attrName) {
 					w.buf = append(w.buf, ' ')
@@ -466,15 +464,14 @@ func (w *writer) sATTRSPACE() error {
 			}
 
 			w.off++
-			if len(w.attr) > 0 {
-				w.attr = w.attr[:0]
-			}
+			w.attr = w.attr[:0]
 			w.attr = append(w.attr, b)
 			w.state = sATTRNAME
 			return nil
 		default:
 			if w.tag != nil {
-				attrName := bytes.ToLower(w.attr)
+				asciiLowerInPlace(w.attr)
+				attrName := w.attr
 				ok, urlAttr := w.tag.attrExists(attrName)
 				if (ok && !urlAttr) || w.attrExists(attrName) {
 					w.buf = append(w.buf, ' ')
@@ -531,10 +528,7 @@ func (w *writer) sVALSPACE() error {
 		default:
 			w.off++
 			w.state = sATTRVAL
-			// reset
-			if len(w.val) > 0 {
-				w.val = w.val[:0]
-			}
+			w.val = w.val[:0]
 			w.val = append(w.val, b)
 			return nil
 		}
@@ -563,15 +557,13 @@ func (w *writer) sETAGSTART() error {
 	case legalKeywordByte(b):
 		w.off++
 		// reset
-		if len(w.tagName) > 0 {
-			w.tagName = w.tagName[:0]
-		}
+		w.tagName = w.tagName[:0]
 		w.tagName = append(w.tagName, b)
 		w.state = sETAGNAME
 
 	case w.nonHTMLTag != nil:
 		w.state = sNONHTML
-		if w.shouldKeepNonHTMLContent() {
+		if w.keepNonHTML {
 			w.buf = append(w.buf, `&lt;/`...)
 		}
 
@@ -590,8 +582,9 @@ func (w *writer) sETAGNAME() error {
 			if w.nonHTMLTag != nil {
 				if w.isEndTagOfNonHTMLElement(w.tagName) {
 					w.nonHTMLTag = nil
+					w.keepNonHTML = false
 				} else {
-					if w.shouldKeepNonHTMLContent() {
+					if w.keepNonHTML {
 						w.safeAppend([]byte(`</`))
 						w.safeAppend(w.tagName)
 					}
@@ -600,7 +593,8 @@ func (w *writer) sETAGNAME() error {
 				}
 			}
 
-			w.tag = w.FindTag(w.tagName)
+			asciiLowerInPlace(w.tagName)
+			w.tag = w.FindTag(string(w.tagName))
 			if w.tag == nil {
 				// no w.off++
 				w.state = sERRTAG
@@ -620,7 +614,7 @@ func (w *writer) sETAGNAME() error {
 		case w.nonHTMLTag != nil:
 			if !w.isEndTagOfNonHTMLElement(w.tagName) {
 				// all other tags
-				if w.shouldKeepNonHTMLContent() {
+				if w.keepNonHTML {
 					w.safeAppend([]byte(`</`))
 					w.safeAppend(w.tagName)
 				}
@@ -630,10 +624,12 @@ func (w *writer) sETAGNAME() error {
 
 			// is end tag of non-html element
 			w.nonHTMLTag = nil
+			w.keepNonHTML = false
 			fallthrough
 
 		default:
-			w.tag = w.FindTag(w.tagName)
+			asciiLowerInPlace(w.tagName)
+			w.tag = w.FindTag(string(w.tagName))
 			if w.tag == nil {
 				// no w.off++
 				w.state = sERRTAG
@@ -657,9 +653,7 @@ func (w *writer) sERRTAG() error {
 			w.off++
 			w.state = sNORMAL
 			// reset
-			if len(w.buf) > 0 {
-				w.buf = w.buf[:0]
-			}
+			w.buf = w.buf[:0]
 			return nil
 		}
 	}
@@ -688,3 +682,5 @@ func (w *writer) sETAGEND() error {
 	_, err := w.flush()
 	return err
 }
+
+// #end

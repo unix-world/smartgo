@@ -3,7 +3,7 @@
 // Minimal Settings for Smart.Framework JS
 // (c) 2006-present unix-world.org - all rights reserved
 // settings.js
-// v.20260804
+// v.20260902
 
 // settings.js
 

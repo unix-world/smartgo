@@ -9,7 +9,7 @@
 // 	* CryptoHash: CRC32B, MD5, SHA1, SHA224, SHA256, SHA384, SHA512, SHA3-224, SHA3-256, SHA3-384, SHA3-512, HMAC (Hex / B64) ; PBKDF2 (Hex / B92)
 // 	* DhKx: Srv/Cli :: Shad
 // 	* CipherCrypto: Twofish / Blowfish :: enc/dec :: CBC
-// r.20260804
+// r.20260902
 
 //==================================================================
 // The code is released under the BSD License.
@@ -41,7 +41,7 @@
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$BaseConv
  * @static
  * @frozen
@@ -406,7 +406,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$CryptoHash
  * @static
  * @frozen
@@ -1967,14 +1967,14 @@ const smartJ$CryptoHash = new class{constructor(){ // STATIC CLASS (ES6)
 						W[i] = M[offset + i] | 0;
 					} else {
 						let gamma0x = W[i - 15];
-						let gamma0  = ((gamma0x << 25) | (gamma0x >>> 7))  ^
-									  ((gamma0x << 14) | (gamma0x >>> 18)) ^
-									   (gamma0x >>> 3);
+						let gamma0  = 	((gamma0x << 25) | (gamma0x >>> 7))  ^
+										((gamma0x << 14) | (gamma0x >>> 18)) ^
+										(gamma0x >>> 3);
 
 						let gamma1x = W[i - 2];
-						let gamma1  = ((gamma1x << 15) | (gamma1x >>> 17)) ^
-									  ((gamma1x << 13) | (gamma1x >>> 19)) ^
-									   (gamma1x >>> 10);
+						let gamma1  = 	((gamma1x << 15) | (gamma1x >>> 17)) ^
+										((gamma1x << 13) | (gamma1x >>> 19)) ^
+										(gamma1x >>> 10);
 
 						W[i] = gamma0 + W[i - 7] + gamma1 + W[i - 16];
 					}
@@ -2460,8 +2460,8 @@ const smartJ$CryptoHash = new class{constructor(){ // STATIC CLASS (ES6)
 				for(let i = 0; i < 4; i++) {
 					// Shortcut
 					let H_i = H[i];
-					H[i] = (((H_i << 8)  | (H_i >>> 24)) & 0x00ff00ff) |
-						   (((H_i << 24) | (H_i >>> 8))  & 0xff00ff00);
+					H[i] = 	(((H_i << 8)  | (H_i >>> 24)) & 0x00ff00ff) |
+							(((H_i << 24) | (H_i >>> 8))  & 0xff00ff00);
 				}
 				// Return final computed hash
 				return hash;
@@ -3607,7 +3607,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$DhKx
  * @static
  * @frozen
@@ -4104,7 +4104,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$CryptoCipherTwofish
  * @static
  * @frozen
@@ -4961,7 +4961,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$CryptoCipherBlowfish
  * @static
  * @frozen
@@ -5553,7 +5553,7 @@ if(typeof(window) != 'undefined') {
  * @author unix-world.org
  * @license BSD
  * @file crypt_utils.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$CipherCrypto
  * @static
  * @frozen

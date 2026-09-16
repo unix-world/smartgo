@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -121,17 +121,28 @@ func UrlHandlerRegisterRoute(route string, skipAuth bool, methods []string, maxT
 	var allowedSafeMethods []string = []string{}
 	for _, method := range methods {
 		method = smart.StrToUpper(smart.StrTrimWhitespaces(method))
-		if(!smart.InListArr(method, allowedRouteMethods)) {
-			log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Method [" + method + "] for Route: `" + route + "`")
-			return false
+		if(method == HttpMethodTRACE) { // if TRACE method is present the route definition, must be allowed as separately, and should allow just TRACE, HEAD and GET ; also OPTIONS are allowed for each route but must not be includded, they are handled for each route separately
+			allowedSafeMethods = []string{
+				HttpMethodTRACE,
+				HttpMethodHEAD,
+				HttpMethodGET,
+			}
+			break
 		} else {
-			allowedSafeMethods = append(allowedSafeMethods, method)
-		} //end if else
+			if(!smart.InListArr(method, allowedRouteMethods)) { // if not allowed
+				log.Println("[ERROR]", smart.CurrentFunctionName(), "Invalid Method [" + method + "] for Route: `" + route + "`")
+				return false
+			} else {
+				if(!smart.InListArr(method, allowedSafeMethods)) { // prevent duplicates
+					allowedSafeMethods = append(allowedSafeMethods, method)
+				} //end if
+			} //end if else
+		} //end if
 	} //end for
-	if(len(allowedSafeMethods) <= 0) {
-		allowedSafeMethods = append(allowedSafeMethods, "HEAD")
-		allowedSafeMethods = append(allowedSafeMethods, "GET")
-		allowedSafeMethods = append(allowedSafeMethods, "POST")
+	if(len(allowedSafeMethods) <= 0) { // if no method was listed by the controller, add the 3 standard methods: HEAD, GET, POST
+		allowedSafeMethods = append(allowedSafeMethods, HttpMethodHEAD)
+		allowedSafeMethods = append(allowedSafeMethods, HttpMethodGET)
+		allowedSafeMethods = append(allowedSafeMethods, HttpMethodPOST)
 	} //end if
 	//--
 	sr := smartRoute{

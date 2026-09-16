@@ -1,0 +1,10 @@
+github.com/emersion/go-msgauth/dmarc @head.20260829
+github.com/desdic/godmarcparser @head.20260829
+
+go 1.23
+
+contains fixes by unixman: # r.20260829
+	* unixman use io, os instead of io-util
+	* re-optimized code structure
+	* added json hints
+

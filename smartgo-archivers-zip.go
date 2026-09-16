@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2021-present, unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ ARCHIVERS / ZIP ]
 
-// REQUIRE: go 1.22 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (

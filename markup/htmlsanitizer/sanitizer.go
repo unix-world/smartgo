@@ -1,59 +1,65 @@
+
 package htmlsanitizer
 
-// modified by unixman
+// modified by unixman r.20260829
 
 import (
 	"bytes"
 	"strings"
 	"io"
-	"net/url"
+
+	validate_url           "github.com/unix-world/smartgo/validate/url"
+	validate_data_url      "github.com/unix-world/smartgo/validate/data-url"
+	validate_email_address "github.com/unix-world/smartgo/validate/email"
 )
 
 // DefaultURLSanitizer is a default and strict sanitizer.
 // It only accepts
-//  * URL with scheme http or https
-//  * relative URL, such as abc, abc?xxx=1, abc#123
-//  * absolute URL, such as /abc, /abc?xxx=1, /abc#123
-func DefaultURLSanitizer(rawURL string) (sanitzed string, ok bool) {
+//   - URL with scheme http or https
+//   - relative URL, such as abc, abc?xxx=1, abc#123
+//   - absolute URL, such as /abc, /abc?xxx=1, /abc#123
+func DefaultURLSanitizer(rawURL string) (sanitized string, ok bool) {
 	//-- unixman
-	if(strings.HasPrefix(rawURL, "data:")) {
-		ok = true
-		sanitzed = rawURL
+	sanitized = ""
+	if(strings.HasPrefix(rawURL, "mailto:")) {
+		if(len(rawURL) > 7) {
+			eml, err := validate_email_address.Validate(rawURL[7:])
+			if(err == nil) {
+				ok = true
+				sanitized = "mailto:" + eml
+			}
+		}
 		return
-	} //end if
+	} else if(strings.HasPrefix(rawURL, "data:")) {
+		u, err := validate_data_url.Validate(rawURL)
+		if(err == nil) {
+			ok = true
+			sanitized = u
+		}
+		return
+	} //end if else
 	//-- #
 
-	u, err := url.Parse(rawURL)
-	if err != nil {
+	u, err := validate_url.Validate(rawURL, false) // disallow here `data:` scheme ; allow just `http:` and `https`
+	if(err != nil) {
 		return
 	}
-
-	if len(u.Opaque) > 0 {
-		return
-	}
-
-	switch u.Scheme {
-	case "http", "https", "":
-	default:
-		return
-	}
-
-	sanitzed = u.String()
+	sanitized = u
 	ok = true
 	return
 }
 
 // HTMLSanitizer is a super fast HTML sanitizer for arbitrary HTML content.
-// This is a allowlist-based santizer, of which the time complexity is O(n).
+// This is an allowlist-based sanitizer, of which the time complexity is O(n).
 type HTMLSanitizer struct {
 	*AllowList
 
 	// URLSanitizer is a func used to sanitize all the URLAttr.
-	// URLSanitizer returns a sanitzed URL and a bool var indicating
+	// URLSanitizer returns a sanitized URL and a bool var indicating
 	// whether the current attribute is acceptable. If not acceptable,
 	// the current attribute will be ignored.
 	// If the func is nil, then DefaultURLSanitizer will be used.
-	URLSanitizer func(rawURL string) (sanitzed string, ok bool)
+	URLSanitizer func(rawURL string) (sanitized string, ok bool)
 }
 
 // NewHTMLSanitizer creates a new HTMLSanitizer with the clone of
@@ -64,7 +70,7 @@ func NewHTMLSanitizer() *HTMLSanitizer {
 	}
 }
 
-func (f *HTMLSanitizer) urlSanitizer(rawURL string) (sanitzed string, ok bool) {
+func (f *HTMLSanitizer) urlSanitizer(rawURL string) (sanitized string, ok bool) {
 	if f.URLSanitizer != nil {
 		return f.URLSanitizer(rawURL)
 	}
@@ -80,9 +86,9 @@ func (f *HTMLSanitizer) NewWriter(w io.Writer) io.Writer {
 	}
 }
 
-// Sanitize the HTML data and return the sanitzed HTML.
+// Sanitize the HTML data and return the sanitized HTML.
 func (f *HTMLSanitizer) Sanitize(data []byte) ([]byte, error) {
-	buf := new(bytes.Buffer)
+	buf := bytes.NewBuffer(make([]byte, 0, len(data)))
 
 	if _, err := f.NewWriter(buf).Write(data); err != nil {
 		return nil, err
@@ -91,7 +97,7 @@ func (f *HTMLSanitizer) Sanitize(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// SanitizeString sanitizes the HTML string and return the sanitzed HTML.
+// SanitizeString sanitizes the HTML string and return the sanitized HTML.
 func (f *HTMLSanitizer) SanitizeString(data string) (string, error) {
 	ret, err := f.Sanitize([]byte(data))
 	var retStr string
@@ -119,3 +125,5 @@ func Sanitize(data []byte) ([]byte, error) {
 func SanitizeString(data string) (string, error) {
 	return defaultHTMLSanitizer.SanitizeString(data)
 }
+
+// #end

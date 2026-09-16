@@ -1,14 +1,16 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ TPL (MARKERS-TPL TEMPLATING) ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
 	"log"
+
+	"embed"
 
 	"regexp"
 	"strings"
@@ -25,12 +27,15 @@ const (
 	MTPL_FILE_EXTENSION string = ".mtpl.htm"
 
 	MAX_DOC_SIZE_TPL uint64 = SIZE_BYTES_16M // {{{SYNC-TPL-MAX-SIZE}}} ; 16MB
+
+	EFS_PREFIX string = "<EFS:tpl>"
 )
 
 //-----
 
 
 // syntax: r.20260805
+// EFS: r.20260831
 
 
 //-----
@@ -83,13 +88,51 @@ func RenderMarkersTpl(template string, arrobj map[string]string) string {
 //-----
 
 
-func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arrpobj map[string]string) (string, error) {
+func extractFilePathFromEfsPath(mtplFile string) string {
+	//--
+	if(!StrStartsWith(mtplFile, EFS_PREFIX)) {
+		return "" // unsupported
+	} //end if
+	//--
+	return StrSubstr(mtplFile, len(EFS_PREFIX), -1)
+	//--
+} //END FUNCTION
+
+
+func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arrpobj map[string]string, efs *embed.FS) (string, error) {
 	//--
 	// render a file TPL with markers, placeholders and sub-templates (1 level only) ; this is intended to be used for a main template only
 	//--
+	// IMPORTANT: placeholders need to be HTML escaped !
+	//--
 	defer PanicHandler()
 	//--
-	template, err := readTPLFile(mtplFile)
+	if(StrTrimWhitespaces(mtplFile) == "") {
+		var msg string = "TPL Path is Empty"
+		log.Println("[WARNING]", CurrentFunctionName(), msg)
+		return "", NewError(msg)
+	} //end if
+	//--
+	// SECURITY: files that need to be loaded from an EFS virtual File System have to be be prefixed with EFS_PREFIX
+	//-- {{{SYNC-TPL-EFS-SECURITY-CHECK}}}
+	if(StrStartsWith(mtplFile, EFS_PREFIX)) {
+		if(efs == nil) {
+			var msg string = "EFS TPL expects a non-Null EFS resource"
+			log.Println("[WARNING]", CurrentFunctionName(), msg, mtplFile)
+			return "", NewError(msg)
+		} //end if
+	} else if(efs != nil) {
+		if(!StrStartsWith(mtplFile, EFS_PREFIX)) {
+			var msg string = "EFS Resource expects an EFS TPL prefix"
+			log.Println("[WARNING]", CurrentFunctionName(), msg, mtplFile)
+			return "", NewError(msg)
+		} //end if
+	} //ebd if else
+	if(StrStartsWith(mtplFile, EFS_PREFIX)) {
+		mtplFile = extractFilePathFromEfsPath(mtplFile)
+	} //end if
+	//-- #
+	template, err := readTPLFile(mtplFile, efs)
 	if(err != nil) {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
 		return "", err
@@ -105,7 +148,7 @@ func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arr
 	} //end if
 	//--
 	var errStplProcess error = nil
-	template, errStplProcess = markersTplProcessSubTemplates(mtplFile, template)
+	template, errStplProcess = markersTplProcessSubTemplates(mtplFile, template, efs)
 	if(errStplProcess != nil) {
 		log.Println("[WARNING]", CurrentFunctionName(), "Sub-TPL Process Failed", mtplFile, "#", errStplProcess)
 	} //end if
@@ -119,13 +162,38 @@ func RenderMainHtmlMarkersFileTpl(mtplFile string, arrobj map[string]string, arr
 } //END FUNCTION
 
 
-func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string) (string, error) {
+func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string, efs *embed.FS) (string, error) {
 	//--
 	// render a file TPL with markers and sub-templates (1 level only) ; this is intended to be used for a partial template only
 	//--
 	defer PanicHandler()
 	//--
-	template, err := readTPLFile(mtplFile)
+	if(StrTrimWhitespaces(mtplFile) == "") {
+		var msg string = "TPL Path is Empty"
+		log.Println("[WARNING]", CurrentFunctionName(), msg)
+		return "", NewError(msg)
+	} //end if
+	//--
+	// SECURITY: files that need to be loaded from an EFS virtual File System have to be be prefixed with EFS_PREFIX
+	//-- {{{SYNC-TPL-EFS-SECURITY-CHECK}}}
+	if(StrStartsWith(mtplFile, EFS_PREFIX)) {
+		if(efs == nil) {
+			var msg string = "EFS TPL expects a non-Null EFS resource"
+			log.Println("[WARNING]", CurrentFunctionName(), msg, mtplFile)
+			return "", NewError(msg)
+		} //end if
+	} else if(efs != nil) {
+		if(!StrStartsWith(mtplFile, EFS_PREFIX)) {
+			var msg string = "EFS Resource expects an EFS TPL prefix"
+			log.Println("[WARNING]", CurrentFunctionName(), msg, mtplFile)
+			return "", NewError(msg)
+		} //end if
+	} //ebd if else
+	if(StrStartsWith(mtplFile, EFS_PREFIX)) {
+		mtplFile = extractFilePathFromEfsPath(mtplFile)
+	} //end if
+	//-- #
+	template, err := readTPLFile(mtplFile, efs)
 	if(err != nil) {
 		log.Println("[WARNING]", CurrentFunctionName(), "TPL Read Error", err, mtplFile)
 		return "", err
@@ -141,7 +209,7 @@ func RenderMarkersFileTpl(mtplFile string, arrobj map[string]string) (string, er
 	} //end if
 	//--
 	var errStplProcess error = nil
-	template, errStplProcess = markersTplProcessSubTemplates(mtplFile, template)
+	template, errStplProcess = markersTplProcessSubTemplates(mtplFile, template, efs)
 	if(errStplProcess != nil) {
 		log.Println("[WARNING]", CurrentFunctionName(), "Sub-TPL Process Failed", mtplFile, "#", errStplProcess)
 	} //end if
@@ -307,6 +375,8 @@ func PlaceholdersTplRender(template string, arrpobj map[string]string, isEncoded
 	// this is intended for low level usage only
 	// use Render* methods from above
 	//--
+	// IMPORTANT: placeholders need to be HTML escaped !
+	//--
 	defer PanicHandler() // url decode may panic
 	//--
 	if(StrTrimWhitespaces(template) == "") {
@@ -440,7 +510,7 @@ func MarkersTplRender(template string, arrobj map[string]string, isEncoded bool,
 //-----
 
 
-func markersTplProcessSubTemplates(mtplFile string, template string) (string, error) {
+func markersTplProcessSubTemplates(mtplFile string, template string, efs *embed.FS) (string, error) {
 	//--
 	// the current implementation supports just 1st level sub-templates, to simplify things and have a better security management
 	//--
@@ -452,7 +522,7 @@ func markersTplProcessSubTemplates(mtplFile string, template string) (string, er
 	//--
 	if((arrSTPLs != nil) && (len(arrSTPLs) > 0)) {
 		var errStplLoad error = nil
-		template, errStplLoad = markersTplLoadSubTemplates(mtplFile, template, arrSTPLs)
+		template, errStplLoad = markersTplLoadSubTemplates(mtplFile, template, arrSTPLs, efs)
 		if(errStplLoad != nil) {
 			return template, errStplLoad
 		} //end if
@@ -508,7 +578,7 @@ func markersTplDetectSubTemplates(template string) map[string]string {
 } //END FUNCTION
 
 
-func markersTplLoadSubTemplates(mtplFile string, template string, arrSTPLs map[string]string) (string, error) {
+func markersTplLoadSubTemplates(mtplFile string, template string, arrSTPLs map[string]string, efs *embed.FS) (string, error) {
 	//--
 	// supported escapings: `|trim` `|js` `|js|html` `|html`
 	//--
@@ -524,8 +594,18 @@ func markersTplLoadSubTemplates(mtplFile string, template string, arrSTPLs map[s
 	if(!StrEndsWith(mtplFile, MTPL_FILE_EXTENSION)) {
 		return template, NewError("Sub-TPL File Path is Not MTPL")
 	} //end if
-	if(!PathIsFile(mtplFile)) {
-		return template, NewError("TPL File Path does not exists")
+	if(efs != nil) {
+		_, isFile, errFile := SafePathEmbedIsFile(efs, mtplFile)
+		if(errFile != nil) {
+			return template, NewError("EFS: TPL File Path detection Failed: " + errFile.Error())
+		} //end if
+		if(!isFile) {
+			return template, NewError("EFS: TPL File Path does not exists")
+		} //end if
+	} else {
+		if(!PathIsFile(mtplFile)) {
+			return template, NewError("TPL File Path does not exists")
+		} //end if
 	} //end if
 	//--
 	mtplDir := StrTrimWhitespaces(PathDirName(mtplFile))
@@ -537,8 +617,18 @@ func markersTplLoadSubTemplates(mtplFile string, template string, arrSTPLs map[s
 		(PathIsAbsolute(mtplDir) == true)) {
 		return template, NewError("Sub-TPL Dir Path is Empty or Unsafe")
 	} //end if
-	if(!PathIsDir(mtplDir)) {
-		return template, NewError("Sub-TPL Dir Path is Not a Dir")
+	if(efs != nil) {
+		_, isDir, errDir := SafePathEmbedIsDir(efs, mtplDir)
+		if(errDir != nil) {
+			return template, NewError("EFS: Sub-TPL Dir Path detection Failed: " + errDir.Error())
+		} //end if
+		if(!isDir) {
+			return template, NewError("EFS: Sub-TPL Dir Path is Not a Dir")
+		} //end if
+	} else {
+		if(!PathIsDir(mtplDir)) {
+			return template, NewError("Sub-TPL Dir Path is Not a Dir")
+		} //end if
 	} //end if
 	//--
 	if((template == "") || (!StrContains(template, "[@@@SUB-TEMPLATE:")) || (!StrContains(template, "@@@]"))) {
@@ -575,7 +665,7 @@ func markersTplLoadSubTemplates(mtplFile string, template string, arrSTPLs map[s
 				} //end if
 			} //end if
 			//--
-			stplFContent, stplErr := readTPLFile(PathAddDirLastSlash(mtplDir) +  stplFName)
+			stplFContent, stplErr := readTPLFile(PathAddDirLastSlash(mtplDir) +  stplFName, efs)
 			if(stplErr != nil) {
 				return template, NewError("Sub-TPL Read SubTemplate ERR for Key: `" + key + "` # " + stplErr.Error())
 			} //end if
@@ -995,10 +1085,10 @@ func markersTplProcessMarkerSyntax(template string, arrobj map[string]string, co
 	//--
 	for i, match := range regexMarkers.FindAllStringSubmatch(template, -1) {
 		//--
-		var tmp_marker_val string			= "" 				// just initialize
-		var tmp_marker_id  string			= string(match[0]) 	// [###THE-MARKER|escapings...###]
-		var tmp_marker_key string			= string(match[1]) 	// THE-MARKER
-		var tmp_marker_esc string			= string(match[2]) 	// |escaping1(|escaping2...|escaping99)
+		var tmp_marker_val string = "" 					// just initialize
+		var tmp_marker_id  string = string(match[0]) 	// [###THE-MARKER|escapings...###]
+		var tmp_marker_key string = string(match[1]) 	// THE-MARKER
+		var tmp_marker_esc string = string(match[2]) 	// |escaping1(|escaping2...|escaping99)
 		//--
 		if(context != "") {
 			if(StrContains(tmp_marker_key, ".") == true) {
@@ -1494,7 +1584,7 @@ func markersTplProcessLoopSyntax(template string, arrobj map[string]string) stri
 //-----
 
 
-func readTPLFile(mtplFile string) (string, error) {
+func readTPLFile(mtplFile string, efs *embed.FS) (string, error) {
 	//--
 	defer PanicHandler()
 	//--
@@ -1507,24 +1597,46 @@ func readTPLFile(mtplFile string) (string, error) {
 		return "", NewError("Invalid TPL File Extension")
 	} //end if
 	//--
-	fileSize, errSize := SafePathFileGetSize(mtplFile, false)
-	if(errSize != nil) {
-		return "", errSize
-	} //end if
-	if(uint64(fileSize) > MAX_DOC_SIZE_TPL) {
-		return "", NewError("TPL is OverSized")
-	} //end if
+	var template string = ""
 	//--
-	template, errRd := SafePathFileRead(mtplFile, false)
-	if(errRd != nil) {
-		return "", errRd
-	} //end if
-	if(template == "") {
-		return "", NewError("TPL File is Unreadable or Empty")
-	} //end if
-	if(StrTrimWhitespaces(template) == "") {
-		return "", NewError("TPL File is Empty or Contains just Spacing characters")
-	} //end if
+	if(efs != nil) {
+		//--
+		bytTemplate, errRd := SafePathEmbedFileRead(efs, mtplFile)
+		if(errRd != nil) {
+			return "", NewError("EFS: " + errRd.Error())
+		} //end if
+		if((bytTemplate == nil) || (len(bytTemplate) <= 0)) {
+			return "", NewError("EFS: TPL File is Unreadable or Empty")
+		} //end if
+		template = string(bytTemplate)
+		bytTemplate = nil
+		if(StrTrimWhitespaces(template) == "") {
+			return "", NewError("EFS: TPL File is Empty or Contains just Spacing characters")
+		} //end if
+		//--
+	} else {
+		//--
+		fileSize, errSize := SafePathFileGetSize(mtplFile, false)
+		if(errSize != nil) {
+			return "", errSize
+		} //end if
+		if(uint64(fileSize) > MAX_DOC_SIZE_TPL) {
+			return "", NewError("TPL is OverSized")
+		} //end if
+		//--
+		var errRd error
+		template, errRd = SafePathFileRead(mtplFile, false)
+		if(errRd != nil) {
+			return "", errRd
+		} //end if
+		if(template == "") {
+			return "", NewError("TPL File is Unreadable or Empty")
+		} //end if
+		if(StrTrimWhitespaces(template) == "") {
+			return "", NewError("TPL File is Empty or Contains just Spacing characters")
+		} //end if
+		//--
+	} //end if else
 	//--
 	return template, nil
 	//--

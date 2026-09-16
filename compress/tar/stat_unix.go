@@ -6,7 +6,10 @@
 
 package tar
 
+// modified by unixman
+
 import (
+	"fmt"
 	"io/fs"
 	"os/user"
 	"runtime"
@@ -35,13 +38,15 @@ func statUnix(fi fs.FileInfo, h *Header, doNameLookups bool) error {
 		// The os/user functions may fail for any number of reasons
 		// (not implemented on that platform, cgo not enabled, etc).
 		if u, ok := userMap.Load(h.Uid); ok {
-			h.Uname = u.(string)
+		//	h.Uname = u.(string)
+			h.Uname = fmt.Sprint(u) // unixman
 		} else if u, err := user.LookupId(strconv.Itoa(h.Uid)); err == nil {
 			h.Uname = u.Username
 			userMap.Store(h.Uid, h.Uname)
 		}
 		if g, ok := groupMap.Load(h.Gid); ok {
-			h.Gname = g.(string)
+		//	h.Gname = g.(string)
+			h.Gname = fmt.Sprint(g) // unixman
 		} else if g, err := user.LookupGroupId(strconv.Itoa(h.Gid)); err == nil {
 			h.Gname = g.Name
 			groupMap.Store(h.Gid, h.Gname)

@@ -1,4 +1,4 @@
-@v1.11.5 #20241231 + @head.20260220
+@v1.12.0 #20260419 @head.20260826
 
 Go 1.13 or later
 
@@ -6,4 +6,8 @@ github.com/dlclark/regexp2
 
 # refactored by unixman as:
 github.com/unix-world/smartgo/regexp2
+
+last patch:
+    * fixes #37 fixes #34 fix stack curruption based on dotnet engine: 3d5df45b703801b3fe51eb3f5c0dd302e8b0d676
+
 

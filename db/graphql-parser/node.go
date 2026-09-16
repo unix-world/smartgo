@@ -9,6 +9,8 @@
 
 package parser
 
+// modified by unixman
+
 import (
 	"bytes"
 	"fmt"
@@ -66,7 +68,8 @@ func ASTFromPlain(plainAST map[string]interface{}) (*ASTNode, error) {
 
 			childrenList := make([]map[string]interface{}, len(ic))
 			for i := range ic {
-				childrenList[i] = ic[i].(map[string]interface{})
+			//	childrenList[i] = ic[i].(map[string]interface{})
+				childrenList[i], _ = ic[i].(map[string]interface{}) // unixman
 			}
 
 			children = childrenList

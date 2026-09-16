@@ -2,7 +2,7 @@ github.com/simonnilsson/ask # v.0.5.0 @head.20260822
 
 go 1.17
 
-refactored and modified by unixman r.20260823.2358
+refactored and modified by unixman r.20260829.2358
     * upstream last patch:
 	* "Version 0.5.0": 1373413dacb1c325446eedf49736cb30b8a8b4b5
 

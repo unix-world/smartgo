@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Auth :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -75,6 +75,7 @@ type authNfo struct {
 //-- auth token api
 var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse) {
 	//--
+	// allowed methods: GET
 	// routes:
 	// 			/auth
 	// 			/auth/2fatotp 	; req. Area=DEFAULT
@@ -107,7 +108,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "" // reset on 3xx
 				return
 			} //end if
-			if(r.Method != "GET") {
+			if(r.Method != HttpMethodGET) {
 				response.ContentBody = ApiResponseJsonERR(405, "Unsupported Request Method: `" + r.Method + "`", nil)
 				return
 			} //end if
@@ -261,7 +262,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 				response.ContentFileName = "" // reset on 3xx
 				return
 			} //end if
-			if(r.Method != "GET") {
+			if(r.Method != HttpMethodGET) {
 				response.StatusCode = 405
 				response.LogMessage = "Unsupported Request Method: `" + r.Method + "`"
 				response.ContentBody = response.LogMessage
@@ -372,7 +373,7 @@ var RouteHandlerAuthApi HttpHandlerFunc = func(r *http.Request, headPath string,
 			return
 		break
 		case "jwt": // OK: handle: `/auth/jwt`
-			if(r.Method != "GET") {
+			if(r.Method != HttpMethodGET) {
 				response.LogMessage = "Unsupported Request Method: `" + r.Method + "`"
 				response.ContentBody = ApiResponseJsonERR(405, response.LogMessage, nil)
 				return

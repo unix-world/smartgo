@@ -4,6 +4,8 @@
 
 package zstd
 
+// modified by unixman
+
 import (
 	"fmt"
 	rdebug "runtime/debug"
@@ -125,7 +127,8 @@ func (e *Encoder) compressJob(enc encoder, job *encJob) {
 
 func (js *jobState) getInputBuf(size int) []byte {
 	if v := js.inputPool.Get(); v != nil {
-		bp := v.(*[]byte)
+	//	bp := v.(*[]byte)
+		bp, _ := v.(*[]byte) // unixman
 		b := *bp
 		if cap(b) >= size {
 			return b[:0]
@@ -143,7 +146,8 @@ func (js *jobState) putInputBuf(b []byte) {
 
 func (js *jobState) getOutputBuf(size int) []byte {
 	if v := js.outputPool.Get(); v != nil {
-		bp := v.(*[]byte)
+	//	bp := v.(*[]byte)
+		bp, _ := v.(*[]byte) // unixman
 		b := *bp
 		if cap(b) >= size {
 			return b[:0]
@@ -161,7 +165,8 @@ func (js *jobState) putOutputBuf(b []byte) {
 
 func (js *jobState) getOverlapBuf(size int) []byte {
 	if v := js.overlapPool.Get(); v != nil {
-		bp := v.(*[]byte)
+	//	bp := v.(*[]byte)
+		bp, _ := v.(*[]byte) // unixman
 		b := *bp
 		if cap(b) >= size {
 			return b[:size]

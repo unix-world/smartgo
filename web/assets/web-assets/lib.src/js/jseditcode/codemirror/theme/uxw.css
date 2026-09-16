@@ -1,21 +1,22 @@
+
 /*
-// theme/uxw.css
-// codemirror: v.5.61.1
+// theme/uxw.css (default editor)
+// codemirror: v.5.65.18
+// maintained by unixman # r.20260824
 */
 
 /*
-	UXW Write theme, inspired from MDN-LIKE Theme - Mozilla
-	Ported to CodeMirror by Peter Kroon <plakroon@gmail.com>, Report bugs/issues here: https://github.com/codemirror/CodeMirror/issues, GitHub: @peterkroon
-	The mdn-like theme is inspired on the displayed code examples at: https://developer.mozilla.org/en-US/docs/Web/CSS/animation
-	Inspired by mdn-like theme, modified by unixman, (c) 2016-2021 unix-world.org
+UXW Write theme, inspired from MDN-LIKE Theme - Mozilla
+Ported to CodeMirror by Peter Kroon <plakroon@gmail.com>, Report bugs/issues here: https://github.com/codemirror/CodeMirror/issues, GitHub: @peterkroon
+The mdn-like theme is inspired on the displayed code examples at: https://developer.mozilla.org/en-US/docs/Web/CSS/animation
+Inspired by mdn-like theme, modified by unixman, (c) 2016-present unix-world.org
 */
 
-.cm-s-uxw.CodeMirror { color: #333333; background-color: #FFFFFF; }
 .cm-s-uxw div.CodeMirror-selected { background: #DDEEFF; }
 .cm-s-uxw .CodeMirror-line::selection, .cm-s-uxw .CodeMirror-line > span::selection, .cm-s-uxw .CodeMirror-line > span > span::selection { background: #FEFD53; }
 .cm-s-uxw .CodeMirror-line::-moz-selection, .cm-s-uxw .CodeMirror-line > span::-moz-selection, .cm-s-uxw .CodeMirror-line > span > span::-moz-selection { background: #FEFD53; }
 
-.cm-s-uxw .CodeMirror-gutters { border-left: 2px solid #DDEEFF; background: #FFFFFF; color: #333333; }
+.cm-s-uxw .CodeMirror-gutters { border-left: 2px solid #ED2559; background: #FFFFFF; color: #333333; }
 .cm-s-uxw .CodeMirror-linenumber { color: #AAAAAA; padding-left: 8px; }
 .cm-s-uxw .CodeMirror-cursor { border-left: 2px solid #222222; }
 
@@ -49,5 +50,12 @@
 .cm-s-uxw .cm-error { border-bottom: 1px solid red; }
 
 div.cm-s-uxw .CodeMirror-activeline-background { background: #EFEFFF; }
+
+.cm-s-uxw.CodeMirror {
+	color: #333333;
+	background-color: #FFFFFF;
+	background: linear-gradient(to bottom, #FAFAFA, #FAFAFA 50%, #FAFCFC 50%, #FAFCFC);
+	background-size: 100% 10px;
+}
 
 /* END */

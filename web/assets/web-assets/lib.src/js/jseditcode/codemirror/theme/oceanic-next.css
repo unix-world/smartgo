@@ -1,13 +1,29 @@
+
 /*
 // theme/oceanic-next.css
 // codemirror: v.5.61.1
+// modified by unixman # r.20260824
 */
 
 /*
-	Name:       oceanic-next
-	Author:     Filype Pereira (https://github.com/fpereira1)
-	Original oceanic-next color scheme by Dmitri Voronianski (https://github.com/voronianski/oceanic-next-color-scheme)
+Name: oceanic-next
+Author: Filype Pereira (https://github.com/fpereira1)
+Original oceanic-next color scheme by Dmitri Voronianski (https://github.com/voronianski/oceanic-next-color-scheme)
 */
+
+.CodeMirror.cm-s-oceanic-next {
+	border-top: 0 !important;
+}
+.CodeMirror-SmartMenu-Bar-oceanic-next {
+	background-color: #203040 !important;
+}
+.CodeMirror-SmartMenu-Bar-oceanic-next,
+.CodeMirror-SmartMenu-Bar-oceanic-next * {
+	color: #FFFFFF !important;
+}
+.CodeMirror-SmartMenu-Bar-oceanic-next img {
+	filter: invert(1) !important;
+}
 
 .cm-s-oceanic-next.CodeMirror { background: #304148; color: #f8f8f2; }
 .cm-s-oceanic-next div.CodeMirror-selected { background: rgba(101, 115, 126, 0.33); }

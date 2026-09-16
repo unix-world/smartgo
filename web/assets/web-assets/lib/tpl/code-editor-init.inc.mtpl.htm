@@ -1,0 +1,24 @@
+<!-- Partial Template: Plugins.InitEditArea r.20260831 (go) -->
+<!-- CodeMirror Editor -->
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/lib/codemirror.css">
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/lib/codemirror-custom.css">
+[%%%IF:CODEED-THEMES:@>0;%%%]
+[%%%LOOP:CODEED-THEMES%%%]
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/theme/[###CODEED-THEMES._-VAL-_|url|html###].css">
+[%%%/LOOP:CODEED-THEMES%%%]
+[%%%ELSE:CODEED-THEMES%%%]
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/theme/uxm.css"><!-- light:readonly -->
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/theme/uxw.css"><!-- light:editable -->
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/theme/zenburn.css"><!-- dark:readonly -->
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/theme/nord.css"><!-- dark:editable -->
+[%%%/IF:CODEED-THEMES%%%]
+<script src="lib/js/jseditcode/codemirror/lib/codemirror.js"></script>
+<!-- CodeMirror Editor / Addons -->
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/codemirror/addons.pak.css">
+<script src="lib/js/jseditcode/codemirror/addons.pak.js"></script>
+<!-- CodeMirror Editor / Parsers -->
+<script src="lib/js/jseditcode/codemirror/modes.pak.js"></script>
+<!-- CodeMirror Editor (smart) -->
+<link rel="stylesheet" type="text/css" href="lib/js/jseditcode/smartcodemirror/smart-codemirror.css">
+<script src="lib/js/jseditcode/smartcodemirror/smart-codemirror.js"></script>
+<!-- #END :: Partial Template: Plugins.InitEditArea -->

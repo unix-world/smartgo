@@ -1,5 +1,7 @@
 github.com/go-yaml/yaml @v3.0.1
 [ gopkg.in/yaml.v3 ]
 
+modified by unixman r.20260826
+
 go 1.15
 

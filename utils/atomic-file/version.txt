@@ -1,0 +1,8 @@
+github.com/caddyserver/certmagic/internal/atomicfile @head.20260915
+
+go 1.26
+
+
+LICENSE: Apache 2.0
+
+

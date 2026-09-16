@@ -1,0 +1,3 @@
+/* CSS-Stylesheet (UM): str-diff.css @ 2026-08-30 06:15:37 +0000 */
+.str-diff ins{display:inline-block;padding:2px;background:#bdf;text-decoration:overline;text-decoration-color:#ace}.str-diff ins:hover{text-decoration:none}.str-diff del{display:inline-block;padding:2px;background:#f5cbe1;text-decoration-color:#e4bad0}.str-diff del:hover{text-decoration:none}
+/* #END */

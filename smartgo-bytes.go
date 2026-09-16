@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ BYTES ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -22,7 +22,7 @@ import (
 
 func BytesConcatenate(src1 []byte, src2 []byte) []byte {
 	//--
-	if((src1 == nil) && (src2 == nil)) {
+	if((src1 == nil) && (src2 == nil)) { // do not text for len() here ... can be nil or []byte, which is different on what to return !
 		return nil
 	} else if(src1 == nil) {
 		return src2
@@ -80,7 +80,7 @@ func BExplode(delimiter []byte, src []byte) [][]byte {
 
 func BImplode(glue []byte, pieces [][]byte) []byte {
 	//--
-	if(pieces == nil) {
+	if((pieces == nil) || (len(pieces) <= 0)) {
 		return nil
 	} //end if
 	if(len(pieces) <= 0) {
@@ -102,7 +102,7 @@ func BytPos(haystack []byte, needle []byte, binary bool) int {
 	//--
 	// Benchmark: use BytStartsWith() which is much faster instead of this to test if a byte slice starts with some part
 	//--
-	if((haystack == nil) || (needle == nil)) {
+	if((haystack == nil) || (len(haystack) <= 0) || (needle == nil) || (len(needle) <= 0)) {
 		return -1
 	} //end if
 	//--
@@ -144,7 +144,7 @@ func BytRPos(haystack []byte, needle []byte, binary bool) int {
 	//--
 	// Benchmark: use BytEndsWith() which is much faster instead of this to test if a string ends with some part
 	//--
-	if((haystack == nil) || (needle == nil)) {
+	if((haystack == nil) || (len(haystack) <= 0) || (needle == nil) || (len(needle) <= 0)) {
 		return -1
 	} //end if
 	//--
@@ -231,7 +231,7 @@ func BytIContains(src []byte, part []byte) bool {
 
 func BytTrim(src []byte, cutset string) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -242,7 +242,7 @@ func BytTrim(src []byte, cutset string) []byte {
 
 func BytTrimLeft(src []byte, cutset string) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -253,7 +253,7 @@ func BytTrimLeft(src []byte, cutset string) []byte {
 
 func BytTrimRight(src []byte, cutset string) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -264,6 +264,10 @@ func BytTrimRight(src []byte, cutset string) []byte {
 
 func BytTrimWhitespaces(s []byte) []byte {
 	//--
+	if((s == nil) || (len(s) <= 0)) {
+		return nil
+	} //end if
+	//--
 	return BytTrim(s, TRIM_WHITESPACES) // this is compatible with PHP
 	//--
 } //END FUNCTION
@@ -271,12 +275,20 @@ func BytTrimWhitespaces(s []byte) []byte {
 
 func BytTrimLeftWhitespaces(s []byte) []byte {
 	//--
+	if((s == nil) || (len(s) <= 0)) {
+		return nil
+	} //end if
+	//--
 	return BytTrimLeft(s, TRIM_WHITESPACES) // this is compatible with PHP
 	//--
 } //END FUNCTION
 
 
 func BytTrimRightWhitespaces(s []byte) []byte {
+	//--
+	if((s == nil) || (len(s) <= 0)) {
+		return nil
+	} //end if
 	//--
 	return BytTrimRight(s, TRIM_WHITESPACES) // this is compatible with PHP
 	//--
@@ -288,7 +300,7 @@ func BytTrimRightWhitespaces(s []byte) []byte {
 
 func BytSubstr(s []byte, start int, stop int) []byte {
 	//--
-	if(s == nil) {
+	if((s == nil) || (len(s) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -314,7 +326,7 @@ func BytSubstr(s []byte, start int, stop int) []byte {
 
 func BytToLower(src []byte) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -325,7 +337,7 @@ func BytToLower(src []byte) []byte {
 
 func BytToUpper(src []byte) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -339,9 +351,10 @@ func BytToUpper(src []byte) []byte {
 
 func BytRepeat(src []byte, count int) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
+	//--
 	if(count <= 0) {
 		return nil
 	} //end if
@@ -354,9 +367,61 @@ func BytRepeat(src []byte, count int) []byte {
 //-----
 
 
+func BytNormalizeLineEndings(s []byte) []byte {
+	//--
+	if((s == nil) || (len(s) <= 0)) {
+		return nil
+	} //end if
+	//-- do not use BytTr here because the order of replacements is random there and here the order of replacements real matters
+	s = BytReplaceAll(s, []byte(CARRIAGE_RETURN + LINE_FEED), []byte(LINE_FEED))
+	s = BytReplaceAll(s, []byte(CARRIAGE_RETURN),             []byte(LINE_FEED))
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func BytNormalizeOnlySpaces(s []byte) []byte {
+	//--
+	if((s == nil) || (len(s) <= 0)) {
+		return nil
+	} //end if
+	//--
+	var space []byte = []byte(" ")
+	//-- do not use BytTr here because the order of replacements is random there and here the order of replacements real matters
+	s = BytReplaceAll(s, []byte(HORIZONTAL_TAB),              space)
+	s = BytReplaceAll(s, []byte(VERTICAL_TAB),                space)
+	s = BytReplaceAll(s, []byte(NULL_BYTE),                   space)
+	s = BytReplaceAll(s, []byte(FORM_FEED),                   space)
+	//--
+	s = BytReplaceAll(s, []byte(BACK_SPACE),                  space)
+	s = BytReplaceAll(s, []byte(ASCII_BELL),                  space)
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func BytNormalizeSpaces(s []byte) []byte {
+	//--
+	if((s == nil) || (len(s) <= 0)) {
+		return nil
+	} //end if
+	//--
+	var space []byte = []byte(" ")
+	//-- do not use BytTr here because the order of replacements is random there and here the order of replacements real matters
+	s = BytReplaceAll(s, []byte(CARRIAGE_RETURN + LINE_FEED), space)
+	s = BytReplaceAll(s, []byte(CARRIAGE_RETURN),             space)
+	s = BytReplaceAll(s, []byte(LINE_FEED),                   space)
+	//--
+	return BytNormalizeOnlySpaces(s)
+	//--
+} //END FUNCTION
+
+
 func BytToValidUTF8Fix(src []byte) []byte {
 	//--
-	if(src == nil) {
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -403,7 +468,7 @@ func BytReplaceAll(src []byte, part []byte, replacement []byte) []byte {
 // case insensitive replacer
 func BytIReplaceWithLimit(s []byte, part []byte, replacement []byte, limit int) []byte {
 	//--
-	if(s == nil) {
+	if((s == nil) || (len(s) <= 0)) {
 		return nil
 	} //end if
 	if((part == nil) || (BytesEqual(part, replacement) == true)) {
@@ -478,7 +543,12 @@ func BytRegexCallbackReplaceWithLimit(rexpr string, src []byte, replFx func(mgro
 	// https://github.com/agext/regexp # License: Apache 2.0
 	// https://gist.github.com/slimsag/14c66b88633bd52b7fa710349e4c6749 # License: MIT
 	//--
-	if(src == nil) {
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return nil
+	} //end if
+	//--
+	if((src == nil) || (len(src) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -521,6 +591,15 @@ func BytRegexCallbackReplaceAll(rexpr string, src []byte, replFx func(mgroups []
 	//--
 	defer PanicHandler() // regex compile
 	//--
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return nil
+	} //end if
+	//--
+	if((src == nil) || (len(src) <= 0)) {
+		return nil
+	} //end if
+	//--
 	return BytRegexCallbackReplaceWithLimit(rexpr, src, replFx, -1)
 	//--
 } //END FUNCTION
@@ -530,7 +609,12 @@ func BytRegexReplaceAll(rexpr string, s []byte, repl []byte) []byte {
 	//--
 	defer PanicHandler() // regex compile
 	//--
-	if(s == nil) {
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return nil
+	} //end if
+	//--
+	if((s == nil) || (len(s) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -549,7 +633,12 @@ func BytRegexReplaceFirst(rexpr string, s []byte, repl []byte) []byte {
 	//--
 	defer PanicHandler() // regex compile
 	//--
-	if(s == nil) {
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return nil
+	} //end if
+	//--
+	if((s == nil) || (len(s) <= 0)) {
 		return nil
 	} //end if
 	//--
@@ -572,7 +661,12 @@ func BytRegexMatch(rexpr string, s []byte) bool {
 	//--
 	defer PanicHandler() // regex compile
 	//--
-	if(s == nil) {
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return false
+	} //end if
+	//--
+	if((s == nil) || (len(s) <= 0)) {
 		return false
 	} //end if
 	//--
@@ -593,7 +687,11 @@ func BytRegexFindFirstMatch(rexp string, s []byte) ([][]byte, error) {
 	//--
 	var match [][]byte = [][]byte{}
 	//--
-	if(s == nil) {
+	if(rexp == "") {
+		return match, NewError("Regex Expression is Empty")
+	} //end if
+	//--
+	if((s == nil) || (len(s) <= 0)) {
 		return match, nil
 	} //end if
 	//--
@@ -616,7 +714,11 @@ func BytRegexFindAllMatches(rexp string, s []byte, maxRecursion uint32) ([][][]b
 	//--
 	var matches [][][]byte = [][][]byte{}
 	//--
-	if(s == nil) {
+	if(rexp == "") {
+		return matches, NewError("Regex Expression is Empty")
+	} //end if
+	//--
+	if((s == nil) || (len(s) <= 0)) {
 		return matches, nil
 	} //end if
 	//--

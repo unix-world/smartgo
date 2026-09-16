@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ AUTH ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -61,6 +61,9 @@ const (
 	HTTP_AUTH_USER_RAW    string = ":RAW" 		// used for http client to add custom header like: 	`Authorization: %Custom% ****` where `%Custom% ****` is the password ; ex: `Authorization: OAuth ****`
 
 	JWT_API_KEY_VIRTUAL_EXTERNAL string = "ApiKey:Virtual:External"
+
+	AUTH_BASIC_ROUTE_LOGIN   string = "login"  // auth basic 	; must be relative because may have proxy prefix
+	AUTH_COOKIE_ROUTE_SIGNIN string = "signin" // auth cookie 	; must be relative because may have proxy prefix
 )
 
 var (

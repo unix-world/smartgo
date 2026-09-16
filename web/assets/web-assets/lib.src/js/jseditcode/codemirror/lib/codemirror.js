@@ -6,8 +6,8 @@
 // at http://marijnhaverbeke.nl/blog/#cm-internals .
 
 // lib/codemirror.js
-// codemirror: v.5.65.15
-// r.20210605 with fixes by unixman: accept calc() in css properties
+// codemirror: v.5.65.18
+// r.20260824 with fixes by unixman: accept calc() in css properties
 
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
@@ -114,13 +114,14 @@
 		} while (child = child.parentNode)
 	}
 
-	function activeElt(doc) {
+	function activeElt(rootNode) {
 		// IE and Edge may throw an "Unspecified Error" when accessing document.activeElement.
 		// IE < 10 will throw when accessed while the page is loading or in an iframe.
 		// IE > 9 and Edge will throw when accessed in an iframe if document.body is unavailable.
+		var doc = rootNode.ownerDocument || rootNode;
 		var activeElement;
 		try {
-			activeElement = doc.activeElement;
+			activeElement = rootNode.activeElement;
 		} catch(e) {
 			activeElement = doc.body || null;
 		}
@@ -147,6 +148,15 @@
 		{ selectInput = function(node) { try { node.select(); } catch(_e) {} }; }
 
 	function doc(cm) { return cm.display.wrapper.ownerDocument }
+
+	function root(cm) {
+		return rootNode(cm.display.wrapper)
+	}
+
+	function rootNode(element) {
+		// Detect modern browsers (2017+).
+		return element.getRootNode ? element.getRootNode() : element.ownerDocument
+	}
 
 	function win(cm) { return doc(cm).defaultView }
 
@@ -3417,7 +3427,7 @@
 	}
 
 	// Compute the lines that are visible in a given viewport (defaults
-	// the the current scroll position). viewport may contain top,
+	// the current scroll position). viewport may contain top,
 	// height, and ensure (see op.scrollToPos) properties.
 	function visibleLines(display, doc, viewport) {
 		var top = viewport && viewport.top != null ? Math.max(0, viewport.top) : display.scroller.scrollTop;
@@ -3902,7 +3912,7 @@
 			cm.display.maxLineChanged = false;
 		}
 
-		var takeFocus = op.focus && op.focus == activeElt(doc(cm));
+		var takeFocus = op.focus && op.focus == activeElt(root(cm));
 		if (op.preparedSelection)
 			{ cm.display.input.showSelection(op.preparedSelection, takeFocus); }
 		if (op.updatedDisplay || op.startHeight != cm.doc.height)
@@ -4079,7 +4089,7 @@
 
 	function selectionSnapshot(cm) {
 		if (cm.hasFocus()) { return null }
-		var active = activeElt(doc(cm));
+		var active = activeElt(root(cm));
 		if (!active || !contains(cm.display.lineDiv, active)) { return null }
 		var result = {activeElt: active};
 		if (window.getSelection) {
@@ -4095,7 +4105,7 @@
 	}
 
 	function restoreSelection(snapshot) {
-		if (!snapshot || !snapshot.activeElt || snapshot.activeElt == activeElt(snapshot.activeElt.ownerDocument)) { return }
+		if (!snapshot || !snapshot.activeElt || snapshot.activeElt == activeElt(rootNode(snapshot.activeElt))) { return }
 		snapshot.activeElt.focus();
 		if (!/^(INPUT|TEXTAREA)$/.test(snapshot.activeElt.nodeName) &&
 				snapshot.anchorNode && contains(document.body, snapshot.anchorNode) && contains(document.body, snapshot.focusNode)) {
@@ -7266,7 +7276,7 @@
 	function onKeyDown(e) {
 		var cm = this;
 		if (e.target && e.target != cm.display.input.getField()) { return }
-		cm.curOp.focus = activeElt(doc(cm));
+		cm.curOp.focus = activeElt(root(cm));
 		if (signalDOMEvent(cm, e)) { return }
 		// IE does strange things with escape.
 		if (ie && ie_version < 11 && e.keyCode == 27) { e.returnValue = false; }
@@ -7428,7 +7438,7 @@
 
 	function leftButtonDown(cm, pos, repeat, event) {
 		if (ie) { setTimeout(bind(ensureFocus, cm), 0); }
-		else { cm.curOp.focus = activeElt(doc(cm)); }
+		else { cm.curOp.focus = activeElt(root(cm)); }
 
 		var behavior = configureMouse(cm, repeat, event);
 
@@ -7498,19 +7508,19 @@
 	// Normal selection, as opposed to text dragging.
 	function leftButtonSelect(cm, event, start, behavior) {
 		if (ie) { delayBlurEvent(cm); }
-		var display = cm.display, doc$1 = cm.doc;
+		var display = cm.display, doc = cm.doc;
 		e_preventDefault(event);
 
-		var ourRange, ourIndex, startSel = doc$1.sel, ranges = startSel.ranges;
+		var ourRange, ourIndex, startSel = doc.sel, ranges = startSel.ranges;
 		if (behavior.addNew && !behavior.extend) {
-			ourIndex = doc$1.sel.contains(start);
+			ourIndex = doc.sel.contains(start);
 			if (ourIndex > -1)
 				{ ourRange = ranges[ourIndex]; }
 			else
 				{ ourRange = new Range(start, start); }
 		} else {
-			ourRange = doc$1.sel.primary();
-			ourIndex = doc$1.sel.primIndex;
+			ourRange = doc.sel.primary();
+			ourIndex = doc.sel.primIndex;
 		}
 
 		if (behavior.unit == "rectangle") {
@@ -7527,18 +7537,18 @@
 
 		if (!behavior.addNew) {
 			ourIndex = 0;
-			setSelection(doc$1, new Selection([ourRange], 0), sel_mouse);
-			startSel = doc$1.sel;
+			setSelection(doc, new Selection([ourRange], 0), sel_mouse);
+			startSel = doc.sel;
 		} else if (ourIndex == -1) {
 			ourIndex = ranges.length;
-			setSelection(doc$1, normalizeSelection(cm, ranges.concat([ourRange]), ourIndex),
+			setSelection(doc, normalizeSelection(cm, ranges.concat([ourRange]), ourIndex),
 									 {scroll: false, origin: "*mouse"});
 		} else if (ranges.length > 1 && ranges[ourIndex].empty() && behavior.unit == "char" && !behavior.extend) {
-			setSelection(doc$1, normalizeSelection(cm, ranges.slice(0, ourIndex).concat(ranges.slice(ourIndex + 1)), 0),
+			setSelection(doc, normalizeSelection(cm, ranges.slice(0, ourIndex).concat(ranges.slice(ourIndex + 1)), 0),
 									 {scroll: false, origin: "*mouse"});
-			startSel = doc$1.sel;
+			startSel = doc.sel;
 		} else {
-			replaceOneSelection(doc$1, ourIndex, ourRange, sel_mouse);
+			replaceOneSelection(doc, ourIndex, ourRange, sel_mouse);
 		}
 
 		var lastPos = start;
@@ -7548,19 +7558,19 @@
 
 			if (behavior.unit == "rectangle") {
 				var ranges = [], tabSize = cm.options.tabSize;
-				var startCol = countColumn(getLine(doc$1, start.line).text, start.ch, tabSize);
-				var posCol = countColumn(getLine(doc$1, pos.line).text, pos.ch, tabSize);
+				var startCol = countColumn(getLine(doc, start.line).text, start.ch, tabSize);
+				var posCol = countColumn(getLine(doc, pos.line).text, pos.ch, tabSize);
 				var left = Math.min(startCol, posCol), right = Math.max(startCol, posCol);
 				for (var line = Math.min(start.line, pos.line), end = Math.min(cm.lastLine(), Math.max(start.line, pos.line));
 						 line <= end; line++) {
-					var text = getLine(doc$1, line).text, leftPos = findColumn(text, left, tabSize);
+					var text = getLine(doc, line).text, leftPos = findColumn(text, left, tabSize);
 					if (left == right)
 						{ ranges.push(new Range(Pos(line, leftPos), Pos(line, leftPos))); }
 					else if (text.length > leftPos)
 						{ ranges.push(new Range(Pos(line, leftPos), Pos(line, findColumn(text, right, tabSize)))); }
 				}
 				if (!ranges.length) { ranges.push(new Range(start, start)); }
-				setSelection(doc$1, normalizeSelection(cm, startSel.ranges.slice(0, ourIndex).concat(ranges), ourIndex),
+				setSelection(doc, normalizeSelection(cm, startSel.ranges.slice(0, ourIndex).concat(ranges), ourIndex),
 										 {origin: "*mouse", scroll: false});
 				cm.scrollIntoView(pos);
 			} else {
@@ -7575,8 +7585,8 @@
 					anchor = maxPos(oldRange.to(), range.head);
 				}
 				var ranges$1 = startSel.ranges.slice(0);
-				ranges$1[ourIndex] = bidiSimplify(cm, new Range(clipPos(doc$1, anchor), head));
-				setSelection(doc$1, normalizeSelection(cm, ranges$1, ourIndex), sel_mouse);
+				ranges$1[ourIndex] = bidiSimplify(cm, new Range(clipPos(doc, anchor), head));
+				setSelection(doc, normalizeSelection(cm, ranges$1, ourIndex), sel_mouse);
 			}
 		}
 
@@ -7592,9 +7602,9 @@
 			var cur = posFromMouse(cm, e, true, behavior.unit == "rectangle");
 			if (!cur) { return }
 			if (cmp(cur, lastPos) != 0) {
-				cm.curOp.focus = activeElt(doc(cm));
+				cm.curOp.focus = activeElt(root(cm));
 				extendTo(cur);
-				var visible = visibleLines(display, doc$1);
+				var visible = visibleLines(display, doc);
 				if (cur.line >= visible.to || cur.line < visible.from)
 					{ setTimeout(operation(cm, function () {if (counter == curCount) { extend(e); }}), 150); }
 			} else {
@@ -7619,7 +7629,7 @@
 			}
 			off(display.wrapper.ownerDocument, "mousemove", move);
 			off(display.wrapper.ownerDocument, "mouseup", up);
-			doc$1.history.lastSelOrigin = null;
+			doc.history.lastSelOrigin = null;
 		}
 
 		var move = operation(cm, function (e) {
@@ -8619,7 +8629,7 @@
 
 				signal(this, "overwriteToggle", this, this.state.overwrite);
 			},
-			hasFocus: function() { return this.display.input.getField() == activeElt(doc(this)) },
+			hasFocus: function() { return this.display.input.getField() == activeElt(root(this)) },
 			isReadOnly: function() { return !!(this.options.readOnly || this.doc.cantEdit) },
 
 			scrollTo: methodOp(function (x, y) { scrollToCoords(this, x, y); }),
@@ -8657,10 +8667,12 @@
 			//	var interpret = function (val) { return typeof val == "number" || /^\d+$/.test(String(val)) ? val + "px" : val; };
 			//	if (width != null) { this.display.wrapper.style.width = interpret(width); }
 			//	if (height != null) { this.display.wrapper.style.height = interpret(height); }
+				//--
 				var interpret = function (val) { return val; }; // fix by unixman
 				if (width != undefined) { this.display.wrapper.style.setProperty('width', interpret(width)); }
 				if (height != undefined) { this.display.wrapper.style.setProperty('height', interpret(height)); }
 				//-- #end fix
+
 				if (this.options.lineWrapping) { clearLineMeasurementCache(this); }
 				var lineNo = this.display.viewFrom;
 				this.doc.iter(lineNo, this.display.viewTo, function (line) {
@@ -8906,7 +8918,7 @@
 			disableBrowserMagic(te);
 			cm.display.lineSpace.insertBefore(kludge, cm.display.lineSpace.firstChild);
 			te.value = lastCopied.text.join("\n");
-			var hadFocus = activeElt(div.ownerDocument);
+			var hadFocus = activeElt(rootNode(div));
 			selectInput(te);
 			setTimeout(function () {
 				cm.display.lineSpace.removeChild(kludge);
@@ -8929,7 +8941,7 @@
 
 	ContentEditableInput.prototype.prepareSelection = function () {
 		var result = prepareSelection(this.cm, false);
-		result.focus = activeElt(this.div.ownerDocument) == this.div;
+		result.focus = activeElt(rootNode(this.div)) == this.div;
 		return result
 	};
 
@@ -9025,7 +9037,7 @@
 
 	ContentEditableInput.prototype.focus = function () {
 		if (this.cm.options.readOnly != "nocursor") {
-			if (!this.selectionInEditor() || activeElt(this.div.ownerDocument) != this.div)
+			if (!this.selectionInEditor() || activeElt(rootNode(this.div)) != this.div)
 				{ this.showSelection(this.prepareSelection(), true); }
 			this.div.focus();
 		}
@@ -9533,7 +9545,7 @@
 	TextareaInput.prototype.supportsTouch = function () { return false };
 
 	TextareaInput.prototype.focus = function () {
-		if (this.cm.options.readOnly != "nocursor" && (!mobile || activeElt(this.textarea.ownerDocument) != this.textarea)) {
+		if (this.cm.options.readOnly != "nocursor" && (!mobile || activeElt(rootNode(this.textarea)) != this.textarea)) {
 			try { this.textarea.focus(); }
 			catch (e) {} // IE8 will throw if the textarea is display: none or not in DOM
 		}
@@ -9740,7 +9752,7 @@
 		// Set autofocus to true if this textarea is focused, or if it has
 		// autofocus and no other element is focused.
 		if (options.autofocus == null) {
-			var hasFocus = activeElt(textarea.ownerDocument);
+			var hasFocus = activeElt(rootNode(textarea));
 			options.autofocus = hasFocus == textarea ||
 				textarea.getAttribute("autofocus") != null && hasFocus == document.body;
 		}
@@ -9874,7 +9886,7 @@
 
 	addLegacyProps(CodeMirror);
 
-	CodeMirror.version = "5.65.15";
+	CodeMirror.version = "5.65.18";
 
 	return CodeMirror;
 

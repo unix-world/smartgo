@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!-- TPL Default: r.20260903 (go) -->
+<!-- Settings: [###SEMAPHORE|smartlist|html###] -->
+<html><!-- Language: [###LANG|html###] -->
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Smart.Framework.Go">
+<title>[###TITLE|nmspace|html###]</title>
+<link rel="icon" href="[%%%IF:FAVICON:!=;%%%][###FAVICON|html###][%%%ELSE:FAVICON%%%]data:,[%%%/IF:FAVICON%%%]">
+<base href="[###BASE-HREF|html###]">
+[%%%IF:HEAD-META:==;%%%]
+<!-- no head meta -->
+[%%%ELSE:HEAD-META%%%]
+<!-- Head Meta -->
+[###HEAD-META###]
+[%%%/IF:HEAD-META%%%]
+<!-- CSS Styles -->
+[@@@SUB-TEMPLATE:tpl-css-base.inc.mtpl.htm@@@]
+[%%%IF:SEMAPHORE:&*<skip:css>;(0)%%%]
+<!-- no app css -->
+[%%%ELSE:SEMAPHORE(0)%%%]
+[@@@SUB-TEMPLATE:tpl-css-app.inc.mtpl.htm@@@]
+[%%%/IF:SEMAPHORE(0)%%%]
+<!-- Scripts -->
+[%%%IF:SEMAPHORE:&*<skip:js>;(0)%%%]
+<!-- no base/framework js -->
+[%%%ELSE:SEMAPHORE(0)%%%]
+[@@@SUB-TEMPLATE:tpl-js-base-jquery.inc.mtpl.htm@@@]
+[@@@SUB-TEMPLATE:tpl-js-framework.inc.mtpl.htm@@@]
+[%%%IF:SEMAPHORE:&*<load:js-idle>;(1)%%%]
+<!-- JsIdle -->
+<script defer src="lib/js-app/jquery.idle.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- JsIdle: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%IF:SEMAPHORE:&*<load:js-stopwatch>;%%%]
+<!-- StopWatch -->
+<script src="lib/js-app/jquery.stopwatch.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- StopWatch: skip -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-sparkline>;%%%]
+<!-- SparkLine -->
+<script src="lib/js-app/jquery.sparkline.js?[###RELEASE-HASH|url|html###]"></script>
+[%%%ELSE:SEMAPHORE%%%]
+<!-- SparkLine: skip -->
+[%%%/IF:SEMAPHORE%%%]
+[%%%IF:SEMAPHORE:&*<load:js-media>;(1)%%%]
+[@@@SUB-TEMPLATE:tpl-js-media.inc.mtpl.htm@@@]
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- MediaJS: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%IF:SEMAPHORE:&*<load:js-ui>;(1)%%%]
+[@@@SUB-TEMPLATE:tpl-js-ui.inc.mtpl.htm@@@]
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- LightJS: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%/IF:SEMAPHORE(0)%%%]
+[%%%IF:HEAD-CSS:==;%%%]
+<!-- no head css -->
+[%%%ELSE:HEAD-CSS%%%]
+<!-- Head CSS -->
+[###HEAD-CSS###]
+[%%%/IF:HEAD-CSS%%%]
+[%%%IF:HEAD-JS:==;%%%]
+<!-- no head js -->
+[%%%ELSE:HEAD-JS%%%]
+<!-- Head JS -->
+[###HEAD-JS###]
+[%%%/IF:HEAD-JS%%%]
+<!-- #.# -->
+</head>
+<body>
+[%%%IF:ALIGN-CENTER:==yes;%%%]<center>[%%%ELSE:ALIGN-CENTER%%%]<!-- no align center -->[%%%/IF:ALIGN-CENTER%%%]
+[%%%IF:HEADER:!=;%%%]
+[###HEADER###]
+[%%%ELSE:HEADER%%%]
+<!-- no header -->
+[%%%/IF:HEADER%%%]
+<div id="app-container">
+[###MAIN###]
+[%%%IF:ASIDE:!=;%%%]
+[###ASIDE###]
+[%%%ELSE:ASIDE%%%]
+<!-- no aside -->
+[%%%/IF:ASIDE%%%]
+</div>
+[%%%IF:FOOTER:!=;%%%]
+[###FOOTER###]
+[%%%ELSE:FOOTER%%%]
+<!-- no footer -->
+[%%%/IF:FOOTER%%%]
+<!-- TPL Foot -->
+[%%%IF:SEMAPHORE:&*<skip:js>;(0)%%%]
+<!-- no base/framework js -->
+[%%%ELSE:SEMAPHORE(0)%%%]
+[%%%IF:SEMAPHORE:&*<load:searchterm-highlight-js>;(1)%%%]
+[@@@SUB-TEMPLATE:tpl-js-search-term-highlight.inc.mtpl.htm@@@]
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- HLSrcTerm: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%IF:SEMAPHORE:&*<load:code-highlight-js>;(1)%%%]
+[@@@SUB-TEMPLATE:tpl-js-hljs.inc.mtpl.htm@@@]
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- HLjs: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%IF:SEMAPHORE:&*<load:math-latex-js>;(1)%%%]
+[@@@SUB-TEMPLATE:tpl-js-mathlatex.inc.mtpl.htm@@@]
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- MathLatex: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%IF:SEMAPHORE:&*<load:unveil-js>;(1)%%%]
+[@@@SUB-TEMPLATE:tpl-js-unveil.inc.mtpl.htm@@@]
+[%%%ELSE:SEMAPHORE(1)%%%]
+<!-- Unveil: skip -->
+[%%%/IF:SEMAPHORE(1)%%%]
+[%%%/IF:SEMAPHORE(0)%%%]
+<!-- #.# -->
+[%%%IF:ALIGN-CENTER:==yes;%%%]</center>[%%%ELSE:ALIGN-CENTER%%%]<!-- / no align center -->[%%%/IF:ALIGN-CENTER%%%]
+</body>
+</html>
+<!-- Date and Time: `[:::RENDER-DATE-TIME:::]` -->

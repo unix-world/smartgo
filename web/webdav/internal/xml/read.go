@@ -1,6 +1,5 @@
-
 // SmartGo :: WebDAV / XML :: Read
-// r.20250214.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 // (c) 2024-present unix-world.org
 
 // Copyright 2009 The Go Authors. All rights reserved.
@@ -269,9 +268,9 @@ func (p *Decoder) unmarshalAttr(val reflect.Value, attr Attr) error {
 } //END FUNCTION
 
 var (
-	unmarshalerType     = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
-	unmarshalerAttrType = reflect.TypeOf((*UnmarshalerAttr)(nil)).Elem()
-	textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+	unmarshalerType     = reflect.TypeFor[Unmarshaler]()
+	unmarshalerAttrType = reflect.TypeFor[UnmarshalerAttr]()
+	textUnmarshalerType = reflect.TypeFor[encoding.TextUnmarshaler]()
 )
 
 // Unmarshal a single XML element into val.

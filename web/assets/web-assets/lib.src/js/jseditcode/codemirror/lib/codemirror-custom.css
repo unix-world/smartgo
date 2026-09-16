@@ -1,9 +1,10 @@
-/* Customizations # Smart.Framework # r.20220920 */
+
+/* Customizations # Smart.Framework # r.20260824 */
 
 @import url("../../../../../lib/core/plugins/fonts/typo/mono/ibm-plex-mono.css");
 
 .CodeMirror * {
-	font-family: 'IBM Plex Mono',monospace,courier !important;
+	font-family: 'IBM Plex Mono', mono !important;
 	font-size: 0.875rem !important;
 }
 

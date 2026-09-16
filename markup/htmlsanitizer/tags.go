@@ -1,11 +1,9 @@
+
 package htmlsanitizer
 
-// modified by unixman
-
-// r.20241212.2358
+// modified by unixman r.20260829
 
 import (
-	"bytes"
 	"strings"
 )
 
@@ -20,7 +18,7 @@ type Tag struct {
 	// e.g. colspan, rowspan
 	Attr []string
 
-	// URLAttr specifies the allowed, URL-relatedd attributes for current tag,
+	// URLAttr specifies the allowed, URL-related attributes for current tag,
 	// must be lowercase.
 	//
 	// e.g. src, href
@@ -52,15 +50,15 @@ func (t *Tag) attrExists(p []byte) (ok, urlAttr bool) {
 	return
 }
 
-// AllowList speficies all the allowed HTML tags and its attributes for
-// the filter.
+// AllowList specifies all the allowed HTML tags and its attributes for
+// the sanitizer.
 type AllowList struct {
 	// Tags specifies all the allow tags.
 	Tags []*Tag
 
 	// GlobalAttr specifies the allowed attributes for all the tag.
 	// It's very useful for some common attributes, such as `class`, `id`.
-	// For security reasons, it's not recommended to set a glboal attr for
+	// For security reasons, it's not recommended to set a global attr for
 	// any URL-related attribute.
 	GlobalAttr []string
 
@@ -69,6 +67,18 @@ type AllowList struct {
 	// So we should treat it as a single element, without any child elements.
 	// TODO: rename this one
 	NonHTMLTags []*Tag
+
+	// internal lookup maps, built lazily
+	tagMap        map[string]*Tag
+	nonHTMLTagMap map[string]*Tag
+}
+
+func buildTagLookup(tags []*Tag) map[string]*Tag {
+	m := make(map[string]*Tag, len(tags))
+	for _, tag := range tags {
+		m[tag.Name] = tag
+	}
+	return m
 }
 
 // attrExists checks whether global attr exists. Case sensitive
@@ -89,20 +99,17 @@ func (l *AllowList) attrExists(p []byte) bool {
 }
 
 // checkNonHTMLTag checks if the given tag name is a non-html tag,
-// such as `script` and `style`. Return nil if it's not a non-html tag
-func (l *AllowList) checkNonHTMLTag(p []byte) *Tag {
+// such as `script` and `style`. Return nil if it's not a non-html tag.
+// The name parameter must already be lowercased.
+func (l *AllowList) checkNonHTMLTag(name string) *Tag {
 	if l == nil {
 		return nil
 	}
 
-	name := string(bytes.ToLower(p))
-	for _, tag := range l.NonHTMLTags {
-		if name == tag.Name {
-			return tag
-		}
+	if l.nonHTMLTagMap == nil {
+		l.nonHTMLTagMap = buildTagLookup(l.NonHTMLTags)
 	}
-
-	return nil
+	return l.nonHTMLTagMap[name]
 }
 
 // RemoveTag removes all tags name `name`, must be lowercase
@@ -125,36 +132,64 @@ func (l *AllowList) RemoveTag(name string) {
 		l.Tags = append(l.Tags[:idx], l.Tags[idx+1:]...)
 		l.RemoveTag(name)
 	}
+
+	// invalidate maps
+	l.tagMap = nil
+	l.nonHTMLTagMap = nil
 }
 
-// FindTag finds and returns tag by its name, case insensitive.
-func (l *AllowList) FindTag(p []byte) *Tag {
+// FindTag finds and returns tag by its name.
+// The name parameter must already be lowercased.
+func (l *AllowList) FindTag(name string) *Tag {
 	if l == nil {
 		return nil
 	}
 
-	name := string(bytes.ToLower(p))
-	for _, tag := range l.Tags {
-		if name == tag.Name {
-			return tag
-		}
+	if l.tagMap == nil {
+		l.tagMap = buildTagLookup(l.Tags)
 	}
-
-	return nil
+	return l.tagMap[name]
 }
 
-// Clone a new AllowList.
+func cloneTagSlice(tags []*Tag) []*Tag {
+	out := make([]*Tag, len(tags))
+	for i, t := range tags {
+		copied := *t
+		copied.Attr = append([]string(nil), t.Attr...)
+		copied.URLAttr = append([]string(nil), t.URLAttr...)
+		out[i] = &copied
+	}
+	return out
+}
+
+// Clone a new AllowList. Tags and NonHTMLTags are deep-copied so that
+// mutating the clone does not affect the original.
 func (l *AllowList) Clone() *AllowList {
 	if l == nil {
 		return l
 	}
 
 	newList := new(AllowList)
-	newList.Tags = append(newList.Tags, l.Tags...)
+	newList.Tags = cloneTagSlice(l.Tags)
 	newList.GlobalAttr = append(newList.GlobalAttr, l.GlobalAttr...)
-	newList.NonHTMLTags = append(newList.NonHTMLTags, l.NonHTMLTags...)
+	newList.NonHTMLTags = cloneTagSlice(l.NonHTMLTags)
 
 	return newList
+}
+
+func asciiLowerByte(b byte) byte {
+	if 'A' <= b && b <= 'Z' {
+		return b | 0x20
+	}
+	return b
+}
+
+// asciiLowerInPlace lowercases ASCII A-Z bytes in-place. Since HTML tag and
+// attribute names are ASCII-only, this avoids allocating via bytes.ToLower.
+func asciiLowerInPlace(p []byte) {
+	for i, b := range p {
+		p[i] = asciiLowerByte(b)
+	}
 }
 
 // DefaultAllowList for HTML filter.
@@ -189,7 +224,6 @@ var DefaultAllowList = &AllowList{
 		{"figure", []string{}, []string{}},
 		{"hr", []string{}, []string{}},
 		{"li", []string{}, []string{}},
-		{"main", []string{}, []string{}},
 		{"ol", []string{}, []string{}},
 		{"p", []string{}, []string{}},
 		{"pre", []string{}, []string{}},
@@ -244,6 +278,7 @@ var DefaultAllowList = &AllowList{
 		{"th", []string{"colspan", "rowspan", "scope"}, []string{}},
 		{"thead", []string{}, []string{}},
 		{"tr", []string{}, []string{}},
+		// no Forms
 		{"details", []string{"open"}, []string{}},
 		{"summary", []string{}, []string{}},
 		// no web-components
@@ -268,3 +303,5 @@ var DefaultAllowList = &AllowList{
 		{Name: "object"},
 	},
 }
+
+// #end

@@ -1,12 +1,13 @@
 
 // GO Lang :: SmartGo / Web Server :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ var (
 )
 
 const (
-	VERSION string = "r.20260823.2358"
+	VERSION string = "r.20260829.2358"
 	SIGNATURE string = smart.COPYRIGHT
 
 	SERVE_HTTP2 bool = false // HTTP2 still have many bugs and many security flaws, disable
@@ -53,6 +54,22 @@ const (
 	CERTIFICATES_DEFAULT_PATH string = "./ssl/"
 	CERTIFICATE_PEM_CRT string = "cert.crt"
 	CERTIFICATE_PEM_KEY string = "cert.key"
+)
+
+const (
+	//-- special
+	HttpMethodTRACE 	string = smarthttputils.HTTP_METHOD_TRACE
+	// required
+	HttpMethodOPTIONS 	string = smarthttputils.HTTP_METHOD_OPTIONS
+	//-- standard
+	HttpMethodHEAD 		string = smarthttputils.HTTP_METHOD_HEAD
+	HttpMethodGET 		string = smarthttputils.HTTP_METHOD_GET
+	HttpMethodPOST 		string = smarthttputils.HTTP_METHOD_POST
+	//-- api
+	HttpMethodPUT 		string = smarthttputils.HTTP_METHOD_PUT
+	HttpMethodPATCH 	string = smarthttputils.HTTP_METHOD_PATCH
+	HttpMethodDELETE 	string = smarthttputils.HTTP_METHOD_DELETE
+	//--
 )
 
 const TheStrName string = "SmartGO Web Server"
@@ -88,11 +105,18 @@ type HttpResponse struct {
 type HttpHandlerFunc func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse)
 type smartRoute struct {
 	AuthSkip 		bool 				// if Auth is Enabled: all routes are enforced to authenticate, so to skip a particular route (w/o tails) from authentication set this to TRUE ; if Auth is not enabled this setting has no effect
-	AllowedMethods  []string 			// "OPTIONS" is handled separately (not allowed to be selected here) ; if is nil will (default) allow "HEAD", "GET", "POST" ; otherwise if explicit must be one or many of the: "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE"
+	AllowedMethods  []string 			// "OPTIONS" or "TRACE" are handled separately (not allowed to be selected here) ; if is nil will (default) allow "HEAD", "GET", "POST" ; otherwise if explicit must be one or many of the: "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE"
 	MaxTailSegments int 				// if is zero, will allow no tails ; if is -1 will allow any number of tails and will pass them to controller ; if is 1 will alow one tail ; if is 2 will allow 2 tails, and so on ...
 	FxHandler  		HttpHandlerFunc 	// see UrlHandlerRegisterRoute()
 }
-var allowedMethods []string = []string{ "HEAD", "GET", "POST", "PUT", "PATCH", "DELETE" } // OPTIONS is always available thus must not be includded here
+var allowedMethods []string = []string{ // TRACE is special, must not include here ; OPTIONS is always available, handled separately, must not be includded here
+	HttpMethodHEAD,
+	HttpMethodGET,
+	HttpMethodPOST,
+	HttpMethodPUT,
+	HttpMethodPATCH,
+	HttpMethodDELETE,
+}
 var urlNamedRoutesMap map[string]string = map[string]string{}
 var urlHandlersMap map[string]smartRoute = map[string]smartRoute{}
 var handlersWriteMutex sync.Mutex
@@ -498,12 +522,12 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 		//-- serve assets first
 	//	if(smart.StrStartsWith(urlPath, "/lib/")) {
 		if(headPath == "lib") {
-			if(r.Method == "OPTIONS") {
+			if(r.Method == HttpMethodOPTIONS) { // OPTIONS should not include a content
 				log.Printf("[SRV] Web Server: OPTIONS Request Method for Assets :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "200", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-				smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{"Allow":"OPTIONS, GET, HEAD"})
+				smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{smarthttputils.HTTP_HEADER_ALLOW:"OPTIONS, HEAD, GET"})
 				return
 			} //end if
-			if((r.Method != "GET") && (r.Method != "HEAD")) {
+			if((r.Method != HttpMethodGET) && (r.Method != HttpMethodHEAD)) {
 				log.Printf("[SRV] Web Server: Invalid Request Method for Assets :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "405", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Assets [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 				return
@@ -536,16 +560,14 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			cycles++
 		} //end for
 	//	sr, okInternalRoute := urlHandlersMap["/"+headPath] // previous, original code, replaced with the above
-		//-- session UUID cookie (moved below, it was just after webDAV), required also by AUTH, must be set before serving, but after assets, before below which also serves WEB-PUBLIC
-		manageSessUUIDCookie(w, r) // manage session UUID Cookie
 		//-- serve public routes (no authentication) ; if the current route is not inside the internal ones, try ...
 		if(okInternalRoute != true) { // if not an internal route, try to see if it is an existing web public path, if not, exit with 404
-			if(r.Method == "OPTIONS") {
+			if(r.Method == HttpMethodOPTIONS) { // may not handle TRACE
 				log.Printf("[SRV] Web Server: OPTIONS Request Method :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "200", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-				smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{"Allow":"OPTIONS, GET, HEAD"})
+				smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{smarthttputils.HTTP_HEADER_ALLOW:"OPTIONS, GET, HEAD"})
 				return
 			} //end if
-			if((r.Method != "GET") && (r.Method != "HEAD")) {
+			if((r.Method != HttpMethodGET) && (r.Method != HttpMethodHEAD)) {
 				log.Printf("[SRV] Web Server: Invalid Request Method :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "405", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
 				smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 				return
@@ -567,9 +589,9 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			smarthttputils.HttpStatus404(w, r, "Web Resource Not Found: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
-		if(r.Method == "OPTIONS") {
+		if(r.Method == HttpMethodOPTIONS) {
 			log.Printf("[SRV] Web Server: OPTIONS Request Method for Internal Route :: %s [%s `%s` %s] :: Host [%s] :: RemoteAddress/Client [%s] # RealClientIP [%s]\n", "200", r.Method, r.URL, r.Proto, r.Host, r.RemoteAddr, realClientIp)
-			smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{"Allow":listMethods(sr.AllowedMethods)})
+			smarthttputils.HttpStatus200(w, r, "", "options.txt", "", -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, map[string]string{smarthttputils.HTTP_HEADER_ALLOW:listMethods(sr.AllowedMethods)})
 			return
 		} //end if
 		if(!smart.InListArr(r.Method, sr.AllowedMethods)) {
@@ -577,6 +599,19 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 			smarthttputils.HttpStatus405(w, r, "Invalid Request Method (" + r.Method + ") for Internal Route [Rule:DENY]: `" + GetCurrentPath(r) + "`", true)
 			return
 		} //end if
+		if(r.Method == HttpMethodTRACE) { // special handle for http TRACE method
+			var recomposeHeader string = "TRACE / HTTP/1.1" + "\n"
+			recomposeHeader += "Host: " + smarthttputils.HttpSafeHeaderValue(r.RemoteAddr) + "\n"
+			for hK, hV := range r.Header {
+				for _, hLV := range hV {
+					recomposeHeader += fmt.Sprintf("%s: %s\n", smarthttputils.HttpSafeHeaderKey(hK), smarthttputils.HttpSafeHeaderValue(hLV))
+				} //end for
+			} //end for
+			smarthttputils.HttpStatus200(w, r, recomposeHeader, "message.httph", smarthttputils.DISP_TYPE_INLINE, -1, "", smarthttputils.CACHE_CONTROL_NOCACHE, nil)
+			return
+		} //end if
+		//-- must be after handling method TRACE ; session UUID cookie (moved below, it was just after webDAV), required also by AUTH, must be set before serving, but after assets, before below which also serves WEB-PUBLIC
+		manageSessUUIDCookie(w, r) // manage session UUID Cookie, except if OPTIONS and TRACE ; just for internal routes ; not for assets, not for static routes
 		//-- auth check (if auth is active and not explicit skip auth by route)
 		var authErr error = nil
 		var authData smart.AuthDataStruct
@@ -782,8 +817,8 @@ func WebServerRun(servePublicPath bool, webdavOptions *WebdavRunOptions, serveSe
 	//	// the below commented code may work but only in certain circumstances and is intended just for Development / Debugging
 	//	if(DEBUG) {
 	//		hdrCType := w.Header().Get(smarthttputils.HTTP_HEADER_CONTENT_TYPE)
-	//		mType, mCharSet := smarthttputils.MimeAndCharsetGetFromMimeType(hdrCType)
-	//		log.Println("[DEBUG]", "Web Server Mux Handler Response Content Type:", "MimeType = `" + mType + "` / Charset = `" + mCharSet + "` / Header [" + smarthttputils.HTTP_HEADER_CONTENT_TYPE + "] Raw Value is: `" + hdrCType + "`")
+	//		mType := smarthttputils.ParseMimeContentTypeOrDisposition(hdrCType)
+	//		log.Println("[DEBUG]", "Web Server Mux Handler Response Content Type:", "MimeType = `" + mType.MediaType + "` / Charset = `" + mType.Charset + "` / Header [" + smarthttputils.HTTP_HEADER_CONTENT_TYPE + "] Raw Value is: `" + hdrCType + "` ; Parse Error `" + mType.Error + "`")
 	//	} //end if
 		//--
 	} //end fx

@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ ENCODERS / DECODERS ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -127,6 +127,20 @@ func Base64BytEncode(data []byte) []byte {
 	base64.StdEncoding.Encode(dst, data)
 	//--
 	return dst
+	//--
+} //END FUNCTION
+
+
+func Base64BytNormalizeMultiLineData(data []byte) []byte {
+	//--
+	data = BytTr(data, map[string][]byte { // fix: replace SPACE, TAB, LF, CRLF, to be compatible with PHP and MIME Part Decoding
+		" ":  []byte(""),
+		"\t": []byte(""),
+		"\n": []byte(""),
+		"\r": []byte(""),
+	})
+	//--
+	return BytTrimWhitespaces(data)
 	//--
 } //END FUNCTION
 
@@ -271,6 +285,20 @@ func Base64Encode(data string) string {
 	defer PanicHandler() // req. by base64 enc
 	//--
 	return base64.StdEncoding.EncodeToString([]byte(data))
+	//--
+} //END FUNCTION
+
+
+func Base64NormalizeMultiLineData(data string) string {
+	//--
+	data = StrTr(data, map[string]string { // fix: replace SPACE, TAB, LF, CRLF, to be compatible with PHP and MIME Part Decoding
+		" ":  "",
+		"\t": "",
+		"\n": "",
+		"\r": "",
+	})
+	//--
+	return StrTrimWhitespaces(data)
 	//--
 } //END FUNCTION
 

@@ -1,7 +1,7 @@
 
 // GO Lang :: SmartGo / Web Server / Routing-Defaults :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260829.2358 :: STABLE
 
 // Req: go 1.16 or later (embed.FS is N/A on Go 1.15 or lower)
 package websrv
@@ -22,7 +22,8 @@ import (
 //-- home page (html)
 var RouteHandlerHomePage HttpHandlerFunc = func(r *http.Request, headPath string, tailPaths []string, authData smart.AuthDataStruct) (response HttpResponse) {
 	//--
-	// route: / ; allowed methods: GET, HEAD
+	// allowed methods: GET, HEAD
+	// route: /
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
@@ -31,11 +32,25 @@ var RouteHandlerHomePage HttpHandlerFunc = func(r *http.Request, headPath string
 	response.StatusCode = 200
 	response.ContentFileName = "webapp.html"
 	//--
-	if(r.Method == "HEAD") {
+	if(r.Method == HttpMethodHEAD) {
 		response.ContentBody = `<h1>` + smart.EscapeHtml(title) + `</h1>`
-	} else if(r.Method == "GET") {
-		var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.app { text-align:center; margin:20px; } div.app * { color: #ED2839 !important; }" + "\n" + "</style>"
-		var bodyHtml string = `<center><div class="app" style="background:#FFFFFF; width:552px; border-radius:7px;">` + "<h1>" + smart.EscapeHtml(TheStrName) + "</h1>" + "\n" + `<img alt="app:svg" title="` + smart.EscapeHtml(title) + `" width="512" height="512" src="` + smart.EscapeHtml(assets.GetAppLogo(false)) + `"></div></center>` + "\n"
+	} else if(r.Method == HttpMethodGET) {
+		var headHtml string = assets.HTML_CSS_STYLE_PREFER_COLOR_DARK + "\n" + "<style>" + "\n" + "div.app { text-align:center; margin:20px; } div.app * { font-weight:normal!important; }" + "\n" + "</style>"
+		var bodyHtml string = `<center>` + "\n"
+		bodyHtml += `<div class="app" style="background:#FFFFFF; width:552px; border-radius:7px;">` + `<h1 style="color:#ED2839">` + smart.EscapeHtml(TheStrName) + `</h1>` + "\n"
+		if((smart.AuthBasicIsEnabled() == true) || (smart.AuthCookieIsEnabled() == true)) {
+			bodyHtml += `<select id="sign-login" class="ux-field" style="width:125px; text-align:center!important;" title="Select an Auth Method from the list">`
+			if(smart.AuthCookieIsEnabled() == true) {
+				bodyHtml += `<option value="` + smart.EscapeHtml(smart.AUTH_COOKIE_ROUTE_SIGNIN) + `">Auth.Cookie</option>`
+			} //end if
+			if(smart.AuthBasicIsEnabled() == true) {
+				bodyHtml += `<option value="` + smart.EscapeHtml(smart.AUTH_BASIC_ROUTE_LOGIN) + `">Auth.Http</option>`
+			} //end if
+			bodyHtml += `</select>` + "\n"
+			bodyHtml += `<button class="ux-button ux-button-small ux-button-details" type="button" onclick="try { const area = document.querySelector('#sign-login').value; setTimeout(() => { self.location = area; }); } catch(err) { console.warn(err); }">Go to Authentication area</button>`
+		} //end if
+		bodyHtml += `<img alt="app:svg" title="` + smart.EscapeHtml(title) + `" width="512" height="512" src="` + smart.EscapeHtml(assets.GetAppLogo(false)) + `"></div>` + "\n"
+		bodyHtml += `</center>` + "\n"
 		response.ContentBody = assets.HtmlStandaloneFaviconTemplate(title, headHtml, bodyHtml, false, assets.GetAppLogo(true)) // skip js
 	} else {
 		response.StatusCode = 405
@@ -112,6 +127,12 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	if(mb == true) {
 		isMobile = "yes"
 	} //end if
+	//--
+	var runtimePlatform string = "go"
+	if(authData.UserName != "") {
+		runtimePlatform = smart.CurrentRuntimeVersion() // {{{SYNC-CONTROLLER-RUNTIME-VERSION}}}
+	} //end if
+	//--
 	response.StatusCode = 208
 	const title string = "WebService / Info"
 	var headHtml string = assets.HTML_META_ROBOTS_NOINDEX + "\n" + assets.HTML_CSS_STYLE_PREFER_COLOR_DARK
@@ -146,7 +167,7 @@ var RouteHandlerInfoPage HttpHandlerFunc = func(r *http.Request, headPath string
 	bodyHtml += "\n"
 	bodyHtml += `<img src="` + smart.EscapeHtml(assets.GetSfLogo(false)) + `" height="64" style="margin-right:12px; cursor:help;" alt="sf-logo" title="Platform: ` + smart.EscapeHtml("`" + smart.NAME + " (" + smart.DESCRIPTION + ") " + smart.VERSION + "`") + `">`
 	bodyHtml += "\n"
-	bodyHtml += `<img src="` + smart.EscapeHtml(assets.GetGolangLogo(false)) + `" height="64" style="margin-right:12px; cursor:help;" alt="golang-logo" title="Runtime: ` + smart.EscapeHtml("`" + smart.CurrentRuntimeVersion() + "`") + `">`
+	bodyHtml += `<img src="` + smart.EscapeHtml(assets.GetGolangLogo(false)) + `" height="64" style="margin-right:12px; cursor:help;" alt="golang-logo" title="Runtime: ` + smart.EscapeHtml("`" + runtimePlatform + "`") + `">`
 	bodyHtml += "\n"
 	bodyHtml += `<img src="` + smart.EscapeHtml(assets.GetOSLogo(false)) + `" height="64" style="margin-right:12px; cursor:help;" alt="os-logo" title="OS / Arch: ` + smart.EscapeHtml("`" + smart.CurrentOSName() + "`" + " / " + "`" + smart.CurrentOSArch() + "`") + `">`
 	bodyHtml += "\n"
@@ -205,13 +226,18 @@ var RouteHandlerVersionPage HttpHandlerFunc = func(r *http.Request, headPath str
 	//--
 	defer smart.PanicHandler() // safe recovery handler
 	//--
+	var runtimePlatform string = "go"
+	if(authData.UserName != "") {
+		runtimePlatform = smart.CurrentRuntimeVersion() // {{{SYNC-CONTROLLER-RUNTIME-VERSION}}}
+	} //end if
+	//--
 	response.StatusCode = 203
 	json := versionStruct{
 		MetaInfo: 	"WebService / Version",
 		Version: 	VERSION,
 		Platform: 	"`" + smart.NAME + " (" + smart.DESCRIPTION + ") " + smart.VERSION + "`",
 		Server: 	TheStrName,
-		GoVersion: 	smart.CurrentRuntimeVersion(),
+		GoVersion: 	runtimePlatform,
 		OsName: 	smart.CurrentOSName(),
 		OsArch: 	smart.CurrentOSArch(),
 		Copyright: 	SIGNATURE,

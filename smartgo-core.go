@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ SMART.CORE ]
 
-// REQUIRE: go 1.22 or later (depends on Go generics, available since go 1.18 but stable only since go 1.19)
+// REQUIRE: go 1.24 or later (depends on Go generics, available since go 1.18 but stable only since go 1.19 and optimal just after go 1.22)
 package smartgo
 
 import (
@@ -168,7 +168,7 @@ func ObjectPrint(o interface{}) string { // pretty print an object
 
 func ObjectToString(o interface{}) string { // converts any object to string
 	//--
-	return fmt.Sprint(o) // this is much better and safe than using cast as: o.(string)
+	return fmt.Sprint(o) // this is much simple for some situations than using cast as: o.(string)
 	//--
 } //END FUNCTION
 
@@ -478,9 +478,11 @@ func SmartArrToList(arr []string, sepSpaces bool) string {
 		//-- fix just on value
 		val = strings.ReplaceAll(val, ",", ";")
 		//--
-		var listVal string = "<" + val + ">"
-		if(!InListArr(listVal, safeArr)) {
-			safeArr = append(safeArr, listVal)
+		if(val != "") {
+			var listVal string = "<" + val + ">"
+			if(!InListArr(listVal, safeArr)) {
+				safeArr = append(safeArr, listVal)
+			} //end if
 		} //end if
 		//--
 	} //end for

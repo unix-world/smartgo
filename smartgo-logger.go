@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ LOGGER ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	LOG_MAX_MSG_LEN uint16 = 65535 // max log message length
+	LOG_MAX_MSG_LEN uint32 = 65535 * 4 // max log message length ; by ex, slhdsa signatures are longer than 65535 (65k), so let instead 256k
 )
 
 //-----
@@ -131,29 +131,34 @@ func (writer logWriterWithColors) Write(bMsg []byte) (int, error) {
 		bMsg = bMsg[0:LOG_MAX_MSG_LEN]
 	} //end if
 	//--
-	var theMsg string = StrTrimWhitespaces(StrNormalizeSpaces(string(bMsg)))
+	var theMsg string = string(bMsg)
+	if(AppGetRunInBackground()) { // if production env
+		theMsg = StrNormalizeSpaces(theMsg)
+	} //end if
+	theMsg = StrTrimWhitespaces(theMsg)
+	//--
 	var hdrMsg string = StrToUpper(StrSubstr(theMsg, 0, 16))
 	//--
 	if(logColoredOnConsole) {
 		if((StrStartsWith(hdrMsg, "[FATAL]") == true) || (StrStartsWith(hdrMsg, "[PANIC]") == true)) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 			theMsg = color.MagentaString(StrTrimWhitespaces(string(bMsg))) // for data preserve the string how it is, except trim ! ; brown
-		} else if((StrStartsWith(hdrMsg, "[ERROR]") == true) || (StrStartsWith(hdrMsg, "[ERR]") == true) || (StrStartsWith(hdrMsg, "[FAIL]") == true)) {
+		} else if((StrStartsWith(hdrMsg, "[ERROR]") == true) || (StrStartsWith(hdrMsg, "[ERR]") == true) || (StrStartsWith(hdrMsg, "[FAIL]") == true) || (StrStartsWith(hdrMsg, "[FAILED]") == true)) {
 			theMsg = color.RedString(theMsg)
-		} else if((StrStartsWith(hdrMsg, "[WARNING]") == true) || (StrStartsWith(hdrMsg, "[WARN]") == true)) {
+		} else if((StrStartsWith(hdrMsg, "[WARNING]") == true) || (StrStartsWith(hdrMsg, "[WARN]") == true) || (StrStartsWith(hdrMsg, "[EXCEPTION]") == true)) {
 			theMsg = color.HiRedString(theMsg)
-		} else if((StrStartsWith(hdrMsg, "[OK]") == true) || (StrStartsWith(hdrMsg, "[DONE]") == true) || (StrStartsWith(hdrMsg, "[SUCCESS]") == true)) {
+		} else if((StrStartsWith(hdrMsg, "[OK]") == true) || (StrStartsWith(hdrMsg, "[DONE]") == true) || (StrStartsWith(hdrMsg, "[SUCCESS]") == true) || (StrStartsWith(hdrMsg, "[COMPLETED]") == true)) {
 			theMsg = color.HiGreenString(theMsg)
 		} else if(StrStartsWith(hdrMsg, "[LOG]") == true) {
 			theMsg = color.WhiteString(theMsg)
-		} else if(StrStartsWith(hdrMsg, "[INFO]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[INFO]") == true) || (StrStartsWith(hdrMsg, "[INF]") == true)) {
 			theMsg = color.HiYellowString(theMsg)
-		} else if(StrStartsWith(hdrMsg, "[NOTICE]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[NOTICE]") == true) || (StrStartsWith(hdrMsg, "[NOTE]") == true)) {
 			theMsg = color.HiBlueString(theMsg)
-		} else if(StrStartsWith(hdrMsg, "[META]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[META]") == true) || (StrStartsWith(hdrMsg, "[HINT]") == true)) {
 			theMsg = color.HiCyanString(theMsg)
-		} else if(StrStartsWith(hdrMsg, "[DATA]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[DATA]") == true) || (StrStartsWith(hdrMsg, "[SNAPSHOT]") == true)) {
 			theMsg = color.YellowString(StrTrimWhitespaces(string(bMsg))) // for data preserve the string how it is, except trim ! ; brown
-		} else if(StrStartsWith(hdrMsg, "[DEBUG]") == true) {
+		} else if((StrStartsWith(hdrMsg, "[DEBUG]") == true) || (StrStartsWith(hdrMsg, "[DBG]") == true)) {
 			theMsg = color.HiMagentaString(theMsg)
 		} else { // ALL OTHER CASES
 			theMsg = color.HiGreyString(theMsg)
@@ -184,6 +189,8 @@ type logWriteJsonStruct struct {
 }
 func (writer logWriterFile) Write(bMsg []byte) (int, error) {
 	//--
+	defer PanicHandler()
+	//--
 	if(len(bMsg) > int(LOG_MAX_MSG_LEN)) {
 		bMsg = bMsg[0:LOG_MAX_MSG_LEN]
 	} //end if
@@ -202,21 +209,21 @@ func (writer logWriterFile) Write(bMsg []byte) (int, error) {
 	var theType string = ""
 	var colorMsg string = theMsg
 	if((StrStartsWith(hdrMsg, "[FATAL]") == true) || (StrStartsWith(hdrMsg, "[PANIC]") == true)) {
-		theType = "panic"
+		theType = "fatal"
 		if(logColoredOnConsole) {
 			colorMsg = color.MagentaString(colorMsg)
 		} //end if
-	} else if((StrStartsWith(hdrMsg, "[ERROR]") == true) || (StrStartsWith(hdrMsg, "[ERR]") == true) || (StrStartsWith(hdrMsg, "[FAIL]") == true)) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
+	} else if((StrStartsWith(hdrMsg, "[ERROR]") == true) || (StrStartsWith(hdrMsg, "[ERR]") == true) || (StrStartsWith(hdrMsg, "[FAIL]") == true) || (StrStartsWith(hdrMsg, "[FAILED]") == true)) { // {{{SYNC-SMARTGO-ERR:LEVELS+COLORS}}}
 		theType = "error"
 		if(logColoredOnConsole) {
 			colorMsg = color.RedString(colorMsg)
 		} //end if
-	} else if((StrStartsWith(hdrMsg, "[WARNING]") == true) || (StrStartsWith(hdrMsg, "[WARN]") == true)) {
+	} else if((StrStartsWith(hdrMsg, "[WARNING]") == true) || (StrStartsWith(hdrMsg, "[WARN]") == true) || (StrStartsWith(hdrMsg, "[EXCEPTION]") == true)) {
 		theType = "warning"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiRedString(colorMsg)
 		} //end if
-	} else if((StrStartsWith(hdrMsg, "[OK]") == true) || (StrStartsWith(hdrMsg, "[DONE]") == true) || (StrStartsWith(hdrMsg, "[SUCCESS]") == true)) {
+	} else if((StrStartsWith(hdrMsg, "[OK]") == true) || (StrStartsWith(hdrMsg, "[DONE]") == true) || (StrStartsWith(hdrMsg, "[SUCCESS]") == true) || (StrStartsWith(hdrMsg, "[COMPLETED]") == true)) {
 		theType = "ok"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiGreenString(colorMsg)
@@ -226,27 +233,27 @@ func (writer logWriterFile) Write(bMsg []byte) (int, error) {
 		if(logColoredOnConsole) {
 			colorMsg = color.WhiteString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[INFO]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[INFO]") == true) || (StrStartsWith(hdrMsg, "[INF]") == true)) {
 		theType = "info"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiYellowString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[NOTICE]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[NOTICE]") == true) || (StrStartsWith(hdrMsg, "[NOTE]") == true)) {
 		theType = "notice"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiBlueString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[META]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[META]") == true) || (StrStartsWith(hdrMsg, "[HINT]") == true)) {
 		theType = "meta"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiCyanString(colorMsg)
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[DATA]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[DATA]") == true) || (StrStartsWith(hdrMsg, "[SNAPSHOT]") == true)) {
 		theType = "data"
 		if(logColoredOnConsole) {
 			colorMsg = color.YellowString(colorMsg) // brown
 		} //end if
-	} else if(StrStartsWith(hdrMsg, "[DEBUG]") == true) {
+	} else if((StrStartsWith(hdrMsg, "[DEBUG]") == true) || (StrStartsWith(hdrMsg, "[DBG]") == true)) {
 		theType = "debug"
 		if(logColoredOnConsole) {
 			colorMsg = color.HiMagentaString(colorMsg)
@@ -340,29 +347,47 @@ func setLogLevelOutput(level string, output io.Writer) { // Example: setLogLevel
 	level = StrToUpper(StrTrimWhitespaces(level))
 	//--
 	switch(level) {
-		case "DEBUG": 		fallthrough
-		case "DATA": 		fallthrough
-		case "META": 		fallthrough
-		case "NOTICE": 		fallthrough
-		case "INFO": 		fallthrough
+		case "DBG": 		fallthrough
+		case "DEBUG":
+			level = "DEBUG" // remap to debug
+			break
+		case "SNAPSHOT": 	fallthrough
+		case "DATA":
+			level = "DATA" // remap to data
+			break
+		case "HINT": 		fallthrough
+		case "META":
+			level = "META" // remap to meta
+			break
+		case "NOTE": 		fallthrough
+		case "NOTICE":
+			level = "NOTICE" // remap to notice
+			break
+		case "INF": 		fallthrough
+		case "INFO":
+			level = "INFO" // remap to info
+			break
 		case "LOG":
 			// keep as is
 			break
+		case "COMPLETED": 	fallthrough
 		case "DONE": 		fallthrough
 		case "SUCCESS": 	fallthrough
 		case "OK":
 			level = "OK" // remap to ok
 			break
+		case "EXCEPTION": 	fallthrough
 		case "WARN": 		fallthrough
 		case "WARNING":
 			level = "WARNING" // remap to warning
 			break
-		case "FAIL": 	fallthrough
-		case "ERR": 	fallthrough
+		case "FAILED": 		fallthrough
+		case "FAIL": 		fallthrough
+		case "ERR": 		fallthrough
 		case "ERROR":
 			level = "ERROR" // remap to error
 			break
-		case "FATAL": fallthrough
+		case "FATAL": 		fallthrough
 		case "PANIC":
 		default:
 			level = "FATAL" // remap to fatal

@@ -19,7 +19,7 @@
  * @author unix-world.org
  * @license BSD
  * @file browser_check.js
- * @version 20260804
+ * @version 20260902
  * @class smartJ$TestBrowser
  * @static
  * @frozen

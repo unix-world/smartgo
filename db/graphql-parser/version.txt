@@ -3,4 +3,5 @@ github.com/krotik/common/lang/graphql/parser @ v.1.5.1 # @head.20260818
 go 1.12
 
 contains fixes by unixman: ioutil deprecations, fixed
-
+fix safe assertions
+r.20260826

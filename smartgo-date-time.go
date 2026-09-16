@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ DATE / TIME ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -82,13 +82,13 @@ func DateTimeSetLocation(loc string) bool {
 	tzLocation, tzLocErr := time.LoadLocation(ini_SMART_FRAMEWORK_TIMEZONE)
 	if(tzLocErr != nil) {
 		ini_SMART_FRAMEWORK_TIMEZONE = DATE_TIME_DEFAULT_LOCAL_TIMEZONE // restore
-		log.Println("[ERROR]", CurrentFunctionName(), "SmartGo Date/Time Location FAILED to be Set to: `" + ini_SMART_FRAMEWORK_TIMEZONE + "`")
+		log.Println("[ERR]", CurrentFunctionName(), "SmartGo Date/Time Location FAILED to be Set to: `" + ini_SMART_FRAMEWORK_TIMEZONE + "`")
 		return false
 	} //end if
 	//--
 	time.Local = tzLocation // set the global timezone
 	//--
-	log.Println("[INFO]", CurrentFunctionName(), "SmartGo Date/Time Location was Set to `" + ini_SMART_FRAMEWORK_TIMEZONE + "`: Success")
+	log.Println("[INF]", CurrentFunctionName(), "SmartGo Date/Time Location was Set to `" + ini_SMART_FRAMEWORK_TIMEZONE + "`: Success")
 	//--
 	return true
 	//--
@@ -447,6 +447,37 @@ func TimeNowHexUnix() string {
 	tnu := TimeNowUnix()
 	//--
 	return Int64ToHex(tnu, false) // disallow negative timestamps, make non-sense
+	//--
+} //END FUNCTION
+
+
+//-----
+
+
+func TimeNowMilliUtc() string {
+	//--
+	return time.Now().UTC().Format(time.RFC3339)
+	//--
+} //END FUNCTION
+
+
+func TimeNowMilliLocal() string {
+	//--
+	return time.Now().Format(time.RFC3339)
+	//--
+} //END FUNCTION
+
+
+func TimeNowNanoUtc() string {
+	//--
+	return time.Now().UTC().Format(time.RFC3339Nano)
+	//--
+} //END FUNCTION
+
+
+func TimeNowNanoLocal() string {
+	//--
+	return time.Now().Format(time.RFC3339Nano)
 	//--
 } //END FUNCTION
 

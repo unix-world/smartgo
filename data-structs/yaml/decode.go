@@ -15,15 +15,17 @@
 
 package yaml
 
+// modified by unixman
+
 import (
+	"fmt"
+	"math"
+	"time"
+	"strconv"
 	"encoding"
 	"encoding/base64"
-	"fmt"
 	"io"
-	"math"
 	"reflect"
-	"strconv"
-	"time"
 )
 
 // ----------------------------------------------------------------------------
@@ -571,7 +573,8 @@ func (d *decoder) scalar(n *Node, out reflect.Value) bool {
 	} else {
 		tag, resolved = resolve(n.Tag, n.Value)
 		if tag == binaryTag {
-			data, err := base64.StdEncoding.DecodeString(resolved.(string))
+		//	data, err := base64.StdEncoding.DecodeString(resolved.(string))
+			data, err := base64.StdEncoding.DecodeString(fmt.Sprint(resolved)) // unixman
 			if err != nil {
 				failf("!!binary value contains invalid base64 data")
 			}
@@ -593,7 +596,8 @@ func (d *decoder) scalar(n *Node, out reflect.Value) bool {
 		if ok {
 			var text []byte
 			if tag == binaryTag {
-				text = []byte(resolved.(string))
+			//	text = []byte(resolved.(string))
+				text = []byte(fmt.Sprint(resolved)) // unixman
 			} else {
 				// We let any value be unmarshaled into TextUnmarshaler.
 				// That might be more lax than we'd like, but the
@@ -610,7 +614,8 @@ func (d *decoder) scalar(n *Node, out reflect.Value) bool {
 	switch out.Kind() {
 	case reflect.String:
 		if tag == binaryTag {
-			out.SetString(resolved.(string))
+		//	out.SetString(resolved.(string))
+			out.SetString(fmt.Sprint(resolved)) // unixman
 			return true
 		}
 		out.SetString(n.Value)

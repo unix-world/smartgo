@@ -1,0 +1,7 @@
+github.com/trailofbits/go-slh-dsa @head.20260915
+
+go 1.26
+
+includes improvements by unixman r.20260915
+	* added SHA3 methods, similar with existing SHA2 methods
+

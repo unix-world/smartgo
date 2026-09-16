@@ -1,0 +1,13 @@
+<!-- Unveil :: r.20260903 (go) -->
+<script defer src="lib/js/jquery/jquery.unveil.js?[###RELEASE-HASH|url|html###]"></script>
+<script>
+jQuery(() => {
+	jQuery(window).on('refreshunveil', () => { jQuery('.unveil').off('unveil').unveil(); });
+	setTimeout(() => { jQuery(window).trigger('refreshunveil'); }, 250); // call for init or dom changes that include unveil elements (can include also unhide unveil elements)
+[%%%COMMENT%%%]
+	//jQuery(window).trigger('lookup'); // call after unhide unveil elements
+	// unveil is a compatibility alternative to newer syntax <img loading="lazy" src="...">
+[%%%/COMMENT%%%]
+});
+</script>
+<!-- # -->

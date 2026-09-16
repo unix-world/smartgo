@@ -1,10 +1,10 @@
 
 // GO Lang :: SmartGo :: Smart.Go.Framework
 // (c) 2020-present unix-world.org
-// r.20260823.2358 :: STABLE
+// r.20260915.2358 :: STABLE
 // [ STRINGS ]
 
-// REQUIRE: go 1.19 or later
+// REQUIRE: go 1.24 or later
 package smartgo
 
 import (
@@ -316,6 +316,10 @@ func StrTrimRight(s string, cutset string) string {
 
 func StrTrimWhitespaces(s string) string {
 	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
 	return StrTrim(s, TRIM_WHITESPACES) // this is compatible with PHP
 	//--
 } //END FUNCTION
@@ -323,12 +327,20 @@ func StrTrimWhitespaces(s string) string {
 
 func StrTrimLeftWhitespaces(s string) string {
 	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//--
 	return StrTrimLeft(s, TRIM_WHITESPACES) // this is compatible with PHP
 	//--
 } //END FUNCTION
 
 
 func StrTrimRightWhitespaces(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
 	//--
 	return StrTrimRight(s, TRIM_WHITESPACES) // this is compatible with PHP
 	//--
@@ -388,24 +400,50 @@ func StrSubstr(s string, start int, stop int) string {
 //-----
 
 
+func StrNormalizeLineEndings(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//-- do not use StrTr here because the order of replacements is random there and here the order of replacements real matters
+	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, LINE_FEED)
+	s = StrReplaceAll(s, CARRIAGE_RETURN,             LINE_FEED)
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
+func StrNormalizeOnlySpaces(s string) string {
+	//--
+	if(s == "") {
+		return ""
+	} //end if
+	//-- do not use StrTr here because the order of replacements is random there and here the order of replacements real matters
+	s = StrReplaceAll(s, HORIZONTAL_TAB,              " ")
+	s = StrReplaceAll(s, VERTICAL_TAB,                " ")
+	s = StrReplaceAll(s, NULL_BYTE,                   " ")
+	s = StrReplaceAll(s, FORM_FEED,                   " ")
+	//--
+	s = StrReplaceAll(s, BACK_SPACE,                  " ")
+	s = StrReplaceAll(s, ASCII_BELL,                  " ")
+	//--
+	return s
+	//--
+} //END FUNCTION
+
+
 func StrNormalizeSpaces(s string) string {
 	//--
 	if(s == "") {
 		return ""
 	} //end if
-	//--
+	//-- do not use StrTr here because the order of replacements is random there and here the order of replacements real matters
 	s = StrReplaceAll(s, CARRIAGE_RETURN + LINE_FEED, " ")
-	s = StrReplaceAll(s, CARRIAGE_RETURN, " ")
-	s = StrReplaceAll(s, LINE_FEED, " ")
-	s = StrReplaceAll(s, HORIZONTAL_TAB, " ")
-	s = StrReplaceAll(s, VERTICAL_TAB, " ")
-	s = StrReplaceAll(s, NULL_BYTE, " ")
-	s = StrReplaceAll(s, FORM_FEED,   " ")
+	s = StrReplaceAll(s, CARRIAGE_RETURN,             " ")
+	s = StrReplaceAll(s, LINE_FEED,                   " ")
 	//--
-	s = StrReplaceAll(s, BACK_SPACE,   " ")
-	s = StrReplaceAll(s, ASCII_BELL,   " ")
-	//--
-	return s
+	return StrNormalizeOnlySpaces(s)
 	//--
 } //END FUNCTION
 
@@ -615,6 +653,7 @@ func StrRepeat(str string, count int) string {
 	if(str == "") {
 		return ""
 	} //end if
+	//--
 	if(count <= 0) {
 		return ""
 	} //end if
@@ -750,6 +789,11 @@ func StrRegexCallbackReplaceWithLimit(rexpr string, str string, replFx func(mgro
 	// this method is a modified blend, inspired from the following source code:
 	// https://github.com/agext/regexp # License: Apache 2.0
 	//--
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return ""
+	} //end if
+	//--
 	if(str == "") {
 		return ""
 	} //end if
@@ -790,6 +834,15 @@ func StrRegexCallbackReplaceAll(rexpr string, str string, replFx func(mgroups []
 	//--
 	defer PanicHandler() // regex compile
 	//--
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return ""
+	} //end if
+	//--
+	if(str == "") {
+		return ""
+	} //end if
+	//--
 	return StrRegexCallbackReplaceWithLimit(rexpr, str, replFx, -1)
 	//--
 } //END FUNCTION
@@ -798,6 +851,11 @@ func StrRegexCallbackReplaceAll(rexpr string, str string, replFx func(mgroups []
 func StrRegexReplaceAll(rexpr string, s string, repl string) string {
 	//--
 	defer PanicHandler() // regex compile
+	//--
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return ""
+	} //end if
 	//--
 	if(s == "") {
 		return ""
@@ -817,6 +875,11 @@ func StrRegexReplaceAll(rexpr string, s string, repl string) string {
 func StrRegexReplaceFirst(rexpr string, s string, repl string) string {
 	//--
 	defer PanicHandler() // regex compile
+	//--
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return ""
+	} //end if
 	//--
 	if(s == "") {
 		return ""
@@ -841,6 +904,11 @@ func StrRegexMatch(rexpr string, s string) bool {
 	//--
 	defer PanicHandler() // regex compile
 	//--
+	if(rexpr == "") {
+		log.Println("[WARNING]", CurrentFunctionName(), "Empty Regexp Expression")
+		return false
+	} //end if
+	//--
 	if(s == "") {
 		return false
 	} //end if
@@ -861,6 +929,10 @@ func StrRegexFindFirstMatch(rexp string, s string) ([]string, error) {
 	defer PanicHandler() // regex compile
 	//--
 	var match []string = []string{}
+	//--
+	if(rexp == "") {
+		return match, NewError("Regex Expression is Empty")
+	} //end if
 	//--
 	if(s == "") {
 		return match, nil
@@ -885,6 +957,10 @@ func StrRegex2FindFirstMatch(mode string, rexp string, s string, maxTimeOut uint
 	//--
 	var match []string = []string{}
 	//--
+	if(rexp == "") {
+		return match, NewError("Regex Expression is Empty")
+	} //end if
+	//--
 	if(s == "") {
 		return match, nil
 	} //end if
@@ -907,6 +983,10 @@ func StrRegexFindAllMatches(rexp string, s string, maxRecursion uint32) ([][]str
 	defer PanicHandler() // regex compile
 	//--
 	var matches [][]string = [][]string{}
+	//--
+	if(rexp == "") {
+		return matches, NewError("Regex Expression is Empty")
+	} //end if
 	//--
 	if(s == "") {
 		return matches, nil
@@ -943,6 +1023,10 @@ func StrRegex2FindAllMatches(mode string, rexp string, s string, maxRecursion ui
 	defer PanicHandler() // regex compile
 	//--
 	var matches [][]string = [][]string{}
+	//--
+	if(rexp == "") {
+		return matches, NewError("Regex Expression is Empty")
+	} //end if
 	//--
 	mode = StrToUpper(StrTrimWhitespaces(mode))
 	var flags regexp2.RegexOptions

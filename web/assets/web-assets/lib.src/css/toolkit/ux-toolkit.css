@@ -45,9 +45,9 @@ License: BSD
 }
 
 .ux-align-center {
-  max-width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
+	max-width: fit-content;
+	margin-left: auto;
+	margin-right: auto;
 }
 
 .ux-align-content-center {
@@ -58,7 +58,7 @@ License: BSD
 }
 
 .ux-full-width {
-    width: 100% !important;
+	width: 100% !important;
 }
 
 /* Apply Border to Elements */
@@ -637,8 +637,8 @@ there's a rowspan on the first cell. Case added to the tests. issue#432 */
 
 /*
 striping:
-   even - #FFFFFF (white)
-   odd  - #F2F2F2 (light gray)
+	even - #FFFFFF (white)
+	odd  - #F2F2F2 (light gray)
 */
 .ux-table td {
 	background: transparent;
